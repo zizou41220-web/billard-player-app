@@ -149,6 +149,15 @@ export const initSync = async () => {
         supabase.from('tournoi2_matches').upsert(mapMatchToDB(updatedMatches[table.currentMatchId])).then();
       }
     }
+
+    // Clean up any duplicate matches claiming the same table
+    Object.values(updatedMatches).forEach(m => {
+      if (m.tableId === table.id && m.id !== table.currentMatchId && m.status !== 'playing') {
+        updatedMatches[m.id] = { ...m, tableId: undefined };
+        matchesNeedUpdate = true;
+        supabase.from('tournoi2_matches').upsert(mapMatchToDB(updatedMatches[m.id])).then();
+      }
+    });
   });
 
   if (matchesNeedUpdate) {

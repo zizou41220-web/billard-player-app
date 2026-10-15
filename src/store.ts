@@ -20,13 +20,13 @@ interface AppState {
   updateScore: (playerId: string, delta: number) => void;
   updateMatchScore: (matchId: string, score1: number, score2: number) => void;
   updateFinishedMatchScore: (matchId: string, score1: number, score2: number) => void;
-  assignMatchToTable: (matchId: string, tableId: string) => void;
+  assignMatchToTable: (matchId: string, tableId: string) => { success: boolean; reason?: string };
   finishMatch: (matchId?: string) => void;
   freeTable: (tableId: string) => void;
   updateTablePosition: (tableId: string, x: number, y: number) => void;
   addTable: (name: string) => void;
   removeTable: (tableId: string) => void;
-  postponeMatch: (matchId: string) => void;
+  postponeMatch: (matchId: string, replacementMatchId?: string) => void;
   launchFinalStage: (tournamentId: string) => void;
   endTournament: (tournamentId: string) => void;
   deleteTournament: (tournamentId: string) => void;
@@ -92,6 +92,62 @@ export const dispatchTournamentMatches = (
   const newTables = { ...tables };
   const newMatches = { ...matches };
 
+  // =========================================================================
+  // 1. AUTO-HEALING & SANITIZATION OF STALE / DUPLICATE TABLE ASSIGNMENTS
+  // =========================================================================
+  // Rule A: Each table can have at most ONE match assigned to it
+  Object.keys(newTables).forEach(tId => {
+    const table = newTables[tId];
+    const assignedMatches = Object.values(newMatches).filter(m => m.tableId === tId && m.status !== 'finished');
+
+    if (assignedMatches.length > 1) {
+      // Prioritize: playing > currentMatchId > first
+      const keeper = assignedMatches.find(m => m.status === 'playing')
+        || assignedMatches.find(m => m.id === table.currentMatchId)
+        || assignedMatches[0];
+
+      assignedMatches.forEach(m => {
+        if (m.id !== keeper.id) {
+          newMatches[m.id] = { ...m, tableId: undefined };
+        }
+      });
+      newTables[tId] = { ...table, status: keeper.status === 'playing' ? 'occupied' : 'occupied', currentMatchId: keeper.id };
+    } else if (assignedMatches.length === 1) {
+      const single = assignedMatches[0];
+      if (table.currentMatchId !== single.id || table.status === 'free') {
+        newTables[tId] = { ...table, status: 'occupied', currentMatchId: single.id };
+      }
+    } else if (table.currentMatchId && (!newMatches[table.currentMatchId] || newMatches[table.currentMatchId].status === 'finished')) {
+      newTables[tId] = { ...table, status: 'free', currentMatchId: undefined };
+    }
+  });
+
+  // Rule B: A player can be in at most ONE active table match across all tables
+  const playerSeen = new Set<string>();
+  // Process playing matches first
+  Object.values(newMatches).filter(m => m.status === 'playing' && Boolean(m.tableId)).forEach(m => {
+    if (m.player1Id) playerSeen.add(m.player1Id);
+    if (m.player2Id) playerSeen.add(m.player2Id);
+  });
+  // Process pending table matches
+  Object.values(newMatches).filter(m => m.status === 'pending' && Boolean(m.tableId)).forEach(m => {
+    const p1Conflict = m.player1Id && playerSeen.has(m.player1Id);
+    const p2Conflict = m.player2Id && playerSeen.has(m.player2Id);
+    if (p1Conflict || p2Conflict) {
+      // Duplicate player on multiple tables: unassign this pending match
+      newMatches[m.id] = { ...m, tableId: undefined };
+      if (m.tableId && newTables[m.tableId]?.currentMatchId === m.id) {
+        newTables[m.tableId] = { ...newTables[m.tableId], status: 'free', currentMatchId: undefined };
+      }
+    } else {
+      if (m.player1Id) playerSeen.add(m.player1Id);
+      if (m.player2Id) playerSeen.add(m.player2Id);
+    }
+  });
+
+  // =========================================================================
+  // 2. DISPATCH READY MATCHES TO FREE TABLES
+  // =========================================================================
   const targetTournaments = tournamentId
     ? [tournaments[tournamentId]].filter(Boolean)
     : Object.values(tournaments).filter(t => t && t.status === 'ongoing');
@@ -99,22 +155,27 @@ export const dispatchTournamentMatches = (
   for (const tournament of targetTournaments) {
     if (!tournament.settings?.tableIds || tournament.settings.tableIds.length === 0) continue;
 
-    // Available tables assigned to this tournament that are currently free or unassigned
     const tournamentTableIds = tournament.settings.tableIds;
+    // Available tables that are truly free (no match assigned to tableId and no active currentMatchId)
     const availableTables = tournamentTableIds
       .map(tId => newTables[tId])
-      .filter(t => Boolean(t) && (t.status === 'free' || !t.currentMatchId))
+      .filter(t => {
+        if (!t) return false;
+        if (t.status === 'occupied' && t.currentMatchId && newMatches[t.currentMatchId]?.status !== 'finished') return false;
+        const hasAssignedMatch = Object.values(newMatches).some(m => m.tableId === t.id && m.status !== 'finished');
+        return !hasAssignedMatch;
+      })
       .sort((a, b) => a.number - b.number);
 
     if (availableTables.length === 0) continue;
 
     const isPlayerBusy = (playerId: string) => {
       if (!playerId) return false;
-      return Object.values(newMatches).some(m =>
-        m.tournamentId === tournament.id &&
-        (m.status === 'playing' || (m.status === 'pending' && Boolean(m.tableId))) &&
-        (m.player1Id === playerId || m.player2Id === playerId)
-      );
+      return Object.values(newMatches).some(m => {
+        if (m.status === 'finished') return false;
+        const hasTable = Boolean(m.tableId) || Object.values(newTables).some(t => t.currentMatchId === m.id && t.status !== 'free');
+        return hasTable && (m.player1Id === playerId || m.player2Id === playerId);
+      });
     };
 
     const playCount: Record<string, number> = {};
@@ -165,6 +226,14 @@ export const dispatchTournamentMatches = (
 
       if (eligibleMatchIds.length > 0) {
         const nextMatchId = eligibleMatchIds[0];
+
+        // Ensure no other match points to this table
+        Object.values(newMatches).forEach(m => {
+          if (m.tableId === table.id && m.id !== nextMatchId) {
+            newMatches[m.id] = { ...m, tableId: undefined };
+          }
+        });
+
         newMatches[nextMatchId] = {
           ...newMatches[nextMatchId],
           tableId: table.id
@@ -352,21 +421,24 @@ export const useStore = create<AppState>((set, get) => ({
     }));
   },
 
-  postponeMatch: (matchId) => {
+  postponeMatch: (matchId, replacementMatchId) => {
     set((state) => {
       const match = state.matches[matchId];
-      if (!match || match.status !== 'pending' || !match.tableId) return state;
+      if (!match || match.status === 'finished') return state;
 
-      const newMatches = { ...state.matches, [matchId]: { ...match, tableId: undefined } };
+      // Find the effective table id this match was assigned to
+      const tableId = match.tableId || Object.values(state.tables).find(t => t.currentMatchId === matchId)?.id;
+      if (!tableId) return state;
+
+      const newMatches = { ...state.matches };
       const newTables = { ...state.tables };
-      const freedTableId = match.tableId;
-      newTables[freedTableId] = { ...newTables[freedTableId], status: 'free' as const, currentMatchId: undefined };
+
+      // 1. Unassign the postponed match and send it to the end of tournament queue
+      newMatches[matchId] = { ...match, tableId: undefined, status: 'pending' };
 
       let newTournaments = state.tournaments;
-
       if (match.tournamentId && state.tournaments[match.tournamentId]) {
         const tournament = state.tournaments[match.tournamentId];
-        // Push the postponed match to the end of the queue
         newTournaments = {
           ...state.tournaments,
           [match.tournamentId]: {
@@ -376,6 +448,60 @@ export const useStore = create<AppState>((set, get) => ({
         };
       }
 
+      // 2. Clear ANY match that was pointing to this tableId
+      Object.values(newMatches).forEach(m => {
+        if (m.tableId === tableId && m.id !== replacementMatchId && m.status !== 'finished') {
+          newMatches[m.id] = { ...m, tableId: undefined, status: 'pending' };
+        }
+      });
+
+      // 3. CASE A: A specific replacement match was chosen
+      if (replacementMatchId && newMatches[replacementMatchId]) {
+        const repMatch = newMatches[replacementMatchId];
+
+        // Check if either player of replacement match is busy on ANOTHER table
+        const isPlayerBusyOnOtherTable = (pId: string) => {
+          if (!pId) return false;
+          return Object.values(newMatches).some(m => {
+            if (m.id === replacementMatchId || m.id === matchId || m.status === 'finished') return false;
+            const assignedTable = m.tableId || Object.values(newTables).find(t => t.currentMatchId === m.id)?.id;
+            return Boolean(assignedTable) && assignedTable !== tableId && (m.player1Id === pId || m.player2Id === pId);
+          });
+        };
+
+        if (isPlayerBusyOnOtherTable(repMatch.player1Id) || isPlayerBusyOnOtherTable(repMatch.player2Id)) {
+          // Cannot replace with this match because player is on another table. Fall back to auto-rotation
+          newTables[tableId] = { ...newTables[tableId], status: 'free', currentMatchId: undefined };
+          const { tables: dTables, matches: dMatches } = dispatchTournamentMatches(newTables, newMatches, newTournaments, match.tournamentId);
+          return { tables: dTables, matches: dMatches, tournaments: newTournaments };
+        }
+
+        // If replacement match had another table, free it
+        if (repMatch.tableId && repMatch.tableId !== tableId) {
+          const oldT = newTables[repMatch.tableId];
+          if (oldT && oldT.currentMatchId === replacementMatchId) {
+            newTables[repMatch.tableId] = { ...oldT, status: 'free', currentMatchId: undefined };
+          }
+        }
+
+        // Assign replacement match to tableId
+        newMatches[replacementMatchId] = {
+          ...repMatch,
+          tableId: tableId,
+          status: 'pending'
+        };
+
+        newTables[tableId] = {
+          ...newTables[tableId],
+          status: 'occupied',
+          currentMatchId: replacementMatchId
+        };
+
+        return { matches: newMatches, tables: newTables, tournaments: newTournaments };
+      }
+
+      // 4. CASE B: Automatic rotation (no replacement selected)
+      newTables[tableId] = { ...newTables[tableId], status: 'free', currentMatchId: undefined };
       const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
         newTables,
         newMatches,
@@ -443,29 +569,63 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   assignMatchToTable: (matchId, tableId) => {
+    let result: { success: boolean; reason?: string } = { success: true };
+
     set((state) => {
       const match = state.matches[matchId];
       const table = state.tables[tableId];
-      if (!match || !table) return state;
+      if (!match || !table) {
+        result = { success: false, reason: 'Match ou table introuvable' };
+        return state;
+      }
 
       const newMatches = { ...state.matches };
       const newTables = { ...state.tables };
 
-      // If the target table already had a pending match, unassign it and put it back to queue
-      if (table.currentMatchId && newMatches[table.currentMatchId]) {
-        const prevMatch = newMatches[table.currentMatchId];
-        if (prevMatch.id !== matchId && prevMatch.status !== 'finished') {
-          newMatches[prevMatch.id] = {
-            ...prevMatch,
+      // Check if player1 or player2 is already busy on another table
+      const isPlayerBusyOnOtherTable = (playerId: string) => {
+        if (!playerId) return null;
+        for (const m of Object.values(newMatches)) {
+          if (m.id === matchId || m.status === 'finished') continue;
+          const assignedTableId = m.tableId || Object.values(newTables).find(t => t.currentMatchId === m.id)?.id;
+          if (assignedTableId && assignedTableId !== tableId) {
+            if (m.player1Id === playerId || m.player2Id === playerId) {
+              const busyTable = newTables[assignedTableId];
+              const tName = busyTable?.name || `Table ${busyTable?.number || assignedTableId}`;
+              const pName = state.players[playerId]?.name || 'Ce joueur';
+              return `${pName} est déjà assigné sur ${tName}`;
+            }
+          }
+        }
+        return null;
+      };
+
+      const p1Conflict = isPlayerBusyOnOtherTable(match.player1Id);
+      if (p1Conflict) {
+        result = { success: false, reason: p1Conflict };
+        return state;
+      }
+
+      const p2Conflict = isPlayerBusyOnOtherTable(match.player2Id);
+      if (p2Conflict) {
+        result = { success: false, reason: p2Conflict };
+        return state;
+      }
+
+      // Clean up ANY match currently assigned to this target table
+      Object.values(newMatches).forEach(m => {
+        if (m.tableId === tableId && m.id !== matchId && m.status !== 'finished') {
+          newMatches[m.id] = {
+            ...m,
             tableId: undefined,
             status: 'pending'
           };
         }
-      }
+      });
 
       // If this match was already assigned to another table, clear that table
       Object.keys(newTables).forEach(tId => {
-        if (newTables[tId].currentMatchId === matchId && tId !== tableId) {
+        if ((newTables[tId].currentMatchId === matchId || match.tableId === tId) && tId !== tableId) {
           newTables[tId] = {
             ...newTables[tId],
             status: 'free' as const,
@@ -492,6 +652,8 @@ export const useStore = create<AppState>((set, get) => ({
         tables: newTables
       };
     });
+
+    return result;
   },
 
   finishMatch: (targetMatchId?: string) => {

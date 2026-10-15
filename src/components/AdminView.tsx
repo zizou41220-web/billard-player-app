@@ -1262,8 +1262,59 @@ const AdminView: React.FC = () => {
             return match.tableId || tableByCurrentMatchId[match.id];
           };
 
-          const matchesToPlay = pendingTourMatches.filter(m => m.status === 'pending' && Boolean(getEffectiveTableId(m)));
-          const matchesWaiting = pendingTourMatches.filter(m => !getEffectiveTableId(m));
+          // Safe, strictly deduplicated matchesToPlay: 1 match max per table, no player on 2 tables at once
+          const { matchesToPlay, matchesWaiting } = (() => {
+            const tableAssigned = new Map<string, any>();
+            const busyPlayerSet = new Set<string>();
+
+            // 1. Live playing matches get top priority
+            pendingTourMatches.filter(m => m.status === 'playing').forEach(m => {
+              const tId = getEffectiveTableId(m);
+              if (tId && !tableAssigned.has(tId)) {
+                tableAssigned.set(tId, m);
+                if (m.player1Id) busyPlayerSet.add(m.player1Id);
+                if (m.player2Id) busyPlayerSet.add(m.player2Id);
+              }
+            });
+
+            // 2. Pending matches with a table assigned
+            pendingTourMatches.filter(m => m.status === 'pending' && Boolean(getEffectiveTableId(m))).forEach(m => {
+              const tId = getEffectiveTableId(m)!;
+              if (!tableAssigned.has(tId)) {
+                const p1Conflict = m.player1Id && busyPlayerSet.has(m.player1Id);
+                const p2Conflict = m.player2Id && busyPlayerSet.has(m.player2Id);
+                if (!p1Conflict && !p2Conflict) {
+                  tableAssigned.set(tId, m);
+                  if (m.player1Id) busyPlayerSet.add(m.player1Id);
+                  if (m.player2Id) busyPlayerSet.add(m.player2Id);
+                }
+              }
+            });
+
+            const toPlay = Array.from(tableAssigned.values());
+            const toPlayIds = new Set(toPlay.map(m => m.id));
+            const waiting = pendingTourMatches.filter(m => !toPlayIds.has(m.id));
+
+            return { matchesToPlay: toPlay, matchesWaiting: waiting };
+          })();
+
+          // Helper to check if any player in a match is already busy on an assigned table
+          const getBusyPlayerInfo = (m: any) => {
+            for (const activeM of matchesToPlay) {
+              if (activeM.id === m.id) continue;
+              const tId = getEffectiveTableId(activeM);
+              const tObj = tId ? tables[tId] : null;
+              const tName = tObj?.name || (tId ? `T.${tObj?.number || tId}` : 'un billard');
+
+              if (m.player1Id && (activeM.player1Id === m.player1Id || activeM.player2Id === m.player1Id)) {
+                return { busy: true, playerName: players[m.player1Id]?.name || 'Joueur 1', tableName: tName };
+              }
+              if (m.player2Id && (activeM.player1Id === m.player2Id || activeM.player2Id === m.player2Id)) {
+                return { busy: true, playerName: players[m.player2Id]?.name || 'Joueur 2', tableName: tName };
+              }
+            }
+            return { busy: false, playerName: '', tableName: '' };
+          };
 
           if (dashboardSubTab === 'bracket') {
             return (
@@ -1312,58 +1363,86 @@ const AdminView: React.FC = () => {
                         Aucun match en attente.
                       </div>
                     ) : (
-                      matchesWaiting.map((match, idx) => (
-                        <div
-                          key={match.id}
-                          style={{
-                            background: 'rgba(255,255,255,0.03)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: '8px',
-                            padding: '0.6rem 0.8rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.3rem'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
-                            {match.stage && (
-                              <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                {match.stage}
-                              </span>
+                      matchesWaiting.map((match, idx) => {
+                        const busyInfo = getBusyPlayerInfo(match);
+
+                        return (
+                          <div
+                            key={match.id}
+                            style={{
+                              background: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '8px',
+                              padding: '0.6rem 0.8rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.3rem'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                              {match.stage && (
+                                <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  {match.stage}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                              <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player1Id]?.name || 'Attente...'}</span>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '0 4px' }}>VS</span>
+                              <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player2Id]?.name || 'Attente...'}</span>
+                            </div>
+
+                            {/* Warning badge if player is busy on another table */}
+                            {busyInfo.busy && (
+                              <div style={{ fontSize: '0.65rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255, 183, 3, 0.3)', marginTop: '0.1rem' }}>
+                                ⚠️ {busyInfo.playerName} déjà sur {busyInfo.tableName}
+                              </div>
+                            )}
+
+                            {/* Quick assign buttons if tournament tables exist */}
+                            {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Placer :</span>
+                                <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                  {activeTournament.settings.tableIds.map(tId => {
+                                    const tObj = tables[tId];
+                                    const label = tObj ? `T.${tObj.number}` : tId;
+                                    return (
+                                      <button
+                                        key={tId}
+                                        className="btn btn-outline"
+                                        disabled={busyInfo.busy}
+                                        style={{
+                                          fontSize: '0.65rem',
+                                          padding: '2px 6px',
+                                          height: '20px',
+                                          lineHeight: 1,
+                                          opacity: busyInfo.busy ? 0.35 : 1,
+                                          cursor: busyInfo.busy ? 'not-allowed' : 'pointer'
+                                        }}
+                                        title={busyInfo.busy ? `Impossible : ${busyInfo.playerName} est déjà sur ${busyInfo.tableName}` : `Assigner directement à ${tObj?.name || label}`}
+                                        onClick={() => {
+                                          if (busyInfo.busy) {
+                                            alert(`Impossible : ${busyInfo.playerName} est déjà sur ${busyInfo.tableName}`);
+                                            return;
+                                          }
+                                          const res = assignMatchToTable(match.id, tId);
+                                          if (!res.success && res.reason) {
+                                            alert(res.reason);
+                                          }
+                                        }}
+                                      >
+                                        ▶ {label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             )}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                            <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player1Id]?.name || 'Attente...'}</span>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '0 4px' }}>VS</span>
-                            <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player2Id]?.name || 'Attente...'}</span>
-                          </div>
-
-                          {/* Quick assign buttons if tournament tables exist */}
-                          {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
-                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Placer :</span>
-                              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                                {activeTournament.settings.tableIds.map(tId => {
-                                  const tObj = tables[tId];
-                                  const label = tObj ? `T.${tObj.number}` : tId;
-                                  return (
-                                    <button
-                                      key={tId}
-                                      className="btn btn-outline"
-                                      style={{ fontSize: '0.65rem', padding: '2px 6px', height: '20px', lineHeight: 1 }}
-                                      title={`Assigner directement à ${tObj?.name || label}`}
-                                      onClick={() => assignMatchToTable(match.id, tId)}
-                                    >
-                                      ▶ {label}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -2318,47 +2397,83 @@ const AdminView: React.FC = () => {
                       Aucun autre match en attente dans la file.
                     </div>
                   ) : (
-                    waitingList.map((m, idx) => (
-                      <div
-                        key={m.id}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.04)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          borderRadius: '8px',
-                          padding: '0.7rem 0.9rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '0.8rem'
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
-                            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fff' }}>
-                              {players[m.player1Id]?.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>VS</span> {players[m.player2Id]?.name}
-                            </span>
-                          </div>
-                          {m.stage && (
-                            <div style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', marginTop: '0.1rem', textTransform: 'uppercase' }}>
-                              {m.stage}
-                            </div>
-                          )}
-                        </div>
+                    waitingList.map((m, idx) => {
+                      // Check if either player is already busy on another table (excluding the one being replaced)
+                      let busyConflict: { busy: boolean; playerName: string; tableName: string } = { busy: false, playerName: '', tableName: '' };
+                      for (const otherMatch of Object.values(matches)) {
+                        if (otherMatch.id === m.id || otherMatch.id === postponingMatchModal.matchId || otherMatch.status === 'finished') continue;
+                        const effTId = otherMatch.tableId || Object.values(tables).find(t => t.currentMatchId === otherMatch.id)?.id;
+                        if (effTId && effTId !== postponingMatchModal.tableId) {
+                          if (m.player1Id && (otherMatch.player1Id === m.player1Id || otherMatch.player2Id === m.player1Id)) {
+                            const busyT = tables[effTId];
+                            busyConflict = { busy: true, playerName: players[m.player1Id]?.name || 'Joueur 1', tableName: busyT?.name || `Table ${busyT?.number || effTId}` };
+                            break;
+                          }
+                          if (m.player2Id && (otherMatch.player1Id === m.player2Id || otherMatch.player2Id === m.player2Id)) {
+                            const busyT = tables[effTId];
+                            busyConflict = { busy: true, playerName: players[m.player2Id]?.name || 'Joueur 2', tableName: busyT?.name || `Table ${busyT?.number || effTId}` };
+                            break;
+                          }
+                        }
+                      }
 
-                        <button
-                          className="btn btn-neon"
-                          style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', whiteSpace: 'nowrap', flexShrink: 0 }}
-                          onClick={() => {
-                            postponeMatch(postponingMatchModal.matchId);
-                            assignMatchToTable(m.id, postponingMatchModal.tableId);
-                            setPostponingMatchModal(null);
+                      return (
+                        <div
+                          key={m.id}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px',
+                            padding: '0.7rem 0.9rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.8rem'
                           }}
                         >
-                          Placer ici ▶
-                        </button>
-                      </div>
-                    ))
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                              <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fff' }}>
+                                {players[m.player1Id]?.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>VS</span> {players[m.player2Id]?.name}
+                              </span>
+                            </div>
+                            {m.stage && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', marginTop: '0.1rem', textTransform: 'uppercase' }}>
+                                {m.stage}
+                              </div>
+                            )}
+                            {busyConflict.busy && (
+                              <div style={{ fontSize: '0.7rem', color: '#ffb703', marginTop: '0.15rem' }}>
+                                ⚠️ {busyConflict.playerName} déjà sur {busyConflict.tableName}
+                              </div>
+                            )}
+                          </div>
+
+                          {busyConflict.busy ? (
+                            <button
+                              className="btn btn-outline"
+                              disabled
+                              style={{ fontSize: '0.75rem', padding: '0.4rem 0.7rem', whiteSpace: 'nowrap', opacity: 0.35, cursor: 'not-allowed' }}
+                              title={`Impossible : ${busyConflict.playerName} est déjà sur ${busyConflict.tableName}`}
+                            >
+                              Occupé
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-neon"
+                              style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                              onClick={() => {
+                                postponeMatch(postponingMatchModal.matchId, m.id);
+                                setPostponingMatchModal(null);
+                              }}
+                            >
+                              Placer ici ▶
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
