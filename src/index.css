@@ -1,0 +1,179 @@
+:root {
+  --bg-color: #F8FAFC;
+  --bg-surface: #0F766E; /* Duck green */
+  --bg-surface-active: #0D9488;
+  --accent-primary: #F59E0B; /* Amber/Gold */
+  --accent-secondary: #10B981;
+  --text-primary: #0F172A; /* Dark for main body */
+  --text-muted: #64748B;
+  --border-color: rgba(15, 118, 110, 0.2);
+  --shadow-neon: 0 4px 12px rgba(245, 158, 11, 0.3);
+  
+  --card-bg: #0F766E;
+  --card-text: #FFFFFF;
+  --card-text-muted: #99F6E4; /* Light teal for muted inside cards */
+  --card-border: #115E59;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none; /* Mobile app feel */
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: 'Outfit', sans-serif;
+  overflow: hidden; /* Prevent body scroll, handle inside views */
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  justify-content: center;
+  background-image: none;
+}
+
+.mobile-container {
+  width: 100%;
+  max-width: 480px; /* Limit width for desktop viewing to mimic mobile */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  box-shadow: 0 0 50px rgba(0,0,0,0.1);
+  background: var(--bg-color);
+}
+
+.view-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  padding-bottom: calc(1.5rem + 80px); /* Space for bottom nav */
+}
+
+.view-content::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for sleek look */
+}
+
+/* Glass Card */
+.glass-card {
+  background: var(--card-bg);
+  color: var(--card-text);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 1.25rem;
+  box-shadow: 0 10px 25px rgba(15, 118, 110, 0.2);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  width: 100%;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-neon {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: #000;
+  box-shadow: var(--shadow-neon);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.btn-surface {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+/* Typography */
+h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; }
+h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; }
+h3 { font-size: 1.2rem; font-weight: 600; color: var(--text-muted); }
+
+/* Inputs */
+.input-field {
+  width: 100%;
+  padding: 1rem;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1rem;
+  font-family: inherit;
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Bottom Nav */
+.bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: rgba(10, 14, 23, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom, 10px); /* For iOS safe area */
+  z-index: 100;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: color 0.3s;
+}
+
+.nav-item.active {
+  color: var(--accent-primary);
+}
+.nav-item span {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Utilities */
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

@@ -1,0 +1,139 @@
+import { Tournament, Match } from '../types';
+
+export type PlayerQualifStat = {
+  id: string;
+  name?: string;
+  played: number;
+  totalMatches: number;
+  remainingMatches: number;
+  won: number;
+  lost: number;
+  sf: number;
+  sa: number;
+  pts: number;
+  maxPossiblePts: number;
+  isSure: boolean;
+};
+
+export function getTournamentQualificationStatus(
+  tournament: Tournament | null,
+  matches: Record<string, Match>
+) {
+  if (!tournament) {
+    return {
+      isFinalLaunched: false,
+      isQualifAllDone: false,
+      hasSureQualifiers: false,
+      sureQualifiers: [] as string[],
+      ranking: [] as PlayerQualifStat[],
+      numQualifiers: 4,
+      totalQualifMatches: 0,
+      finishedQualifMatches: 0
+    };
+  }
+
+  const allTourMatches = tournament.matches.map(id => matches[id]).filter(Boolean);
+  const qualifMatches = allTourMatches.filter(m => !m.stage || m.stage === 'qualif');
+  const finalMatches = allTourMatches.filter(m => m.stage && m.stage !== 'qualif');
+
+  const isFinalLaunched = Boolean(tournament.finalStageLaunched && finalMatches.length > 0);
+  const totalQualifMatches = qualifMatches.length;
+  const finishedQualifMatches = qualifMatches.filter(m => m.status === 'finished').length;
+  const isQualifAllDone = totalQualifMatches > 0 && finishedQualifMatches === totalQualifMatches;
+
+  const reqQualifiers = tournament.settings?.qualifNbQualifiers || 4;
+  const participantsCount = tournament.participants.length;
+
+  let numQualifiers = 4;
+  if (reqQualifiers >= 8 && participantsCount >= 8) numQualifiers = 8;
+  else if (reqQualifiers <= 2 || participantsCount < 4) numQualifiers = 2;
+  else numQualifiers = Math.min(reqQualifiers, participantsCount);
+
+  // Stats calculation
+  const pStats: Record<string, PlayerQualifStat> = {};
+  tournament.participants.forEach(pId => {
+    pStats[pId] = {
+      id: pId,
+      played: 0,
+      totalMatches: 0,
+      remainingMatches: 0,
+      won: 0,
+      lost: 0,
+      sf: 0,
+      sa: 0,
+      pts: 0,
+      maxPossiblePts: 0,
+      isSure: false
+    };
+  });
+
+  // Calculate total scheduled matches per player in qualifs
+  qualifMatches.forEach(m => {
+    if (pStats[m.player1Id]) pStats[m.player1Id].totalMatches++;
+    if (pStats[m.player2Id]) pStats[m.player2Id].totalMatches++;
+
+    if (m.status === 'finished') {
+      const p1 = pStats[m.player1Id];
+      const p2 = pStats[m.player2Id];
+      if (p1 && p2) {
+        p1.played++; p2.played++;
+        p1.sf += m.score1; p1.sa += m.score2;
+        p2.sf += m.score2; p2.sa += m.score1;
+        if (m.score1 > m.score2) {
+          p1.won++; p1.pts += 3; p2.lost++;
+        } else if (m.score2 > m.score1) {
+          p2.won++; p2.pts += 3; p1.lost++;
+        } else {
+          p1.pts += 1; p2.pts += 1;
+        }
+      }
+    }
+  });
+
+  tournament.participants.forEach(pId => {
+    const p = pStats[pId];
+    p.remainingMatches = Math.max(0, p.totalMatches - p.played);
+    p.maxPossiblePts = p.pts + p.remainingMatches * 3;
+  });
+
+  const ranking = Object.values(pStats).sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    return (b.sf - b.sa) - (a.sf - a.sa);
+  });
+
+  // Determine "qualifiés sûrs"
+  if (isFinalLaunched || isQualifAllDone) {
+    ranking.slice(0, numQualifiers).forEach(p => {
+      p.isSure = true;
+    });
+  } else {
+    // A player is sure if they have played at least 1 match, have points > 0,
+    // and strictly fewer than `numQualifiers` other players can possibly reach or exceed their current points
+    ranking.forEach(p => {
+      if (p.played > 0 && p.pts > 0) {
+        const competitorsWhoCanTieOrBeat = ranking.filter(other => {
+          if (other.id === p.id) return false;
+          return other.maxPossiblePts >= p.pts;
+        }).length;
+
+        if (competitorsWhoCanTieOrBeat < numQualifiers) {
+          p.isSure = true;
+        }
+      }
+    });
+  }
+
+  const sureQualifiers = ranking.filter(p => p.isSure).map(p => p.id);
+  const hasSureQualifiers = isFinalLaunched || isQualifAllDone || sureQualifiers.length > 0;
+
+  return {
+    isFinalLaunched,
+    isQualifAllDone,
+    hasSureQualifiers,
+    sureQualifiers,
+    ranking,
+    numQualifiers,
+    totalQualifMatches,
+    finishedQualifMatches
+  };
+}
