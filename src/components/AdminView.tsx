@@ -4,7 +4,8 @@ import QRCode from 'react-qr-code';
 import {
   Trophy, Users, MonitorPlay, Settings, Rocket,
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
-  Swords, CheckCircle2, Building2, Copy, Check
+  Swords, CheckCircle2, Building2, Copy, Check,
+  XCircle, Minus, Plus
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
@@ -15,7 +16,7 @@ const AdminView: React.FC = () => {
     tournaments, matches, players, tables, currentClub, setClub,
     createTournament, addPlayer, updatePlayer, deletePlayer,
     updateTablePosition, addTable, removeTable, postponeMatch,
-    endTournament
+    endTournament, finishMatch, freeTable, updateMatchScore
   } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -1699,8 +1700,8 @@ const AdminView: React.FC = () => {
                 </div>
               ) : match ? (
                 match.status === 'playing' ? (
-                  /* 2. Match already in progress: NO QR code to prevent duplicate scan */
-                  <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', width: '100%' }}>
+                  /* 2. Match already in progress: Allow score adjustment, validation & freeing table */
+                  <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem', width: '100%' }}>
                     <div style={{
                       display: 'inline-flex', alignItems: 'center', gap: '6px',
                       background: 'rgba(0, 255, 170, 0.15)', color: 'var(--accent-primary)',
@@ -1711,21 +1712,95 @@ const AdminView: React.FC = () => {
                       MATCH EN DIRECT
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', justifyContent: 'center', width: '100%' }}>
-                      <div style={{ flex: 1, textAlign: 'right', fontSize: '1.2rem', fontWeight: 700 }}>
-                        {players[match.player1Id]?.name}
+                    {/* Players & Scores with interactive adjustments */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+                      width: '100%', background: 'rgba(255, 255, 255, 0.03)',
+                      padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)'
+                    }}>
+                      {/* Player 1 */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                          {players[match.player1Id]?.name}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            className="btn-surface"
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0 }}
+                            onClick={() => updateMatchScore(match.id, match.score1 - 1, match.score2)}
+                          >
+                            <Minus size={16} />
+                          </button>
+                          <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
+                            {match.score1}
+                          </span>
+                          <button
+                            className="btn-surface"
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0 }}
+                            onClick={() => updateMatchScore(match.id, match.score1 + 1, match.score2)}
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '2.4rem', fontWeight: 900, color: 'var(--accent-primary)', padding: '0 0.5rem' }}>
-                        {match.score1} - {match.score2}
-                      </div>
-                      <div style={{ flex: 1, textAlign: 'left', fontSize: '1.2rem', fontWeight: 700 }}>
-                        {players[match.player2Id]?.name}
+
+                      <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-muted)' }}>VS</div>
+
+                      {/* Player 2 */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>
+                          {players[match.player2Id]?.name}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            className="btn-surface"
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0 }}
+                            onClick={() => updateMatchScore(match.id, match.score1, match.score2 - 1)}
+                          >
+                            <Minus size={16} />
+                          </button>
+                          <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
+                            {match.score2}
+                          </span>
+                          <button
+                            className="btn-surface"
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0 }}
+                            onClick={() => updateMatchScore(match.id, match.score1, match.score2 + 1)}
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
-                      Ce match a déjà été scanné et se joue actuellement.
-                    </p>
+                    {/* Admin Actions */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%' }}>
+                      <button
+                        className="btn btn-neon"
+                        style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontWeight: 800, fontSize: '1rem', color: '#000' }}
+                        onClick={() => {
+                          if (window.confirm(`Valider le score (${match.score1} - ${match.score2}) et terminer ce match ?`)) {
+                            finishMatch(match.id);
+                            setSelectedTableForQR(null);
+                          }
+                        }}
+                      >
+                        <CheckCircle2 size={20} /> Valider le score & Terminer le match
+                      </button>
+
+                      <button
+                        className="btn btn-outline"
+                        style={{ width: '100%', justifyContent: 'center', color: '#ff4466', borderColor: 'rgba(255, 68, 102, 0.4)', fontSize: '0.85rem' }}
+                        onClick={() => {
+                          if (window.confirm("Forcer la libération de ce billard ? Le match sera remis en attente.")) {
+                            freeTable(table.id);
+                            setSelectedTableForQR(null);
+                          }
+                        }}
+                      >
+                        <XCircle size={16} /> Forcer la libération de ce billard
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   /* 3. Match pending: Show QR code to scan */
@@ -1745,16 +1820,40 @@ const AdminView: React.FC = () => {
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
                       Scannez ce QR Code avec votre smartphone pour démarrer ce match
                     </p>
+
+                    <button
+                      className="btn btn-outline"
+                      style={{ width: '100%', justifyContent: 'center', color: 'var(--text-muted)', borderColor: 'var(--border-color)', fontSize: '0.85rem', marginTop: '0.5rem' }}
+                      onClick={() => {
+                        freeTable(table.id);
+                        setSelectedTableForQR(null);
+                      }}
+                    >
+                      <XCircle size={16} /> Libérer ce billard (remettre le match en attente)
+                    </button>
                   </>
                 )
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: 'var(--text-muted)', width: '100%' }}>
                   <div style={{ fontSize: '1.2rem', color: '#fff' }}>Aucun match assigné</div>
-                  <p style={{ margin: 0 }}>
+                  <p style={{ margin: 0, textAlign: 'center' }}>
                     {activeTournament?.settings?.tableIds.includes(table.id)
                       ? 'En attente du prochain match du tournoi.'
                       : "Ce billard n'est pas utilisé par le tournoi en cours."}
                   </p>
+
+                  {table.status === 'occupied' && (
+                    <button
+                      className="btn btn-outline"
+                      style={{ color: '#ff4466', borderColor: 'rgba(255, 68, 102, 0.4)', marginTop: '0.5rem' }}
+                      onClick={() => {
+                        freeTable(table.id);
+                        setSelectedTableForQR(null);
+                      }}
+                    >
+                      <XCircle size={16} /> Forcer la libération (ce billard est marqué occupé)
+                    </button>
+                  )}
                 </div>
               )}
 

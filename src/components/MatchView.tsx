@@ -18,8 +18,9 @@ const MatchView: React.FC = () => {
 
   const tournament = match.tournamentId ? useStore.getState().tournaments[match.tournamentId] : null;
   const settings = tournament?.settings;
-  const maxScore = settings ? settings.qualifNbSets : 99;
-  const isWinningSets = settings ? settings.qualifIsWinningSets : true;
+  const isFinal = match.stage === 'quarter' || match.stage === 'semi' || match.stage === 'final' || match.stage === 'third_place';
+  const maxScore = settings ? (isFinal ? settings.finalNbSets : settings.qualifNbSets) : 99;
+  const isWinningSets = settings ? (isFinal ? settings.finalIsWinningSets : settings.qualifIsWinningSets) : true;
 
   let canFinish = true;
   if (settings) {

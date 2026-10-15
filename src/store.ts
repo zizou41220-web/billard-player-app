@@ -18,7 +18,9 @@ interface AppState {
   createTournament: (name: string, format: TournamentFormat, settings: TournamentSettings, participants: string[]) => void;
   startTournamentMatch: (matchId: string) => void;
   updateScore: (playerId: string, delta: number) => void;
-  finishMatch: () => void;
+  updateMatchScore: (matchId: string, score1: number, score2: number) => void;
+  finishMatch: (matchId?: string) => void;
+  freeTable: (tableId: string) => void;
   updateTablePosition: (tableId: string, x: number, y: number) => void;
   addTable: (name: string) => void;
   removeTable: (tableId: string) => void;
@@ -329,17 +331,31 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  finishMatch: () => {
-    const { activeMatchId, matches } = get();
-    if (!activeMatchId) return;
-    const match = matches[activeMatchId];
+  updateMatchScore: (matchId, score1, score2) => {
+    set((state) => {
+      const match = state.matches[matchId];
+      if (!match) return state;
+      return {
+        matches: {
+          ...state.matches,
+          [matchId]: { ...match, score1: Math.max(0, score1), score2: Math.max(0, score2) }
+        }
+      };
+    });
+  },
+
+  finishMatch: (targetMatchId?: string) => {
+    const activeId = targetMatchId || get().activeMatchId;
+    if (!activeId) return;
+    const match = get().matches[activeId];
+    if (!match) return;
     
     const winnerId = match.score1 > match.score2 ? match.player1Id : (match.score2 > match.score1 ? match.player2Id : undefined);
 
     set((state) => {
       const newMatches = {
         ...state.matches,
-        [activeMatchId]: { ...match, status: 'finished', endTime: Date.now(), winnerId }
+        [activeId]: { ...match, status: 'finished', endTime: Date.now(), winnerId }
       } as Record<string, Match>;
 
       // Advance winner to next bracket match if defined
@@ -361,15 +377,20 @@ export const useStore = create<AppState>((set, get) => ({
       }
 
       const newTables = { ...state.tables };
-      const freedTableId = match.tableId;
+      let freedTableId = match.tableId;
 
-      if (freedTableId) {
-        newTables[freedTableId] = { ...newTables[freedTableId], status: 'free', currentMatchId: undefined };
+      // Free ANY table associated with this match or pointing to this matchId
+      Object.keys(newTables).forEach(tId => {
+        if (newTables[tId].currentMatchId === activeId || (freedTableId && tId === freedTableId)) {
+          freedTableId = tId;
+          newTables[tId] = { ...newTables[tId], status: 'free', currentMatchId: undefined };
+        }
+      });
 
-        // Auto-assign the next eligible pending match
-        if (match.tournamentId) {
-          const tournament = state.tournaments[match.tournamentId];
-          
+      // Auto-assign the next eligible pending match
+      if (freedTableId && match.tournamentId) {
+        const tournament = state.tournaments[match.tournamentId];
+        if (tournament) {
           const isPlayerBusy = (playerId: string) => {
             return Object.values(newMatches).some(m => 
               m.tournamentId === match.tournamentId &&
@@ -412,7 +433,40 @@ export const useStore = create<AppState>((set, get) => ({
       return {
         matches: newMatches,
         tables: newTables,
-        activeMatchId: null
+        activeMatchId: state.activeMatchId === activeId ? null : state.activeMatchId
+      };
+    });
+  },
+
+  freeTable: (tableId: string) => {
+    set((state) => {
+      const table = state.tables[tableId];
+      if (!table) return state;
+
+      const newTables = {
+        ...state.tables,
+        [tableId]: { ...table, status: 'free' as const, currentMatchId: undefined }
+      };
+
+      const newMatches = { ...state.matches };
+      // If table was pointing to a match, disconnect match from table
+      Object.values(newMatches).forEach(m => {
+        if (m.tableId === tableId && m.status !== 'finished') {
+          newMatches[m.id] = { ...m, tableId: undefined, status: 'pending' };
+        }
+      });
+      if (table.currentMatchId && newMatches[table.currentMatchId] && newMatches[table.currentMatchId].status !== 'finished') {
+        newMatches[table.currentMatchId] = {
+          ...newMatches[table.currentMatchId],
+          tableId: undefined,
+          status: 'pending'
+        };
+      }
+
+      return {
+        tables: newTables,
+        matches: newMatches,
+        activeMatchId: (state.activeMatchId === table.currentMatchId) ? null : state.activeMatchId
       };
     });
   },
