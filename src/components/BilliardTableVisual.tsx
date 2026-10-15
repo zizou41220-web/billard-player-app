@@ -370,7 +370,7 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
           >
             {tableName}
           </span>
-          {isOccupied && (
+          {match?.status === 'playing' && (
             <span
               style={{
                 fontSize: '0.58rem',
@@ -385,10 +385,26 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
               LIVE
             </span>
           )}
+          {match?.status === 'pending' && (
+            <span
+              style={{
+                fontSize: '0.58rem',
+                fontWeight: 800,
+                color: '#00e5ff',
+                background: 'rgba(0, 229, 255, 0.15)',
+                padding: '0 4px',
+                borderRadius: '3px',
+                border: '1px solid rgba(0, 229, 255, 0.3)',
+                letterSpacing: '0.4px'
+              }}
+            >
+              PRÊT
+            </span>
+          )}
         </div>
 
         {/* Ultra-compact 1-line Match Players & Score */}
-        {isOccupied && match && (
+        {match && (
           <div
             style={{
               display: 'flex',
@@ -415,7 +431,7 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
               {player1?.name || 'J1'}
             </span>
             <span style={{ color: 'var(--accent-primary)', fontWeight: 900 }}>
-              {match.score1}-{match.score2}
+              {match.status === 'playing' ? `${match.score1}-${match.score2}` : 'VS'}
             </span>
             <span
               style={{

@@ -216,9 +216,14 @@ const AdminView: React.FC = () => {
             </div>
           ) : (
             tournamentTables.map(table => {
-              const currentMatch = table.currentMatchId ? matches[table.currentMatchId] : undefined;
+              // Ensure match strictly belongs to active tournament
+              const currentMatch = (table.currentMatchId && matches[table.currentMatchId]?.tournamentId === activeTournament?.id)
+                ? matches[table.currentMatchId]
+                : Object.values(matches).find(m => m.tournamentId === activeTournament?.id && m.tableId === table.id && m.status !== 'finished');
+
               const p1 = currentMatch ? players[currentMatch.player1Id] : undefined;
               const p2 = currentMatch ? players[currentMatch.player2Id] : undefined;
+              const isPlaying = currentMatch?.status === 'playing';
 
               return (
                 <div
@@ -228,7 +233,7 @@ const AdminView: React.FC = () => {
                     transition: 'transform 0.2s ease',
                     transform: 'scale(1.32)',
                     margin: '0.8rem 1.5rem',
-                    zIndex: table.status === 'occupied' ? 10 : 1
+                    zIndex: isPlaying ? 10 : 1
                   }}
                   onClick={() => setSelectedTableForQR(table.id)}
                   title={`Cliquer pour voir le match de ${table.name || `Table ${table.number}`}`}
@@ -236,7 +241,7 @@ const AdminView: React.FC = () => {
                   <BilliardTableVisual
                     number={table.number}
                     name={table.name}
-                    status={table.status}
+                    status={isPlaying ? 'occupied' : 'free'}
                     match={currentMatch}
                     player1={p1}
                     player2={p2}

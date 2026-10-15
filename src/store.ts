@@ -69,19 +69,14 @@ const MOCK_PLAYERS: Record<string, Player> = {
 };
 
 const MOCK_TABLES: Record<string, Table> = {
-  't1': { id: 't1', clubId: 'bc41', number: 1, name: 'Billard 1', status: 'occupied', currentMatchId: 'm2', x: 20, y: 20 },
-  't2': { id: 't2', clubId: 'bc41', number: 2, name: 'Billard 2', status: 'occupied', currentMatchId: 'm1', x: 50, y: 20 },
+  't1': { id: 't1', clubId: 'bc41', number: 1, name: 'Billard 1', status: 'free', x: 20, y: 20 },
+  't2': { id: 't2', clubId: 'bc41', number: 2, name: 'Billard 2', status: 'free', x: 50, y: 20 },
   't3': { id: 't3', clubId: 'bc41', number: 3, name: 'Billard 3', status: 'free', x: 80, y: 20 },
 };
 
-const MOCK_MATCHES: Record<string, Match> = {
-  'm1': { id: 'm1', clubId: 'bc41', tableId: 't2', player1Id: 'p3', player2Id: 'p4', score1: 2, score2: 1, status: 'playing', startTime: Date.now() - 1000 * 60 * 15, tournamentId: 'tour1' },
-  'm2': { id: 'm2', clubId: 'bc41', tableId: 't1', player1Id: 'p1', player2Id: 'p2', score1: 0, score2: 0, status: 'playing', startTime: Date.now() - 1000 * 60 * 5, tournamentId: 'tour1' }
-};
+const MOCK_MATCHES: Record<string, Match> = {};
 
-const MOCK_TOURNAMENTS: Record<string, Tournament> = {
-  'tour1': { id: 'tour1', clubId: 'bc41', name: 'Tournoi d\'Hiver 2026', format: 'cartesien', status: 'ongoing', participants: ['p1', 'p2', 'p3', 'p4'], matches: ['m1', 'm2'] }
-};
+const MOCK_TOURNAMENTS: Record<string, Tournament> = {};
 
 export const dispatchTournamentMatches = (
   tables: Record<string, Table>,
@@ -156,13 +151,34 @@ export const dispatchTournamentMatches = (
     if (!tournament.settings?.tableIds || tournament.settings.tableIds.length === 0) continue;
 
     const tournamentTableIds = tournament.settings.tableIds;
+
+    // Detach any foreign or obsolete matches not belonging to this tournament from tournament tables
+    tournamentTableIds.forEach(tId => {
+      const t = newTables[tId];
+      if (!t) return;
+      if (t.currentMatchId) {
+        const curM = newMatches[t.currentMatchId];
+        if (!curM || curM.tournamentId !== tournament.id) {
+          if (curM) {
+            newMatches[curM.id] = { ...curM, tableId: undefined, status: curM.status === 'playing' ? 'finished' : curM.status };
+          }
+          newTables[tId] = { ...t, status: 'free', currentMatchId: undefined };
+        }
+      }
+      Object.values(newMatches).forEach(m => {
+        if (m.tableId === tId && m.tournamentId !== tournament.id) {
+          newMatches[m.id] = { ...m, tableId: undefined, status: m.status === 'playing' ? 'finished' : m.status };
+        }
+      });
+    });
+
     // Available tables that are truly free (no match assigned to tableId and no active currentMatchId)
     const availableTables = tournamentTableIds
       .map(tId => newTables[tId])
       .filter(t => {
         if (!t) return false;
         if (t.status === 'occupied' && t.currentMatchId && newMatches[t.currentMatchId]?.status !== 'finished') return false;
-        const hasAssignedMatch = Object.values(newMatches).some(m => m.tableId === t.id && m.status !== 'finished');
+        const hasAssignedMatch = Object.values(newMatches).some(m => m.tournamentId === tournament.id && m.tableId === t.id && m.status !== 'finished');
         return !hasAssignedMatch;
       })
       .sort((a, b) => a.number - b.number);
@@ -351,21 +367,46 @@ export const useStore = create<AppState>((set, get) => ({
     matchIds.sort(() => 0.5 - Math.random());
 
     set((state) => {
-      const allTournaments = {
-        ...state.tournaments,
-        [tourId]: { id: tourId, clubId: state.currentClub.id, name, format, status: 'ongoing' as const, participants, settings, matches: matchIds }
-      };
-      const allMatches = {
-        ...state.matches,
-        ...newMatches
+      // 1. Mark any previous ongoing tournaments as finished
+      const allTournaments = { ...state.tournaments };
+      Object.keys(allTournaments).forEach(tId => {
+        if (allTournaments[tId].status === 'ongoing') {
+          allTournaments[tId] = { ...allTournaments[tId], status: 'finished' as const };
+        }
+      });
+      allTournaments[tourId] = {
+        id: tourId,
+        clubId: state.currentClub.id,
+        name,
+        format,
+        status: 'ongoing' as const,
+        participants,
+        settings,
+        matches: matchIds
       };
 
-      // Clear tables selected for tournament
+      // 2. Detach ANY old match from any table and finish any lingering playing match
+      const allMatches = { ...state.matches };
+      Object.keys(allMatches).forEach(mId => {
+        const m = allMatches[mId];
+        if (m.tournamentId !== tourId && m.tableId) {
+          allMatches[mId] = {
+            ...m,
+            tableId: undefined,
+            status: m.status === 'playing' ? 'finished' : m.status
+          };
+        }
+      });
+      // Add the new tournament matches
+      Object.assign(allMatches, newMatches);
+
+      // 3. Clear tables selected for tournament (and club tables)
       const clearedTables = { ...state.tables };
       Object.values(clearedTables).forEach(t => {
         clearedTables[t.id] = { ...t, status: 'free' as const, currentMatchId: undefined };
       });
 
+      // 4. Dispatch new matches onto clean tables
       const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
         clearedTables,
         allMatches,

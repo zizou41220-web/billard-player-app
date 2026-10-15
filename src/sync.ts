@@ -135,10 +135,15 @@ export const initSync = async () => {
   // Auto-heal table <-> match associations if desynced
   const currentTables = useStore.getState().tables;
   const currentMatches = useStore.getState().matches;
+  const currentTournaments = useStore.getState().tournaments;
+  const activeTournament = Object.values(currentTournaments).slice().reverse().find(t => t.status === 'ongoing');
+  let tablesNeedUpdate = false;
   let matchesNeedUpdate = false;
-  const updatedMatches = { ...currentMatches };
+  const updatedTables: Record<string, Table> = { ...currentTables };
+  const updatedMatches: Record<string, Match> = { ...currentMatches };
 
-  Object.values(currentTables).forEach(table => {
+  // Rule 1: Fix table.currentMatchId -> match.tableId consistency
+  Object.values(updatedTables).forEach(table => {
     if (table.status === 'occupied' && table.currentMatchId && updatedMatches[table.currentMatchId]) {
       if (updatedMatches[table.currentMatchId].tableId !== table.id) {
         updatedMatches[table.currentMatchId] = {
@@ -149,16 +154,41 @@ export const initSync = async () => {
         supabase.from('tournoi2_matches').upsert(mapMatchToDB(updatedMatches[table.currentMatchId])).then();
       }
     }
+  });
 
-    // Clean up any duplicate matches claiming the same table
+  // Rule 2: If an ongoing tournament exists, clean any foreign matches off tournament tables
+  if (activeTournament && activeTournament.settings?.tableIds) {
+    const tourTableIds = activeTournament.settings.tableIds;
+    tourTableIds.forEach(tId => {
+      const table = updatedTables[tId];
+      if (!table) return;
+      if (table.currentMatchId) {
+        const curM = updatedMatches[table.currentMatchId];
+        if (!curM || curM.tournamentId !== activeTournament.id) {
+          if (curM) {
+            updatedMatches[curM.id] = { ...curM, tableId: undefined, status: curM.status === 'playing' ? 'finished' : curM.status };
+            matchesNeedUpdate = true;
+            supabase.from('tournoi2_matches').upsert(mapMatchToDB(updatedMatches[curM.id])).then();
+          }
+          updatedTables[tId] = { ...table, status: 'free', currentMatchId: undefined };
+          tablesNeedUpdate = true;
+          supabase.from('tournoi2_tables').upsert(mapTableToDB(updatedTables[tId])).then();
+        }
+      }
+    });
+
     Object.values(updatedMatches).forEach(m => {
-      if (m.tableId === table.id && m.id !== table.currentMatchId && m.status !== 'playing') {
-        updatedMatches[m.id] = { ...m, tableId: undefined };
+      if (m.tournamentId !== activeTournament.id && m.tableId && tourTableIds.includes(m.tableId)) {
+        updatedMatches[m.id] = { ...m, tableId: undefined, status: m.status === 'playing' ? 'finished' : m.status };
         matchesNeedUpdate = true;
         supabase.from('tournoi2_matches').upsert(mapMatchToDB(updatedMatches[m.id])).then();
       }
     });
-  });
+  }
+
+  if (tablesNeedUpdate) {
+    useStore.setState({ tables: updatedTables });
+  }
 
   if (matchesNeedUpdate) {
     useStore.setState({ matches: updatedMatches });
