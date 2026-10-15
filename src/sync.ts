@@ -155,6 +155,9 @@ export const initSync = async () => {
     useStore.setState({ matches: updatedMatches });
   }
 
+  // Auto-dispatch any ready tournament matches to available free tables
+  useStore.getState().autoDispatchMatches();
+
   isReceiving = false;
 
   // Setup Realtime Subscriptions
@@ -198,8 +201,14 @@ export const initSync = async () => {
           return { [storeKey]: { ...state[storeKey], [mappedData.id]: mappedData } };
         });
         
-        // Small delay to prevent echo loops
-        setTimeout(() => { isReceiving = false; }, 100);
+        // Small delay to prevent echo loops and dispatch next matches if a match finished or table was freed
+        setTimeout(() => {
+          isReceiving = false;
+          const data: any = payload.new;
+          if ((storeKey === 'matches' && data?.status === 'finished') || (storeKey === 'tables' && data?.status === 'free')) {
+            useStore.getState().autoDispatchMatches();
+          }
+        }, 120);
       }).subscribe();
   });
 };

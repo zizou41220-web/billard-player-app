@@ -28,6 +28,7 @@ interface AppState {
   launchFinalStage: (tournamentId: string) => void;
   endTournament: (tournamentId: string) => void;
   deleteTournament: (tournamentId: string) => void;
+  autoDispatchMatches: () => void;
 }
 
 const getInitialClub = (): Club => {
@@ -78,6 +79,104 @@ const MOCK_MATCHES: Record<string, Match> = {
 
 const MOCK_TOURNAMENTS: Record<string, Tournament> = {
   'tour1': { id: 'tour1', clubId: 'bc41', name: 'Tournoi d\'Hiver 2026', format: 'cartesien', status: 'ongoing', participants: ['p1', 'p2', 'p3', 'p4'], matches: ['m1', 'm2'] }
+};
+
+export const dispatchTournamentMatches = (
+  tables: Record<string, Table>,
+  matches: Record<string, Match>,
+  tournaments: Record<string, Tournament>,
+  tournamentId?: string
+): { tables: Record<string, Table>; matches: Record<string, Match> } => {
+  const newTables = { ...tables };
+  const newMatches = { ...matches };
+
+  const targetTournaments = tournamentId
+    ? [tournaments[tournamentId]].filter(Boolean)
+    : Object.values(tournaments).filter(t => t && t.status === 'ongoing');
+
+  for (const tournament of targetTournaments) {
+    if (!tournament.settings?.tableIds || tournament.settings.tableIds.length === 0) continue;
+
+    // Available tables assigned to this tournament that are currently free or unassigned
+    const tournamentTableIds = tournament.settings.tableIds;
+    const availableTables = tournamentTableIds
+      .map(tId => newTables[tId])
+      .filter(t => Boolean(t) && (t.status === 'free' || !t.currentMatchId))
+      .sort((a, b) => a.number - b.number);
+
+    if (availableTables.length === 0) continue;
+
+    const isPlayerBusy = (playerId: string) => {
+      if (!playerId) return false;
+      return Object.values(newMatches).some(m =>
+        m.tournamentId === tournament.id &&
+        (m.status === 'playing' || (m.status === 'pending' && Boolean(m.tableId))) &&
+        (m.player1Id === playerId || m.player2Id === playerId)
+      );
+    };
+
+    const playCount: Record<string, number> = {};
+    tournament.matches.forEach(mId => {
+      const m = newMatches[mId];
+      if (m && m.status !== 'pending') {
+        playCount[m.player1Id] = (playCount[m.player1Id] || 0) + 1;
+        playCount[m.player2Id] = (playCount[m.player2Id] || 0) + 1;
+      }
+    });
+
+    for (const table of availableTables) {
+      // Find all ready pending matches whose players are not busy
+      const eligibleMatchIds = tournament.matches.filter(id => {
+        const m = newMatches[id];
+        return (
+          m &&
+          m.status === 'pending' &&
+          !m.tableId &&
+          Boolean(m.player1Id) &&
+          Boolean(m.player2Id) &&
+          !isPlayerBusy(m.player1Id) &&
+          !isPlayerBusy(m.player2Id)
+        );
+      }).sort((a, b) => {
+        const ma = newMatches[a];
+        const mb = newMatches[b];
+
+        // 1. Stage priority: qualif < quarter < semi < third_place < final
+        const stagePriority: Record<string, number> = { qualif: 1, quarter: 2, semi: 3, third_place: 4, final: 5 };
+        const sA = stagePriority[ma.stage || 'qualif'] || 1;
+        const sB = stagePriority[mb.stage || 'qualif'] || 1;
+        if (sA !== sB) return sA - sB;
+
+        // 2. Bracket round if defined
+        if (ma.bracketRound !== undefined && mb.bracketRound !== undefined && ma.bracketRound !== mb.bracketRound) {
+          return ma.bracketRound - mb.bracketRound;
+        }
+
+        // 3. Player fairness (fewest matches played)
+        const pa = (playCount[ma.player1Id] || 0) + (playCount[ma.player2Id] || 0);
+        const pb = (playCount[mb.player1Id] || 0) + (playCount[mb.player2Id] || 0);
+        if (pa !== pb) return pa - pb;
+
+        // 4. Preserve original match order in tournament
+        return tournament.matches.indexOf(a) - tournament.matches.indexOf(b);
+      });
+
+      if (eligibleMatchIds.length > 0) {
+        const nextMatchId = eligibleMatchIds[0];
+        newMatches[nextMatchId] = {
+          ...newMatches[nextMatchId],
+          tableId: table.id
+        };
+        newTables[table.id] = {
+          ...table,
+          status: 'occupied',
+          currentMatchId: nextMatchId
+        };
+      }
+    }
+  }
+
+  return { tables: newTables, matches: newMatches };
 };
 
 export const useStore = create<AppState>((set, get) => ({
@@ -181,48 +280,32 @@ export const useStore = create<AppState>((set, get) => ({
     matchIds.sort(() => 0.5 - Math.random());
 
     set((state) => {
-      const newTables = { ...state.tables };
-
-      // First, clear all tables
-      Object.values(newTables).forEach(t => {
-        newTables[t.id] = { ...t, status: 'free', currentMatchId: undefined };
-      });
-
-      const isPlayerBusy = (playerId: string) => {
-        return Object.values(newMatches).some(m => 
-          m.tournamentId === tourId &&
-          (m.status === 'playing' || (m.status === 'pending' && m.tableId)) &&
-          (m.player1Id === playerId || m.player2Id === playerId)
-        );
+      const allTournaments = {
+        ...state.tournaments,
+        [tourId]: { id: tourId, clubId: state.currentClub.id, name, format, status: 'ongoing' as const, participants, settings, matches: matchIds }
+      };
+      const allMatches = {
+        ...state.matches,
+        ...newMatches
       };
 
-      // Assign specified tables to the first N eligible matches
-      const availableTables = settings.tableIds
-        .map(tId => newTables[tId])
-        .filter(t => t); 
+      // Clear tables selected for tournament
+      const clearedTables = { ...state.tables };
+      Object.values(clearedTables).forEach(t => {
+        clearedTables[t.id] = { ...t, status: 'free' as const, currentMatchId: undefined };
+      });
 
-      for (const table of availableTables) {
-        const eligibleMatchId = matchIds.find(mId => {
-          const m = newMatches[mId];
-          return m.status === 'pending' && !m.tableId && !isPlayerBusy(m.player1Id) && !isPlayerBusy(m.player2Id);
-        });
-
-        if (eligibleMatchId) {
-          newMatches[eligibleMatchId] = { ...newMatches[eligibleMatchId], tableId: table.id };
-          newTables[table.id] = { ...table, status: 'occupied', currentMatchId: eligibleMatchId };
-        }
-      }
+      const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
+        clearedTables,
+        allMatches,
+        allTournaments,
+        tourId
+      );
 
       return {
-        tables: newTables,
-        tournaments: {
-          ...state.tournaments,
-          [tourId]: { id: tourId, clubId: state.currentClub.id, name, format, status: 'ongoing', participants, settings, matches: matchIds }
-        },
-        matches: {
-          ...state.matches,
-          ...newMatches
-        }
+        tables: dispatchedTables,
+        matches: dispatchedMatches,
+        tournaments: allTournaments
       };
     });
   },
@@ -275,13 +358,12 @@ export const useStore = create<AppState>((set, get) => ({
       const newMatches = { ...state.matches, [matchId]: { ...match, tableId: undefined } };
       const newTables = { ...state.tables };
       const freedTableId = match.tableId;
-      newTables[freedTableId] = { ...newTables[freedTableId], status: 'free', currentMatchId: undefined };
+      newTables[freedTableId] = { ...newTables[freedTableId], status: 'free' as const, currentMatchId: undefined };
 
       let newTournaments = state.tournaments;
 
-      if (match.tournamentId) {
+      if (match.tournamentId && state.tournaments[match.tournamentId]) {
         const tournament = state.tournaments[match.tournamentId];
-        
         // Push the postponed match to the end of the queue
         newTournaments = {
           ...state.tournaments,
@@ -290,44 +372,16 @@ export const useStore = create<AppState>((set, get) => ({
             matches: [...tournament.matches.filter(id => id !== matchId), matchId]
           }
         };
-        const newTournament = newTournaments[match.tournamentId];
-
-        const isPlayerBusy = (playerId: string) => {
-          return Object.values(newMatches).some(m => 
-            m.tournamentId === match.tournamentId &&
-            (m.status === 'playing' || (m.status === 'pending' && m.tableId)) &&
-            (m.player1Id === playerId || m.player2Id === playerId)
-          );
-        };
-
-        const playCount: Record<string, number> = {};
-        newTournament.matches.forEach(mId => {
-          const m = newMatches[mId];
-          if (m && m.status !== 'pending') {
-            playCount[m.player1Id] = (playCount[m.player1Id] || 0) + 1;
-            playCount[m.player2Id] = (playCount[m.player2Id] || 0) + 1;
-          }
-        });
-
-        const eligibleMatchIds = newTournament.matches.filter(id => {
-          const m = newMatches[id];
-          return id !== matchId && m && m.status === 'pending' && !m.tableId && !isPlayerBusy(m.player1Id) && !isPlayerBusy(m.player2Id);
-        }).sort((a, b) => {
-          const ma = newMatches[a];
-          const mb = newMatches[b];
-          const pa = (playCount[ma.player1Id] || 0) + (playCount[ma.player2Id] || 0);
-          const pb = (playCount[mb.player1Id] || 0) + (playCount[mb.player2Id] || 0);
-          return pa - pb;
-        });
-
-        if (eligibleMatchIds.length > 0) {
-          const nextPendingMatchId = eligibleMatchIds[0];
-          newMatches[nextPendingMatchId] = { ...newMatches[nextPendingMatchId], tableId: freedTableId };
-          newTables[freedTableId] = { ...newTables[freedTableId], status: 'occupied', currentMatchId: nextPendingMatchId };
-        }
       }
 
-      return { matches: newMatches, tables: newTables, tournaments: newTournaments };
+      const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
+        newTables,
+        newMatches,
+        newTournaments,
+        match.tournamentId
+      );
+
+      return { matches: dispatchedMatches, tables: dispatchedTables, tournaments: newTournaments };
     });
   },
 
@@ -387,52 +441,17 @@ export const useStore = create<AppState>((set, get) => ({
         }
       });
 
-      // Auto-assign the next eligible pending match
-      if (freedTableId && match.tournamentId) {
-        const tournament = state.tournaments[match.tournamentId];
-        if (tournament) {
-          const isPlayerBusy = (playerId: string) => {
-            return Object.values(newMatches).some(m => 
-              m.tournamentId === match.tournamentId &&
-              (m.status === 'playing' || (m.status === 'pending' && m.tableId)) &&
-              (m.player1Id === playerId || m.player2Id === playerId)
-            );
-          };
-
-          const playCount: Record<string, number> = {};
-          tournament.matches.forEach(mId => {
-            const m = newMatches[mId];
-            if (m && m.status !== 'pending') {
-              playCount[m.player1Id] = (playCount[m.player1Id] || 0) + 1;
-              playCount[m.player2Id] = (playCount[m.player2Id] || 0) + 1;
-            }
-          });
-
-          const eligibleMatchIds = tournament.matches.filter(id => {
-            const m = newMatches[id];
-            return m && m.status === 'pending' && !m.tableId && Boolean(m.player1Id) && Boolean(m.player2Id) && !isPlayerBusy(m.player1Id) && !isPlayerBusy(m.player2Id);
-          }).sort((a, b) => {
-            const ma = newMatches[a];
-            const mb = newMatches[b];
-            const pa = (playCount[ma.player1Id] || 0) + (playCount[ma.player2Id] || 0);
-            const pb = (playCount[mb.player1Id] || 0) + (playCount[mb.player2Id] || 0);
-            return pa - pb;
-          });
-
-          if (eligibleMatchIds.length > 0) {
-            const nextPendingMatchId = eligibleMatchIds[0];
-            newMatches[nextPendingMatchId] = {
-              ...newMatches[nextPendingMatchId],
-              tableId: freedTableId
-            };
-            newTables[freedTableId] = { ...newTables[freedTableId], status: 'occupied', currentMatchId: nextPendingMatchId };
-          }
-        }
-      }
+      // Auto-assign tournament matches across ALL free tables
+      const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
+        newTables,
+        newMatches,
+        state.tournaments,
+        match.tournamentId
+      );
 
       return {
-        matches: newMatches,
-        tables: newTables,
+        matches: dispatchedMatches,
+        tables: dispatchedTables,
         activeMatchId: state.activeMatchId === activeId ? null : state.activeMatchId
       };
     });
@@ -463,9 +482,16 @@ export const useStore = create<AppState>((set, get) => ({
         };
       }
 
+      // Auto-dispatch pending matches to newly freed and existing free tables
+      const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
+        newTables,
+        newMatches,
+        state.tournaments
+      );
+
       return {
-        tables: newTables,
-        matches: newMatches,
+        tables: dispatchedTables,
+        matches: dispatchedMatches,
         activeMatchId: (state.activeMatchId === table.currentMatchId) ? null : state.activeMatchId
       };
     });
@@ -702,34 +728,27 @@ export const useStore = create<AppState>((set, get) => ({
         newMatchIds.push(finalId);
       }
 
-      // Auto-assign available free tables to ready final matches
-      const newTables = { ...state.tables };
-      const allocatedTables = (tournament.settings?.tableIds || [])
-        .map(tId => newTables[tId])
-        .filter(t => t && t.status === 'free');
-
-      for (const table of allocatedTables) {
-        const eligibleMatchId = newMatchIds.find(mId => {
-          const m = newMatches[mId];
-          return m.status === 'pending' && !m.tableId && Boolean(m.player1Id) && Boolean(m.player2Id);
-        });
-        if (eligibleMatchId) {
-          newMatches[eligibleMatchId] = { ...newMatches[eligibleMatchId], tableId: table.id };
-          newTables[table.id] = { ...table, status: 'occupied', currentMatchId: eligibleMatchId };
+      const updatedTournaments = {
+        ...state.tournaments,
+        [tournamentId]: {
+          ...tournament,
+          matches: [...tournament.matches, ...newMatchIds],
+          finalStageLaunched: true
         }
-      }
+      };
+
+      // Auto-assign available free tables to ready final matches with dispatchTournamentMatches
+      const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
+        state.tables,
+        newMatches,
+        updatedTournaments,
+        tournamentId
+      );
 
       return {
-        matches: newMatches,
-        tables: newTables,
-        tournaments: {
-          ...state.tournaments,
-          [tournamentId]: {
-            ...tournament,
-            matches: [...tournament.matches, ...newMatchIds],
-            finalStageLaunched: true
-          }
-        }
+        matches: dispatchedMatches,
+        tables: dispatchedTables,
+        tournaments: updatedTournaments
       };
     });
   },
@@ -819,6 +838,25 @@ export const useStore = create<AppState>((set, get) => ({
         tables: newTables,
         matches: newMatches
       };
+    });
+  },
+
+  autoDispatchMatches: () => {
+    set((state) => {
+      const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
+        state.tables,
+        state.matches,
+        state.tournaments
+      );
+
+      // Only update if changes occurred
+      if (dispatchedTables !== state.tables || dispatchedMatches !== state.matches) {
+        return {
+          tables: dispatchedTables,
+          matches: dispatchedMatches
+        };
+      }
+      return state;
     });
   }
 }));
