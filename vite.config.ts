@@ -24,6 +24,7 @@ const lanUrl = `https://${detectLanIp()}:${PORT}`
 console.log(`\n  📱 Adresse pour les smartphones : ${lanUrl}\n`)
 
 export default defineConfig({
+  base: './',
   plugins: [react(), basicSsl()],
   server: { host: true, port: PORT, strictPort: true },
   define: { __LAN_URL__: JSON.stringify(lanUrl) },

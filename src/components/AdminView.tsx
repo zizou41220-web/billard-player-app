@@ -41,6 +41,15 @@ const AdminView: React.FC = () => {
   const [clubSavedFeedback, setClubSavedFeedback] = useState(false);
   const [copiedClubUrl, setCopiedClubUrl] = useState(false);
 
+  const getClubShareUrl = () => {
+    if (typeof window === 'undefined') return '';
+    if (window.location.hostname === 'localhost') {
+      return `${__LAN_URL__}?club=${currentClub.id}`;
+    }
+    const cleanBase = window.location.href.split('?')[0].replace(/\/+$/, '');
+    return `${cleanBase}/?club=${currentClub.id}`;
+  };
+
   // Tournament Setup State
   const [newTourName, setNewTourName] = useState('');
   const [newTourFormat, setNewTourFormat] = useState<any>('cartesien');
@@ -1181,7 +1190,7 @@ const AdminView: React.FC = () => {
                 <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                   <h2 style={{ fontSize: '1.2rem', color: 'var(--accent-primary)', marginBottom: '0.5rem', fontWeight: 800 }}>{activeTournament.name}</h2>
                   <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', marginBottom: '1rem', marginTop: '1rem' }}>
-                    <QRCode value={window.location.hostname === 'localhost' ? `${__LAN_URL__}?club=${currentClub.id}` : `${window.location.origin}?club=${currentClub.id}`} size={150} />
+                    <QRCode value={getClubShareUrl()} size={150} />
                   </div>
                   <p style={{ fontSize: '0.85rem', color: 'var(--card-text-muted)' }}>Scannez ce code pour rejoindre l'application</p>
 
@@ -1612,14 +1621,14 @@ const AdminView: React.FC = () => {
                         type="text"
                         readOnly
                         className="input-field"
-                        value={`${window.location.origin}?club=${currentClub.id}`}
+                        value={getClubShareUrl()}
                         style={{ fontSize: '0.85rem', background: 'rgba(0,0,0,0.4)', color: 'var(--accent-primary)', fontWeight: 600 }}
                       />
                       <button
                         className="btn btn-outline"
                         style={{ padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}
                         onClick={() => {
-                          navigator.clipboard.writeText(`${window.location.origin}?club=${currentClub.id}`);
+                          navigator.clipboard.writeText(getClubShareUrl());
                           setCopiedClubUrl(true);
                           setTimeout(() => setCopiedClubUrl(false), 2500);
                         }}
@@ -1632,7 +1641,7 @@ const AdminView: React.FC = () => {
 
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.3)', borderRadius: '12px' }}>
                     <div style={{ background: '#fff', padding: '12px', borderRadius: '12px' }}>
-                      <QRCode value={`${window.location.origin}?club=${currentClub.id}`} size={160} />
+                      <QRCode value={getClubShareUrl()} size={160} />
                     </div>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>
                       Flashez ce QR Code pour ouvrir directement <b>{currentClub.name}</b> sur un smartphone ou une tablette.
