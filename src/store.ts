@@ -548,6 +548,7 @@ export const useStore = create<AppState>((set, get) => ({
           const pair = qPairs[idx];
           newMatches[qId] = {
             id: qId,
+            clubId: state.currentClub.id,
             player1Id: pair.p1,
             player2Id: pair.p2,
             score1: 0,
@@ -572,6 +573,7 @@ export const useStore = create<AppState>((set, get) => ({
 
         newMatches[finalId] = {
           id: finalId,
+          clubId: state.currentClub.id,
           player1Id: '',
           player2Id: '',
           score1: 0,
@@ -594,6 +596,7 @@ export const useStore = create<AppState>((set, get) => ({
 
         newMatches[semi1Id] = {
           id: semi1Id,
+          clubId: state.currentClub.id,
           player1Id: s1Pair.p1,
           player2Id: s1Pair.p2,
           score1: 0,
@@ -609,6 +612,7 @@ export const useStore = create<AppState>((set, get) => ({
 
         newMatches[semi2Id] = {
           id: semi2Id,
+          clubId: state.currentClub.id,
           player1Id: s2Pair.p1,
           player2Id: s2Pair.p2,
           score1: 0,
@@ -629,6 +633,7 @@ export const useStore = create<AppState>((set, get) => ({
         const finalId = `m_final_${timestamp}`;
         newMatches[finalId] = {
           id: finalId,
+          clubId: state.currentClub.id,
           player1Id: qualifiers[0],
           player2Id: qualifiers[1] || qualifiers[0],
           score1: 0,
