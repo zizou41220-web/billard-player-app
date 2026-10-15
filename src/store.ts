@@ -19,6 +19,8 @@ interface AppState {
   startTournamentMatch: (matchId: string) => void;
   updateScore: (playerId: string, delta: number) => void;
   updateMatchScore: (matchId: string, score1: number, score2: number) => void;
+  updateFinishedMatchScore: (matchId: string, score1: number, score2: number) => void;
+  assignMatchToTable: (matchId: string, tableId: string) => void;
   finishMatch: (matchId?: string) => void;
   freeTable: (tableId: string) => void;
   updateTablePosition: (tableId: string, x: number, y: number) => void;
@@ -394,6 +396,100 @@ export const useStore = create<AppState>((set, get) => ({
           ...state.matches,
           [matchId]: { ...match, score1: Math.max(0, score1), score2: Math.max(0, score2) }
         }
+      };
+    });
+  },
+
+  updateFinishedMatchScore: (matchId, score1, score2) => {
+    set((state) => {
+      const match = state.matches[matchId];
+      if (!match) return state;
+
+      const s1 = Math.max(0, score1);
+      const s2 = Math.max(0, score2);
+      const newWinnerId = s1 > s2 ? match.player1Id : (s2 > s1 ? match.player2Id : undefined);
+
+      const newMatches = {
+        ...state.matches,
+        [matchId]: {
+          ...match,
+          score1: s1,
+          score2: s2,
+          winnerId: newWinnerId,
+          status: 'finished' as const
+        }
+      };
+
+      // Advance/update winner in next bracket match if defined
+      if (match.nextMatchId && newMatches[match.nextMatchId]) {
+        const nextM = newMatches[match.nextMatchId];
+        if (match.bracketPosition !== undefined) {
+          if (match.bracketPosition % 2 === 0) {
+            newMatches[match.nextMatchId] = { ...nextM, player1Id: newWinnerId || '' };
+          } else {
+            newMatches[match.nextMatchId] = { ...nextM, player2Id: newWinnerId || '' };
+          }
+        } else {
+          if (nextM.player1Id === match.winnerId || !nextM.player1Id) {
+            newMatches[match.nextMatchId] = { ...nextM, player1Id: newWinnerId || '' };
+          } else if (nextM.player2Id === match.winnerId || !nextM.player2Id) {
+            newMatches[match.nextMatchId] = { ...nextM, player2Id: newWinnerId || '' };
+          }
+        }
+      }
+
+      return { matches: newMatches };
+    });
+  },
+
+  assignMatchToTable: (matchId, tableId) => {
+    set((state) => {
+      const match = state.matches[matchId];
+      const table = state.tables[tableId];
+      if (!match || !table) return state;
+
+      const newMatches = { ...state.matches };
+      const newTables = { ...state.tables };
+
+      // If the target table already had a pending match, unassign it and put it back to queue
+      if (table.currentMatchId && newMatches[table.currentMatchId]) {
+        const prevMatch = newMatches[table.currentMatchId];
+        if (prevMatch.id !== matchId && prevMatch.status !== 'finished') {
+          newMatches[prevMatch.id] = {
+            ...prevMatch,
+            tableId: undefined,
+            status: 'pending'
+          };
+        }
+      }
+
+      // If this match was already assigned to another table, clear that table
+      Object.keys(newTables).forEach(tId => {
+        if (newTables[tId].currentMatchId === matchId && tId !== tableId) {
+          newTables[tId] = {
+            ...newTables[tId],
+            status: 'free' as const,
+            currentMatchId: undefined
+          };
+        }
+      });
+
+      // Assign match to table
+      newMatches[matchId] = {
+        ...match,
+        tableId: tableId,
+        status: 'pending'
+      };
+
+      newTables[tableId] = {
+        ...table,
+        status: 'occupied',
+        currentMatchId: matchId
+      };
+
+      return {
+        matches: newMatches,
+        tables: newTables
       };
     });
   },

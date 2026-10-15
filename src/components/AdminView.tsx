@@ -5,7 +5,7 @@ import {
   Trophy, Users, MonitorPlay, Settings, Rocket,
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
-  XCircle, Minus, Plus
+  XCircle, Minus, Plus, Edit2, ArrowUpDown
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
@@ -16,7 +16,8 @@ const AdminView: React.FC = () => {
     tournaments, matches, players, tables, currentClub, setClub,
     createTournament, addPlayer, updatePlayer, deletePlayer,
     updateTablePosition, addTable, removeTable, postponeMatch,
-    endTournament, finishMatch, freeTable, updateMatchScore
+    endTournament, finishMatch, freeTable, updateMatchScore,
+    assignMatchToTable, updateFinishedMatchScore
   } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -73,6 +74,14 @@ const AdminView: React.FC = () => {
   const [editPlayerName, setEditPlayerName] = useState('');
   const [editPlayerLevel, setEditPlayerLevel] = useState<any>('Amateur');
   const [editPlayerPhoto, setEditPlayerPhoto] = useState<string | null>(null);
+
+  // Finished Match Score Correction State (Admin Mode)
+  const [editingFinishedMatchId, setEditingFinishedMatchId] = useState<string | null>(null);
+  const [editFinishedScore1, setEditFinishedScore1] = useState(0);
+  const [editFinishedScore2, setEditFinishedScore2] = useState(0);
+
+  // Postpone Match Modal (Choose replacement from waiting queue)
+  const [postponingMatchModal, setPostponingMatchModal] = useState<{ matchId: string; tableId: string } | null>(null);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -173,12 +182,12 @@ const AdminView: React.FC = () => {
             border: '1px solid var(--border-color)',
             borderRadius: '16px',
             position: 'relative',
-            minHeight: tablesCount <= 2 ? '210px' : '260px',
-            padding: '1.2rem',
+            minHeight: tablesCount <= 2 ? '240px' : '280px',
+            padding: '1.4rem 1.2rem',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: tablesCount <= 2 ? '3.5rem' : '2rem',
+            gap: tablesCount <= 2 ? '4.5rem' : '2.5rem',
             flexWrap: 'wrap',
             overflow: 'hidden',
             boxShadow: 'inset 0 0 35px rgba(0,0,0,0.85)'
@@ -217,8 +226,8 @@ const AdminView: React.FC = () => {
                   style={{
                     cursor: 'pointer',
                     transition: 'transform 0.2s ease',
-                    transform: 'scale(1.15)',
-                    margin: '0.6rem 1rem',
+                    transform: 'scale(1.32)',
+                    margin: '0.8rem 1.5rem',
                     zIndex: table.status === 'occupied' ? 10 : 1
                   }}
                   onClick={() => setSelectedTableForQR(table.id)}
@@ -1265,24 +1274,98 @@ const AdminView: React.FC = () => {
           }
 
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr 350px', gap: '2rem', height: '100%' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr 340px', gap: '1.5rem', height: '100%' }}>
 
-              {/* LEFT: Meta & QR */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', height: '100%' }}>
-                <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <h2 style={{ fontSize: '1.2rem', color: 'var(--accent-primary)', marginBottom: '0.5rem', fontWeight: 800 }}>{activeTournament.name}</h2>
-                  <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', marginBottom: '1rem', marginTop: '1rem' }}>
-                    <QRCode value={getClubShareUrl()} size={150} />
+              {/* LEFT: Meta & QR + FILE D'ATTENTE */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', height: '100%', overflowY: 'auto', paddingRight: '0.3rem' }}>
+                {/* QR Code pour rejoindre l'appli */}
+                <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  <h2 style={{ fontSize: '1.1rem', color: 'var(--accent-primary)', marginBottom: '0.2rem', fontWeight: 800 }}>{activeTournament.name}</h2>
+                  <div style={{ background: '#fff', padding: '8px', borderRadius: '10px', marginBottom: '0.6rem', marginTop: '0.6rem' }}>
+                    <QRCode value={getClubShareUrl()} size={115} />
                   </div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--card-text-muted)' }}>Scannez ce code pour rejoindre l'application</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--card-text-muted)', margin: 0 }}>Scannez pour rejoindre l'application</p>
 
                   <button
                     className="btn btn-outline"
-                    style={{ marginTop: '1rem', width: '100%', fontSize: '0.8rem', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                    style={{ marginTop: '0.8rem', width: '100%', fontSize: '0.75rem', padding: '0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
                     onClick={() => setActiveTab('launcher')}
                   >
-                    <Rocket size={14} /> Gérer dans le Lanceur
+                    <Rocket size={13} /> Gérer dans le Lanceur
                   </button>
+                </div>
+
+                {/* File d'attente (directement sous le QR code) */}
+                <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: '280px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                    <h3 style={{ fontSize: '1rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
+                      <Users size={16} style={{ color: 'var(--accent-secondary)' }} /> File d'attente
+                    </h3>
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.15)', color: 'var(--accent-secondary)', padding: '2px 7px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.3)' }}>
+                      {matchesWaiting.length} {matchesWaiting.length > 1 ? 'matchs' : 'match'}
+                    </span>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingRight: '0.2rem' }}>
+                    {matchesWaiting.length === 0 ? (
+                      <div style={{ color: 'var(--card-text-muted)', fontSize: '0.8rem', textAlign: 'center', marginTop: '1.5rem' }}>
+                        Aucun match en attente.
+                      </div>
+                    ) : (
+                      matchesWaiting.map((match, idx) => (
+                        <div
+                          key={match.id}
+                          style={{
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '8px',
+                            padding: '0.6rem 0.8rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.3rem'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                            {match.stage && (
+                              <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                {match.stage}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                            <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player1Id]?.name || 'Attente...'}</span>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '0 4px' }}>VS</span>
+                            <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player2Id]?.name || 'Attente...'}</span>
+                          </div>
+
+                          {/* Quick assign buttons if tournament tables exist */}
+                          {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Placer :</span>
+                              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                {activeTournament.settings.tableIds.map(tId => {
+                                  const tObj = tables[tId];
+                                  const label = tObj ? `T.${tObj.number}` : tId;
+                                  return (
+                                    <button
+                                      key={tId}
+                                      className="btn btn-outline"
+                                      style={{ fontSize: '0.65rem', padding: '2px 6px', height: '20px', lineHeight: 1 }}
+                                      title={`Assigner directement à ${tObj?.name || label}`}
+                                      onClick={() => assignMatchToTable(match.id, tId)}
+                                    >
+                                      ▶ {label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1328,27 +1411,24 @@ const AdminView: React.FC = () => {
                             {match.status === 'playing' ? (
                               <div style={{ marginTop: '0.5rem', color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
                             ) : (
-                              <button className="btn btn-outline" style={{ fontSize: '0.7rem', padding: '0.3rem', marginTop: '0.5rem', width: '100%' }} onClick={() => postponeMatch(match.id)}>Repousser</button>
+                              <button
+                                className="btn btn-outline"
+                                style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', marginTop: '0.5rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                                onClick={() => {
+                                  if (effTableId && matchesWaiting.length > 0) {
+                                    setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
+                                  } else {
+                                    postponeMatch(match.id);
+                                  }
+                                }}
+                              >
+                                <ArrowUpDown size={12} /> Repousser...
+                              </button>
                             )}
                           </div>
                         </div>
                       );
                     })}
-                  </div>
-                </div>
-
-                {/* Matchs en attente */}
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
-                  <h2 style={{ fontSize: '1.4rem', color: 'var(--card-text-muted)', marginBottom: '1rem' }}>File d'attente</h2>
-                  {matchesWaiting.length === 0 && <div style={{ color: 'var(--text-muted)' }}>Aucun match en attente.</div>}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                    {matchesWaiting.map(match => (
-                      <div key={match.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border-color)', borderRadius: '12px', padding: '1rem', opacity: 0.6 }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player1Id]?.name}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
-                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player2Id]?.name}</div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>
@@ -1429,23 +1509,168 @@ const AdminView: React.FC = () => {
 
                 {/* Match Results */}
                 <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', flex: 1, overflow: 'hidden' }}>
-                  <h2 style={{ fontSize: '1.2rem', color: 'var(--card-text-muted)', marginBottom: '1rem' }}>Derniers Résultats</h2>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '1.2rem', color: 'var(--card-text-muted)', margin: 0 }}>Derniers Résultats</h2>
+                    <button
+                      className="btn btn-outline"
+                      style={{
+                        fontSize: '0.7rem',
+                        padding: '0.25rem 0.6rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        borderColor: isAdminUnlocked ? 'rgba(0, 255, 170, 0.4)' : 'rgba(255, 255, 255, 0.15)',
+                        color: isAdminUnlocked ? 'var(--accent-primary)' : 'var(--text-muted)'
+                      }}
+                      onClick={() => {
+                        if (isAdminUnlocked) {
+                          setIsAdminUnlocked(false);
+                          setEditingFinishedMatchId(null);
+                        } else {
+                          const pin = prompt("Entrez le code PIN Admin (1234) pour modifier les scores :");
+                          if (pin === '1234') {
+                            setIsAdminUnlocked(true);
+                          } else if (pin !== null) {
+                            alert("Code PIN incorrect.");
+                          }
+                        }
+                      }}
+                    >
+                      {isAdminUnlocked ? <Unlock size={12} /> : <Lock size={12} />}
+                      {isAdminUnlocked ? 'Admin actif' : 'Modifier'}
+                    </button>
+                  </div>
+
                   <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '0.5rem' }}>
                     {finishedMatches.length === 0 ? (
                       <div style={{ color: 'var(--card-text-muted)', textAlign: 'center', marginTop: '1rem' }}>Aucun match terminé.</div>
                     ) : (
-                      finishedMatches.map(m => (
-                        <div key={m.id} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', padding: '0.8rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score1 > m.score2 ? 1 : 0.5 }}>
-                            <span style={{ fontWeight: m.score1 > m.score2 ? 700 : 400, color: m.score1 > m.score2 ? 'var(--accent-primary)' : 'var(--card-text)' }}>{players[m.player1Id]?.name}</span>
-                            <span style={{ fontWeight: 800 }}>{m.score1}</span>
+                      finishedMatches.map(m => {
+                        const isEditing = editingFinishedMatchId === m.id;
+
+                        if (isEditing) {
+                          return (
+                            <div
+                              key={m.id}
+                              style={{
+                                background: 'rgba(0, 255, 170, 0.06)',
+                                border: '1px solid var(--accent-primary)',
+                                padding: '0.8rem',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.5rem'
+                              }}
+                            >
+                              <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                ✏️ Modification du score
+                              </div>
+
+                              {/* Player 1 */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{players[m.player1Id]?.name}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <button
+                                    className="btn btn-outline"
+                                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                                    onClick={() => setEditFinishedScore1(Math.max(0, editFinishedScore1 - 1))}
+                                  >
+                                    -
+                                  </button>
+                                  <span style={{ fontWeight: 800, minWidth: '1.5rem', textAlign: 'center' }}>{editFinishedScore1}</span>
+                                  <button
+                                    className="btn btn-outline"
+                                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                                    onClick={() => setEditFinishedScore1(editFinishedScore1 + 1)}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Player 2 */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{players[m.player2Id]?.name}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <button
+                                    className="btn btn-outline"
+                                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                                    onClick={() => setEditFinishedScore2(Math.max(0, editFinishedScore2 - 1))}
+                                  >
+                                    -
+                                  </button>
+                                  <span style={{ fontWeight: 800, minWidth: '1.5rem', textAlign: 'center' }}>{editFinishedScore2}</span>
+                                  <button
+                                    className="btn btn-outline"
+                                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                                    onClick={() => setEditFinishedScore2(editFinishedScore2 + 1)}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
+                                <button
+                                  className="btn btn-neon"
+                                  style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem' }}
+                                  onClick={() => {
+                                    updateFinishedMatchScore(m.id, editFinishedScore1, editFinishedScore2);
+                                    setEditingFinishedMatchId(null);
+                                  }}
+                                >
+                                  Valider
+                                </button>
+                                <button
+                                  className="btn btn-outline"
+                                  style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem' }}
+                                  onClick={() => setEditingFinishedMatchId(null)}
+                                >
+                                  Annuler
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={m.id} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', padding: '0.8rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score1 > m.score2 ? 1 : 0.5 }}>
+                              <span style={{ fontWeight: m.score1 > m.score2 ? 700 : 400, color: m.score1 > m.score2 ? 'var(--accent-primary)' : 'var(--card-text)' }}>{players[m.player1Id]?.name}</span>
+                              <span style={{ fontWeight: 800 }}>{m.score1}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score2 > m.score1 ? 1 : 0.5 }}>
+                              <span style={{ fontWeight: m.score2 > m.score1 ? 700 : 400, color: m.score2 > m.score1 ? 'var(--accent-primary)' : 'var(--card-text)' }}>{players[m.player2Id]?.name}</span>
+                              <span style={{ fontWeight: 800 }}>{m.score2}</span>
+                            </div>
+
+                            {isAdminUnlocked && (
+                              <button
+                                className="btn btn-outline"
+                                style={{
+                                  fontSize: '0.68rem',
+                                  padding: '0.2rem 0.5rem',
+                                  marginTop: '0.2rem',
+                                  alignSelf: 'flex-end',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  borderColor: 'rgba(255,255,255,0.15)',
+                                  color: 'var(--accent-primary)'
+                                }}
+                                onClick={() => {
+                                  setEditingFinishedMatchId(m.id);
+                                  setEditFinishedScore1(m.score1);
+                                  setEditFinishedScore2(m.score2);
+                                }}
+                              >
+                                <Edit2 size={11} /> Corriger le score
+                              </button>
+                            )}
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score2 > m.score1 ? 1 : 0.5 }}>
-                            <span style={{ fontWeight: m.score2 > m.score1 ? 700 : 400, color: m.score2 > m.score1 ? 'var(--accent-primary)' : 'var(--card-text)' }}>{players[m.player2Id]?.name}</span>
-                            <span style={{ fontWeight: 800 }}>{m.score2}</span>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -1993,6 +2218,158 @@ const AdminView: React.FC = () => {
               </div>
 
               <button className="btn btn-outline" onClick={() => setSelectedTableForQR(null)}>Fermer</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal: Choisir un match de remplacement lors du report */}
+      {postponingMatchModal && (() => {
+        const curMatch = matches[postponingMatchModal.matchId];
+        const curTable = tables[postponingMatchModal.tableId];
+        const tableName = curTable?.name || `Table ${curTable?.number || postponingMatchModal.tableId}`;
+
+        // Find available waiting matches from active tournament
+        const activeTourMatches = activeTournament ? Object.values(matches).filter(m => activeTournament.matches.includes(m.id)) : [];
+        const waitingList = activeTourMatches.filter(m => m.status === 'pending' && !m.tableId && m.id !== postponingMatchModal.matchId);
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              background: 'rgba(0,0,0,0.85)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem'
+            }}
+            onClick={() => setPostponingMatchModal(null)}
+          >
+            <div
+              className="glass-card"
+              style={{
+                width: '100%',
+                maxWidth: '540px',
+                background: '#0d1326',
+                border: '1px solid rgba(0, 255, 170, 0.4)',
+                padding: '1.8rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.2rem',
+                maxHeight: '90vh',
+                overflowY: 'auto'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div>
+                <h3 style={{ fontSize: '1.3rem', color: '#fff', margin: 0, fontWeight: 800 }}>
+                  Repousser le match sur {tableName}
+                </h3>
+                {curMatch && (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0.4rem 0 0 0' }}>
+                    Match repoussé : <b style={{ color: '#fff' }}>{players[curMatch.player1Id]?.name}</b> VS <b style={{ color: '#fff' }}>{players[curMatch.player2Id]?.name}</b>
+                  </p>
+                )}
+              </div>
+
+              {/* Option 1: Automatic rotation */}
+              <button
+                className="btn btn-outline"
+                style={{
+                  padding: '0.85rem 1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  textAlign: 'left',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.03)'
+                }}
+                onClick={() => {
+                  postponeMatch(postponingMatchModal.matchId);
+                  setPostponingMatchModal(null);
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <RotateCcw size={15} style={{ color: 'var(--accent-primary)' }} /> Mettre en fin de file (Rotation automatique)
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    Le match retourne en queue et la table prendra automatiquement le prochain match prêt
+                  </div>
+                </div>
+                <ArrowRight size={18} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginLeft: '0.5rem' }} />
+              </button>
+
+              {/* Option 2: Pick specific match */}
+              <div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--accent-secondary)', fontWeight: 800, marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Ou choisir directement le remplaçant sur {tableName} :
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '0.3rem' }}>
+                  {waitingList.length === 0 ? (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem' }}>
+                      Aucun autre match en attente dans la file.
+                    </div>
+                  ) : (
+                    waitingList.map((m, idx) => (
+                      <div
+                        key={m.id}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          padding: '0.7rem 0.9rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.8rem'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fff' }}>
+                              {players[m.player1Id]?.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>VS</span> {players[m.player2Id]?.name}
+                            </span>
+                          </div>
+                          {m.stage && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', marginTop: '0.1rem', textTransform: 'uppercase' }}>
+                              {m.stage}
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          className="btn btn-neon"
+                          style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                          onClick={() => {
+                            postponeMatch(postponingMatchModal.matchId);
+                            assignMatchToTable(m.id, postponingMatchModal.tableId);
+                            setPostponingMatchModal(null);
+                          }}
+                        >
+                          Placer ici ▶
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <button
+                className="btn btn-outline"
+                style={{ width: '100%', marginTop: '0.4rem' }}
+                onClick={() => setPostponingMatchModal(null)}
+              >
+                Annuler
+              </button>
             </div>
           </div>
         );
