@@ -158,7 +158,88 @@ const AdminView: React.FC = () => {
   }, [selectedTableForQR, tables, matches]);
 
   const renderMap = (isEditable: boolean, scaleOverride?: number, showOnlyTournamentTables = false) => {
-    const tablesCount = Object.keys(tables).length;
+    const tournamentTables = Object.values(tables)
+      .filter(t => !showOnlyTournamentTables || !activeTournament || activeTournament.settings?.tableIds.includes(t.id))
+      .sort((a, b) => a.number - b.number);
+    const tablesCount = tournamentTables.length;
+
+    // Compact centered deck for live tournament dashboard
+    if (showOnlyTournamentTables) {
+      return (
+        <div
+          style={{
+            backgroundColor: '#050814',
+            backgroundImage: 'radial-gradient(circle at center, rgba(18, 32, 60, 0.7) 0%, rgba(4, 7, 16, 0.98) 100%), repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 20px, transparent 20px, transparent 40px)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '16px',
+            position: 'relative',
+            minHeight: tablesCount <= 2 ? '210px' : '260px',
+            padding: '1.2rem',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: tablesCount <= 2 ? '3.5rem' : '2rem',
+            flexWrap: 'wrap',
+            overflow: 'hidden',
+            boxShadow: 'inset 0 0 35px rgba(0,0,0,0.85)'
+          }}
+        >
+          {/* Subtle Room Watermark Floor Crest */}
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+            opacity: 0.04,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.5rem',
+            userSelect: 'none'
+          }}>
+            <img src={currentClub.logoUrl || '/logo.png'} alt="Club Crest" style={{ width: '160px', filter: 'grayscale(1)' }} />
+          </div>
+
+          {tournamentTables.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              Aucun billard assigné à ce tournoi.
+            </div>
+          ) : (
+            tournamentTables.map(table => {
+              const currentMatch = table.currentMatchId ? matches[table.currentMatchId] : undefined;
+              const p1 = currentMatch ? players[currentMatch.player1Id] : undefined;
+              const p2 = currentMatch ? players[currentMatch.player2Id] : undefined;
+
+              return (
+                <div
+                  key={table.id}
+                  style={{
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s ease',
+                    transform: 'scale(1.15)',
+                    margin: '0.6rem 1rem',
+                    zIndex: table.status === 'occupied' ? 10 : 1
+                  }}
+                  onClick={() => setSelectedTableForQR(table.id)}
+                  title={`Cliquer pour voir le match de ${table.name || `Table ${table.number}`}`}
+                >
+                  <BilliardTableVisual
+                    number={table.number}
+                    name={table.name}
+                    status={table.status}
+                    match={currentMatch}
+                    player1={p1}
+                    player2={p2}
+                  />
+                </div>
+              );
+            })
+          )}
+        </div>
+      );
+    }
+
     const scale = scaleOverride !== undefined ? scaleOverride : Math.max(0.5, Math.min(1.8, 2.0 - (tablesCount * 0.08)));
 
     return (
@@ -1207,16 +1288,19 @@ const AdminView: React.FC = () => {
 
               {/* CENTER: Main Operations (Map + Matches) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', height: '100%', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', position: 'relative', minHeight: '600px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h2 style={{ fontSize: '1.4rem', color: 'var(--card-text-muted)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <MonitorPlay size={20} /> Billards du Tournoi en Live
+                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', position: 'relative', padding: '1.2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                    <h2 style={{ fontSize: '1.3rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                      <MonitorPlay size={20} style={{ color: 'var(--accent-primary)' }} /> Billards du Tournoi en Live
+                      <span style={{ fontSize: '0.8rem', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.3)' }}>
+                        {activeTournament.settings?.tableIds.length || 0} billards
+                      </span>
                     </h2>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      Cliquez sur une table pour voir son QR code de match
+                      Cliquez sur une table pour afficher son QR code ou gérer le match
                     </span>
                   </div>
-                  <div style={{ flex: 1, position: 'relative' }}>
+                  <div style={{ position: 'relative' }}>
                     {renderMap(false, undefined, true)}
                   </div>
                 </div>
