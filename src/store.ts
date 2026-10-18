@@ -807,9 +807,12 @@ export const useStore = create<AppState>((set, get) => ({
         pStats[pId] = { id: pId, played: 0, won: 0, lost: 0, sf: 0, sa: 0, pts: 0 };
       });
 
-      tournament.matches.forEach(mId => {
-        const m = state.matches[mId];
-        if (m && m.status === 'finished' && (!m.stage || m.stage === 'qualif')) {
+      const qualifMatches = tournament.matches
+        .map(mId => state.matches[mId])
+        .filter((m): m is Match => Boolean(m && (!m.stage || m.stage === 'qualif')));
+
+      qualifMatches.forEach(m => {
+        if (m.status === 'finished') {
           const p1 = pStats[m.player1Id];
           const p2 = pStats[m.player2Id];
           if (p1 && p2) {
