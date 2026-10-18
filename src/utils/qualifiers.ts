@@ -17,7 +17,8 @@ export type PlayerQualifStat = {
 
 export function getTournamentQualificationStatus(
   tournament: Tournament | null,
-  matches: Record<string, Match>
+  matches: Record<string, Match>,
+  players?: Record<string, { name?: string }>
 ) {
   if (!tournament) {
     return {
@@ -54,6 +55,7 @@ export function getTournamentQualificationStatus(
   tournament.participants.forEach(pId => {
     pStats[pId] = {
       id: pId,
+      name: players?.[pId]?.name || 'Inconnu',
       played: 0,
       totalMatches: 0,
       remainingMatches: 0,
@@ -98,7 +100,21 @@ export function getTournamentQualificationStatus(
 
   const ranking = Object.values(pStats).sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;
-    return (b.sf - b.sa) - (a.sf - a.sa);
+    const diffDiff = (b.sf - b.sa) - (a.sf - a.sa);
+    if (diffDiff !== 0) return diffDiff;
+    if (b.sf !== a.sf) return b.sf - a.sf;
+    const directMatch = qualifMatches.find(
+      m => m.status === 'finished' &&
+      ((m.player1Id === a.id && m.player2Id === b.id) || (m.player1Id === b.id && m.player2Id === a.id))
+    );
+    if (directMatch) {
+      if (directMatch.player1Id === a.id) {
+        if (directMatch.score1 !== directMatch.score2) return directMatch.score2 - directMatch.score1;
+      } else {
+        if (directMatch.score2 !== directMatch.score1) return directMatch.score1 - directMatch.score2;
+      }
+    }
+    return a.id.localeCompare(b.id);
   });
 
   // Determine "qualifiés sûrs"

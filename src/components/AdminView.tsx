@@ -107,7 +107,7 @@ const AdminView: React.FC = () => {
   const pendingTourMatches = allTourMatches.filter(m => m.status !== 'finished');
   const finishedTourMatches = allTourMatches.filter(m => m.status === 'finished');
 
-  const qualifStatus = getTournamentQualificationStatus(activeTournament, matches);
+  const qualifStatus = getTournamentQualificationStatus(activeTournament, matches, players);
   const { hasSureQualifiers } = qualifStatus;
 
   // Keep user on 'live' if no sure qualifiers exist
@@ -1229,7 +1229,7 @@ const AdminView: React.FC = () => {
             activeTournament.participants.forEach(pId => {
               pStats[pId] = { id: pId, name: players[pId]?.name || 'Inconnu', played: 0, won: 0, lost: 0, sf: 0, sa: 0, pts: 0 };
             });
-            allTourMatches.forEach(m => {
+            allTourMatches.filter(m => !m.stage || m.stage === 'qualif').forEach(m => {
               if (m.status === 'finished') {
                 const p1 = pStats[m.player1Id];
                 const p2 = pStats[m.player2Id];
@@ -1250,7 +1250,21 @@ const AdminView: React.FC = () => {
           }
           const ranking = Object.values(pStats).sort((a, b) => {
             if (b.pts !== a.pts) return b.pts - a.pts;
-            return (b.sf - b.sa) - (a.sf - a.sa);
+            const diffDiff = (b.sf - b.sa) - (a.sf - a.sa);
+            if (diffDiff !== 0) return diffDiff;
+            if (b.sf !== a.sf) return b.sf - a.sf;
+            const directMatch = allTourMatches.find(
+              m => (!m.stage || m.stage === 'qualif') && m.status === 'finished' &&
+              ((m.player1Id === a.id && m.player2Id === b.id) || (m.player1Id === b.id && m.player2Id === a.id))
+            );
+            if (directMatch) {
+              if (directMatch.player1Id === a.id) {
+                if (directMatch.score1 !== directMatch.score2) return directMatch.score2 - directMatch.score1;
+              } else {
+                if (directMatch.score2 !== directMatch.score1) return directMatch.score1 - directMatch.score2;
+              }
+            }
+            return a.id.localeCompare(b.id);
           });
 
           const finishedMatches = allTourMatches.filter(m => m.status === 'finished').reverse();
@@ -1537,10 +1551,18 @@ const AdminView: React.FC = () => {
                       </thead>
                       <tbody>
                         {ranking.map((p, i) => {
-                          const isSure = qualifStatus.sureQualifiers.includes(p.id) || qualifStatus.isFinalLaunched || qualifStatus.isQualifAllDone;
+                          const isSure = qualifStatus.sureQualifiers.includes(p.id);
+                          const isQualifyingZone = i < qualifStatus.numQualifiers;
+                          const isCutoff = i === qualifStatus.numQualifiers - 1 && i < ranking.length - 1;
                           return (
-                            <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)', background: i === 0 ? 'rgba(255, 255, 255, 0.08)' : 'transparent' }}>
-                              <td style={{ padding: '0.5rem', fontWeight: 800, color: i === 0 ? 'var(--accent-primary)' : 'inherit' }}>{i + 1}</td>
+                            <tr
+                              key={p.id}
+                              style={{
+                                borderBottom: isCutoff ? '2px dashed rgba(0, 255, 170, 0.4)' : '1px solid var(--border-color)',
+                                background: isQualifyingZone ? 'rgba(0, 255, 170, 0.05)' : 'transparent'
+                              }}
+                            >
+                              <td style={{ padding: '0.5rem', fontWeight: 800, color: isQualifyingZone ? 'var(--accent-primary)' : 'inherit' }}>{i + 1}</td>
                               <td style={{ padding: '0.5rem', fontWeight: 600 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span>{p.name}</span>

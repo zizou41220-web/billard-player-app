@@ -36,7 +36,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     sureQualifiers,
     ranking,
     numQualifiers
-  } = getTournamentQualificationStatus(activeTournament, matches);
+  } = getTournamentQualificationStatus(activeTournament, matches, players);
 
   const allTourMatches = activeTournament.matches.map(id => matches[id]).filter(Boolean);
   const finalMatches = allTourMatches.filter(m => m.stage && m.stage !== 'qualif');
