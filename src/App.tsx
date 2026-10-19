@@ -59,7 +59,15 @@ function App() {
     <div style={{ position: 'relative', height: '100dvh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
       {isDesktop && (
         <div style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <span style={{
+            fontSize: '0.8rem',
+            color: 'var(--accent-primary)',
+            background: 'rgba(0, 255, 170, 0.12)',
+            padding: '4px 10px',
+            borderRadius: '10px',
+            border: '1px solid rgba(0, 255, 170, 0.3)',
+            fontWeight: 800
+          }}>
             {APP_VERSION}
           </span>
           <button 
@@ -73,8 +81,21 @@ function App() {
       )}
 
       <div className="mobile-container">
-        {/* Subtle version indicator for mobile */}
-        <div style={{ position: 'absolute', top: '8px', right: '12px', zIndex: 10, opacity: 0.45, fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+        {/* Version indicator for mobile */}
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          right: '12px',
+          zIndex: 99,
+          fontSize: '0.7rem',
+          color: 'var(--accent-primary)',
+          background: 'rgba(0, 255, 170, 0.12)',
+          padding: '2px 8px',
+          borderRadius: '8px',
+          border: '1px solid rgba(0, 255, 170, 0.3)',
+          fontWeight: 800,
+          pointerEvents: 'none'
+        }}>
           {APP_VERSION}
         </div>
       <div className="view-content">

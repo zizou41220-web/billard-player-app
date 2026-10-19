@@ -5,7 +5,7 @@ import {
   Trophy, Users, MonitorPlay, Settings, Rocket,
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
-  XCircle, Minus, Plus, Edit2, ArrowUpDown
+  XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
@@ -421,13 +421,14 @@ const AdminView: React.FC = () => {
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <span>Espace Gérant & Tournois • {currentClub.name}</span>
               <span style={{
-                background: 'rgba(255, 255, 255, 0.08)',
+                background: 'rgba(0, 255, 170, 0.15)',
                 color: 'var(--accent-primary)',
-                padding: '2px 8px',
+                padding: '3px 9px',
                 borderRadius: '8px',
-                fontSize: '0.7rem',
+                fontSize: '0.75rem',
                 fontWeight: 800,
-                border: '1px solid rgba(0, 255, 170, 0.25)'
+                border: '1px solid rgba(0, 255, 170, 0.4)',
+                boxShadow: '0 0 10px rgba(0, 255, 170, 0.2)'
               }}>
                 {APP_VERSION}
               </span>
@@ -1904,8 +1905,9 @@ const AdminView: React.FC = () => {
                 </div>
               </div>
             </div>
-          );
-        })()}
+          </div>
+        );
+      })()}
 
         {/* ========================================================================= */}
         {/* 3. ADMINISTRATION TAB (SUB-MENUS: PLAN DE SALLE & JOUEURS)               */}
@@ -2736,7 +2738,7 @@ const AdminView: React.FC = () => {
                 Joueurs qualifiés pour l'arbre final :
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.6rem' }}>
-                {ranking.slice(0, qualifStatus.numQualifiers).map((p, idx) => (
+                {qualifStatus.ranking.slice(0, qualifStatus.numQualifiers).map((p, idx) => (
                   <div key={p.id} style={{
                     display: 'flex', alignItems: 'center', gap: '0.6rem',
                     background: 'rgba(0, 255, 170, 0.08)', padding: '0.5rem 0.8rem',

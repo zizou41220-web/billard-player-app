@@ -1095,17 +1095,17 @@ export const useStore = create<AppState>((set, get) => ({
         }
       });
 
-      const updatedTournaments = {
+      const updatedTournaments: Record<string, Tournament> = {
         ...state.tournaments,
         [tournamentId]: {
           ...tournament,
           matches: [...tournament.matches, ...newMatchIds],
           finalStageLaunched: true,
-          settings: {
-            ...(tournament.settings || {}),
+          settings: tournament.settings ? {
+            ...tournament.settings,
             tableIds: tournamentTableIds,
             finalStageLaunched: true
-          }
+          } : undefined
         }
       };
 

@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { Match } from '../types';
 import {
   Trophy, Swords, CheckCircle2, Clock, Sparkles,
-  Users, AlertCircle, ShieldCheck, QrCode, MonitorPlay
+  Users, AlertCircle, ShieldCheck, QrCode
 } from 'lucide-react';
 import { getTournamentQualificationStatus, PlayerQualifStat } from '../utils/qualifiers';
 
