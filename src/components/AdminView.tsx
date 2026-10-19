@@ -5,7 +5,7 @@ import {
   Trophy, Users, MonitorPlay, Settings, Rocket,
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
-  XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles
+  XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
@@ -19,7 +19,7 @@ const AdminView: React.FC = () => {
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
     assignMatchToTable, updateFinishedMatchScore, startTournamentMatch,
-    launchFinalStage
+    launchFinalStage, reseedFinalStage
   } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -119,6 +119,15 @@ const AdminView: React.FC = () => {
     activeTournament?.settings?.finalStageLaunched ||
     qualifStatus.isFinalLaunched
   );
+
+  const hasInvertedSemi = Boolean(isFinalStageActive && qualifStatus.ranking.length >= 2 && (() => {
+    const tourMatches = activeTournament ? activeTournament.matches.map(id => matches[id]).filter(Boolean) : [];
+    const s1 = tourMatches.find(m => (m.stage === 'semi' || m.id.includes('_semi_')) && (m.bracketPosition === 0 || m.id.includes('_semi_1_')));
+    if (!s1 || s1.status === 'finished') return false;
+    const r0 = qualifStatus.ranking[0]?.id;
+    const r1 = qualifStatus.ranking[1]?.id;
+    return (s1.player1Id === r0 && s1.player2Id === r1) || (s1.player1Id === r1 && s1.player2Id === r0);
+  })());
 
   const areAllQualifiersKnown = Boolean(
     activeTournament &&
@@ -1435,6 +1444,46 @@ const AdminView: React.FC = () => {
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1.2rem' }}>
+              {/* Alert banner if 1st vs 2nd anomaly detected in semi-finals */}
+              {hasInvertedSemi && (
+                <div style={{
+                  background: 'rgba(255, 60, 60, 0.15)',
+                  border: '2px solid #ff4d4d',
+                  borderRadius: '16px',
+                  padding: '1rem 1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                  flexShrink: 0
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                      width: '42px', height: '42px', borderRadius: '50%',
+                      background: 'rgba(255, 60, 60, 0.25)', border: '2px solid #ff4d4d',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff4d4d'
+                    }}>
+                      <AlertTriangle size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff' }}>
+                        Anomalie de croisement détectée : Le 1er affronte le 2ème !
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+                        En tournoi officiel, le 1er doit jouer contre le 4ème et le 2ème contre le 3ème pour qu'ils ne se croisent qu'en finale.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-neon"
+                    style={{ background: '#00ffaa', color: '#000', fontWeight: 800, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.7rem 1.2rem' }}
+                    onClick={() => reseedFinalStage(activeTournament.id)}
+                  >
+                    <RefreshCw size={16} /> Rétablir 1er vs 4ème
+                  </button>
+                </div>
+              )}
+
               {/* Alert banner if qualifiers are known but final stage not launched yet */}
               {areAllQualifiersKnown && !activeTournament.finalStageLaunched && (
                 <div style={{

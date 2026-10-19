@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { Match } from '../types';
 import {
   Trophy, Swords, CheckCircle2, Clock, Sparkles,
-  Users, AlertCircle, ShieldCheck, QrCode
+  Users, AlertCircle, ShieldCheck, QrCode, RefreshCw
 } from 'lucide-react';
 import { getTournamentQualificationStatus, PlayerQualifStat } from '../utils/qualifiers';
 
@@ -12,7 +12,7 @@ interface BracketViewProps {
 }
 
 export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTableForQR }) => {
-  const { tournaments, matches, players, tables, launchFinalStage, currentClub } = useStore();
+  const { tournaments, matches, players, tables, launchFinalStage, reseedFinalStage, currentClub } = useStore();
 
   const allTournaments = Object.values(tournaments);
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
@@ -46,6 +46,15 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
 
   const allTourMatches = activeTournament.matches.map(id => matches[id]).filter(Boolean);
   const finalMatches = allTourMatches.filter(isFinalStageMatch);
+
+  // Check if active final matches have an inverted 1st vs 2nd pairing in semi 1
+  const hasInvertedSemi = Boolean(isFinalLaunched && ranking.length >= 2 && (() => {
+    const s1 = finalMatches.find(m => (m.stage === 'semi' || m.id.includes('_semi_')) && (m.bracketPosition === 0 || m.id.includes('_semi_1_')));
+    if (!s1 || s1.status === 'finished') return false;
+    const r0 = ranking[0]?.id;
+    const r1 = ranking[1]?.id;
+    return (s1.player1Id === r0 && s1.player2Id === r1) || (s1.player1Id === r1 && s1.player2Id === r0);
+  })());
 
   // Active / Projected bracket matches
   type DisplayMatch = {
@@ -172,17 +181,12 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     };
 
     if (numQualifiers === 8) {
-      // 4 Quarters
-      const qPairs = seedByMerit ? [
-        { p1: getSlotPlayerId(ranking[0]), p2: getSlotPlayerId(ranking[7]), l1: getSlotLabel(ranking[0], '1er'), l2: getSlotLabel(ranking[7], '8ème') },
-        { p1: getSlotPlayerId(ranking[3]), p2: getSlotPlayerId(ranking[4]), l1: getSlotLabel(ranking[3], '4ème'), l2: getSlotLabel(ranking[4], '5ème') },
-        { p1: getSlotPlayerId(ranking[1]), p2: getSlotPlayerId(ranking[6]), l1: getSlotLabel(ranking[1], '2ème'), l2: getSlotLabel(ranking[6], '7ème') },
-        { p1: getSlotPlayerId(ranking[2]), p2: getSlotPlayerId(ranking[5]), l1: getSlotLabel(ranking[2], '3ème'), l2: getSlotLabel(ranking[5], '6ème') },
-      ] : [
-        { p1: getSlotPlayerId(ranking[0]), p2: getSlotPlayerId(ranking[1]), l1: getSlotLabel(ranking[0], '1er'), l2: getSlotLabel(ranking[1], '2ème') },
-        { p1: getSlotPlayerId(ranking[2]), p2: getSlotPlayerId(ranking[3]), l1: getSlotLabel(ranking[2], '3ème'), l2: getSlotLabel(ranking[3], '4ème') },
-        { p1: getSlotPlayerId(ranking[4]), p2: getSlotPlayerId(ranking[5]), l1: getSlotLabel(ranking[4], '5ème'), l2: getSlotLabel(ranking[5], '6ème') },
-        { p1: getSlotPlayerId(ranking[6]), p2: getSlotPlayerId(ranking[7]), l1: getSlotLabel(ranking[6], '7ème'), l2: getSlotLabel(ranking[7], '8ème') },
+      // 4 Quarts : 1er vs 8eme, 4eme vs 5eme, 2eme vs 7eme, 3eme vs 6eme
+      const qPairs = [
+        { p1: getSlotPlayerId(ranking[0]), p2: getSlotPlayerId(ranking[7] || ranking[3]), l1: getSlotLabel(ranking[0], '1er'), l2: getSlotLabel(ranking[7] || ranking[3], ranking[7] ? '8ème' : '4ème') },
+        { p1: getSlotPlayerId(ranking[3] || ranking[1]), p2: getSlotPlayerId(ranking[4] || ranking[2]), l1: getSlotLabel(ranking[3] || ranking[1], ranking[3] ? '4ème' : '2ème'), l2: getSlotLabel(ranking[4] || ranking[2], ranking[4] ? '5ème' : '3ème') },
+        { p1: getSlotPlayerId(ranking[1] || ranking[2]), p2: getSlotPlayerId(ranking[6] || ranking[0]), l1: getSlotLabel(ranking[1] || ranking[2], ranking[1] ? '2ème' : '3ème'), l2: getSlotLabel(ranking[6] || ranking[0], ranking[6] ? '7ème' : '1er') },
+        { p1: getSlotPlayerId(ranking[2] || ranking[0]), p2: getSlotPlayerId(ranking[5] || ranking[1]), l1: getSlotLabel(ranking[2] || ranking[0], ranking[2] ? '3ème' : '1er'), l2: getSlotLabel(ranking[5] || ranking[1], ranking[5] ? '6ème' : '2ème') },
       ];
 
       rounds.push({
@@ -250,13 +254,19 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       });
 
     } else if (numQualifiers === 4) {
-      // 2 Semis
-      const s1Pair = seedByMerit
-        ? { p1: getSlotPlayerId(ranking[0]), p2: getSlotPlayerId(ranking[3]), l1: getSlotLabel(ranking[0], '1er'), l2: getSlotLabel(ranking[3], '4ème') }
-        : { p1: getSlotPlayerId(ranking[0]), p2: getSlotPlayerId(ranking[1]), l1: getSlotLabel(ranking[0], '1er'), l2: getSlotLabel(ranking[1], '2ème') };
-      const s2Pair = seedByMerit
-        ? { p1: getSlotPlayerId(ranking[1]), p2: getSlotPlayerId(ranking[2]), l1: getSlotLabel(ranking[1], '2ème'), l2: getSlotLabel(ranking[2], '3ème') }
-        : { p1: getSlotPlayerId(ranking[2]), p2: getSlotPlayerId(ranking[3]), l1: getSlotLabel(ranking[2], '3ème'), l2: getSlotLabel(ranking[3], '4ème') };
+      // 2 Demis : 1er vs 4eme et 2eme vs 3eme (règle universelle de tournoi)
+      const s1Pair = {
+        p1: getSlotPlayerId(ranking[0]),
+        p2: getSlotPlayerId(ranking[3] || ranking[1]),
+        l1: getSlotLabel(ranking[0], '1er'),
+        l2: getSlotLabel(ranking[3] || ranking[1], ranking[3] ? '4ème' : '2ème')
+      };
+      const s2Pair = {
+        p1: getSlotPlayerId(ranking[1]),
+        p2: getSlotPlayerId(ranking[2] || ranking[0]),
+        l1: getSlotLabel(ranking[1], '2ème'),
+        l2: getSlotLabel(ranking[2] || ranking[0], ranking[2] ? '3ème' : '1er')
+      };
 
       rounds.push({
         title: 'Demi-Finales',
@@ -445,20 +455,44 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
               {isQualifAllDone ? 'Valider les Qualifiés & Lancer le Tableau Final' : 'Forcer le Lancement du Tableau Final'}
             </button>
           ) : (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: 'var(--accent-primary)',
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              background: 'rgba(0, 255, 170, 0.1)',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid rgba(0, 255, 170, 0.3)'
-            }}>
-              <ShieldCheck size={18} />
-              Tableau Officiel Verrouillé ({finalMatches.length} matchs générés)
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                color: 'var(--accent-primary)',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                background: 'rgba(0, 255, 170, 0.1)',
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(0, 255, 170, 0.3)'
+              }}>
+                <ShieldCheck size={18} />
+                Tableau Officiel ({finalMatches.length} matchs)
+              </div>
+              <button
+                className="btn btn-outline"
+                title="Rétablir les têtes de séries officielles : 1er vs 4ème et 2ème vs 3ème"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  borderColor: 'var(--accent-primary)',
+                  color: 'var(--accent-primary)',
+                  padding: '0.5rem 0.9rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  if (confirm("Réaligner les duels de la phase finale selon le classement officiel (1er vs 4ème et 2ème vs 3ème) ?")) {
+                    reseedFinalStage(activeTournament.id);
+                  }
+                }}
+              >
+                <RefreshCw size={14} /> Réaligner 1er vs 4ème
+              </button>
             </div>
           )}
         </div>
@@ -522,6 +556,50 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Alert Banner if 1st vs 2nd anomaly detected */}
+      {hasInvertedSemi && (
+        <div style={{
+          background: 'rgba(255, 60, 60, 0.15)',
+          border: '1px solid rgba(255, 60, 60, 0.5)',
+          borderRadius: '12px',
+          padding: '1.2rem 1.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem',
+          color: '#ff6b6b'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
+            <AlertCircle size={26} style={{ flexShrink: 0, color: '#ff6b6b' }} />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '1rem', color: '#fff' }}>
+                Anomalie détectée : La 1/2 finale oppose actuellement le 1er au 2ème !
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginTop: '2px' }}>
+                Dans un tableau officiel, le 1er doit affronter le 4ème et le 2ème le 3ème pour que les deux meilleurs ne se rencontrent qu'en finale.
+              </div>
+            </div>
+          </div>
+          <button
+            className="btn btn-neon"
+            style={{
+              background: '#00ffaa',
+              color: '#000',
+              fontWeight: 800,
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              cursor: 'pointer',
+              padding: '0.7rem 1.2rem'
+            }}
+            onClick={() => reseedFinalStage(activeTournament.id)}
+          >
+            <RefreshCw size={16} /> Rétablir 1er vs 4ème
+          </button>
         </div>
       )}
 

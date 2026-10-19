@@ -30,6 +30,7 @@ interface AppState {
   removeTable: (tableId: string) => void;
   postponeMatch: (matchId: string, replacementMatchId?: string) => void;
   launchFinalStage: (tournamentId: string) => void;
+  reseedFinalStage: (tournamentId: string) => void;
   endTournament: (tournamentId: string) => void;
   deleteTournament: (tournamentId: string) => void;
   autoDispatchMatches: () => void;
@@ -983,18 +984,12 @@ export const useStore = create<AppState>((set, get) => ({
           nextMatchId: finalId
         };
 
-        // Quarters: Seed 1 vs 8, 4 vs 5, 2 vs 7, 3 vs 6
-        const seedByMerit = tournament.settings?.seedByMerit ?? true;
-        const qPairs = seedByMerit ? [
+        // Quarters: Seed 1 vs 8 (ou 4), 4 vs 5, 2 vs 7, 3 vs 6
+        const qPairs = [
           { p1: qualifiers[0], p2: qualifiers[7] || qualifiers[3], next: semi1Id, pos: 0 },
           { p1: qualifiers[3] || qualifiers[1], p2: qualifiers[4] || qualifiers[2], next: semi1Id, pos: 1 },
           { p1: qualifiers[1] || qualifiers[2], p2: qualifiers[6] || qualifiers[0], next: semi2Id, pos: 2 },
           { p1: qualifiers[2] || qualifiers[0], p2: qualifiers[5] || qualifiers[1], next: semi2Id, pos: 3 },
-        ] : [
-          { p1: qualifiers[0], p2: qualifiers[1], next: semi1Id, pos: 0 },
-          { p1: qualifiers[2], p2: qualifiers[3], next: semi1Id, pos: 1 },
-          { p1: qualifiers[4], p2: qualifiers[5], next: semi2Id, pos: 2 },
-          { p1: qualifiers[6], p2: qualifiers[7], next: semi2Id, pos: 3 },
         ];
 
         const qIds = [q1Id, q2Id, q3Id, q4Id];
@@ -1047,13 +1042,9 @@ export const useStore = create<AppState>((set, get) => ({
           bracketPosition: 0
         };
 
-        const seedByMerit = tournament.settings?.seedByMerit ?? true;
-        const s1Pair = seedByMerit
-          ? { p1: qualifiers[0], p2: qualifiers[3] || qualifiers[1] }
-          : { p1: qualifiers[0], p2: qualifiers[1] };
-        const s2Pair = seedByMerit
-          ? { p1: qualifiers[1], p2: qualifiers[2] || qualifiers[0] }
-          : { p1: qualifiers[2], p2: qualifiers[3] };
+        // 4 Qualifiés: Demi 1 = 1er vs 4eme, Demi 2 = 2eme vs 3eme
+        const s1Pair = { p1: qualifiers[0], p2: qualifiers[3] || qualifiers[1] };
+        const s2Pair = { p1: qualifiers[1], p2: qualifiers[2] || qualifiers[0] };
 
         const hS1 = getMatchHandicap(
           state.players[s1Pair.p1]?.level,
@@ -1131,7 +1122,21 @@ export const useStore = create<AppState>((set, get) => ({
         newMatchIds.push(finalId);
       }
 
-      // 1. Cancel / unassign all qualification matches so they release tables
+      // 1. Filtrer les anciens matchs de phase finale pour éviter les doublons en cas de relance
+      const qualifMatchIdsOnly = tournament.matches.filter(mId => {
+        const m = state.matches[mId];
+        return m && (!m.stage || m.stage === 'qualif');
+      });
+      Object.keys(newMatches).forEach(mId => {
+        const m = newMatches[mId];
+        if (m.tournamentId === tournamentId && m.stage && m.stage !== 'qualif') {
+          if (!newMatchIds.includes(mId)) {
+            delete newMatches[mId];
+          }
+        }
+      });
+
+      // 2. Cancel / unassign all qualification matches so they release tables
       Object.keys(newMatches).forEach(mId => {
         const m = newMatches[mId];
         if (m.tournamentId === tournamentId && (!m.stage || m.stage === 'qualif')) {
@@ -1145,7 +1150,7 @@ export const useStore = create<AppState>((set, get) => ({
         }
       });
 
-      // 2. Clear all tournament tables so they are immediately available for the bracket matches
+      // 3. Clear all tournament tables so they are immediately available for the bracket matches
       const clearedTables = { ...state.tables };
       const tournamentTableIds = tournament.settings?.tableIds?.length ? tournament.settings.tableIds : Object.keys(clearedTables);
       tournamentTableIds.forEach(tId => {
@@ -1162,17 +1167,18 @@ export const useStore = create<AppState>((set, get) => ({
         ...state.tournaments,
         [tournamentId]: {
           ...tournament,
-          matches: [...tournament.matches, ...newMatchIds],
+          matches: [...qualifMatchIdsOnly, ...newMatchIds],
           finalStageLaunched: true,
           settings: tournament.settings ? {
             ...tournament.settings,
             tableIds: tournamentTableIds,
-            finalStageLaunched: true
+            finalStageLaunched: true,
+            seedByMerit: true
           } : undefined
         }
       };
 
-      // 3. Auto-assign free tables to ready final matches with dispatchTournamentMatches
+      // 4. Auto-assign free tables to ready final matches with dispatchTournamentMatches
       const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
         clearedTables,
         newMatches,
@@ -1180,7 +1186,7 @@ export const useStore = create<AppState>((set, get) => ({
         tournamentId
       );
 
-      // 4. Guarantee table assignment for first ready bracket match
+      // 5. Guarantee table assignment for first ready bracket match
       const readyBracketMatch = newMatchIds
         .map(id => dispatchedMatches[id])
         .find(m => m && m.player1Id && m.player2Id && !m.tableId);
@@ -1199,6 +1205,122 @@ export const useStore = create<AppState>((set, get) => ({
           };
         }
       }
+
+      return {
+        matches: dispatchedMatches,
+        tables: dispatchedTables,
+        tournaments: updatedTournaments
+      };
+    });
+  },
+
+  reseedFinalStage: (tournamentId: string) => {
+    set((state) => {
+      const tournament = state.tournaments[tournamentId];
+      if (!tournament) return state;
+
+      const qualifStatus = getTournamentQualificationStatus(tournament, state.matches, state.players);
+      const qualifiers = qualifStatus.ranking.map(r => r.id);
+      if (qualifiers.length < 2) return state;
+
+      const newMatches = { ...state.matches };
+      const newTables = { ...state.tables };
+
+      const finalMatches = tournament.matches
+        .map(mId => newMatches[mId])
+        .filter((m): m is Match => Boolean(m && (m.stage === 'quarter' || m.stage === 'semi' || m.stage === 'final' || m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_'))));
+
+      const quarters = finalMatches.filter(m => m.stage === 'quarter' || m.id.includes('_quarter_')).sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+      const semis = finalMatches.filter(m => m.stage === 'semi' || m.id.includes('_semi_')).sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+
+      if (quarters.length === 4) {
+        // Quarts: 1er vs 8eme, 4eme vs 5eme, 2eme vs 7eme, 3eme vs 6eme
+        const qPairs = [
+          { p1: qualifiers[0], p2: qualifiers[7] || qualifiers[3] },
+          { p1: qualifiers[3] || qualifiers[1], p2: qualifiers[4] || qualifiers[2] },
+          { p1: qualifiers[1] || qualifiers[2], p2: qualifiers[6] || qualifiers[0] },
+          { p1: qualifiers[2] || qualifiers[0], p2: qualifiers[5] || qualifiers[1] },
+        ];
+        quarters.forEach((q, idx) => {
+          if (q.status !== 'finished') {
+            const pair = qPairs[idx];
+            const { h1, h2 } = getMatchHandicap(
+              state.players[pair.p1]?.level,
+              state.players[pair.p2]?.level,
+              tournament.settings?.handicapAmateurSets
+            );
+            newMatches[q.id] = {
+              ...q,
+              player1Id: pair.p1,
+              player2Id: pair.p2,
+              score1: q.status === 'playing' ? q.score1 : h1,
+              score2: q.status === 'playing' ? q.score2 : h2,
+              handicapP1: h1 > 0 ? h1 : undefined,
+              handicapP2: h2 > 0 ? h2 : undefined
+            };
+          }
+        });
+      } else if (semis.length >= 2) {
+        // 4 Qualifiés: Demi 1 = 1er vs 4eme, Demi 2 = 2eme vs 3eme
+        const s1 = semis.find(m => m.bracketPosition === 0 || m.id.includes('_semi_1_')) || semis[0];
+        const s2 = semis.find(m => m.bracketPosition === 1 || m.id.includes('_semi_2_')) || semis[1];
+
+        if (s1 && s1.status !== 'finished') {
+          const p1 = qualifiers[0];
+          const p2 = qualifiers[3] || qualifiers[1];
+          const { h1, h2 } = getMatchHandicap(
+            state.players[p1]?.level,
+            state.players[p2]?.level,
+            tournament.settings?.handicapAmateurSets
+          );
+          newMatches[s1.id] = {
+            ...s1,
+            player1Id: p1,
+            player2Id: p2,
+            score1: s1.status === 'playing' ? s1.score1 : h1,
+            score2: s1.status === 'playing' ? s1.score2 : h2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+        }
+
+        if (s2 && s2.status !== 'finished') {
+          const p1 = qualifiers[1];
+          const p2 = qualifiers[2] || qualifiers[0];
+          const { h1, h2 } = getMatchHandicap(
+            state.players[p1]?.level,
+            state.players[p2]?.level,
+            tournament.settings?.handicapAmateurSets
+          );
+          newMatches[s2.id] = {
+            ...s2,
+            player1Id: p1,
+            player2Id: p2,
+            score1: s2.status === 'playing' ? s2.score1 : h1,
+            score2: s2.status === 'playing' ? s2.score2 : h2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+        }
+      }
+
+      const updatedTournaments = {
+        ...state.tournaments,
+        [tournamentId]: {
+          ...tournament,
+          settings: tournament.settings ? {
+            ...tournament.settings,
+            seedByMerit: true
+          } : undefined
+        }
+      };
+
+      const { matches: dispatchedMatches, tables: dispatchedTables } = dispatchTournamentMatches(
+        newTables,
+        newMatches,
+        updatedTournaments,
+        tournamentId
+      );
 
       return {
         matches: dispatchedMatches,
