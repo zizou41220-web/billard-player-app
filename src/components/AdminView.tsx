@@ -2217,10 +2217,8 @@ const AdminView: React.FC = () => {
                         className="btn btn-neon"
                         style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontWeight: 800, fontSize: '1rem', color: '#000' }}
                         onClick={() => {
-                          if (window.confirm(`Valider le score (${match.score1} - ${match.score2}) et terminer ce match ?`)) {
-                            finishMatch(match.id);
-                            setSelectedTableForQR(null);
-                          }
+                          finishMatch(match.id);
+                          setSelectedTableForQR(null);
                         }}
                       >
                         <CheckCircle2 size={20} /> Valider le score & Terminer le match
