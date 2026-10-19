@@ -10,6 +10,7 @@ import {
 import TournamentBracketView from './TournamentBracketView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import BilliardTableVisual from './BilliardTableVisual';
+import { APP_VERSION } from '../version';
 
 const AdminView: React.FC = () => {
   const {
@@ -419,6 +420,17 @@ const AdminView: React.FC = () => {
             </h1>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <span>Espace Gérant & Tournois • {currentClub.name}</span>
+              <span style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                color: 'var(--accent-primary)',
+                padding: '2px 8px',
+                borderRadius: '8px',
+                fontSize: '0.7rem',
+                fontWeight: 800,
+                border: '1px solid rgba(0, 255, 170, 0.25)'
+              }}>
+                {APP_VERSION}
+              </span>
               {activeTournament && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.3)' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-primary)', boxShadow: '0 0 6px var(--accent-primary)' }} />

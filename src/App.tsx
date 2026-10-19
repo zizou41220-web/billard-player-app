@@ -8,6 +8,7 @@ import AdminView from './components/AdminView';
 import StreamOverlayView from './components/StreamOverlayView';
 import { QrCode, User, Activity, Settings } from 'lucide-react';
 import { initSync } from './sync';
+import { APP_VERSION } from './version';
 
 export type Tab = 'scan' | 'feed' | 'profile';
 
@@ -57,16 +58,25 @@ function App() {
   return (
     <div style={{ position: 'relative', height: '100dvh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
       {isDesktop && (
-        <button 
-          onClick={() => setAppMode('admin')}
-          className="btn btn-outline"
-          style={{ position: 'absolute', top: '2rem', right: '2rem', background: '#050816' }}
-        >
-          <Settings size={20} style={{marginRight: '0.5rem'}}/> Retour Écran Gérant (TV)
-        </button>
+        <div style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            {APP_VERSION}
+          </span>
+          <button 
+            onClick={() => setAppMode('admin')}
+            className="btn btn-outline"
+            style={{ background: '#050816' }}
+          >
+            <Settings size={20} style={{marginRight: '0.5rem'}}/> Retour Écran Gérant (TV)
+          </button>
+        </div>
       )}
 
       <div className="mobile-container">
+        {/* Subtle version indicator for mobile */}
+        <div style={{ position: 'absolute', top: '8px', right: '12px', zIndex: 10, opacity: 0.45, fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+          {APP_VERSION}
+        </div>
       <div className="view-content">
         {renderView()}
       </div>
