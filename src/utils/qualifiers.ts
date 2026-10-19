@@ -33,11 +33,21 @@ export function getTournamentQualificationStatus(
     };
   }
 
-  const allTourMatches = tournament.matches.map(id => matches[id]).filter(Boolean);
-  const qualifMatches = allTourMatches.filter(m => !m.stage || m.stage === 'qualif');
-  const finalMatches = allTourMatches.filter(m => m.stage && m.stage !== 'qualif');
+  const isFinalStageMatch = (m: Match) => {
+    if (m.stage && m.stage !== 'qualif') return true;
+    if (m.id && (m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_'))) return true;
+    return false;
+  };
 
-  const isFinalLaunched = Boolean(tournament.finalStageLaunched && finalMatches.length > 0);
+  const allTourMatches = tournament.matches.map(id => matches[id]).filter(Boolean);
+  const qualifMatches = allTourMatches.filter(m => !isFinalStageMatch(m));
+  const finalMatches = allTourMatches.filter(isFinalStageMatch);
+
+  const isFinalLaunched = Boolean(
+    tournament.finalStageLaunched ||
+    tournament.settings?.finalStageLaunched ||
+    finalMatches.length > 0
+  );
   const totalQualifMatches = qualifMatches.length;
   const finishedQualifMatches = qualifMatches.filter(m => m.status === 'finished').length;
   const isQualifAllDone = totalQualifMatches > 0 && finishedQualifMatches === totalQualifMatches;

@@ -207,9 +207,17 @@ export const dispatchTournamentMatches = (
       // Find all ready pending matches whose players are not busy
       const eligibleMatchIds = tournament.matches.filter(id => {
         const m = newMatches[id];
-        if (!m || m.status !== 'pending' || Boolean(m.tableId)) return false;
+        const isFinalStageActive = Boolean(tournament.finalStageLaunched || tournament.settings?.finalStageLaunched);
+        const getMatchStage = (m: Match): string => {
+          if (m.stage) return m.stage;
+          if (m.id?.includes('_final_')) return 'final';
+          if (m.id?.includes('_semi_')) return 'semi';
+          if (m.id?.includes('_quarter_')) return 'quarter';
+          return 'qualif';
+        };
+
         // If final stage launched, do not dispatch unplayed qualif matches
-        if (tournament.finalStageLaunched && (!m.stage || m.stage === 'qualif')) return false;
+        if (isFinalStageActive && getMatchStage(m) === 'qualif') return false;
         return (
           Boolean(m.player1Id) &&
           Boolean(m.player2Id) &&
@@ -220,12 +228,21 @@ export const dispatchTournamentMatches = (
         const ma = newMatches[a];
         const mb = newMatches[b];
 
+        const isFinalStageActive = Boolean(tournament.finalStageLaunched || tournament.settings?.finalStageLaunched);
+        const getMatchStage = (m: Match): string => {
+          if (m.stage) return m.stage;
+          if (m.id?.includes('_final_')) return 'final';
+          if (m.id?.includes('_semi_')) return 'semi';
+          if (m.id?.includes('_quarter_')) return 'quarter';
+          return 'qualif';
+        };
+
         // 1. Stage priority: when final stage is launched, quarter/semi/final take precedence!
-        const stagePriority: Record<string, number> = tournament.finalStageLaunched
+        const stagePriority: Record<string, number> = isFinalStageActive
           ? { quarter: 1, semi: 2, third_place: 3, final: 4, qualif: 999 }
           : { qualif: 1, quarter: 2, semi: 3, third_place: 4, final: 5 };
-        const sA = stagePriority[ma.stage || 'qualif'] || 1;
-        const sB = stagePriority[mb.stage || 'qualif'] || 1;
+        const sA = stagePriority[getMatchStage(ma)] || 1;
+        const sB = stagePriority[getMatchStage(mb)] || 1;
         if (sA !== sB) return sA - sB;
 
         // 2. Bracket round if defined
@@ -885,6 +902,7 @@ export const useStore = create<AppState>((set, get) => ({
         // Final
         newMatches[finalId] = {
           id: finalId,
+          clubId: state.currentClub.id,
           player1Id: '',
           player2Id: '',
           score1: 0,
@@ -900,6 +918,7 @@ export const useStore = create<AppState>((set, get) => ({
         // Semis
         newMatches[semi1Id] = {
           id: semi1Id,
+          clubId: state.currentClub.id,
           player1Id: '',
           player2Id: '',
           score1: 0,
@@ -914,6 +933,7 @@ export const useStore = create<AppState>((set, get) => ({
         };
         newMatches[semi2Id] = {
           id: semi2Id,
+          clubId: state.currentClub.id,
           player1Id: '',
           player2Id: '',
           score1: 0,
@@ -1079,7 +1099,11 @@ export const useStore = create<AppState>((set, get) => ({
         [tournamentId]: {
           ...tournament,
           matches: [...tournament.matches, ...newMatchIds],
-          finalStageLaunched: true
+          finalStageLaunched: true,
+          settings: {
+            ...(tournament.settings || {}),
+            finalStageLaunched: true
+          }
         }
       };
 

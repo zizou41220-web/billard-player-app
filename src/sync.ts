@@ -44,37 +44,87 @@ const mapMatchToDB = (m: Match) => {
   return data;
 };
 
-const mapDBToMatch = (d: any): Match => ({
-  id: d.id,
-  clubId: d.club_id || undefined,
-  tableId: d.table_id || undefined,
-  player1Id: d.player1_id,
-  player2Id: d.player2_id,
-  score1: d.score1,
-  score2: d.score2,
-  status: d.status,
-  startTime: d.start_time,
-  endTime: d.end_time || undefined,
-  winnerId: d.winner_id || undefined,
-  tournamentId: d.tournament_id || undefined
-});
+const mapDBToMatch = (d: any): Match => {
+  let stage: Match['stage'] = d.stage;
+  if (!stage && d.id) {
+    if (d.id.includes('_final_')) stage = 'final';
+    else if (d.id.includes('_semi_')) stage = 'semi';
+    else if (d.id.includes('_quarter_')) stage = 'quarter';
+    else stage = 'qualif';
+  }
+
+  let bracketRound = d.bracket_round;
+  let bracketPosition = d.bracket_position;
+  if (bracketRound === undefined && d.id) {
+    if (d.id.includes('_quarter_')) {
+      bracketRound = 1;
+      const m = d.id.match(/_quarter_(\d+)_/);
+      if (m) bracketPosition = parseInt(m[1], 10) - 1;
+    } else if (d.id.includes('_semi_')) {
+      bracketRound = 2;
+      const m = d.id.match(/_semi_(\d+)_/);
+      if (m) bracketPosition = parseInt(m[1], 10) - 1;
+    } else if (d.id.includes('_final_')) {
+      bracketRound = 3;
+      bracketPosition = 0;
+    }
+  }
+
+  return {
+    id: d.id,
+    clubId: d.club_id || undefined,
+    tableId: d.table_id || undefined,
+    player1Id: d.player1_id || '',
+    player2Id: d.player2_id || '',
+    score1: d.score1 || 0,
+    score2: d.score2 || 0,
+    status: d.status,
+    startTime: d.start_time,
+    endTime: d.end_time || undefined,
+    winnerId: d.winner_id || undefined,
+    tournamentId: d.tournament_id || undefined,
+    stage,
+    bracketRound,
+    bracketPosition,
+    nextMatchId: d.next_match_id || undefined
+  };
+};
 
 const mapTournamentToDB = (t: Tournament) => {
-  const data: any = { id: t.id, name: t.name, format: t.format, status: t.status, participants: t.participants, settings: t.settings, matches: t.matches };
+  const settings = {
+    ...(t.settings || {}),
+    finalStageLaunched: Boolean(t.finalStageLaunched ?? t.settings?.finalStageLaunched)
+  };
+  const data: any = {
+    id: t.id,
+    name: t.name,
+    format: t.format,
+    status: t.status,
+    participants: t.participants,
+    settings,
+    matches: t.matches
+  };
   if (hasClubColumn) data.club_id = t.clubId || useStore.getState().currentClub.id;
   return data;
 };
 
-const mapDBToTournament = (d: any): Tournament => ({
-  id: d.id,
-  clubId: d.club_id || undefined,
-  name: d.name,
-  format: d.format,
-  status: d.status,
-  participants: d.participants,
-  settings: d.settings,
-  matches: d.matches
-});
+const mapDBToTournament = (d: any): Tournament => {
+  const isFinalLaunched = Boolean(d.final_stage_launched ?? d.settings?.finalStageLaunched ?? false);
+  return {
+    id: d.id,
+    clubId: d.club_id || undefined,
+    name: d.name,
+    format: d.format,
+    status: d.status,
+    participants: d.participants,
+    settings: {
+      ...(d.settings || {}),
+      finalStageLaunched: isFinalLaunched
+    },
+    matches: d.matches || [],
+    finalStageLaunched: isFinalLaunched
+  };
+};
 
 // Initial fetch
 export const initSync = async () => {
@@ -222,8 +272,26 @@ export const initSync = async () => {
           let mappedData: any;
           if (storeKey === 'players') mappedData = mapDBToPlayer(data);
           if (storeKey === 'tables') mappedData = mapDBToTable(data);
-          if (storeKey === 'matches') mappedData = mapDBToMatch(data);
-          if (storeKey === 'tournaments') mappedData = mapDBToTournament(data);
+          if (storeKey === 'matches') {
+            const existingM = state.matches[data.id];
+            mappedData = {
+              ...existingM,
+              ...mapDBToMatch(data),
+              stage: mapDBToMatch(data).stage || existingM?.stage,
+              bracketRound: mapDBToMatch(data).bracketRound ?? existingM?.bracketRound,
+              bracketPosition: mapDBToMatch(data).bracketPosition ?? existingM?.bracketPosition,
+              nextMatchId: mapDBToMatch(data).nextMatchId || existingM?.nextMatchId
+            };
+          }
+          if (storeKey === 'tournaments') {
+            const existingT = state.tournaments[data.id];
+            const parsedT = mapDBToTournament(data);
+            mappedData = {
+              ...existingT,
+              ...parsedT,
+              finalStageLaunched: parsedT.finalStageLaunched || existingT?.finalStageLaunched
+            };
+          }
 
           if (storeKey === 'tables' && mappedData.status === 'occupied' && mappedData.currentMatchId) {
             const currentM = state.matches[mappedData.currentMatchId];
@@ -237,7 +305,15 @@ export const initSync = async () => {
             }
           }
 
-          return { [storeKey]: { ...state[storeKey], [mappedData.id]: mappedData } };
+          return {
+            [storeKey]: {
+              ...state[storeKey],
+              [mappedData.id]: {
+                ...(state[storeKey]?.[mappedData.id] || {}),
+                ...mappedData
+              }
+            }
+          };
         });
         
         // Small delay to prevent echo loops and dispatch next matches if a match finished or table was freed

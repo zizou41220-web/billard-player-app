@@ -38,8 +38,14 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     numQualifiers
   } = getTournamentQualificationStatus(activeTournament, matches, players);
 
+  const isFinalStageMatch = (m: Match) => {
+    if (m.stage && m.stage !== 'qualif') return true;
+    if (m.id && (m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_'))) return true;
+    return false;
+  };
+
   const allTourMatches = activeTournament.matches.map(id => matches[id]).filter(Boolean);
-  const finalMatches = allTourMatches.filter(m => m.stage && m.stage !== 'qualif');
+  const finalMatches = allTourMatches.filter(isFinalStageMatch);
 
   // Active / Projected bracket matches
   type DisplayMatch = {
@@ -66,14 +72,14 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
   if (isFinalLaunched) {
     // Collect from real matches
     const quarters = finalMatches
-      .filter(m => m.stage === 'quarter')
+      .filter(m => (m.stage === 'quarter' || m.id.includes('_quarter_')))
       .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
 
     const semis = finalMatches
-      .filter(m => m.stage === 'semi')
+      .filter(m => (m.stage === 'semi' || m.id.includes('_semi_')))
       .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
 
-    const final = finalMatches.find(m => m.stage === 'final');
+    const final = finalMatches.find(m => (m.stage === 'final' || m.id.includes('_final_')));
 
     if (quarters.length > 0) {
       rounds.push({
@@ -319,7 +325,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
   }
 
   // Find overall tournament champion if final match is finished
-  const realFinal = finalMatches.find(m => m.stage === 'final');
+  const realFinal = finalMatches.find(m => m.stage === 'final' || m.id.includes('_final_'));
   const championId = realFinal?.status === 'finished' ? realFinal.winnerId : undefined;
   const champion = championId ? players[championId] : null;
 

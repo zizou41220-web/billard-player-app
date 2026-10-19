@@ -112,19 +112,25 @@ const AdminView: React.FC = () => {
   const qualifStatus = getTournamentQualificationStatus(activeTournament, matches, players);
   const { hasSureQualifiers } = qualifStatus;
 
+  const isFinalStageActive = Boolean(
+    activeTournament?.finalStageLaunched ||
+    activeTournament?.settings?.finalStageLaunched ||
+    qualifStatus.isFinalLaunched
+  );
+
   const areAllQualifiersKnown = Boolean(
     activeTournament &&
-    !activeTournament.finalStageLaunched &&
+    !isFinalStageActive &&
     (qualifStatus.isQualifAllDone || qualifStatus.sureQualifiers.length >= qualifStatus.numQualifiers)
   );
   const showQualifAlertModal = areAllQualifiersKnown && dismissedQualifAlertTourId !== activeTournament?.id;
 
   // Keep user on 'live' if no sure qualifiers exist and final stage not launched
   React.useEffect(() => {
-    if (dashboardSubTab === 'bracket' && !hasSureQualifiers && !activeTournament?.finalStageLaunched) {
+    if (dashboardSubTab === 'bracket' && !hasSureQualifiers && !isFinalStageActive) {
       setDashboardSubTab('live');
     }
-  }, [dashboardSubTab, hasSureQualifiers, activeTournament?.finalStageLaunched]);
+  }, [dashboardSubTab, hasSureQualifiers, isFinalStageActive]);
 
   // Auto-heal missing match tableId if table has currentMatchId
   React.useEffect(() => {

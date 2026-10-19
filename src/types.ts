@@ -63,6 +63,7 @@ export type TournamentSettings = {
   finalNbSets: number;
   finalIsWinningSets: boolean;
   seedByMerit: boolean; // Tirage au mérite
+  finalStageLaunched?: boolean;
 };
 
 export type Tournament = {
