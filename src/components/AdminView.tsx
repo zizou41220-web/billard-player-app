@@ -127,13 +127,6 @@ const AdminView: React.FC = () => {
   );
   const showQualifAlertModal = areAllQualifiersKnown && dismissedQualifAlertTourId !== activeTournament?.id;
 
-  // Keep user on 'live' if no sure qualifiers exist and final stage not launched
-  React.useEffect(() => {
-    if (dashboardSubTab === 'bracket' && !hasSureQualifiers && !isFinalStageActive) {
-      setDashboardSubTab('live');
-    }
-  }, [dashboardSubTab, hasSureQualifiers, isFinalStageActive]);
-
   // Auto-heal missing match tableId if table has currentMatchId
   React.useEffect(() => {
     let changed = false;
@@ -515,44 +508,36 @@ const AdminView: React.FC = () => {
             </button>
 
             <button
-              onClick={() => {
-                if (!hasSureQualifiers) {
-                  alert("L'accès au Tableau des Phases Finales est verrouillé : aucun joueur n'est encore mathématiquement qualifié.");
-                  return;
-                }
-                setDashboardSubTab('bracket');
-              }}
-              disabled={!hasSureQualifiers}
+              onClick={() => setDashboardSubTab('bracket')}
               style={{
                 background: dashboardSubTab === 'bracket' ? 'var(--accent-primary)' : 'transparent',
-                color: dashboardSubTab === 'bracket' ? '#000' : (hasSureQualifiers ? 'var(--text-muted)' : 'rgba(255,255,255,0.3)'),
+                color: dashboardSubTab === 'bracket' ? '#000' : 'var(--text-muted)',
                 fontWeight: 700,
                 border: 'none',
                 padding: '0.5rem 1.2rem',
                 borderRadius: '8px',
-                cursor: hasSureQualifiers ? 'pointer' : 'not-allowed',
+                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
                 fontSize: '0.85rem',
-                transition: 'all 0.2s ease',
-                opacity: hasSureQualifiers ? 1 : 0.6
+                transition: 'all 0.2s ease'
               }}
-              title={hasSureQualifiers ? "Voir le tableau des phases finales" : "Verrouillé : Aucun qualifié mathématiquement certain"}
+              title="Voir le tableau des phases finales"
             >
-              {hasSureQualifiers ? <Trophy size={16} /> : <Lock size={16} />}
+              <Trophy size={16} />
               Tableau des Phases Finales
               {activeTournament.finalStageLaunched ? (
                 <span style={{ fontSize: '0.7rem', background: 'var(--accent-primary)', color: '#000', padding: '1px 8px', borderRadius: '4px', fontWeight: 800 }}>
                   EN COURS
                 </span>
-              ) : !hasSureQualifiers ? (
-                <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '4px', color: '#ffcc00' }}>
-                  En attente
+              ) : hasSureQualifiers || qualifStatus.isQualifAllDone ? (
+                <span style={{ fontSize: '0.7rem', background: 'rgba(0,255,170,0.2)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                  Prêt
                 </span>
               ) : (
-                <span style={{ fontSize: '0.7rem', background: 'rgba(0,255,170,0.15)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                  Prêt
+                <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '4px', color: '#ffcc00' }}>
+                  Provisoire
                 </span>
               )}
             </button>
@@ -2283,8 +2268,12 @@ const AdminView: React.FC = () => {
       {/* QR Code Modal for Tables */}
       {selectedTableForQR && (() => {
         const table = tables[selectedTableForQR];
-        const currentMatchId = table?.currentMatchId;
-        const match = currentMatchId ? matches[currentMatchId] : null;
+        if (!table) return null;
+        let candidateMatch = table.currentMatchId ? matches[table.currentMatchId] : null;
+        if (!candidateMatch || candidateMatch.status === 'finished') {
+          candidateMatch = Object.values(matches).find(m => m.tableId === table.id && m.status !== 'finished') || null;
+        }
+        const match = (candidateMatch && candidateMatch.status !== 'finished') ? candidateMatch : null;
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedTableForQR(null)}>

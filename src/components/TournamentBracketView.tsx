@@ -155,20 +155,18 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     // Projected Bracket based on live standings
     const seedByMerit = activeTournament.settings?.seedByMerit ?? true;
 
-    // Helper: only assign playerId to a slot if mathematically sure or if qualifs are finished
+    // Helper: assign playerId to a slot (provisional or sure)
     const getSlotPlayerId = (playerStat?: PlayerQualifStat) => {
-      if (isFinalLaunched || isQualifAllDone) {
-        return playerStat?.id;
-      }
-      return playerStat?.isSure ? playerStat.id : undefined;
+      return playerStat?.id;
     };
 
     const getSlotLabel = (playerStat?: PlayerQualifStat, rankLabel?: string) => {
       if (isFinalLaunched || isQualifAllDone) {
         return playerStat ? (players[playerStat.id]?.name || rankLabel) : (rankLabel || 'En attente...');
       }
-      if (playerStat?.isSure) {
-        return `${players[playerStat.id]?.name || 'Joueur'} (Assuré)`;
+      if (playerStat) {
+        const playerName = players[playerStat.id]?.name || 'Joueur';
+        return playerStat.isSure ? `${playerName} (Qualifié)` : `${playerName} (Provisoire ${rankLabel})`;
       }
       return `En attente (${rankLabel || 'Qualifié'})`;
     };
@@ -542,10 +540,10 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           <AlertCircle size={24} style={{ flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffcc00' }}>
-              Aucun joueur n'est encore mathématiquement qualifié
+              Tableau projeté en direct selon le classement provisoire
             </div>
             <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', marginTop: '2px' }}>
-              Les cases du tableau ci-dessous restent vides tant que les qualifications ne sont pas mathématiquement assurées. Chaque case se remplira automatiquement dès qu'un joueur valide sa place.
+              Les cases du tableau ci-dessous affichent les qualifiés projetés selon les résultats actuels. Vous pouvez lancer officiellement les phases finales à tout moment via le bouton ci-dessus.
             </div>
           </div>
         </div>

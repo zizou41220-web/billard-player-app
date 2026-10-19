@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Club, Player, PlayerLevel, Table, Match, Tournament, TournamentFormat, TournamentSettings } from './types';
 import { getMatchHandicap } from './utils/handicap';
+import { getTournamentQualificationStatus } from './utils/qualifiers';
 
 interface AppState {
   currentClub: Club;
@@ -91,6 +92,13 @@ export const dispatchTournamentMatches = (
   // =========================================================================
   // 1. AUTO-HEALING & SANITIZATION OF STALE / DUPLICATE TABLE ASSIGNMENTS
   // =========================================================================
+  // Rule A0: Clean any finished match that still has a tableId
+  Object.keys(newMatches).forEach(mId => {
+    if (newMatches[mId].status === 'finished' && newMatches[mId].tableId) {
+      newMatches[mId] = { ...newMatches[mId], tableId: undefined };
+    }
+  });
+
   // Rule A: Each table can have at most ONE match assigned to it
   Object.keys(newTables).forEach(tId => {
     const table = newTables[tId];
@@ -208,20 +216,24 @@ export const dispatchTournamentMatches = (
       // Find all ready pending matches whose players are not busy
       const eligibleMatchIds = tournament.matches.filter(id => {
         const m = newMatches[id];
+        if (!m) return false;
+        // CRITICAL: MUST be pending and NOT already assigned to any table
+        if (m.status !== 'pending' || m.tableId) return false;
+        // MUST have both players defined
+        if (!m.player1Id || !m.player2Id) return false;
+
         const isFinalStageActive = Boolean(tournament.finalStageLaunched || tournament.settings?.finalStageLaunched);
-        const getMatchStage = (m: Match): string => {
-          if (m.stage) return m.stage;
-          if (m.id?.includes('_final_')) return 'final';
-          if (m.id?.includes('_semi_')) return 'semi';
-          if (m.id?.includes('_quarter_')) return 'quarter';
+        const getMatchStage = (matchObj: Match): string => {
+          if (matchObj.stage) return matchObj.stage;
+          if (matchObj.id?.includes('_final_')) return 'final';
+          if (matchObj.id?.includes('_semi_')) return 'semi';
+          if (matchObj.id?.includes('_quarter_')) return 'quarter';
           return 'qualif';
         };
 
         // If final stage launched, do not dispatch unplayed qualif matches
         if (isFinalStageActive && getMatchStage(m) === 'qualif') return false;
         return (
-          Boolean(m.player1Id) &&
-          Boolean(m.player2Id) &&
           !isPlayerBusy(m.player1Id) &&
           !isPlayerBusy(m.player2Id)
         );
@@ -230,11 +242,11 @@ export const dispatchTournamentMatches = (
         const mb = newMatches[b];
 
         const isFinalStageActive = Boolean(tournament.finalStageLaunched || tournament.settings?.finalStageLaunched);
-        const getMatchStage = (m: Match): string => {
-          if (m.stage) return m.stage;
-          if (m.id?.includes('_final_')) return 'final';
-          if (m.id?.includes('_semi_')) return 'semi';
-          if (m.id?.includes('_quarter_')) return 'quarter';
+        const getMatchStage = (matchObj: Match): string => {
+          if (matchObj.stage) return matchObj.stage;
+          if (matchObj.id?.includes('_final_')) return 'final';
+          if (matchObj.id?.includes('_semi_')) return 'semi';
+          if (matchObj.id?.includes('_quarter_')) return 'quarter';
           return 'qualif';
         };
 
@@ -272,7 +284,8 @@ export const dispatchTournamentMatches = (
 
         newMatches[nextMatchId] = {
           ...newMatches[nextMatchId],
-          tableId: table.id
+          tableId: table.id,
+          status: 'pending'
         };
         newTables[table.id] = {
           ...table,
@@ -612,7 +625,8 @@ export const useStore = create<AppState>((set, get) => ({
           score1: s1,
           score2: s2,
           winnerId: newWinnerId,
-          status: 'finished' as const
+          status: 'finished' as const,
+          tableId: undefined
         }
       };
 
@@ -653,7 +667,14 @@ export const useStore = create<AppState>((set, get) => ({
         newMatches[match.nextMatchId] = nextM;
       }
 
-      return { matches: newMatches };
+      const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
+        state.tables,
+        newMatches,
+        state.tournaments,
+        match.tournamentId
+      );
+
+      return { matches: dispatchedMatches, tables: dispatchedTables };
     });
   },
 
@@ -754,14 +775,28 @@ export const useStore = create<AppState>((set, get) => ({
     const winnerId = match.score1 > match.score2 ? match.player1Id : (match.score2 > match.score1 ? match.player2Id : undefined);
 
     set((state) => {
+      // 1. Mark match as finished and explicitly remove tableId
       const newMatches = {
         ...state.matches,
-        [activeId]: { ...match, status: 'finished', endTime: Date.now(), winnerId }
+        [activeId]: { ...match, status: 'finished', endTime: Date.now(), winnerId, tableId: undefined }
       } as Record<string, Match>;
 
-      // Advance winner to next bracket match if defined
-      if (winnerId && match.nextMatchId && newMatches[match.nextMatchId]) {
-        let nextM = newMatches[match.nextMatchId];
+      // 2. Advance winner to next bracket match if defined or infer next match
+      let targetNextId = match.nextMatchId;
+      if (!targetNextId && match.tournamentId) {
+        const tourMatches = Object.values(newMatches).filter(m => m.tournamentId === match.tournamentId);
+        if (match.stage === 'quarter') {
+          const semiPos = (match.bracketPosition !== undefined && match.bracketPosition >= 2) ? 1 : 0;
+          const semiMatch = tourMatches.find(m => (m.stage === 'semi' || m.id.includes('_semi_')) && m.bracketPosition === semiPos);
+          if (semiMatch) targetNextId = semiMatch.id;
+        } else if (match.stage === 'semi') {
+          const finalMatch = tourMatches.find(m => m.stage === 'final' || m.id.includes('_final_'));
+          if (finalMatch) targetNextId = finalMatch.id;
+        }
+      }
+
+      if (winnerId && targetNextId && newMatches[targetNextId]) {
+        let nextM = newMatches[targetNextId];
         if (match.bracketPosition !== undefined) {
           if (match.bracketPosition % 2 === 0) {
             nextM = { ...nextM, player1Id: winnerId };
@@ -793,7 +828,7 @@ export const useStore = create<AppState>((set, get) => ({
           };
         }
 
-        newMatches[match.nextMatchId] = nextM;
+        newMatches[targetNextId] = nextM;
       }
 
       const newTables = { ...state.tables };
@@ -868,63 +903,16 @@ export const useStore = create<AppState>((set, get) => ({
       const tournament = state.tournaments[tournamentId];
       if (!tournament) return state;
 
-      // 1. Calculate Standings from existing qualification matches
-      const pStats: Record<string, { id: string; played: number; won: number; lost: number; sf: number; sa: number; pts: number }> = {};
-      tournament.participants.forEach(pId => {
-        pStats[pId] = { id: pId, played: 0, won: 0, lost: 0, sf: 0, sa: 0, pts: 0 };
-      });
-
-      const qualifMatches = tournament.matches
-        .map(mId => state.matches[mId])
-        .filter((m): m is Match => Boolean(m && (!m.stage || m.stage === 'qualif')));
-
-      qualifMatches.forEach(m => {
-        if (m.status === 'finished') {
-          const p1 = pStats[m.player1Id];
-          const p2 = pStats[m.player2Id];
-          if (p1 && p2) {
-            p1.played++; p2.played++;
-            p1.sf += m.score1; p1.sa += m.score2;
-            p2.sf += m.score2; p2.sa += m.score1;
-            if (m.score1 > m.score2) {
-              p1.won++; p1.pts += 3; p2.lost++;
-            } else if (m.score2 > m.score1) {
-              p2.won++; p2.pts += 3; p1.lost++;
-            } else {
-              p1.pts += 1; p2.pts += 1;
-            }
-          }
-        }
-      });
-
-      const ranking = Object.values(pStats).sort((a, b) => {
-        if (b.pts !== a.pts) return b.pts - a.pts;
-        const diffDiff = (b.sf - b.sa) - (a.sf - a.sa);
-        if (diffDiff !== 0) return diffDiff;
-        if (b.sf !== a.sf) return b.sf - a.sf;
-        const directMatch = qualifMatches.find(
-          m => m.status === 'finished' &&
-          ((m.player1Id === a.id && m.player2Id === b.id) || (m.player1Id === b.id && m.player2Id === a.id))
-        );
-        if (directMatch) {
-          if (directMatch.player1Id === a.id) {
-            if (directMatch.score1 !== directMatch.score2) return directMatch.score2 - directMatch.score1;
-          } else {
-            if (directMatch.score2 !== directMatch.score1) return directMatch.score1 - directMatch.score2;
-          }
-        }
-        return a.id.localeCompare(b.id);
-      });
-
-      const reqQualifiers = tournament.settings?.qualifNbQualifiers || 4;
+      // 1. Calculate Standings using centralized getTournamentQualificationStatus
+      const qualifStatus = getTournamentQualificationStatus(tournament, state.matches, state.players);
       const participantsCount = tournament.participants.length;
 
-      let numQualifiers = 4;
-      if (reqQualifiers >= 8 && participantsCount >= 8) numQualifiers = 8;
-      else if (reqQualifiers <= 2 || participantsCount < 4) numQualifiers = 2;
-      else numQualifiers = 4;
+      let numQualifiers = qualifStatus.numQualifiers;
+      if (numQualifiers >= 8 && participantsCount >= 8) numQualifiers = 8;
+      else if (numQualifiers <= 2 || participantsCount < 4) numQualifiers = 2;
+      else numQualifiers = Math.min(4, participantsCount);
 
-      const qualifiers = ranking.slice(0, numQualifiers).map(r => r.id);
+      const qualifiers = qualifStatus.ranking.slice(0, numQualifiers).map(r => r.id);
 
       // If somehow not enough qualifiers, fill with available participants
       while (qualifiers.length < numQualifiers && qualifiers.length < participantsCount) {
@@ -1143,19 +1131,17 @@ export const useStore = create<AppState>((set, get) => ({
         newMatchIds.push(finalId);
       }
 
-      // 1. Cancel / unassign any unfinished qualification matches so they release tables
+      // 1. Cancel / unassign all qualification matches so they release tables
       Object.keys(newMatches).forEach(mId => {
         const m = newMatches[mId];
         if (m.tournamentId === tournamentId && (!m.stage || m.stage === 'qualif')) {
-          if (m.status !== 'finished') {
-            newMatches[mId] = {
-              ...m,
-              tableId: undefined,
-              status: 'finished',
-              score1: m.score1 || 0,
-              score2: m.score2 || 0
-            };
-          }
+          newMatches[mId] = {
+            ...m,
+            tableId: undefined,
+            status: m.status === 'playing' ? 'finished' : (m.status !== 'finished' ? 'finished' : m.status),
+            score1: m.score1 || 0,
+            score2: m.score2 || 0
+          };
         }
       });
 

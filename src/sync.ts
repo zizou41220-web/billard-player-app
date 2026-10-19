@@ -39,7 +39,19 @@ const mapDBToTable = (d: any): Table => ({
 });
 
 const mapMatchToDB = (m: Match) => {
-  const data: any = { id: m.id, table_id: m.tableId || null, player1_id: m.player1Id, player2_id: m.player2Id, score1: m.score1, score2: m.score2, status: m.status, start_time: m.startTime, end_time: m.endTime || null, winner_id: m.winnerId || null, tournament_id: m.tournamentId || null };
+  const data: any = {
+    id: m.id,
+    table_id: m.status === 'finished' ? null : (m.tableId || null),
+    player1_id: m.player1Id || null,
+    player2_id: m.player2Id || null,
+    score1: m.score1,
+    score2: m.score2,
+    status: m.status,
+    start_time: m.startTime,
+    end_time: m.endTime || null,
+    winner_id: m.winnerId || null,
+    tournament_id: m.tournamentId || null
+  };
   if (hasClubColumn) data.club_id = m.clubId || useStore.getState().currentClub.id;
   return data;
 };
@@ -70,10 +82,22 @@ const mapDBToMatch = (d: any): Match => {
     }
   }
 
+  let nextMatchId = d.next_match_id;
+  if (!nextMatchId && d.id) {
+    const ts = d.id.split('_').pop();
+    if (d.id.includes('_quarter_1_') || d.id.includes('_quarter_2_')) {
+      nextMatchId = `m_semi_1_${ts}`;
+    } else if (d.id.includes('_quarter_3_') || d.id.includes('_quarter_4_')) {
+      nextMatchId = `m_semi_2_${ts}`;
+    } else if (d.id.includes('_semi_')) {
+      nextMatchId = `m_final_${ts}`;
+    }
+  }
+
   return {
     id: d.id,
     clubId: d.club_id || undefined,
-    tableId: d.table_id || undefined,
+    tableId: d.status === 'finished' ? undefined : (d.table_id || undefined),
     player1Id: d.player1_id || '',
     player2Id: d.player2_id || '',
     score1: d.score1 || 0,
@@ -86,7 +110,7 @@ const mapDBToMatch = (d: any): Match => {
     stage,
     bracketRound,
     bracketPosition,
-    nextMatchId: d.next_match_id || undefined
+    nextMatchId
   };
 };
 
