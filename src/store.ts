@@ -173,17 +173,41 @@ export const healAndAdvanceBracketMatches = (
       const s2Loser = getLoser(semi2);
 
       // Finale du Tournoi
-      if (final && final.status === 'pending') {
-        const p1 = s1Winner || final.player1Id;
-        const p2 = s2Winner || final.player2Id;
-        if (p1 !== final.player1Id || p2 !== final.player2Id) {
+      let targetFinal = final;
+      if (!targetFinal && semis.length >= 2) {
+        const finalId = `m_final_${Date.now()}`;
+        targetFinal = {
+          id: finalId,
+          clubId: tour.clubId || '',
+          player1Id: s1Winner || '',
+          player2Id: s2Winner || '',
+          score1: 0,
+          score2: 0,
+          status: 'pending',
+          startTime: Date.now(),
+          tournamentId: tour.id,
+          stage: 'final',
+          bracketRound: quarters.length > 0 ? 3 : 2,
+          bracketPosition: 0
+        };
+        newMatches[finalId] = targetFinal;
+        if (tour.matches && !tour.matches.includes(finalId)) {
+          tour.matches.push(finalId);
+        }
+        updated = true;
+      }
+
+      if (targetFinal && targetFinal.status === 'pending') {
+        const p1 = s1Winner || targetFinal.player1Id;
+        const p2 = s2Winner || targetFinal.player2Id;
+        if (p1 !== targetFinal.player1Id || p2 !== targetFinal.player2Id) {
           const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
-          newMatches[final.id] = {
-            ...final,
+          newMatches[targetFinal.id] = {
+            ...targetFinal,
             player1Id: p1 || '',
             player2Id: p2 || '',
-            score1: (p1 && p2) ? h1 : final.score1,
-            score2: (p1 && p2) ? h2 : final.score2,
+            score1: (p1 && p2) ? h1 : targetFinal.score1,
+            score2: (p1 && p2) ? h2 : targetFinal.score2,
             handicapP1: h1 > 0 ? h1 : undefined,
             handicapP2: h2 > 0 ? h2 : undefined
           };
@@ -192,17 +216,42 @@ export const healAndAdvanceBracketMatches = (
       }
 
       // Petite Finale (3ème place)
-      if (thirdPlace && thirdPlace.status === 'pending') {
-        const p1 = s1Loser || thirdPlace.player1Id;
-        const p2 = s2Loser || thirdPlace.player2Id;
-        if (p1 !== thirdPlace.player1Id || p2 !== thirdPlace.player2Id) {
+      let targetThirdPlace = thirdPlace;
+      const shouldIncludeThirdPlace = Boolean(tour.settings?.hasThirdPlaceMatch ?? true);
+      if (!targetThirdPlace && shouldIncludeThirdPlace && semis.length >= 2) {
+        const tpId = `m_third_place_${Date.now()}`;
+        targetThirdPlace = {
+          id: tpId,
+          clubId: tour.clubId || '',
+          player1Id: s1Loser || '',
+          player2Id: s2Loser || '',
+          score1: 0,
+          score2: 0,
+          status: 'pending',
+          startTime: Date.now(),
+          tournamentId: tour.id,
+          stage: 'third_place',
+          bracketRound: quarters.length > 0 ? 3 : 2,
+          bracketPosition: 1
+        };
+        newMatches[tpId] = targetThirdPlace;
+        if (tour.matches && !tour.matches.includes(tpId)) {
+          tour.matches.push(tpId);
+        }
+        updated = true;
+      }
+
+      if (targetThirdPlace && targetThirdPlace.status === 'pending') {
+        const p1 = s1Loser || targetThirdPlace.player1Id;
+        const p2 = s2Loser || targetThirdPlace.player2Id;
+        if (p1 !== targetThirdPlace.player1Id || p2 !== targetThirdPlace.player2Id) {
           const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
-          newMatches[thirdPlace.id] = {
-            ...thirdPlace,
+          newMatches[targetThirdPlace.id] = {
+            ...targetThirdPlace,
             player1Id: p1 || '',
             player2Id: p2 || '',
-            score1: (p1 && p2) ? h1 : thirdPlace.score1,
-            score2: (p1 && p2) ? h2 : thirdPlace.score2,
+            score1: (p1 && p2) ? h1 : targetThirdPlace.score1,
+            score2: (p1 && p2) ? h2 : targetThirdPlace.score2,
             handicapP1: h1 > 0 ? h1 : undefined,
             handicapP2: h2 > 0 ? h2 : undefined
           };
