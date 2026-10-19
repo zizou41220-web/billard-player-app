@@ -446,8 +446,11 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
             >
               {player1?.name || 'J1'}
             </span>
-            <span style={{ color: 'var(--accent-primary)', fontWeight: 900 }}>
+            <span style={{ color: 'var(--accent-primary)', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
               {match.status === 'playing' ? `${match.score1}-${match.score2}` : 'VS'}
+              {(Boolean(match.handicapP1) || Boolean(match.handicapP2)) && (
+                <span style={{ fontSize: '0.52rem', color: '#ffd700' }} title="Handicap actif">🎯</span>
+              )}
             </span>
             <span
               style={{

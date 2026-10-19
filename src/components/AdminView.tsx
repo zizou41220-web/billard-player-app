@@ -66,6 +66,7 @@ const AdminView: React.FC = () => {
   const [finalNbSets, setFinalNbSets] = useState(3);
   const [finalIsWinningSets, setFinalIsWinningSets] = useState(true);
   const [seedByMerit, setSeedByMerit] = useState(true);
+  const [handicapAmateurSets, setHandicapAmateurSets] = useState(0);
 
   // New Player State
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -793,6 +794,14 @@ const AdminView: React.FC = () => {
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Progression Matchs</div>
                       <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{finishedTourMatches.length} <span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>/ {allTourMatches.length}</span></div>
                     </div>
+                    {Boolean(activeTournament.settings?.handicapAmateurSets) && (
+                      <div style={{ background: 'rgba(255, 215, 0, 0.12)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.35)' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#ffd700', marginBottom: '0.3rem', fontWeight: 700 }}>🎯 Handicap Niveaux</div>
+                        <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffd700' }}>
+                          +{activeTournament.settings?.handicapAmateurSets} <span style={{ fontSize: '1rem', color: 'rgba(255, 215, 0, 0.8)' }}>manche(s)</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1086,6 +1095,55 @@ const AdminView: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Handicap Rules (Amateur vs Prestige) */}
+                    <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <h3 style={{ fontSize: '1.2rem', color: '#ffd700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                          🎯 Handicap Niveaux (Amateur vs Prestige)
+                        </h3>
+                        <span style={{ fontSize: '0.75rem', background: handicapAmateurSets > 0 ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: handicapAmateurSets > 0 ? '#ffd700' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(255, 215, 0, 0.3)' }}>
+                          {handicapAmateurSets > 0 ? `+${handicapAmateurSets} manche(s) d'avance` : 'Désactivé (Égalité)'}
+                        </span>
+                      </div>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0 0 1.2rem 0', lineHeight: '1.4' }}>
+                        Donne automatiquement un avantage de score au joueur Amateur lorsqu'il affronte un joueur Prestige. Les duels entre deux joueurs du même niveau démarrent normalement à 0-0.
+                      </p>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.8rem' }}>
+                        {[
+                          { val: 0, label: '0 (Aucun)', sub: 'Départ à 0 - 0' },
+                          { val: 1, label: '+1 manche', sub: 'Amateur démarre à 1 - 0' },
+                          { val: 2, label: '+2 manches', sub: 'Amateur démarre à 2 - 0' },
+                          { val: 3, label: '+3 manches', sub: 'Amateur démarre à 3 - 0' }
+                        ].map(opt => {
+                          const isSel = handicapAmateurSets === opt.val;
+                          return (
+                            <button
+                              type="button"
+                              key={opt.val}
+                              onClick={() => setHandicapAmateurSets(opt.val)}
+                              className="btn"
+                              style={{
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0.9rem 0.6rem',
+                                borderRadius: '10px',
+                                border: isSel ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
+                                background: isSel ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.02)',
+                                color: isSel ? '#ffd700' : '#fff',
+                                boxShadow: isSel ? '0 0 15px rgba(255, 215, 0, 0.25)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{opt.label}</span>
+                              <span style={{ fontSize: '0.7rem', color: isSel ? 'rgba(255,215,0,0.8)' : 'var(--text-muted)', marginTop: '0.2rem' }}>{opt.sub}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {/* Tables Allocation */}
                     <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -1167,7 +1225,7 @@ const AdminView: React.FC = () => {
 
                         createTournament(newTourName.trim(), newTourFormat, {
                           tableIds: selectedTables, qualifNbSets, qualifIsWinningSets, qualifNbQualifiers,
-                          finalNbSets, finalIsWinningSets, seedByMerit
+                          finalNbSets, finalIsWinningSets, seedByMerit, handicapAmateurSets
                         }, selectedPlayers);
 
                         setShowNewTourForm(false);
@@ -1215,8 +1273,19 @@ const AdminView: React.FC = () => {
                           </div>
                           <img src={p.avatarUrl} alt={p.name} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                           <div style={{ flex: 1, overflow: 'hidden' }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{p.name}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.level}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{p.name}</span>
+                              {(p.level === 'Prestige' || p.level === 'Confirmé') ? (
+                                <span style={{ fontSize: '0.65rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)', flexShrink: 0 }}>
+                                  👑 Prestige
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.65rem', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600, flexShrink: 0 }}>
+                                  Amateur
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.stats.matchesPlayed} matchs • {p.stats.winRate}% vict.</div>
                           </div>
                         </div>
                       ))}
@@ -1951,9 +2020,9 @@ const AdminView: React.FC = () => {
                           // Edit Mode
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                             <input type="text" className="input-field" value={editPlayerName} onChange={e => setEditPlayerName(e.target.value)} />
-                            <select className="input-field" value={editPlayerLevel} onChange={e => setEditPlayerLevel(e.target.value)} style={{ appearance: 'none', background: 'rgba(255,255,255,0.05)', color: '#fff' }}>
+                            <select className="input-field" value={editPlayerLevel === 'Confirmé' ? 'Prestige' : editPlayerLevel} onChange={e => setEditPlayerLevel(e.target.value)} style={{ appearance: 'none', background: 'rgba(255,255,255,0.05)', color: '#fff' }}>
                               <option value="Amateur" style={{ color: '#000' }}>Amateur</option>
-                              <option value="Confirmé" style={{ color: '#000' }}>Confirmé</option>
+                              <option value="Prestige" style={{ color: '#000' }}>👑 Prestige</option>
                             </select>
                             <input type="file" accept="image/*" onChange={e => {
                               const file = e.target.files?.[0];
@@ -1971,10 +2040,20 @@ const AdminView: React.FC = () => {
                         ) : (
                           // View Mode
                           <>
-                            <img src={p.avatarUrl} alt={p.name} style={{ width: '70px', height: '70px', borderRadius: '50%', border: `3px solid ${p.level === 'Confirmé' ? 'var(--accent-secondary)' : 'var(--border-color)'}`, objectFit: 'cover' }} />
+                            <img src={p.avatarUrl} alt={p.name} style={{ width: '70px', height: '70px', borderRadius: '50%', border: `3px solid ${(p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : 'var(--border-color)'}`, objectFit: 'cover' }} />
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: '1.15rem', fontWeight: 700 }}>{p.name}</div>
-                              <div style={{ color: p.level === 'Confirmé' ? 'var(--accent-secondary)' : 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.4rem', fontWeight: 600 }}>{p.level}</div>
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                color: (p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : 'var(--text-muted)',
+                                fontSize: '0.85rem',
+                                marginBottom: '0.4rem',
+                                fontWeight: 700
+                              }}>
+                                {(p.level === 'Prestige' || p.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
+                              </div>
                               <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem' }}>
                                 <div><span style={{ color: 'var(--text-muted)' }}>Matchs:</span> <b>{p.stats.matchesPlayed}</b></div>
                                 <div><span style={{ color: 'var(--text-muted)' }}>Victoires:</span> <b>{p.stats.winRate}%</b></div>
@@ -1985,7 +2064,7 @@ const AdminView: React.FC = () => {
                                 <button onClick={() => {
                                   setEditingPlayerId(p.id);
                                   setEditPlayerName(p.name);
-                                  setEditPlayerLevel(p.level);
+                                  setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
                                   setEditPlayerPhoto(null);
                                 }} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '0.9rem', width: '28px', height: '28px', borderRadius: '4px' }}>✎</button>
                                 <button onClick={() => {
@@ -2021,12 +2100,12 @@ const AdminView: React.FC = () => {
                         <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Niveau</label>
                         <select
                           className="input-field"
-                          value={newPlayerLevel}
+                          value={newPlayerLevel === 'Confirmé' ? 'Prestige' : newPlayerLevel}
                           onChange={e => setNewPlayerLevel(e.target.value)}
                           style={{ appearance: 'none', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
                         >
                           <option value="Amateur" style={{ color: '#000' }}>Amateur</option>
-                          <option value="Confirmé" style={{ color: '#000' }}>Confirmé</option>
+                          <option value="Prestige" style={{ color: '#000' }}>👑 Prestige</option>
                         </select>
                       </div>
                       <div>

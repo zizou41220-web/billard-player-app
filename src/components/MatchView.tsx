@@ -37,6 +37,10 @@ const MatchView: React.FC = () => {
       if (isWinningSets && (score1 >= maxScore || score2 >= maxScore)) return;
       if (!isWinningSets && (score1 + score2) >= maxScore) return;
     }
+    if (delta < 0) {
+      if (playerId === p1 && score1 <= (match.handicapP1 || 0)) return;
+      if (playerId === p2 && score2 <= (match.handicapP2 || 0)) return;
+    }
     updateScore(playerId, delta);
   };
 
@@ -48,7 +52,7 @@ const MatchView: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
       {/* Top Bar */}
       <div style={{ padding: '1.2rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-primary)', boxShadow: 'var(--shadow-neon)' }} />
           <span style={{ fontWeight: 800, letterSpacing: '1px', fontSize: '0.85rem' }}>EN DIRECT</span>
           {match.stage && match.stage !== 'qualif' && (
@@ -65,6 +69,20 @@ const MatchView: React.FC = () => {
               {match.stage === 'final' ? '🏆 FINALE' : match.stage === 'semi' ? '⚔️ DEMI-FINALE' : '🎯 1/4 DE FINALE'}
             </span>
           )}
+          {(Boolean(match.handicapP1) || Boolean(match.handicapP2)) && (
+            <span style={{
+              background: 'rgba(0, 255, 170, 0.15)',
+              color: 'var(--accent-primary)',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              border: '1px solid rgba(0, 255, 170, 0.35)',
+              marginLeft: '0.3rem'
+            }}>
+              🎯 Handicap actif
+            </span>
+          )}
         </div>
         <div style={{ background: 'var(--bg-surface)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700 }}>
           {table?.name || (table?.number ? `Table ${table.number}` : 'Billard')}
@@ -73,8 +91,24 @@ const MatchView: React.FC = () => {
 
       {/* Player 2 Zone (Top half) */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', minHeight: '200px' }}>
-        <div style={{ position: 'absolute', top: '1rem', color: 'var(--text-muted)' }}>
-          {players[p2]?.name}
+        <div style={{ position: 'absolute', top: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '1.05rem' }}>
+            {players[p2]?.name}
+          </span>
+          {(players[p2]?.level === 'Prestige' || players[p2]?.level === 'Confirmé') ? (
+            <span style={{ fontSize: '0.68rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)' }}>
+              👑 Prestige
+            </span>
+          ) : (
+            <span style={{ fontSize: '0.68rem', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+              Amateur
+            </span>
+          )}
+          {Boolean(match.handicapP2 && match.handicapP2 > 0) && (
+            <span style={{ fontSize: '0.68rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid var(--accent-primary)' }}>
+              🎯 +{match.handicapP2} Handicap
+            </span>
+          )}
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
@@ -99,8 +133,24 @@ const MatchView: React.FC = () => {
 
       {/* Player 1 Zone (Bottom half) */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', minHeight: '200px' }}>
-        <div style={{ position: 'absolute', bottom: '1rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
-          {players[p1]?.name}
+        <div style={{ position: 'absolute', bottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ color: 'var(--accent-primary)', fontWeight: 800, fontSize: '1.15rem' }}>
+            {players[p1]?.name}
+          </span>
+          {(players[p1]?.level === 'Prestige' || players[p1]?.level === 'Confirmé') ? (
+            <span style={{ fontSize: '0.68rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)' }}>
+              👑 Prestige
+            </span>
+          ) : (
+            <span style={{ fontSize: '0.68rem', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+              Amateur
+            </span>
+          )}
+          {Boolean(match.handicapP1 && match.handicapP1 > 0) && (
+            <span style={{ fontSize: '0.68rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid var(--accent-primary)' }}>
+              🎯 +{match.handicapP1} Handicap
+            </span>
+          )}
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>

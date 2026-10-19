@@ -157,8 +157,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                   height: '54px',
                   borderRadius: '50%',
                   objectFit: 'cover',
-                  border: `2px solid ${p1.level === 'Confirmé' ? '#00e5ff' : '#00ffcc'}`,
-                  boxShadow: '0 0 12px rgba(0,0,0,0.5)',
+                  border: `2px solid ${(p1.level === 'Prestige' || p1.level === 'Confirmé') ? '#ffd700' : '#00ffcc'}`,
+                  boxShadow: (p1.level === 'Prestige' || p1.level === 'Confirmé') ? '0 0 16px rgba(255, 215, 0, 0.4)' : '0 0 12px rgba(0,0,0,0.5)',
                   flexShrink: 0
                 }}
               />
@@ -174,8 +174,19 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 }}>
                   {p1.name}
                 </div>
-                <div style={{ color: p1.level === 'Confirmé' ? '#00e5ff' : 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 600 }}>
-                  {p1.level}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                  <span style={{
+                    color: (p1.level === 'Prestige' || p1.level === 'Confirmé') ? '#ffd700' : 'rgba(255,255,255,0.6)',
+                    fontSize: '0.8rem',
+                    fontWeight: 700
+                  }}>
+                    {(p1.level === 'Prestige' || p1.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
+                  </span>
+                  {Boolean(match.handicapP1 && match.handicapP1 > 0) && (
+                    <span style={{ fontSize: '0.7rem', background: 'rgba(0, 255, 170, 0.25)', color: '#00ffaa', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                      +{match.handicapP1} Handicap
+                    </span>
+                  )}
                 </div>
               </div>
               <div style={{
@@ -245,8 +256,19 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 }}>
                   {p2.name}
                 </div>
-                <div style={{ color: p2.level === 'Confirmé' ? '#00e5ff' : 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 600 }}>
-                  {p2.level}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '2px' }}>
+                  {Boolean(match.handicapP2 && match.handicapP2 > 0) && (
+                    <span style={{ fontSize: '0.7rem', background: 'rgba(0, 255, 170, 0.25)', color: '#00ffaa', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                      +{match.handicapP2} Handicap
+                    </span>
+                  )}
+                  <span style={{
+                    color: (p2.level === 'Prestige' || p2.level === 'Confirmé') ? '#ffd700' : 'rgba(255,255,255,0.6)',
+                    fontSize: '0.8rem',
+                    fontWeight: 700
+                  }}>
+                    {(p2.level === 'Prestige' || p2.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
+                  </span>
                 </div>
               </div>
               <img 
@@ -257,8 +279,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                   height: '54px',
                   borderRadius: '50%',
                   objectFit: 'cover',
-                  border: `2px solid ${p2.level === 'Confirmé' ? '#00e5ff' : '#00ffcc'}`,
-                  boxShadow: '0 0 12px rgba(0,0,0,0.5)',
+                  border: `2px solid ${(p2.level === 'Prestige' || p2.level === 'Confirmé') ? '#ffd700' : '#00ffcc'}`,
+                  boxShadow: (p2.level === 'Prestige' || p2.level === 'Confirmé') ? '0 0 16px rgba(255, 215, 0, 0.4)' : '0 0 12px rgba(0,0,0,0.5)',
                   flexShrink: 0
                 }}
               />

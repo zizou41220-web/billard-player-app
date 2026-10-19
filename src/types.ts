@@ -1,4 +1,4 @@
-export type PlayerLevel = 'Amateur' | 'Confirmé';
+export type PlayerLevel = 'Amateur' | 'Prestige' | 'Confirmé';
 
 export type Club = {
   id: string; // ex: 'bc41', 'bc-romorantin'
@@ -51,6 +51,8 @@ export type Match = {
   bracketRound?: number;
   bracketPosition?: number;
   nextMatchId?: string;
+  handicapP1?: number;
+  handicapP2?: number;
 };
 
 export type TournamentFormat = 'cartesien' | 'robin' | 'double_ko';
@@ -64,6 +66,7 @@ export type TournamentSettings = {
   finalIsWinningSets: boolean;
   seedByMerit: boolean; // Tirage au mérite
   finalStageLaunched?: boolean;
+  handicapAmateurSets?: number; // 0 = aucun, 1 = +1 manche d'avance pour Amateur vs Prestige, etc.
 };
 
 export type Tournament = {

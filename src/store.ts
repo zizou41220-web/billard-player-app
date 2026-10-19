@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Club, Player, PlayerLevel, Table, Match, Tournament, TournamentFormat, TournamentSettings } from './types';
+import { getMatchHandicap } from './utils/handicap';
 
 interface AppState {
   currentClub: Club;
@@ -62,9 +63,9 @@ const getInitialClub = (): Club => {
 };
 
 const MOCK_PLAYERS: Record<string, Player> = {
-  'p1': { id: 'p1', clubId: 'bc41', name: 'Sébastien T.', level: 'Confirmé', avatarUrl: 'https://i.pravatar.cc/150?u=p1', stats: { matchesPlayed: 142, wins: 89, winRate: 62.6, nemesisId: 'p3', bestFriendId: 'p2' } },
+  'p1': { id: 'p1', clubId: 'bc41', name: 'Sébastien T.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p1', stats: { matchesPlayed: 142, wins: 89, winRate: 62.6, nemesisId: 'p3', bestFriendId: 'p2' } },
   'p2': { id: 'p2', clubId: 'bc41', name: 'Alexandre D.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p2', stats: { matchesPlayed: 98, wins: 45, winRate: 45.9 } },
-  'p3': { id: 'p3', clubId: 'bc41', name: 'Maxime R.', level: 'Confirmé', avatarUrl: 'https://i.pravatar.cc/150?u=p3', stats: { matchesPlayed: 210, wins: 156, winRate: 74.2 } },
+  'p3': { id: 'p3', clubId: 'bc41', name: 'Maxime R.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p3', stats: { matchesPlayed: 210, wins: 156, winRate: 74.2 } },
   'p4': { id: 'p4', clubId: 'bc41', name: 'Sophie L.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p4', stats: { matchesPlayed: 56, wins: 30, winRate: 53.5 } },
 };
 
@@ -363,16 +364,23 @@ export const useStore = create<AppState>((set, get) => ({
 
     // Generate Round Robin
     const shuffled = [...participants].sort(() => 0.5 - Math.random());
+    const playersState = get().players;
     for (let i = 0; i < shuffled.length; i++) {
       for (let j = i + 1; j < shuffled.length; j++) {
         const matchId = `m_${Date.now()}_${i}_${j}`;
+        const p1 = playersState[shuffled[i]];
+        const p2 = playersState[shuffled[j]];
+        const { h1, h2 } = getMatchHandicap(p1?.level, p2?.level, settings?.handicapAmateurSets);
+
         newMatches[matchId] = {
           id: matchId,
           clubId: get().currentClub.id,
           player1Id: shuffled[i],
           player2Id: shuffled[j],
-          score1: 0,
-          score2: 0,
+          score1: h1,
+          score2: h2,
+          handicapP1: h1 > 0 ? h1 : undefined,
+          handicapP2: h2 > 0 ? h2 : undefined,
           status: 'pending',
           startTime: Date.now(),
           tournamentId: tourId,
@@ -468,14 +476,16 @@ export const useStore = create<AppState>((set, get) => ({
     if (!match) return;
 
     const isPlayer1 = match.player1Id === playerId;
+    const minScore1 = match.handicapP1 || 0;
+    const minScore2 = match.handicapP2 || 0;
     
     set((state) => ({
       matches: {
         ...state.matches,
         [activeMatchId]: {
           ...match,
-          score1: isPlayer1 ? Math.max(0, match.score1 + delta) : match.score1,
-          score2: !isPlayer1 ? Math.max(0, match.score2 + delta) : match.score2
+          score1: isPlayer1 ? Math.max(minScore1, match.score1 + delta) : match.score1,
+          score2: !isPlayer1 ? Math.max(minScore2, match.score2 + delta) : match.score2
         }
       }
     }));
@@ -608,20 +618,39 @@ export const useStore = create<AppState>((set, get) => ({
 
       // Advance/update winner in next bracket match if defined
       if (match.nextMatchId && newMatches[match.nextMatchId]) {
-        const nextM = newMatches[match.nextMatchId];
+        let nextM = newMatches[match.nextMatchId];
         if (match.bracketPosition !== undefined) {
           if (match.bracketPosition % 2 === 0) {
-            newMatches[match.nextMatchId] = { ...nextM, player1Id: newWinnerId || '' };
+            nextM = { ...nextM, player1Id: newWinnerId || '' };
           } else {
-            newMatches[match.nextMatchId] = { ...nextM, player2Id: newWinnerId || '' };
+            nextM = { ...nextM, player2Id: newWinnerId || '' };
           }
         } else {
           if (nextM.player1Id === match.winnerId || !nextM.player1Id) {
-            newMatches[match.nextMatchId] = { ...nextM, player1Id: newWinnerId || '' };
+            nextM = { ...nextM, player1Id: newWinnerId || '' };
           } else if (nextM.player2Id === match.winnerId || !nextM.player2Id) {
-            newMatches[match.nextMatchId] = { ...nextM, player2Id: newWinnerId || '' };
+            nextM = { ...nextM, player2Id: newWinnerId || '' };
           }
         }
+
+        // If next match now has both players and hasn't started, apply handicap
+        if (nextM.player1Id && nextM.player2Id && nextM.status === 'pending') {
+          const tour = match.tournamentId ? state.tournaments[match.tournamentId] : null;
+          const { h1, h2 } = getMatchHandicap(
+            state.players[nextM.player1Id]?.level,
+            state.players[nextM.player2Id]?.level,
+            tour?.settings?.handicapAmateurSets
+          );
+          nextM = {
+            ...nextM,
+            score1: h1,
+            score2: h2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+        }
+
+        newMatches[match.nextMatchId] = nextM;
       }
 
       return { matches: newMatches };
@@ -732,20 +761,39 @@ export const useStore = create<AppState>((set, get) => ({
 
       // Advance winner to next bracket match if defined
       if (winnerId && match.nextMatchId && newMatches[match.nextMatchId]) {
-        const nextM = newMatches[match.nextMatchId];
+        let nextM = newMatches[match.nextMatchId];
         if (match.bracketPosition !== undefined) {
           if (match.bracketPosition % 2 === 0) {
-            newMatches[match.nextMatchId] = { ...nextM, player1Id: winnerId };
+            nextM = { ...nextM, player1Id: winnerId };
           } else {
-            newMatches[match.nextMatchId] = { ...nextM, player2Id: winnerId };
+            nextM = { ...nextM, player2Id: winnerId };
           }
         } else {
           if (!nextM.player1Id) {
-            newMatches[match.nextMatchId] = { ...nextM, player1Id: winnerId };
+            nextM = { ...nextM, player1Id: winnerId };
           } else if (!nextM.player2Id) {
-            newMatches[match.nextMatchId] = { ...nextM, player2Id: winnerId };
+            nextM = { ...nextM, player2Id: winnerId };
           }
         }
+
+        // If next match now has both players and hasn't started, apply handicap
+        if (nextM.player1Id && nextM.player2Id && nextM.status === 'pending') {
+          const tour = match.tournamentId ? state.tournaments[match.tournamentId] : null;
+          const { h1, h2 } = getMatchHandicap(
+            state.players[nextM.player1Id]?.level,
+            state.players[nextM.player2Id]?.level,
+            tour?.settings?.handicapAmateurSets
+          );
+          nextM = {
+            ...nextM,
+            score1: h1,
+            score2: h2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+        }
+
+        newMatches[match.nextMatchId] = nextM;
       }
 
       const newTables = { ...state.tables };
@@ -964,13 +1012,20 @@ export const useStore = create<AppState>((set, get) => ({
         const qIds = [q1Id, q2Id, q3Id, q4Id];
         qIds.forEach((qId, idx) => {
           const pair = qPairs[idx];
+          const { h1, h2 } = getMatchHandicap(
+            state.players[pair.p1]?.level,
+            state.players[pair.p2]?.level,
+            tournament.settings?.handicapAmateurSets
+          );
           newMatches[qId] = {
             id: qId,
             clubId: state.currentClub.id,
             player1Id: pair.p1,
             player2Id: pair.p2,
-            score1: 0,
-            score2: 0,
+            score1: h1,
+            score2: h2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined,
             status: 'pending',
             startTime: timestamp,
             tournamentId,
@@ -1012,13 +1067,26 @@ export const useStore = create<AppState>((set, get) => ({
           ? { p1: qualifiers[1], p2: qualifiers[2] || qualifiers[0] }
           : { p1: qualifiers[2], p2: qualifiers[3] };
 
+        const hS1 = getMatchHandicap(
+          state.players[s1Pair.p1]?.level,
+          state.players[s1Pair.p2]?.level,
+          tournament.settings?.handicapAmateurSets
+        );
+        const hS2 = getMatchHandicap(
+          state.players[s2Pair.p1]?.level,
+          state.players[s2Pair.p2]?.level,
+          tournament.settings?.handicapAmateurSets
+        );
+
         newMatches[semi1Id] = {
           id: semi1Id,
           clubId: state.currentClub.id,
           player1Id: s1Pair.p1,
           player2Id: s1Pair.p2,
-          score1: 0,
-          score2: 0,
+          score1: hS1.h1,
+          score2: hS1.h2,
+          handicapP1: hS1.h1 > 0 ? hS1.h1 : undefined,
+          handicapP2: hS1.h2 > 0 ? hS1.h2 : undefined,
           status: 'pending',
           startTime: timestamp,
           tournamentId,
@@ -1033,8 +1101,10 @@ export const useStore = create<AppState>((set, get) => ({
           clubId: state.currentClub.id,
           player1Id: s2Pair.p1,
           player2Id: s2Pair.p2,
-          score1: 0,
-          score2: 0,
+          score1: hS2.h1,
+          score2: hS2.h2,
+          handicapP1: hS2.h1 > 0 ? hS2.h1 : undefined,
+          handicapP2: hS2.h2 > 0 ? hS2.h2 : undefined,
           status: 'pending',
           startTime: timestamp,
           tournamentId,
@@ -1049,13 +1119,20 @@ export const useStore = create<AppState>((set, get) => ({
       } else {
         // 2 Qualifiers: 1 Final
         const finalId = `m_final_${timestamp}`;
+        const hFinal = getMatchHandicap(
+          state.players[qualifiers[0]]?.level,
+          state.players[qualifiers[1] || qualifiers[0]]?.level,
+          tournament.settings?.handicapAmateurSets
+        );
         newMatches[finalId] = {
           id: finalId,
           clubId: state.currentClub.id,
           player1Id: qualifiers[0],
           player2Id: qualifiers[1] || qualifiers[0],
-          score1: 0,
-          score2: 0,
+          score1: hFinal.h1,
+          score2: hFinal.h2,
+          handicapP1: hFinal.h1 > 0 ? hFinal.h1 : undefined,
+          handicapP2: hFinal.h2 > 0 ? hFinal.h2 : undefined,
           status: 'pending',
           startTime: timestamp,
           tournamentId,

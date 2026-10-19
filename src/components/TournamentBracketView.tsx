@@ -64,6 +64,8 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     winnerId?: string;
     tableId?: string;
     realMatch?: Match;
+    handicapP1?: number;
+    handicapP2?: number;
   };
 
   // Build the bracket rounds
@@ -97,7 +99,9 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           status: m.status,
           winnerId: m.winnerId,
           tableId: m.tableId,
-          realMatch: m
+          realMatch: m,
+          handicapP1: m.handicapP1,
+          handicapP2: m.handicapP2
         }))
       });
     }
@@ -118,7 +122,9 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           status: m.status,
           winnerId: m.winnerId,
           tableId: m.tableId,
-          realMatch: m
+          realMatch: m,
+          handicapP1: m.handicapP1,
+          handicapP2: m.handicapP2
         }))
       });
     }
@@ -139,7 +145,9 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           status: final.status,
           winnerId: final.winnerId,
           tableId: final.tableId,
-          realMatch: final
+          realMatch: final,
+          handicapP1: final.handicapP1,
+          handicapP2: final.handicapP2
         }]
       });
     }
@@ -697,10 +705,18 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                               </div>
                             )}
 
-                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <span style={{ fontWeight: isP1Winner ? 800 : 600, fontSize: '0.85rem', color: isP1Winner ? 'var(--accent-primary)' : '#fff' }}>
+                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <span style={{ fontWeight: isP1Winner ? 800 : 600, fontSize: '0.85rem', color: isP1Winner ? 'var(--accent-primary)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {p1 ? p1.name : (m.player1Label || 'En attente...')}
                               </span>
+                              {p1 && (p1.level === 'Prestige' || p1.level === 'Confirmé') && (
+                                <span title="Joueur Prestige" style={{ fontSize: '0.7rem' }}>👑</span>
+                              )}
+                              {Boolean(m.handicapP1 && m.handicapP1 > 0) && (
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(0,255,170,0.2)', color: 'var(--accent-primary)', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>
+                                  +{m.handicapP1}
+                                </span>
+                              )}
                             </div>
 
                             {isP1Winner && (
@@ -742,10 +758,18 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                               </div>
                             )}
 
-                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <span style={{ fontWeight: isP2Winner ? 800 : 600, fontSize: '0.85rem', color: isP2Winner ? 'var(--accent-primary)' : '#fff' }}>
+                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <span style={{ fontWeight: isP2Winner ? 800 : 600, fontSize: '0.85rem', color: isP2Winner ? 'var(--accent-primary)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {p2 ? p2.name : (m.player2Label || 'En attente...')}
                               </span>
+                              {p2 && (p2.level === 'Prestige' || p2.level === 'Confirmé') && (
+                                <span title="Joueur Prestige" style={{ fontSize: '0.7rem' }}>👑</span>
+                              )}
+                              {Boolean(m.handicapP2 && m.handicapP2 > 0) && (
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(0,255,170,0.2)', color: 'var(--accent-primary)', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>
+                                  +{m.handicapP2}
+                                </span>
+                              )}
                             </div>
 
                             {isP2Winner && (
