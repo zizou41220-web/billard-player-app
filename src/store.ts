@@ -82,14 +82,156 @@ const MOCK_MATCHES: Record<string, Match> = {};
 
 const MOCK_TOURNAMENTS: Record<string, Tournament> = {};
 
+export const healAndAdvanceBracketMatches = (
+  matches: Record<string, Match>,
+  tournaments: Record<string, Tournament>,
+  players: Record<string, Player> = {}
+): { matches: Record<string, Match>; updated: boolean } => {
+  let updated = false;
+  const newMatches = { ...matches };
+
+  const finalStageTournaments = Object.values(tournaments).filter(
+    t => t && (t.finalStageLaunched || t.settings?.finalStageLaunched || t.status === 'ongoing')
+  );
+
+  for (const tour of finalStageTournaments) {
+    const tourMatches = Object.values(newMatches).filter(m => m.tournamentId === tour.id || tour.matches?.includes(m.id));
+    if (tourMatches.length === 0) continue;
+
+    const quarters = tourMatches
+      .filter(m => m.stage === 'quarter' || m.id.includes('_quarter_'))
+      .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+    const semis = tourMatches
+      .filter(m => m.stage === 'semi' || m.id.includes('_semi_'))
+      .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+    const final = tourMatches.find(m => (m.stage === 'final' || m.id.includes('_final_')) && !m.id.includes('_third_place_'));
+    const thirdPlace = tourMatches.find(m => m.stage === 'third_place' || m.id.includes('_third_place_'));
+
+    const getWinner = (m?: Match) => {
+      if (!m || m.status !== 'finished') return undefined;
+      return m.winnerId || (m.score1 > m.score2 ? m.player1Id : (m.score2 > m.score1 ? m.player2Id : undefined));
+    };
+
+    const getLoser = (m?: Match) => {
+      if (!m || m.status !== 'finished') return undefined;
+      const w = getWinner(m);
+      if (!w) return undefined;
+      return w === m.player1Id ? m.player2Id : m.player1Id;
+    };
+
+    // 1. Quarters -> Semis
+    if (quarters.length === 4 && semis.length >= 2) {
+      const qWinners = quarters.map(q => getWinner(q));
+      const semi1 = semis.find(s => s.bracketPosition === 0 || s.id.includes('_semi_1_')) || semis[0];
+      const semi2 = semis.find(s => s.bracketPosition === 1 || s.id.includes('_semi_2_')) || semis[1];
+
+      if (semi1 && semi1.status === 'pending') {
+        const p1 = qWinners[0] || semi1.player1Id;
+        const p2 = qWinners[1] || semi1.player2Id;
+        if (p1 !== semi1.player1Id || p2 !== semi1.player2Id) {
+          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
+          newMatches[semi1.id] = {
+            ...semi1,
+            player1Id: p1 || '',
+            player2Id: p2 || '',
+            score1: (p1 && p2) ? h1 : semi1.score1,
+            score2: (p1 && p2) ? h2 : semi1.score2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+          updated = true;
+        }
+      }
+
+      if (semi2 && semi2.status === 'pending') {
+        const p1 = qWinners[2] || semi2.player1Id;
+        const p2 = qWinners[3] || semi2.player2Id;
+        if (p1 !== semi2.player1Id || p2 !== semi2.player2Id) {
+          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
+          newMatches[semi2.id] = {
+            ...semi2,
+            player1Id: p1 || '',
+            player2Id: p2 || '',
+            score1: (p1 && p2) ? h1 : semi2.score1,
+            score2: (p1 && p2) ? h2 : semi2.score2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+          updated = true;
+        }
+      }
+    }
+
+    // 2. Semis -> Final & Petite Finale
+    if (semis.length >= 2) {
+      const semi1 = semis.find(s => s.bracketPosition === 0 || s.id.includes('_semi_1_')) || semis[0];
+      const semi2 = semis.find(s => s.bracketPosition === 1 || s.id.includes('_semi_2_')) || semis[1];
+
+      const s1Winner = getWinner(semi1);
+      const s2Winner = getWinner(semi2);
+      const s1Loser = getLoser(semi1);
+      const s2Loser = getLoser(semi2);
+
+      // Finale du Tournoi
+      if (final && final.status === 'pending') {
+        const p1 = s1Winner || final.player1Id;
+        const p2 = s2Winner || final.player2Id;
+        if (p1 !== final.player1Id || p2 !== final.player2Id) {
+          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
+          newMatches[final.id] = {
+            ...final,
+            player1Id: p1 || '',
+            player2Id: p2 || '',
+            score1: (p1 && p2) ? h1 : final.score1,
+            score2: (p1 && p2) ? h2 : final.score2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+          updated = true;
+        }
+      }
+
+      // Petite Finale (3ème place)
+      if (thirdPlace && thirdPlace.status === 'pending') {
+        const p1 = s1Loser || thirdPlace.player1Id;
+        const p2 = s2Loser || thirdPlace.player2Id;
+        if (p1 !== thirdPlace.player1Id || p2 !== thirdPlace.player2Id) {
+          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
+          newMatches[thirdPlace.id] = {
+            ...thirdPlace,
+            player1Id: p1 || '',
+            player2Id: p2 || '',
+            score1: (p1 && p2) ? h1 : thirdPlace.score1,
+            score2: (p1 && p2) ? h2 : thirdPlace.score2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+          updated = true;
+        }
+      }
+    }
+  }
+
+  return { matches: newMatches, updated };
+};
+
 export const dispatchTournamentMatches = (
   tables: Record<string, Table>,
   matches: Record<string, Match>,
   tournaments: Record<string, Tournament>,
-  tournamentId?: string
+  tournamentId?: string,
+  players: Record<string, Player> = {}
 ): { tables: Record<string, Table>; matches: Record<string, Match> } => {
   const newTables = { ...tables };
   const newMatches = { ...matches };
+
+  // =========================================================================
+  // 0. AUTO-HEAL & ADVANCE FINAL STAGE BRACKET MATCHES
+  // =========================================================================
+  const bracketHealing = healAndAdvanceBracketMatches(newMatches, tournaments, players);
+  if (bracketHealing.updated) {
+    Object.assign(newMatches, bracketHealing.matches);
+  }
 
   // =========================================================================
   // 1. AUTO-HEALING & SANITIZATION OF STALE / DUPLICATE TABLE ASSIGNMENTS
@@ -704,7 +846,8 @@ export const useStore = create<AppState>((set, get) => ({
         state.tables,
         newMatches,
         state.tournaments,
-        match.tournamentId
+        match.tournamentId,
+        state.players
       );
 
       return { matches: dispatchedMatches, tables: dispatchedTables };
@@ -911,7 +1054,8 @@ export const useStore = create<AppState>((set, get) => ({
         newTables,
         newMatches,
         state.tournaments,
-        match.tournamentId
+        match.tournamentId,
+        state.players
       );
 
       return {
@@ -1641,7 +1785,9 @@ export const useStore = create<AppState>((set, get) => ({
       const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
         state.tables,
         state.matches,
-        state.tournaments
+        state.tournaments,
+        undefined,
+        state.players
       );
 
       // Only update if changes occurred

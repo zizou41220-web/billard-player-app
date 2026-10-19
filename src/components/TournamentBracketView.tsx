@@ -12,13 +12,18 @@ interface BracketViewProps {
 }
 
 export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTableForQR }) => {
-  const { tournaments, matches, players, tables, launchFinalStage, reseedFinalStage, toggleThirdPlaceMatch, currentClub } = useStore();
+  const { tournaments, matches, players, tables, launchFinalStage, reseedFinalStage, toggleThirdPlaceMatch, autoDispatchMatches, currentClub } = useStore();
 
   const allTournaments = Object.values(tournaments);
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
 
   const [confirmLaunchOpen, setConfirmLaunchOpen] = useState(false);
   const [modalIncludeThirdPlace, setModalIncludeThirdPlace] = useState(activeTournament?.settings?.hasThirdPlaceMatch ?? true);
+
+  React.useEffect(() => {
+    // Auto-dispatch / advance any ready bracket matches to ensure sync with DB
+    autoDispatchMatches();
+  }, [activeTournament?.id]);
 
   if (!activeTournament) {
     return (
@@ -144,15 +149,39 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       const finalRoundMatches: DisplayMatch[] = [];
       const finalRoundNumber = quarters.length > 0 ? 3 : (semis.length > 0 ? 2 : 1);
 
+      const semi1 = semis.find(s => s.bracketPosition === 0 || s.id.includes('_semi_1_')) || semis[0];
+      const semi2 = semis.find(s => s.bracketPosition === 1 || s.id.includes('_semi_2_')) || semis[1];
+
+      const getWinnerId = (m?: Match) => {
+        if (!m || m.status !== 'finished') return undefined;
+        return m.winnerId || (m.score1 > m.score2 ? m.player1Id : (m.score2 > m.score1 ? m.player2Id : undefined));
+      };
+
+      const getLoserId = (m?: Match) => {
+        if (!m || m.status !== 'finished') return undefined;
+        const w = getWinnerId(m);
+        if (!w) return undefined;
+        return w === m.player1Id ? m.player2Id : m.player1Id;
+      };
+
+      const s1Winner = getWinnerId(semi1);
+      const s2Winner = getWinnerId(semi2);
+      const s1Loser = getLoserId(semi1);
+      const s2Loser = getLoserId(semi2);
+
       if (final) {
+        const finalP1 = final.player1Id || s1Winner;
+        const finalP2 = final.player2Id || s2Winner;
         finalRoundMatches.push({
           id: final.id,
           stage: 'final',
           title: '🏆 Grande Finale (1ère place)',
           round: finalRoundNumber,
           position: 0,
-          player1Id: final.player1Id,
-          player2Id: final.player2Id,
+          player1Id: finalP1,
+          player2Id: finalP2,
+          player1Label: finalP1 ? undefined : (semi1?.status === 'finished' ? 'Vainqueur Demi #1' : 'En attente Demi #1'),
+          player2Label: finalP2 ? undefined : (semi2?.status === 'finished' ? 'Vainqueur Demi #2' : 'En attente Demi #2'),
           score1: final.score1,
           score2: final.score2,
           status: final.status,
@@ -165,14 +194,18 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       }
 
       if (thirdPlace) {
+        const tpP1 = thirdPlace.player1Id || s1Loser;
+        const tpP2 = thirdPlace.player2Id || s2Loser;
         finalRoundMatches.push({
           id: thirdPlace.id,
           stage: 'third_place',
           title: '🥉 Petite Finale (3ème place)',
           round: finalRoundNumber,
           position: 1,
-          player1Id: thirdPlace.player1Id,
-          player2Id: thirdPlace.player2Id,
+          player1Id: tpP1,
+          player2Id: tpP2,
+          player1Label: tpP1 ? undefined : (semi1?.status === 'finished' ? 'Perdant Demi #1' : 'En attente Demi #1'),
+          player2Label: tpP2 ? undefined : (semi2?.status === 'finished' ? 'Perdant Demi #2' : 'En attente Demi #2'),
           score1: thirdPlace.score1,
           score2: thirdPlace.score2,
           status: thirdPlace.status,
