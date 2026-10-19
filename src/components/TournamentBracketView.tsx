@@ -418,6 +418,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           {!isFinalLaunched ? (
             <button
               className="btn btn-neon"
+              id="btn-launch-final-stage"
               style={{
                 background: isQualifAllDone ? 'linear-gradient(135deg, #00ffaa, #00cc88)' : undefined,
                 boxShadow: isQualifAllDone ? '0 0 20px rgba(0, 255, 170, 0.5)' : undefined,
@@ -426,9 +427,13 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                 gap: '0.6rem',
                 padding: '0.8rem 1.5rem',
                 fontSize: '0.95rem',
-                fontWeight: 800
+                fontWeight: 800,
+                cursor: 'pointer'
               }}
-              onClick={() => setConfirmLaunchOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmLaunchOpen(true);
+              }}
             >
               <Sparkles size={18} />
               {isQualifAllDone ? 'Valider les Qualifiés & Lancer le Tableau Final' : 'Forcer le Lancement du Tableau Final'}
@@ -458,12 +463,12 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.8)',
+          background: 'rgba(0,0,0,0.85)',
           backdropFilter: 'blur(8px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 10000
         }}>
           <div className="glass-card" style={{ maxWidth: '520px', width: '90%', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '1px solid var(--accent-primary)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
@@ -500,7 +505,9 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
               </button>
               <button
                 className="btn btn-neon"
-                onClick={() => {
+                id="btn-confirm-launch-final"
+                onClick={(e) => {
+                  e.stopPropagation();
                   launchFinalStage(activeTournament.id);
                   setConfirmLaunchOpen(false);
                 }}

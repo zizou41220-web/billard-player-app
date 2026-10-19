@@ -1084,7 +1084,8 @@ export const useStore = create<AppState>((set, get) => ({
 
       // 2. Clear all tournament tables so they are immediately available for the bracket matches
       const clearedTables = { ...state.tables };
-      (tournament.settings?.tableIds || []).forEach(tId => {
+      const tournamentTableIds = tournament.settings?.tableIds?.length ? tournament.settings.tableIds : Object.keys(clearedTables);
+      tournamentTableIds.forEach(tId => {
         if (clearedTables[tId]) {
           clearedTables[tId] = {
             ...clearedTables[tId],
@@ -1102,6 +1103,7 @@ export const useStore = create<AppState>((set, get) => ({
           finalStageLaunched: true,
           settings: {
             ...(tournament.settings || {}),
+            tableIds: tournamentTableIds,
             finalStageLaunched: true
           }
         }
@@ -1114,6 +1116,26 @@ export const useStore = create<AppState>((set, get) => ({
         updatedTournaments,
         tournamentId
       );
+
+      // 4. Guarantee table assignment for first ready bracket match
+      const readyBracketMatch = newMatchIds
+        .map(id => dispatchedMatches[id])
+        .find(m => m && m.player1Id && m.player2Id && !m.tableId);
+      if (readyBracketMatch) {
+        const availableTable = tournamentTableIds.map(tId => dispatchedTables[tId]).find(t => t && t.status === 'free');
+        if (availableTable) {
+          dispatchedTables[availableTable.id] = {
+            ...availableTable,
+            status: 'occupied',
+            currentMatchId: readyBracketMatch.id
+          };
+          dispatchedMatches[readyBracketMatch.id] = {
+            ...readyBracketMatch,
+            tableId: availableTable.id,
+            status: 'pending'
+          };
+        }
+      }
 
       return {
         matches: dispatchedMatches,
