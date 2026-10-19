@@ -17,7 +17,8 @@ const AdminView: React.FC = () => {
     createTournament, addPlayer, updatePlayer, deletePlayer,
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
-    assignMatchToTable, updateFinishedMatchScore, startTournamentMatch
+    assignMatchToTable, updateFinishedMatchScore, startTournamentMatch,
+    launchFinalStage
   } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -34,6 +35,7 @@ const AdminView: React.FC = () => {
   const [selectedTableForQR, setSelectedTableForQR] = useState<string | null>(null);
   const [justScannedMatchId, setJustScannedMatchId] = useState<string | null>(null);
   const [copiedOverlay, setCopiedOverlay] = useState(false);
+  const [dismissedQualifAlertTourId, setDismissedQualifAlertTourId] = useState<string | null>(null);
   const matchStatusAtOpenRef = React.useRef<string | null>(null);
 
   // Club Configuration State
@@ -110,12 +112,19 @@ const AdminView: React.FC = () => {
   const qualifStatus = getTournamentQualificationStatus(activeTournament, matches, players);
   const { hasSureQualifiers } = qualifStatus;
 
-  // Keep user on 'live' if no sure qualifiers exist
+  const areAllQualifiersKnown = Boolean(
+    activeTournament &&
+    !activeTournament.finalStageLaunched &&
+    (qualifStatus.isQualifAllDone || qualifStatus.sureQualifiers.length >= qualifStatus.numQualifiers)
+  );
+  const showQualifAlertModal = areAllQualifiersKnown && dismissedQualifAlertTourId !== activeTournament?.id;
+
+  // Keep user on 'live' if no sure qualifiers exist and final stage not launched
   React.useEffect(() => {
-    if (dashboardSubTab === 'bracket' && !hasSureQualifiers) {
+    if (dashboardSubTab === 'bracket' && !hasSureQualifiers && !activeTournament?.finalStageLaunched) {
       setDashboardSubTab('live');
     }
-  }, [dashboardSubTab, hasSureQualifiers]);
+  }, [dashboardSubTab, hasSureQualifiers, activeTournament?.finalStageLaunched]);
 
   // Auto-heal missing match tableId if table has currentMatchId
   React.useEffect(() => {
@@ -513,9 +522,17 @@ const AdminView: React.FC = () => {
             >
               {hasSureQualifiers ? <Trophy size={16} /> : <Lock size={16} />}
               Tableau des Phases Finales
-              {!hasSureQualifiers && (
+              {activeTournament.finalStageLaunched ? (
+                <span style={{ fontSize: '0.7rem', background: 'var(--accent-primary)', color: '#000', padding: '1px 8px', borderRadius: '4px', fontWeight: 800 }}>
+                  EN COURS
+                </span>
+              ) : !hasSureQualifiers ? (
                 <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '4px', color: '#ffcc00' }}>
                   En attente
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.7rem', background: 'rgba(0,255,170,0.15)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                  Prêt
                 </span>
               )}
             </button>
@@ -1344,7 +1361,56 @@ const AdminView: React.FC = () => {
           }
 
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr 340px', gap: '1.5rem', height: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1.2rem' }}>
+              {/* Alert banner if qualifiers are known but final stage not launched yet */}
+              {areAllQualifiersKnown && !activeTournament.finalStageLaunched && (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(0, 255, 170, 0.15), rgba(0, 200, 255, 0.1))',
+                  border: '2px solid var(--accent-primary)',
+                  borderRadius: '16px',
+                  padding: '1rem 1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                  boxShadow: '0 0 25px rgba(0, 255, 170, 0.25)',
+                  flexShrink: 0
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                      width: '42px', height: '42px', borderRadius: '50%',
+                      background: 'rgba(0, 255, 170, 0.2)', border: '2px solid var(--accent-primary)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)'
+                    }}>
+                      <Trophy size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff' }}>
+                        {qualifStatus.isQualifAllDone
+                          ? "Tous les matchs de qualifications sont terminés !"
+                          : `Les ${qualifStatus.numQualifiers} qualifiés sont connus !`}
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        {ranking.slice(0, qualifStatus.numQualifiers).map((p, idx) => `#${idx + 1} ${p.name}`).join(' • ')}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                    <button
+                      className="btn btn-neon"
+                      style={{ padding: '0.65rem 1.3rem', fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#000' }}
+                      onClick={() => {
+                        launchFinalStage(activeTournament.id);
+                        setDashboardSubTab('bracket');
+                      }}
+                    >
+                      <Sparkles size={16} /> Passer à la Phase Finale ➔
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr 340px', gap: '1.5rem', flex: 1, minHeight: 0 }}>
 
               {/* LEFT: Meta & QR + FILE D'ATTENTE */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', height: '100%', overflowY: 'auto', paddingRight: '0.3rem' }}>
@@ -1502,7 +1568,22 @@ const AdminView: React.FC = () => {
                             <QRCode value={`{"tournamentId":"${match.tournamentId || activeTournament.id}","matchId":"${match.id}","clubId":"${currentClub.id}"}`} size={80} />
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem', marginBottom: '0.2rem' }}>{tableName}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                              <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
+                              {match.stage && match.stage !== 'qualif' && (
+                                <span style={{
+                                  background: 'rgba(255, 215, 0, 0.2)',
+                                  color: '#ffd700',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(255, 215, 0, 0.4)'
+                                }}>
+                                  {match.stage === 'final' ? '🏆 Finale' : match.stage === 'semi' ? '⚔️ 1/2 Finale' : '🎯 1/4 Finale'}
+                                </span>
+                              )}
+                            </div>
                             <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player1Id]?.name}</div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
                             <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player2Id]?.name}</div>
@@ -2110,6 +2191,23 @@ const AdminView: React.FC = () => {
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedTableForQR(null)}>
             <div className="glass-card" style={{ padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem', minWidth: '350px' }} onClick={e => e.stopPropagation()}>
               <h2 style={{ fontSize: '2rem', margin: 0 }}>{table.name || `Table ${table.number}`}</h2>
+              {match?.stage && match.stage !== 'qualif' && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(255, 215, 0, 0.2)',
+                  color: '#ffd700',
+                  padding: '4px 14px',
+                  borderRadius: '20px',
+                  fontWeight: 900,
+                  fontSize: '0.85rem',
+                  border: '1px solid rgba(255, 215, 0, 0.4)',
+                  marginTop: '-1rem'
+                }}>
+                  {match.stage === 'final' ? '🏆 GRANDE FINALE' : match.stage === 'semi' ? '⚔️ DEMI-FINALE' : '🎯 1/4 DE FINALE'}
+                </div>
+              )}
 
               {justScannedMatchId && match && match.id === justScannedMatchId ? (
                 /* 1. Just scanned success feedback */
@@ -2549,6 +2647,122 @@ const AdminView: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* Alert Modal: Les qualifiés sont connus ! Continuer le cartésien ou passer à la phase finale ? */}
+      {showQualifAlertModal && activeTournament && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 10500,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1.5rem'
+        }}>
+          <div className="glass-card" style={{
+            maxWidth: '560px',
+            width: '100%',
+            padding: '2.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.5rem',
+            border: '2px solid var(--accent-primary)',
+            boxShadow: '0 0 40px rgba(0, 255, 170, 0.35)',
+            animation: 'fadeIn 0.25s ease'
+          }}>
+            {/* Header Icon + Title */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{
+                width: '54px', height: '54px', borderRadius: '50%',
+                background: 'rgba(0, 255, 170, 0.2)', border: '2px solid var(--accent-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)',
+                boxShadow: '0 0 20px rgba(0, 255, 170, 0.4)'
+              }}>
+                <Trophy size={30} />
+              </div>
+              <div>
+                <span style={{
+                  fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-primary)',
+                  letterSpacing: '1px', textTransform: 'uppercase'
+                }}>
+                  Notification Tournoi
+                </span>
+                <h2 style={{ fontSize: '1.5rem', margin: '0.1rem 0 0 0', fontWeight: 900, color: '#fff' }}>
+                  Les qualifiés sont connus !
+                </h2>
+              </div>
+            </div>
+
+            {/* Description */}
+            <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.95rem', margin: 0, lineHeight: '1.5' }}>
+              {qualifStatus.isQualifAllDone
+                ? `Tous les matchs de qualifications (cartésien) sont terminés ! Les ${qualifStatus.numQualifiers} qualifiés pour la Phase Finale sont officiellement validés.`
+                : `Les ${qualifStatus.numQualifiers} qualifiés pour la Phase Finale sont désormais mathématiquement assurés (${qualifStatus.sureQualifiers.length}/${qualifStatus.numQualifiers}).`}
+              <br /><br />
+              <b>Voulez-vous continuer les matchs de cartésien restants ou passer directement à la phase finale ?</b>
+            </p>
+
+            {/* Qualified Players Preview */}
+            <div style={{
+              background: 'rgba(0,0,0,0.4)',
+              borderRadius: '12px',
+              padding: '1rem',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.6rem'
+            }}>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Joueurs qualifiés pour l'arbre final :
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.6rem' }}>
+                {ranking.slice(0, qualifStatus.numQualifiers).map((p, idx) => (
+                  <div key={p.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    background: 'rgba(0, 255, 170, 0.08)', padding: '0.5rem 0.8rem',
+                    borderRadius: '8px', border: '1px solid rgba(0, 255, 170, 0.25)'
+                  }}>
+                    <span style={{ fontWeight: 900, color: 'var(--accent-primary)', fontSize: '0.9rem' }}>
+                      #{idx + 1}
+                    </span>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.name}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      {p.pts} pts
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Two Action Choices */}
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+              <button
+                className="btn btn-outline"
+                style={{ flex: 1, padding: '0.9rem', justifyContent: 'center', fontSize: '0.95rem', fontWeight: 700 }}
+                onClick={() => setDismissedQualifAlertTourId(activeTournament.id)}
+              >
+                Continuer le cartésien
+              </button>
+
+              <button
+                className="btn btn-neon"
+                style={{ flex: 1.3, padding: '0.9rem', justifyContent: 'center', fontSize: '1rem', fontWeight: 800, color: '#000', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                onClick={() => {
+                  setDismissedQualifAlertTourId(activeTournament.id);
+                  launchFinalStage(activeTournament.id);
+                  setDashboardSubTab('bracket');
+                }}
+              >
+                <Sparkles size={18} /> Passer à la Phase Finale ➔
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

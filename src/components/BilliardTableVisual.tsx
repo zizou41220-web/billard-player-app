@@ -401,6 +401,22 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
               PRÊT
             </span>
           )}
+          {match?.stage && match.stage !== 'qualif' && (
+            <span
+              style={{
+                fontSize: '0.55rem',
+                fontWeight: 900,
+                color: '#ffd700',
+                background: 'rgba(255, 215, 0, 0.2)',
+                padding: '0 4px',
+                borderRadius: '3px',
+                border: '1px solid rgba(255, 215, 0, 0.4)',
+                letterSpacing: '0.3px'
+              }}
+            >
+              {match.stage === 'final' ? 'FINALE' : match.stage === 'semi' ? 'DEMI' : '1/4'}
+            </span>
+          )}
         </div>
 
         {/* Ultra-compact 1-line Match Players & Score */}

@@ -207,10 +207,10 @@ export const dispatchTournamentMatches = (
       // Find all ready pending matches whose players are not busy
       const eligibleMatchIds = tournament.matches.filter(id => {
         const m = newMatches[id];
+        if (!m || m.status !== 'pending' || Boolean(m.tableId)) return false;
+        // If final stage launched, do not dispatch unplayed qualif matches
+        if (tournament.finalStageLaunched && (!m.stage || m.stage === 'qualif')) return false;
         return (
-          m &&
-          m.status === 'pending' &&
-          !m.tableId &&
           Boolean(m.player1Id) &&
           Boolean(m.player2Id) &&
           !isPlayerBusy(m.player1Id) &&
@@ -220,8 +220,10 @@ export const dispatchTournamentMatches = (
         const ma = newMatches[a];
         const mb = newMatches[b];
 
-        // 1. Stage priority: qualif < quarter < semi < third_place < final
-        const stagePriority: Record<string, number> = { qualif: 1, quarter: 2, semi: 3, third_place: 4, final: 5 };
+        // 1. Stage priority: when final stage is launched, quarter/semi/final take precedence!
+        const stagePriority: Record<string, number> = tournament.finalStageLaunched
+          ? { quarter: 1, semi: 2, third_place: 3, final: 4, qualif: 999 }
+          : { qualif: 1, quarter: 2, semi: 3, third_place: 4, final: 5 };
         const sA = stagePriority[ma.stage || 'qualif'] || 1;
         const sB = stagePriority[mb.stage || 'qualif'] || 1;
         if (sA !== sB) return sA - sB;
@@ -1044,6 +1046,34 @@ export const useStore = create<AppState>((set, get) => ({
         newMatchIds.push(finalId);
       }
 
+      // 1. Cancel / unassign any unfinished qualification matches so they release tables
+      Object.keys(newMatches).forEach(mId => {
+        const m = newMatches[mId];
+        if (m.tournamentId === tournamentId && (!m.stage || m.stage === 'qualif')) {
+          if (m.status !== 'finished') {
+            newMatches[mId] = {
+              ...m,
+              tableId: undefined,
+              status: 'finished',
+              score1: m.score1 || 0,
+              score2: m.score2 || 0
+            };
+          }
+        }
+      });
+
+      // 2. Clear all tournament tables so they are immediately available for the bracket matches
+      const clearedTables = { ...state.tables };
+      (tournament.settings?.tableIds || []).forEach(tId => {
+        if (clearedTables[tId]) {
+          clearedTables[tId] = {
+            ...clearedTables[tId],
+            status: 'free',
+            currentMatchId: undefined
+          };
+        }
+      });
+
       const updatedTournaments = {
         ...state.tournaments,
         [tournamentId]: {
@@ -1053,9 +1083,9 @@ export const useStore = create<AppState>((set, get) => ({
         }
       };
 
-      // Auto-assign available free tables to ready final matches with dispatchTournamentMatches
+      // 3. Auto-assign free tables to ready final matches with dispatchTournamentMatches
       const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
-        state.tables,
+        clearedTables,
         newMatches,
         updatedTournaments,
         tournamentId

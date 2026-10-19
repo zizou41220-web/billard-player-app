@@ -41,21 +41,33 @@ const MatchView: React.FC = () => {
   };
 
   const handleFinishMatch = () => {
-    if (window.confirm("Êtes-vous sûr de vouloir terminer ce match et valider les scores ?")) {
-      finishMatch();
-    }
+    finishMatch();
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
       {/* Top Bar */}
-      <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
+      <div style={{ padding: '1.2rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-primary)', boxShadow: 'var(--shadow-neon)' }} />
-          <span style={{ fontWeight: 600, letterSpacing: '1px' }}>EN DIRECT</span>
+          <span style={{ fontWeight: 800, letterSpacing: '1px', fontSize: '0.85rem' }}>EN DIRECT</span>
+          {match.stage && match.stage !== 'qualif' && (
+            <span style={{
+              background: 'rgba(255, 215, 0, 0.2)',
+              color: '#ffd700',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              border: '1px solid rgba(255, 215, 0, 0.4)',
+              marginLeft: '0.3rem'
+            }}>
+              {match.stage === 'final' ? '🏆 FINALE' : match.stage === 'semi' ? '⚔️ DEMI-FINALE' : '🎯 1/4 DE FINALE'}
+            </span>
+          )}
         </div>
-        <div style={{ background: 'var(--bg-surface)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem' }}>
-          Table {table?.number || ''}
+        <div style={{ background: 'var(--bg-surface)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700 }}>
+          {table?.name || (table?.number ? `Table ${table.number}` : 'Billard')}
         </div>
       </div>
 

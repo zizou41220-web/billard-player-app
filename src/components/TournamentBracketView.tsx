@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { Match } from '../types';
 import {
   Trophy, Swords, CheckCircle2, Clock, Sparkles,
-  Users, AlertCircle, ShieldCheck
+  Users, AlertCircle, ShieldCheck, QrCode, MonitorPlay
 } from 'lucide-react';
 import { getTournamentQualificationStatus, PlayerQualifStat } from '../utils/qualifiers';
 
@@ -751,6 +751,39 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                         </div>
 
                       </div>
+
+                      {/* Match Actions / Table QR Access */}
+                      {m.tableId ? (
+                        <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                          <button
+                            className="btn btn-neon"
+                            style={{
+                              width: '100%',
+                              fontSize: '0.75rem',
+                              padding: '0.45rem 0.6rem',
+                              justifyContent: 'center',
+                              color: '#000',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (m.tableId && onSelectTableForQR) onSelectTableForQR(m.tableId);
+                            }}
+                          >
+                            <QrCode size={13} />
+                            {isPlaying ? `Score en direct (${tableName})` : `QR Code & Démarrer (${tableName})`}
+                          </button>
+                        </div>
+                      ) : m.status === 'pending' && m.player1Id && m.player2Id ? (
+                        <div style={{ marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#ffcc00', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={12} /> Prêt • En attente d'un billard libre
+                          </span>
+                        </div>
+                      ) : null}
 
                     </div>
                   );
