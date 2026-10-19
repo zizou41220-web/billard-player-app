@@ -162,7 +162,6 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     }
   } else {
     // Projected Bracket based on live standings
-    const seedByMerit = activeTournament.settings?.seedByMerit ?? true;
 
     // Helper: assign playerId to a slot (provisional or sure)
     const getSlotPlayerId = (playerStat?: PlayerQualifStat) => {
