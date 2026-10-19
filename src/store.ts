@@ -670,6 +670,14 @@ export const useStore = create<AppState>((set, get) => ({
           ...state.matches, 
           [matchId]: { ...match, tableId: effectiveTableId, status: 'playing', startTime } 
         },
+        tables: {
+          ...state.tables,
+          [effectiveTableId]: {
+            ...state.tables[effectiveTableId],
+            status: 'occupied',
+            currentMatchId: matchId
+          }
+        },
         ...(asCurrentUser ? { activeMatchId: matchId } : {})
       };
     });

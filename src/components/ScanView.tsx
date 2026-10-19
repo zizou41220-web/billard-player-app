@@ -1,45 +1,160 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { ScanLine } from 'lucide-react';
+import { ScanLine, Loader2 } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
+import { initSync, mapDBToMatch } from '../sync';
+import { supabase } from '../supabase';
 
 const ScanView: React.FC = () => {
   const { startTournamentMatch, currentClub, setClub } = useStore();
   const [qrData, setQrData] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const processScan = (rawData: string) => {
+  const processScan = async (rawData: string) => {
+    if (!rawData || !rawData.trim() || isProcessing) return;
+    setIsProcessing(true);
+
     try {
-      const data = JSON.parse(rawData);
+      let data: any;
+      try {
+        data = JSON.parse(rawData);
+      } catch {
+        if (rawData.startsWith('http://') || rawData.startsWith('https://')) {
+          alert("Ce QR Code est un lien web, pas un QR Code de match à lancer.");
+          setIsProcessing(false);
+          return;
+        }
+        alert("QR Code invalide (format non reconnu).");
+        setIsProcessing(false);
+        return;
+      }
+
       if (data.clubId && data.clubId !== currentClub.id) {
         setClub({ id: data.clubId });
       }
-      if (data.matchId && data.tournamentId) {
-        const storeMatches = useStore.getState().matches;
-        const match = storeMatches[data.matchId];
-        
-        if (!match) {
-          return alert("Match introuvable !");
-        }
-        if (!match.tableId) {
-          return alert("Ce match n'a pas encore de billard assigné.");
-        }
-        if (match.status === 'finished') {
-          return alert("Ce match est déjà terminé !");
-        }
-        if (match.status === 'playing') {
-          useStore.setState({ activeMatchId: data.matchId });
-          return;
-        }
-        
-        startTournamentMatch(data.matchId);
-      } else {
-        alert("QR Code non reconnu.");
+
+      const matchId = data.matchId;
+      const tableId = data.tableId;
+
+      if (!matchId && !tableId) {
+        alert("QR Code non reconnu : aucun match ou billard trouvé.");
+        setIsProcessing(false);
+        return;
       }
+
+      // Step 1: Check in local Zustand store by matchId
+      let match = matchId ? useStore.getState().matches[matchId] : null;
+
+      // If not found by matchId, check by tableId in local store
+      if (!match && tableId) {
+        const tableObj = useStore.getState().tables[tableId];
+        if (tableObj?.currentMatchId) {
+          match = useStore.getState().matches[tableObj.currentMatchId];
+        }
+        if (!match) {
+          match = Object.values(useStore.getState().matches).find(
+            m => m.tableId === tableId && m.status !== 'finished'
+          ) || null;
+        }
+      }
+
+      // Step 2: If still not found, trigger initSync() to ensure fresh state from Supabase
+      if (!match) {
+        try {
+          await initSync();
+          if (matchId) {
+            match = useStore.getState().matches[matchId];
+          }
+          if (!match && tableId) {
+            const tableObj = useStore.getState().tables[tableId];
+            if (tableObj?.currentMatchId) {
+              match = useStore.getState().matches[tableObj.currentMatchId];
+            }
+            if (!match) {
+              match = Object.values(useStore.getState().matches).find(
+                m => m.tableId === tableId && m.status !== 'finished'
+              ) || null;
+            }
+          }
+        } catch (syncErr) {
+          console.warn("Erreur resync scan:", syncErr);
+        }
+      }
+
+      // Step 3: Direct fallback query to Supabase if still not in store
+      if (!match && matchId) {
+        try {
+          const { data: dbMatch } = await supabase
+            .from('tournoi2_matches')
+            .select('*')
+            .eq('id', matchId)
+            .maybeSingle();
+          if (dbMatch) {
+            const fetched = mapDBToMatch(dbMatch);
+            match = fetched;
+            useStore.setState(s => ({ matches: { ...s.matches, [fetched.id]: fetched } }));
+          }
+        } catch (dbErr) {
+          console.warn("Erreur fetch match Supabase:", dbErr);
+        }
+      }
+
+      // Step 4: If still not found, check Supabase for active match on tableId
+      if (!match && tableId) {
+        try {
+          const { data: dbTableMatches } = await supabase
+            .from('tournoi2_matches')
+            .select('*')
+            .eq('table_id', tableId)
+            .neq('status', 'finished')
+            .limit(1);
+          if (dbTableMatches && dbTableMatches.length > 0) {
+            const fetched = mapDBToMatch(dbTableMatches[0]);
+            match = fetched;
+            useStore.setState(s => ({ matches: { ...s.matches, [fetched.id]: fetched } }));
+          }
+        } catch (dbErr) {
+          console.warn("Erreur fetch table match Supabase:", dbErr);
+        }
+      }
+
+      if (!match) {
+        alert("Match introuvable ! Assurez-vous que le match est bien créé et assigné par le gérant.");
+        setIsProcessing(false);
+        return;
+      }
+
+      // Effective table resolution
+      const effectiveTableId = match.tableId || tableId || Object.values(useStore.getState().tables).find(t => t.currentMatchId === match.id)?.id;
+
+      if (!effectiveTableId) {
+        alert("Ce match n'a pas encore de billard assigné. Veuillez patienter qu'une table se libère.");
+        setIsProcessing(false);
+        return;
+      }
+
+      if (match.status === 'finished') {
+        alert("Ce match est déjà terminé !");
+        setIsProcessing(false);
+        return;
+      }
+
+      if (match.status === 'playing') {
+        useStore.setState({ activeMatchId: match.id });
+        setIsProcessing(false);
+        return;
+      }
+
+      // Start match and enter live scoring
+      startTournamentMatch(match.id);
+      setIsProcessing(false);
     } catch (e) {
-      alert("QR Code invalide.");
+      console.error("Erreur scan:", e);
+      alert("Erreur lors de la lecture du QR code.");
+      setIsProcessing(false);
     }
-  }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', gap: '2rem' }}>
@@ -77,7 +192,7 @@ const ScanView: React.FC = () => {
       ) : (
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' }}>
           
-          <div style={{ width: '100%', borderRadius: '16px', overflow: 'hidden' }}>
+          <div style={{ width: '100%', borderRadius: '16px', overflow: 'hidden', position: 'relative' }}>
             <Scanner
               onScan={(result) => {
                 if (result && result.length > 0) {
@@ -88,6 +203,17 @@ const ScanView: React.FC = () => {
               }}
               formats={['qr_code']}
             />
+            {isProcessing && (
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.7)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '0.8rem', color: 'var(--accent-primary)', fontWeight: 800
+              }}>
+                <Loader2 size={36} className="animate-spin" />
+                <span>Chargement du match...</span>
+              </div>
+            )}
           </div>
 
           <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Ou Collez le JSON manuellement</label>
@@ -97,11 +223,22 @@ const ScanView: React.FC = () => {
             placeholder='{"tournamentId":"...","matchId":"..."}'
             value={qrData}
             onChange={e => setQrData(e.target.value)}
+            disabled={isProcessing}
           />
-          <button className="btn btn-neon" onClick={() => processScan(qrData)} style={{ justifyContent: 'center' }}>
-            Valider le scan
+          <button 
+            className="btn btn-neon" 
+            onClick={() => processScan(qrData)} 
+            style={{ justifyContent: 'center' }}
+            disabled={isProcessing}
+          >
+            {isProcessing ? <Loader2 size={18} className="animate-spin" /> : 'Valider le scan'}
           </button>
-          <button className="btn" style={{ background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', alignSelf: 'center' }} onClick={() => setIsScanning(false)}>
+          <button 
+            className="btn" 
+            style={{ background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', alignSelf: 'center' }} 
+            onClick={() => setIsScanning(false)}
+            disabled={isProcessing}
+          >
             Fermer l'appareil photo
           </button>
         </div>

@@ -56,7 +56,7 @@ const mapMatchToDB = (m: Match) => {
   return data;
 };
 
-const mapDBToMatch = (d: any): Match => {
+export const mapDBToMatch = (d: any): Match => {
   let stage: Match['stage'] = d.stage;
   if (!stage && d.id) {
     if (d.id.includes('_third_place_')) stage = 'third_place';

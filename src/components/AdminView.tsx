@@ -1051,13 +1051,37 @@ const AdminView: React.FC = () => {
                           </select>
                         </div>
                         <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nombre (X)</label>
-                          <input type="number" className="input-field" value={qualifNbSets} onChange={e => setQualifNbSets(Number(e.target.value))} min={1} />
+                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                            Nombre (1 à 20 manches)
+                          </label>
+                          <input 
+                            type="number" 
+                            className="input-field" 
+                            value={qualifNbSets} 
+                            onChange={e => {
+                              const val = parseInt(e.target.value, 10);
+                              setQualifNbSets(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                            }} 
+                            min={1} 
+                            max={20} 
+                          />
                         </div>
                         {(newTourFormat === 'robin' || newTourFormat === 'cartesien') && (
                           <div style={{ gridColumn: 'span 2' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nombre de sortants (qualifiés) par groupe/poule</label>
-                            <input type="number" className="input-field" value={qualifNbQualifiers} onChange={e => setQualifNbQualifiers(Number(e.target.value))} min={1} />
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                              Nombre de sortants (qualifiés) par groupe/poule (max 32)
+                            </label>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              value={qualifNbQualifiers} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10);
+                                setQualifNbQualifiers(isNaN(val) ? 1 : Math.min(32, Math.max(1, val)));
+                              }} 
+                              min={1} 
+                              max={32} 
+                            />
                           </div>
                         )}
                       </div>
@@ -1077,8 +1101,20 @@ const AdminView: React.FC = () => {
                           </select>
                         </div>
                         <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nombre (X)</label>
-                          <input type="number" className="input-field" value={finalNbSets} onChange={e => setFinalNbSets(Number(e.target.value))} min={1} />
+                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                            Nombre (1 à 20 manches max)
+                          </label>
+                          <input 
+                            type="number" 
+                            className="input-field" 
+                            value={finalNbSets} 
+                            onChange={e => {
+                              const val = parseInt(e.target.value, 10);
+                              setFinalNbSets(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                            }} 
+                            min={1} 
+                            max={20} 
+                          />
                         </div>
                         <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
                           <input type="checkbox" checked={seedByMerit} onChange={e => setSeedByMerit(e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--accent-primary)' }} />
@@ -1696,7 +1732,7 @@ const AdminView: React.FC = () => {
                       return (
                         <div key={match.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
                           <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '8px', opacity: match.status === 'playing' ? 0.3 : 1 }}>
-                            <QRCode value={`{"tournamentId":"${match.tournamentId || activeTournament.id}","matchId":"${match.id}","clubId":"${currentClub.id}"}`} size={80} />
+                            <QRCode value={JSON.stringify({ tournamentId: match.tournamentId || activeTournament.id, matchId: match.id, tableId: effTableId || match.tableId || '', clubId: currentClub.id })} size={80} />
                           </div>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
@@ -2492,9 +2528,9 @@ const AdminView: React.FC = () => {
                     </div>
 
                     <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <QRCode value={`{"tournamentId":"${match.tournamentId}","matchId":"${match.id}","clubId":"${currentClub.id}"}`} size={200} />
+                      <QRCode value={JSON.stringify({ tournamentId: match.tournamentId || activeTournament?.id || '', matchId: match.id, tableId: table.id || match.tableId || '', clubId: currentClub.id })} size={200} />
                       <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#666', wordBreak: 'break-all', textAlign: 'center', userSelect: 'all', cursor: 'copy' }} title="Copier ce texte pour la simulation">
-                        {`{"tournamentId":"${match.tournamentId}","matchId":"${match.id}","clubId":"${currentClub.id}"}`}
+                        {JSON.stringify({ tournamentId: match.tournamentId || activeTournament?.id || '', matchId: match.id, tableId: table.id || match.tableId || '', clubId: currentClub.id })}
                       </div>
                     </div>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, textAlign: 'center' }}>
