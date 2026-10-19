@@ -1173,10 +1173,11 @@ export const useStore = create<AppState>((set, get) => ({
       const participantsCount = tournament.participants.length;
 
       let numQualifiers = qualifStatus.numQualifiers;
-      if (numQualifiers >= 8 && participantsCount >= 8) numQualifiers = 8;
-      else if (numQualifiers <= 2 || participantsCount < 4) numQualifiers = 2;
-      else numQualifiers = Math.min(4, participantsCount);
+      if (numQualifiers > 8) numQualifiers = 8;
+      if (numQualifiers < 2) numQualifiers = Math.min(2, participantsCount);
+      numQualifiers = Math.min(numQualifiers, participantsCount);
 
+      const bracketSize = numQualifiers > 4 ? 8 : (numQualifiers > 2 ? 4 : 2);
       const qualifiers = qualifStatus.ranking.slice(0, numQualifiers).map(r => r.id);
 
       // If somehow not enough qualifiers, fill with available participants
@@ -1194,8 +1195,12 @@ export const useStore = create<AppState>((set, get) => ({
       const newMatchIds: string[] = [];
       const timestamp = Date.now();
 
-      if (numQualifiers === 8) {
-        // 8 Qualifiers: 4 Quarters -> 2 Semis -> 1 Final (+ option Petite Finale)
+      if (bracketSize === 8) {
+        // 8 Bracket: 4 Quarts -> 2 Demis -> 1 Finale (+ option Petite Finale)
+        // Attribution des Blancs (Exempts) si numQualifiers < 8:
+        // - Si 7 qualifiés : 1 blanc au 1er (Seed 1 exempt en Q1 -> directement en Demi 1)
+        // - Si 6 qualifiés : 2 blancs au 1er (Q1) et au 2ème (Q3 -> directement en Demi 2)
+        // - Si 5 qualifiés : 3 blancs au 1er (Q1), au 2ème (Q3) et au 3ème (Q4 -> Demi 2)
         const finalId = `m_final_${timestamp}`;
         const semi1Id = `m_semi_1_${timestamp}`;
         const semi2Id = `m_semi_2_${timestamp}`;
@@ -1204,7 +1209,7 @@ export const useStore = create<AppState>((set, get) => ({
         const q3Id = `m_quarter_3_${timestamp}`;
         const q4Id = `m_quarter_4_${timestamp}`;
 
-        // Final
+        // Finale
         newMatches[finalId] = {
           id: finalId,
           clubId: state.currentClub.id,
@@ -1220,7 +1225,7 @@ export const useStore = create<AppState>((set, get) => ({
           bracketPosition: 0
         };
 
-        // Semis
+        // Demis
         newMatches[semi1Id] = {
           id: semi1Id,
           clubId: state.currentClub.id,
@@ -1252,39 +1257,81 @@ export const useStore = create<AppState>((set, get) => ({
           nextMatchId: finalId
         };
 
-        // Quarters: Seed 1 vs 8 (ou 4), 4 vs 5, 2 vs 7, 3 vs 6
+        // Quarts: Seed 1 vs 8, 4 vs 5, 2 vs 7, 3 vs 6
         const qPairs = [
-          { p1: qualifiers[0], p2: qualifiers[7] || qualifiers[3], next: semi1Id, pos: 0 },
-          { p1: qualifiers[3] || qualifiers[1], p2: qualifiers[4] || qualifiers[2], next: semi1Id, pos: 1 },
-          { p1: qualifiers[1] || qualifiers[2], p2: qualifiers[6] || qualifiers[0], next: semi2Id, pos: 2 },
-          { p1: qualifiers[2] || qualifiers[0], p2: qualifiers[5] || qualifiers[1], next: semi2Id, pos: 3 },
+          { qId: q1Id, p1: qualifiers[0], p2: qualifiers[7], nextId: semi1Id, pos: 0, nextSlot: 'player1Id' as const },
+          { qId: q2Id, p1: qualifiers[3], p2: qualifiers[4], nextId: semi1Id, pos: 1, nextSlot: 'player2Id' as const },
+          { qId: q3Id, p1: qualifiers[1], p2: qualifiers[6], nextId: semi2Id, pos: 2, nextSlot: 'player1Id' as const },
+          { qId: q4Id, p1: qualifiers[2], p2: qualifiers[5], nextId: semi2Id, pos: 3, nextSlot: 'player2Id' as const },
         ];
 
-        const qIds = [q1Id, q2Id, q3Id, q4Id];
-        qIds.forEach((qId, idx) => {
-          const pair = qPairs[idx];
-          const { h1, h2 } = getMatchHandicap(
-            state.players[pair.p1]?.level,
-            state.players[pair.p2]?.level,
-            tournament.settings?.handicapAmateurSets
-          );
-          newMatches[qId] = {
-            id: qId,
-            clubId: state.currentClub.id,
-            player1Id: pair.p1,
-            player2Id: pair.p2,
-            score1: h1,
-            score2: h2,
-            handicapP1: h1 > 0 ? h1 : undefined,
-            handicapP2: h2 > 0 ? h2 : undefined,
-            status: 'pending',
-            startTime: timestamp,
-            tournamentId,
-            stage: 'quarter',
-            bracketRound: 1,
-            bracketPosition: pair.pos,
-            nextMatchId: pair.next
-          };
+        qPairs.forEach((pair) => {
+          const isBye = !pair.p2; // Pas d'adversaire -> Blanc (Exempt)
+          if (isBye) {
+            newMatches[pair.qId] = {
+              id: pair.qId,
+              clubId: state.currentClub.id,
+              player1Id: pair.p1,
+              player2Id: '',
+              score1: 0,
+              score2: 0,
+              status: 'finished',
+              winnerId: pair.p1,
+              startTime: timestamp,
+              tournamentId,
+              stage: 'quarter',
+              bracketRound: 1,
+              bracketPosition: pair.pos,
+              nextMatchId: pair.nextId
+            };
+            // Qualifié d'office : avance directement dans la demi-finale correspondante
+            if (pair.nextId === semi1Id) {
+              if (pair.nextSlot === 'player1Id') newMatches[semi1Id].player1Id = pair.p1;
+              else newMatches[semi1Id].player2Id = pair.p1;
+            } else {
+              if (pair.nextSlot === 'player1Id') newMatches[semi2Id].player1Id = pair.p1;
+              else newMatches[semi2Id].player2Id = pair.p1;
+            }
+          } else {
+            const { h1, h2 } = getMatchHandicap(
+              state.players[pair.p1]?.level,
+              state.players[pair.p2]?.level,
+              tournament.settings?.handicapAmateurSets
+            );
+            newMatches[pair.qId] = {
+              id: pair.qId,
+              clubId: state.currentClub.id,
+              player1Id: pair.p1,
+              player2Id: pair.p2,
+              score1: h1,
+              score2: h2,
+              handicapP1: h1 > 0 ? h1 : undefined,
+              handicapP2: h2 > 0 ? h2 : undefined,
+              status: 'pending',
+              startTime: timestamp,
+              tournamentId,
+              stage: 'quarter',
+              bracketRound: 1,
+              bracketPosition: pair.pos,
+              nextMatchId: pair.nextId
+            };
+          }
+        });
+
+        // Si une demi-finale a déjà ses 2 joueurs (ex: en 5 qualifiés, Semi 2 a le 2e et le 3e), appliquer le handicap
+        [semi1Id, semi2Id].forEach(sId => {
+          const s = newMatches[sId];
+          if (s.player1Id && s.player2Id) {
+            const { h1, h2 } = getMatchHandicap(
+              state.players[s.player1Id]?.level,
+              state.players[s.player2Id]?.level,
+              tournament.settings?.handicapAmateurSets
+            );
+            s.score1 = h1;
+            s.score2 = h2;
+            s.handicapP1 = h1 > 0 ? h1 : undefined;
+            s.handicapP2 = h2 > 0 ? h2 : undefined;
+          }
         });
 
         if (shouldIncludeThirdPlace) {
@@ -1308,16 +1355,19 @@ export const useStore = create<AppState>((set, get) => ({
 
         newMatchIds.push(q1Id, q2Id, q3Id, q4Id, semi1Id, semi2Id, finalId);
 
-      } else if (numQualifiers === 4) {
-        // 4 Qualifiers: 2 Semis -> 1 Final (+ option Petite Finale)
+      } else if (bracketSize === 4) {
+        // 4 Bracket: 2 Demis -> 1 Finale (+ option Petite Finale)
+        // Si 3 qualifiés : le 1er a un blanc en Demi 1 et avance directement en Grande Finale !
         const finalId = `m_final_${timestamp}`;
         const semi1Id = `m_semi_1_${timestamp}`;
         const semi2Id = `m_semi_2_${timestamp}`;
 
+        const isS1Bye = !qualifiers[3]; // 4ème qualifié manquant -> Blanc pour le 1er !
+
         newMatches[finalId] = {
           id: finalId,
           clubId: state.currentClub.id,
-          player1Id: '',
+          player1Id: isS1Bye ? qualifiers[0] : '',
           player2Id: '',
           score1: 0,
           score2: 0,
@@ -1329,7 +1379,73 @@ export const useStore = create<AppState>((set, get) => ({
           bracketPosition: 0
         };
 
-        if (shouldIncludeThirdPlace) {
+        if (isS1Bye) {
+          newMatches[semi1Id] = {
+            id: semi1Id,
+            clubId: state.currentClub.id,
+            player1Id: qualifiers[0],
+            player2Id: '',
+            score1: 0,
+            score2: 0,
+            status: 'finished',
+            winnerId: qualifiers[0],
+            startTime: timestamp,
+            tournamentId,
+            stage: 'semi',
+            bracketRound: 1,
+            bracketPosition: 0,
+            nextMatchId: finalId
+          };
+        } else {
+          const hS1 = getMatchHandicap(
+            state.players[qualifiers[0]]?.level,
+            state.players[qualifiers[3]]?.level,
+            tournament.settings?.handicapAmateurSets
+          );
+          newMatches[semi1Id] = {
+            id: semi1Id,
+            clubId: state.currentClub.id,
+            player1Id: qualifiers[0],
+            player2Id: qualifiers[3],
+            score1: hS1.h1,
+            score2: hS1.h2,
+            handicapP1: hS1.h1 > 0 ? hS1.h1 : undefined,
+            handicapP2: hS1.h2 > 0 ? hS1.h2 : undefined,
+            status: 'pending',
+            startTime: timestamp,
+            tournamentId,
+            stage: 'semi',
+            bracketRound: 1,
+            bracketPosition: 0,
+            nextMatchId: finalId
+          };
+        }
+
+        // Demi 2 : 2ème vs 3ème
+        const hS2 = getMatchHandicap(
+          state.players[qualifiers[1]]?.level,
+          state.players[qualifiers[2]]?.level,
+          tournament.settings?.handicapAmateurSets
+        );
+        newMatches[semi2Id] = {
+          id: semi2Id,
+          clubId: state.currentClub.id,
+          player1Id: qualifiers[1],
+          player2Id: qualifiers[2] || qualifiers[0],
+          score1: hS2.h1,
+          score2: hS2.h2,
+          handicapP1: hS2.h1 > 0 ? hS2.h1 : undefined,
+          handicapP2: hS2.h2 > 0 ? hS2.h2 : undefined,
+          status: 'pending',
+          startTime: timestamp,
+          tournamentId,
+          stage: 'semi',
+          bracketRound: 1,
+          bracketPosition: 1,
+          nextMatchId: finalId
+        };
+
+        if (shouldIncludeThirdPlace && numQualifiers >= 4) {
           const thirdPlaceId = `m_third_place_${timestamp}`;
           newMatches[thirdPlaceId] = {
             id: thirdPlaceId,
@@ -1348,61 +1464,10 @@ export const useStore = create<AppState>((set, get) => ({
           newMatchIds.push(thirdPlaceId);
         }
 
-        // 4 Qualifiés: Demi 1 = 1er vs 4eme, Demi 2 = 2eme vs 3eme
-        const s1Pair = { p1: qualifiers[0], p2: qualifiers[3] || qualifiers[1] };
-        const s2Pair = { p1: qualifiers[1], p2: qualifiers[2] || qualifiers[0] };
-
-        const hS1 = getMatchHandicap(
-          state.players[s1Pair.p1]?.level,
-          state.players[s1Pair.p2]?.level,
-          tournament.settings?.handicapAmateurSets
-        );
-        const hS2 = getMatchHandicap(
-          state.players[s2Pair.p1]?.level,
-          state.players[s2Pair.p2]?.level,
-          tournament.settings?.handicapAmateurSets
-        );
-
-        newMatches[semi1Id] = {
-          id: semi1Id,
-          clubId: state.currentClub.id,
-          player1Id: s1Pair.p1,
-          player2Id: s1Pair.p2,
-          score1: hS1.h1,
-          score2: hS1.h2,
-          handicapP1: hS1.h1 > 0 ? hS1.h1 : undefined,
-          handicapP2: hS1.h2 > 0 ? hS1.h2 : undefined,
-          status: 'pending',
-          startTime: timestamp,
-          tournamentId,
-          stage: 'semi',
-          bracketRound: 1,
-          bracketPosition: 0,
-          nextMatchId: finalId
-        };
-
-        newMatches[semi2Id] = {
-          id: semi2Id,
-          clubId: state.currentClub.id,
-          player1Id: s2Pair.p1,
-          player2Id: s2Pair.p2,
-          score1: hS2.h1,
-          score2: hS2.h2,
-          handicapP1: hS2.h1 > 0 ? hS2.h1 : undefined,
-          handicapP2: hS2.h2 > 0 ? hS2.h2 : undefined,
-          status: 'pending',
-          startTime: timestamp,
-          tournamentId,
-          stage: 'semi',
-          bracketRound: 1,
-          bracketPosition: 1,
-          nextMatchId: finalId
-        };
-
         newMatchIds.push(semi1Id, semi2Id, finalId);
 
       } else {
-        // 2 Qualifiers: 1 Final
+        // 2 Qualifiés: Finale directe
         const finalId = `m_final_${timestamp}`;
         const hFinal = getMatchHandicap(
           state.players[qualifiers[0]]?.level,
@@ -1553,14 +1618,32 @@ export const useStore = create<AppState>((set, get) => ({
       if (quarters.length === 4) {
         // Quarts: 1er vs 8eme, 4eme vs 5eme, 2eme vs 7eme, 3eme vs 6eme
         const qPairs = [
-          { p1: qualifiers[0], p2: qualifiers[7] || qualifiers[3] },
-          { p1: qualifiers[3] || qualifiers[1], p2: qualifiers[4] || qualifiers[2] },
-          { p1: qualifiers[1] || qualifiers[2], p2: qualifiers[6] || qualifiers[0] },
-          { p1: qualifiers[2] || qualifiers[0], p2: qualifiers[5] || qualifiers[1] },
+          { p1: qualifiers[0], p2: qualifiers[7], slot: 'player1Id' as const, nextId: quarters[0]?.nextMatchId },
+          { p1: qualifiers[3], p2: qualifiers[4], slot: 'player2Id' as const, nextId: quarters[1]?.nextMatchId },
+          { p1: qualifiers[1], p2: qualifiers[6], slot: 'player1Id' as const, nextId: quarters[2]?.nextMatchId },
+          { p1: qualifiers[2], p2: qualifiers[5], slot: 'player2Id' as const, nextId: quarters[3]?.nextMatchId },
         ];
         quarters.forEach((q, idx) => {
-          if (q.status !== 'finished') {
-            const pair = qPairs[idx];
+          const pair = qPairs[idx];
+          const isBye = !pair.p2;
+          if (isBye) {
+            newMatches[q.id] = {
+              ...q,
+              player1Id: pair.p1,
+              player2Id: '',
+              status: 'finished',
+              winnerId: pair.p1,
+              score1: 0,
+              score2: 0,
+              tableId: undefined
+            };
+            if (pair.nextId && newMatches[pair.nextId]) {
+              newMatches[pair.nextId] = {
+                ...newMatches[pair.nextId],
+                [pair.slot]: pair.p1
+              };
+            }
+          } else if (q.status !== 'finished') {
             const { h1, h2 } = getMatchHandicap(
               state.players[pair.p1]?.level,
               state.players[pair.p2]?.level,
@@ -1578,27 +1661,47 @@ export const useStore = create<AppState>((set, get) => ({
           }
         });
       } else if (semis.length >= 2) {
-        // 4 Qualifiés: Demi 1 = 1er vs 4eme, Demi 2 = 2eme vs 3eme
+        // 4 Qualifiés: Demi 1 = 1er vs 4eme (ou blanc), Demi 2 = 2eme vs 3eme
         const s1 = semis.find(m => m.bracketPosition === 0 || m.id.includes('_semi_1_')) || semis[0];
         const s2 = semis.find(m => m.bracketPosition === 1 || m.id.includes('_semi_2_')) || semis[1];
 
         if (s1 && s1.status !== 'finished') {
           const p1 = qualifiers[0];
-          const p2 = qualifiers[3] || qualifiers[1];
-          const { h1, h2 } = getMatchHandicap(
-            state.players[p1]?.level,
-            state.players[p2]?.level,
-            tournament.settings?.handicapAmateurSets
-          );
-          newMatches[s1.id] = {
-            ...s1,
-            player1Id: p1,
-            player2Id: p2,
-            score1: s1.status === 'playing' ? s1.score1 : h1,
-            score2: s1.status === 'playing' ? s1.score2 : h2,
-            handicapP1: h1 > 0 ? h1 : undefined,
-            handicapP2: h2 > 0 ? h2 : undefined
-          };
+          const p2 = qualifiers[3];
+          const isBye = !p2;
+          if (isBye) {
+            newMatches[s1.id] = {
+              ...s1,
+              player1Id: p1,
+              player2Id: '',
+              status: 'finished',
+              winnerId: p1,
+              score1: 0,
+              score2: 0,
+              tableId: undefined
+            };
+            if (s1.nextMatchId && newMatches[s1.nextMatchId]) {
+              newMatches[s1.nextMatchId] = {
+                ...newMatches[s1.nextMatchId],
+                player1Id: p1
+              };
+            }
+          } else {
+            const { h1, h2 } = getMatchHandicap(
+              state.players[p1]?.level,
+              state.players[p2]?.level,
+              tournament.settings?.handicapAmateurSets
+            );
+            newMatches[s1.id] = {
+              ...s1,
+              player1Id: p1,
+              player2Id: p2,
+              score1: s1.status === 'playing' ? s1.score1 : h1,
+              score2: s1.status === 'playing' ? s1.score2 : h2,
+              handicapP1: h1 > 0 ? h1 : undefined,
+              handicapP2: h2 > 0 ? h2 : undefined
+            };
+          }
         }
 
         if (s2 && s2.status !== 'finished') {

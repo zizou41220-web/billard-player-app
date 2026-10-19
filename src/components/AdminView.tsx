@@ -1068,19 +1068,22 @@ const AdminView: React.FC = () => {
                         </div>
                         {(newTourFormat === 'robin' || newTourFormat === 'cartesien') && (
                           <div style={{ gridColumn: 'span 2' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                              Nombre de sortants (qualifiés) par groupe/poule (max 32)
+                            <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                              Nombre de sortants (qualifiés) pour le tableau final (2 à 8)
                             </label>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', marginBottom: '0.5rem', lineHeight: '1.4' }}>
+                              💡 <strong>Gestion des Blancs :</strong> 7 qualifiés = 1 blanc (au 1er) • 6 qualifiés = 2 blancs (au 1er et 2e) • 5 qualifiés = 3 blancs • 3 qualifiés = 1 blanc (au 1er)
+                            </div>
                             <input 
                               type="number" 
                               className="input-field" 
                               value={qualifNbQualifiers} 
                               onChange={e => {
                                 const val = parseInt(e.target.value, 10);
-                                setQualifNbQualifiers(isNaN(val) ? 1 : Math.min(32, Math.max(1, val)));
+                                setQualifNbQualifiers(isNaN(val) ? 2 : Math.min(8, Math.max(2, val)));
                               }} 
-                              min={1} 
-                              max={32} 
+                              min={2} 
+                              max={8} 
                             />
                           </div>
                         )}

@@ -56,9 +56,13 @@ export function getTournamentQualificationStatus(
   const participantsCount = tournament.participants.length;
 
   let numQualifiers = 4;
-  if (reqQualifiers >= 8 && participantsCount >= 8) numQualifiers = 8;
-  else if (reqQualifiers <= 2 || participantsCount < 4) numQualifiers = 2;
-  else numQualifiers = Math.min(reqQualifiers, participantsCount);
+  if (reqQualifiers >= 8) {
+    numQualifiers = Math.min(8, participantsCount);
+  } else if (reqQualifiers <= 2 || participantsCount < 3) {
+    numQualifiers = Math.min(2, participantsCount);
+  } else {
+    numQualifiers = Math.min(reqQualifiers, participantsCount);
+  }
 
   // Stats calculation
   const pStats: Record<string, PlayerQualifStat> = {};

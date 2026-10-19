@@ -104,46 +104,54 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     if (quarters.length > 0) {
       rounds.push({
         title: 'Quarts de Finale',
-        matches: quarters.map((m, idx) => ({
-          id: m.id,
-          stage: 'quarter',
-          title: `1/4 de Finale #${idx + 1}`,
-          round: 1,
-          position: idx,
-          player1Id: m.player1Id,
-          player2Id: m.player2Id,
-          score1: m.score1,
-          score2: m.score2,
-          status: m.status,
-          winnerId: m.winnerId,
-          tableId: m.tableId,
-          realMatch: m,
-          handicapP1: m.handicapP1,
-          handicapP2: m.handicapP2
-        }))
+        matches: quarters.map((m, idx) => {
+          const isBye = !m.player2Id || m.player2Id === 'BYE';
+          return {
+            id: m.id,
+            stage: 'quarter',
+            title: `1/4 de Finale #${idx + 1}`,
+            round: 1,
+            position: idx,
+            player1Id: m.player1Id,
+            player2Id: isBye ? undefined : m.player2Id,
+            player2Label: isBye ? '⚡ BLANC (Exempt)' : undefined,
+            score1: m.score1,
+            score2: m.score2,
+            status: m.status,
+            winnerId: m.winnerId,
+            tableId: m.tableId,
+            realMatch: m,
+            handicapP1: m.handicapP1,
+            handicapP2: m.handicapP2
+          };
+        })
       });
     }
 
     if (semis.length > 0) {
       rounds.push({
         title: 'Demi-Finales',
-        matches: semis.map((m, idx) => ({
-          id: m.id,
-          stage: 'semi',
-          title: `Demi-Finale #${idx + 1}`,
-          round: quarters.length > 0 ? 2 : 1,
-          position: idx,
-          player1Id: m.player1Id,
-          player2Id: m.player2Id,
-          score1: m.score1,
-          score2: m.score2,
-          status: m.status,
-          winnerId: m.winnerId,
-          tableId: m.tableId,
-          realMatch: m,
-          handicapP1: m.handicapP1,
-          handicapP2: m.handicapP2
-        }))
+        matches: semis.map((m, idx) => {
+          const isBye = (!m.player2Id || m.player2Id === 'BYE') && m.status === 'finished';
+          return {
+            id: m.id,
+            stage: 'semi',
+            title: `Demi-Finale #${idx + 1}`,
+            round: quarters.length > 0 ? 2 : 1,
+            position: idx,
+            player1Id: m.player1Id,
+            player2Id: isBye ? undefined : m.player2Id,
+            player2Label: isBye ? '⚡ BLANC (Exempt)' : undefined,
+            score1: m.score1,
+            score2: m.score2,
+            status: m.status,
+            winnerId: m.winnerId,
+            tableId: m.tableId,
+            realMatch: m,
+            handicapP1: m.handicapP1,
+            handicapP2: m.handicapP2
+          };
+        })
       });
     }
 
@@ -263,13 +271,44 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       return `En attente (${rankLabel || 'Qualifié'})`;
     };
 
-    if (numQualifiers === 8) {
+    const bracketSize = numQualifiers > 4 ? 8 : (numQualifiers > 2 ? 4 : 2);
+
+    if (bracketSize === 8) {
       // 4 Quarts : 1er vs 8eme, 4eme vs 5eme, 2eme vs 7eme, 3eme vs 6eme
+      // Attribution automatique des Blancs (Exempts) si numQualifiers < 8 :
+      const hasQ1Bye = !ranking[7]; // 1er a un blanc en Q1 -> directement en Demi 1
+      const hasQ3Bye = !ranking[6]; // 2ème a un blanc en Q3 -> directement en Demi 2
+      const hasQ4Bye = !ranking[5]; // 3ème a un blanc en Q4 -> directement en Demi 2
+
       const qPairs = [
-        { p1: getSlotPlayerId(ranking[0]), p2: getSlotPlayerId(ranking[7] || ranking[3]), l1: getSlotLabel(ranking[0], '1er'), l2: getSlotLabel(ranking[7] || ranking[3], ranking[7] ? '8ème' : '4ème') },
-        { p1: getSlotPlayerId(ranking[3] || ranking[1]), p2: getSlotPlayerId(ranking[4] || ranking[2]), l1: getSlotLabel(ranking[3] || ranking[1], ranking[3] ? '4ème' : '2ème'), l2: getSlotLabel(ranking[4] || ranking[2], ranking[4] ? '5ème' : '3ème') },
-        { p1: getSlotPlayerId(ranking[1] || ranking[2]), p2: getSlotPlayerId(ranking[6] || ranking[0]), l1: getSlotLabel(ranking[1] || ranking[2], ranking[1] ? '2ème' : '3ème'), l2: getSlotLabel(ranking[6] || ranking[0], ranking[6] ? '7ème' : '1er') },
-        { p1: getSlotPlayerId(ranking[2] || ranking[0]), p2: getSlotPlayerId(ranking[5] || ranking[1]), l1: getSlotLabel(ranking[2] || ranking[0], ranking[2] ? '3ème' : '1er'), l2: getSlotLabel(ranking[5] || ranking[1], ranking[5] ? '6ème' : '2ème') },
+        { 
+          p1: getSlotPlayerId(ranking[0]), 
+          p2: hasQ1Bye ? undefined : getSlotPlayerId(ranking[7]), 
+          l1: getSlotLabel(ranking[0], '1er'), 
+          l2: hasQ1Bye ? '⚡ BLANC (Exempt)' : getSlotLabel(ranking[7], '8ème'),
+          isBye: hasQ1Bye
+        },
+        { 
+          p1: getSlotPlayerId(ranking[3]), 
+          p2: getSlotPlayerId(ranking[4]), 
+          l1: getSlotLabel(ranking[3], '4ème'), 
+          l2: getSlotLabel(ranking[4], '5ème'),
+          isBye: false
+        },
+        { 
+          p1: getSlotPlayerId(ranking[1]), 
+          p2: hasQ3Bye ? undefined : getSlotPlayerId(ranking[6]), 
+          l1: getSlotLabel(ranking[1], '2ème'), 
+          l2: hasQ3Bye ? '⚡ BLANC (Exempt)' : getSlotLabel(ranking[6], '7ème'),
+          isBye: hasQ3Bye
+        },
+        { 
+          p1: getSlotPlayerId(ranking[2]), 
+          p2: hasQ4Bye ? undefined : getSlotPlayerId(ranking[5]), 
+          l1: getSlotLabel(ranking[2], '3ème'), 
+          l2: hasQ4Bye ? '⚡ BLANC (Exempt)' : getSlotLabel(ranking[5], '6ème'),
+          isBye: hasQ4Bye
+        },
       ];
 
       rounds.push({
@@ -286,9 +325,25 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           player2Label: pair.l2,
           score1: 0,
           score2: 0,
-          status: 'pending'
+          status: pair.isBye ? 'finished' : 'pending',
+          winnerId: pair.isBye ? pair.p1 : undefined
         }))
       });
+
+      const s1P1 = hasQ1Bye ? getSlotPlayerId(ranking[0]) : undefined;
+      const s1P1Label = hasQ1Bye 
+        ? `${ranking[0] ? (players[ranking[0].id]?.name || '1er') : '1er'} (Qualifié d'office)`
+        : 'Vainqueur 1/4 #1';
+
+      const s2P1 = hasQ3Bye ? getSlotPlayerId(ranking[1]) : undefined;
+      const s2P1Label = hasQ3Bye 
+        ? `${ranking[1] ? (players[ranking[1].id]?.name || '2ème') : '2ème'} (Qualifié d'office)`
+        : 'Vainqueur 1/4 #3';
+
+      const s2P2 = hasQ4Bye ? getSlotPlayerId(ranking[2]) : undefined;
+      const s2P2Label = hasQ4Bye 
+        ? `${ranking[2] ? (players[ranking[2].id]?.name || '3ème') : '3ème'} (Qualifié d'office)`
+        : 'Vainqueur 1/4 #4';
 
       rounds.push({
         title: 'Demi-Finales',
@@ -299,8 +354,9 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
             title: 'Demi-Finale #1',
             round: 2,
             position: 0,
-            player1Label: 'Vainqueur 1/4 #1',
-            player2Label: 'Vainqueur 1/4 #2',
+            player1Id: s1P1,
+            player1Label: s1P1Label,
+            player2Label: 'Vainqueur 1/4 #2 (4e vs 5e)',
             score1: 0,
             score2: 0,
             status: 'pending'
@@ -311,8 +367,10 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
             title: 'Demi-Finale #2',
             round: 2,
             position: 1,
-            player1Label: 'Vainqueur 1/4 #3',
-            player2Label: 'Vainqueur 1/4 #4',
+            player1Id: s2P1,
+            player2Id: s2P2,
+            player1Label: s2P1Label,
+            player2Label: s2P2Label,
             score1: 0,
             score2: 0,
             status: 'pending'
@@ -355,20 +413,23 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         matches: projFinalMatches8
       });
 
-    } else if (numQualifiers === 4) {
-      const hasThirdPlace = activeTournament.settings?.hasThirdPlaceMatch ?? true;
-      // 2 Demis : 1er vs 4eme et 2eme vs 3eme (règle universelle de tournoi)
+    } else if (bracketSize === 4) {
+      const hasThirdPlace = (activeTournament.settings?.hasThirdPlaceMatch ?? true) && numQualifiers >= 4;
+      const hasS1Bye = !ranking[3]; // Si 3 qualifiés, le 1er a un blanc en demi et avance directement en grande finale !
+
       const s1Pair = {
         p1: getSlotPlayerId(ranking[0]),
-        p2: getSlotPlayerId(ranking[3] || ranking[1]),
+        p2: hasS1Bye ? undefined : getSlotPlayerId(ranking[3]),
         l1: getSlotLabel(ranking[0], '1er'),
-        l2: getSlotLabel(ranking[3] || ranking[1], ranking[3] ? '4ème' : '2ème')
+        l2: hasS1Bye ? '⚡ BLANC (Exempt)' : getSlotLabel(ranking[3], '4ème'),
+        isBye: hasS1Bye
       };
       const s2Pair = {
         p1: getSlotPlayerId(ranking[1]),
-        p2: getSlotPlayerId(ranking[2] || ranking[0]),
+        p2: getSlotPlayerId(ranking[2]),
         l1: getSlotLabel(ranking[1], '2ème'),
-        l2: getSlotLabel(ranking[2] || ranking[0], ranking[2] ? '3ème' : '1er')
+        l2: getSlotLabel(ranking[2], '3ème'),
+        isBye: false
       };
 
       rounds.push({
@@ -386,7 +447,8 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
             player2Label: s1Pair.l2,
             score1: 0,
             score2: 0,
-            status: 'pending'
+            status: hasS1Bye ? 'finished' : 'pending',
+            winnerId: hasS1Bye ? s1Pair.p1 : undefined
           },
           {
             id: 'proj_s_1',
@@ -405,13 +467,19 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         ]
       });
 
+      const finalP1 = hasS1Bye ? getSlotPlayerId(ranking[0]) : undefined;
+      const finalP1Label = hasS1Bye
+        ? `${ranking[0] ? (players[ranking[0].id]?.name || '1er') : '1er'} (Qualifié d'office)`
+        : 'Vainqueur Demi #1';
+
       const projFinalMatches4: DisplayMatch[] = [{
         id: 'proj_f',
         stage: 'final',
         title: '🏆 Grande Finale',
         round: 2,
         position: 0,
-        player1Label: 'Vainqueur Demi #1',
+        player1Id: finalP1,
+        player1Label: finalP1Label,
         player2Label: 'Vainqueur Demi #2',
         score1: 0,
         score2: 0,
@@ -439,7 +507,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       });
 
     } else {
-      // 2 Qualifiers
+      // 2 Qualifiés: Grande Finale directe
       rounds.push({
         title: 'Grande Finale',
         matches: [{
@@ -685,6 +753,31 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
               ))}
             </div>
 
+            {numQualifiers === 7 && (
+              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>⚡</span>
+                <span><strong>1 Blanc (exempt)</strong> sera automatiquement attribué au 1er (#{ranking[0]?.name}) directement en demi-finale !</span>
+              </div>
+            )}
+            {numQualifiers === 6 && (
+              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>⚡</span>
+                <span><strong>2 Blancs (exempts)</strong> attribués au 1er (#{ranking[0]?.name}) et 2ème (#{ranking[1]?.name}) directement en demi-finale !</span>
+              </div>
+            )}
+            {numQualifiers === 5 && (
+              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>⚡</span>
+                <span><strong>3 Blancs (exempts)</strong> attribués au 1er, 2ème et 3ème directement en demi-finale !</span>
+              </div>
+            )}
+            {numQualifiers === 3 && (
+              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>⚡</span>
+                <span><strong>1 Blanc (exempt)</strong> attribué au 1er (#{ranking[0]?.name}) directement en grande finale !</span>
+              </div>
+            )}
+
             {numQualifiers >= 4 && (
               <label style={{
                 display: 'flex',
@@ -860,8 +953,14 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                   const p1 = m.player1Id ? players[m.player1Id] : null;
                   const p2 = m.player2Id ? players[m.player2Id] : null;
 
-                  const isP1Winner = m.status === 'finished' && m.winnerId === m.player1Id;
-                  const isP2Winner = m.status === 'finished' && m.winnerId === m.player2Id;
+                  const isBye = Boolean(
+                    (m.stage === 'quarter' || m.stage === 'semi') &&
+                    (!m.player2Id || m.player2Id === 'BYE' || m.player2Label?.includes('BLANC')) &&
+                    (m.status === 'finished' || m.player2Label?.includes('BLANC'))
+                  );
+
+                  const isP1Winner = (m.status === 'finished' && m.winnerId === m.player1Id) || (isBye && Boolean(m.player1Id));
+                  const isP2Winner = m.status === 'finished' && m.winnerId === m.player2Id && !isBye;
 
                   const tableObj = m.tableId ? tables[m.tableId] : null;
                   const tableName = tableObj?.name || (tableObj ? `Billard ${tableObj.number}` : null);
@@ -913,22 +1012,35 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                             </span>
                           )}
 
-                          {isPlaying && (
+                          {isBye ? (
+                            <span style={{
+                              background: 'rgba(0, 255, 170, 0.15)',
+                              color: 'var(--accent-primary)',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              border: '1px solid rgba(0, 255, 170, 0.3)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}>
+                              ⚡ EXEMPT (BLANC)
+                            </span>
+                          ) : isPlaying ? (
                             <span style={{ color: '#00ffaa', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 800 }}>
                               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00ffaa', animation: 'pulse 1.5s infinite' }} />
                               LIVE
                             </span>
-                          )}
-                          {m.status === 'finished' && (
+                          ) : m.status === 'finished' ? (
                             <span style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700 }}>
                               <CheckCircle2 size={12} /> Terminé
                             </span>
-                          )}
-                          {m.status === 'pending' && !tableName && (
+                          ) : !tableName ? (
                             <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
                               <Clock size={12} /> À venir
                             </span>
-                          )}
+                          ) : null}
                         </div>
                       </div>
 
@@ -1001,10 +1113,14 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                               ? 'rgba(255, 255, 255, 0.04)'
                               : 'rgba(255, 255, 255, 0.02)',
                           border: isP2Winner ? '1px solid var(--accent-primary)' : '1px solid transparent',
-                          opacity: (m.status === 'finished' && !isP2Winner) ? 0.45 : 1
+                          opacity: (m.status === 'finished' && !isP2Winner && !isBye) ? 0.45 : (isBye ? 0.7 : 1)
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: 0 }}>
-                            {p2?.avatarUrl ? (
+                            {isBye ? (
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>
+                                💤
+                              </div>
+                            ) : p2?.avatarUrl ? (
                               <img src={p2.avatarUrl} alt={p2.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
                             ) : (
                               <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>
@@ -1013,13 +1129,13 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                             )}
 
                             <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                              <span style={{ fontWeight: isP2Winner ? 800 : 600, fontSize: '0.85rem', color: isP2Winner ? 'var(--accent-primary)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {p2 ? p2.name : (m.player2Label || 'En attente...')}
+                              <span style={{ fontWeight: isP2Winner ? 800 : (isBye ? 500 : 600), fontStyle: isBye ? 'italic' : 'normal', fontSize: '0.85rem', color: isBye ? 'var(--text-muted)' : (isP2Winner ? 'var(--accent-primary)' : '#fff'), overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {isBye ? 'BLANC (Exempt)' : (p2 ? p2.name : (m.player2Label || 'En attente...'))}
                               </span>
-                              {p2 && (p2.level === 'Prestige' || p2.level === 'Confirmé') && (
+                              {!isBye && p2 && (p2.level === 'Prestige' || p2.level === 'Confirmé') && (
                                 <span title="Joueur Prestige" style={{ fontSize: '0.7rem' }}>👑</span>
                               )}
-                              {Boolean(m.handicapP2 && m.handicapP2 > 0) && (
+                              {!isBye && Boolean(m.handicapP2 && m.handicapP2 > 0) && (
                                 <span style={{ fontSize: '0.62rem', background: 'rgba(0,255,170,0.2)', color: 'var(--accent-primary)', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>
                                   +{m.handicapP2}
                                 </span>
@@ -1037,7 +1153,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                             padding: '0 0.4rem',
                             color: isP2Winner ? 'var(--accent-primary)' : (isPlaying ? '#fff' : 'var(--text-muted)')
                           }}>
-                            {m.status !== 'pending' ? m.score2 : '-'}
+                            {isBye ? '-' : (m.status !== 'pending' ? m.score2 : '-')}
                           </div>
                         </div>
 
