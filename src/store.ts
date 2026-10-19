@@ -16,7 +16,7 @@ interface AppState {
   updatePlayer: (id: string, name: string, level: PlayerLevel, photoUrl?: string) => void;
   deletePlayer: (id: string) => void;
   createTournament: (name: string, format: TournamentFormat, settings: TournamentSettings, participants: string[]) => void;
-  startTournamentMatch: (matchId: string) => void;
+  startTournamentMatch: (matchId: string, asCurrentUser?: boolean) => void;
   updateScore: (playerId: string, delta: number) => void;
   updateMatchScore: (matchId: string, score1: number, score2: number) => void;
   updateFinishedMatchScore: (matchId: string, score1: number, score2: number) => void;
@@ -422,7 +422,7 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  startTournamentMatch: (matchId) => {
+  startTournamentMatch: (matchId, asCurrentUser = true) => {
     set((state) => {
       const match = state.matches[matchId];
       if (!match || match.status === 'finished') return state;
@@ -437,7 +437,7 @@ export const useStore = create<AppState>((set, get) => ({
           ...state.matches, 
           [matchId]: { ...match, tableId: effectiveTableId, status: 'playing', startTime } 
         },
-        activeMatchId: matchId
+        ...(asCurrentUser ? { activeMatchId: matchId } : {})
       };
     });
   },

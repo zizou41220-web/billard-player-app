@@ -29,6 +29,14 @@ function App() {
     return <StreamOverlayView tableParam={overlayTableParam} />;
   }
 
+  if (appMode === 'admin') {
+    return (
+      <div style={{ position: 'relative', width: '100vw', height: '100dvh' }}>
+        <AdminView />
+      </div>
+    );
+  }
+
   if (activeMatchId) {
     return (
       <div className="mobile-container" style={{ overflowY: 'auto' }}>
@@ -45,14 +53,6 @@ function App() {
       default: return <ScanView />;
     }
   };
-
-  if (appMode === 'admin') {
-    return (
-      <div style={{ position: 'relative', width: '100vw', height: '100dvh' }}>
-        <AdminView />
-      </div>
-    );
-  }
 
   return (
     <div style={{ position: 'relative', height: '100dvh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>

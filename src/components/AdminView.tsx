@@ -17,7 +17,7 @@ const AdminView: React.FC = () => {
     createTournament, addPlayer, updatePlayer, deletePlayer,
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
-    assignMatchToTable, updateFinishedMatchScore
+    assignMatchToTable, updateFinishedMatchScore, startTournamentMatch
   } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -1507,21 +1507,44 @@ const AdminView: React.FC = () => {
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
                             <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player2Id]?.name}</div>
                             {match.status === 'playing' ? (
-                              <div style={{ marginTop: '0.5rem', color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
+                              <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                                <div style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
+                                {effTableId && (
+                                  <button
+                                    className="btn btn-outline"
+                                    style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem', width: '100%', justifyContent: 'center' }}
+                                    onClick={() => setSelectedTableForQR(effTableId)}
+                                  >
+                                    Modifier le score
+                                  </button>
+                                )}
+                              </div>
                             ) : (
-                              <button
-                                className="btn btn-outline"
-                                style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', marginTop: '0.5rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                                onClick={() => {
-                                  if (effTableId && matchesWaiting.length > 0) {
-                                    setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
-                                  } else {
-                                    postponeMatch(match.id);
-                                  }
-                                }}
-                              >
-                                <ArrowUpDown size={12} /> Repousser...
-                              </button>
+                              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+                                <button
+                                  className="btn btn-neon"
+                                  style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#000', fontWeight: 800 }}
+                                  onClick={() => {
+                                    startTournamentMatch(match.id, false);
+                                    if (effTableId) setSelectedTableForQR(effTableId);
+                                  }}
+                                >
+                                  <Play size={12} /> Démarrer
+                                </button>
+                                <button
+                                  className="btn btn-outline"
+                                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                                  onClick={() => {
+                                    if (effTableId && matchesWaiting.length > 0) {
+                                      setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
+                                    } else {
+                                      postponeMatch(match.id);
+                                    }
+                                  }}
+                                >
+                                  <ArrowUpDown size={12} /> Repousser
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2232,20 +2255,32 @@ const AdminView: React.FC = () => {
                         {`{"tournamentId":"${match.tournamentId}","matchId":"${match.id}","clubId":"${currentClub.id}"}`}
                       </div>
                     </div>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, textAlign: 'center' }}>
                       Scannez ce QR Code avec votre smartphone pour démarrer ce match
                     </p>
 
-                    <button
-                      className="btn btn-outline"
-                      style={{ width: '100%', justifyContent: 'center', color: 'var(--text-muted)', borderColor: 'var(--border-color)', fontSize: '0.85rem', marginTop: '0.5rem' }}
-                      onClick={() => {
-                        freeTable(table.id);
-                        setSelectedTableForQR(null);
-                      }}
-                    >
-                      <XCircle size={16} /> Libérer ce billard (remettre le match en attente)
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%', marginTop: '0.5rem' }}>
+                      <button
+                        className="btn btn-neon"
+                        style={{ width: '100%', justifyContent: 'center', fontSize: '1rem', fontWeight: 800, padding: '0.85rem', color: '#000' }}
+                        onClick={() => {
+                          startTournamentMatch(match.id, false);
+                        }}
+                      >
+                        <Play size={18} /> Démarrer ce match sur le billard
+                      </button>
+
+                      <button
+                        className="btn btn-outline"
+                        style={{ width: '100%', justifyContent: 'center', color: 'var(--text-muted)', borderColor: 'var(--border-color)', fontSize: '0.85rem' }}
+                        onClick={() => {
+                          freeTable(table.id);
+                          setSelectedTableForQR(null);
+                        }}
+                      >
+                        <XCircle size={16} /> Libérer ce billard (remettre le match en attente)
+                      </button>
+                    </div>
                   </>
                 )
               ) : (
