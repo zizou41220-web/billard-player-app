@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Match } from '../types';
+import { Match, MatchStage } from '../types';
 import {
   Trophy, Swords, CheckCircle2, Clock, Sparkles,
   Users, AlertCircle, ShieldCheck, QrCode, RefreshCw
 } from 'lucide-react';
 import { getTournamentQualificationStatus, PlayerQualifStat } from '../utils/qualifiers';
+import { getBracketSize, getBracketRounds, isFinalStageMatch, generateSeedingPairs } from '../utils/bracket';
 
 interface BracketViewProps {
   onSelectTableForQR?: (tableId: string) => void;
@@ -19,6 +20,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
 
   const [confirmLaunchOpen, setConfirmLaunchOpen] = useState(false);
   const [modalIncludeThirdPlace, setModalIncludeThirdPlace] = useState(activeTournament?.settings?.hasThirdPlaceMatch ?? true);
+  const [selectedRoundFilter, setSelectedRoundFilter] = useState<string>('all');
 
   React.useEffect(() => {
     // Auto-dispatch / advance any ready bracket matches to ensure sync with DB
@@ -44,12 +46,6 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     numQualifiers
   } = getTournamentQualificationStatus(activeTournament, matches, players);
 
-  const isFinalStageMatch = (m: Match) => {
-    if (m.stage && m.stage !== 'qualif') return true;
-    if (m.id && (m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_') || m.id.includes('_third_place_'))) return true;
-    return false;
-  };
-
   const allTourMatches = Object.values(matches).filter(m =>
     Boolean(m && (m.tournamentId === activeTournament.id || activeTournament.matches.includes(m.id)))
   );
@@ -67,7 +63,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
   // Active / Projected bracket matches
   type DisplayMatch = {
     id: string;
-    stage: 'quarter' | 'semi' | 'final' | 'third_place';
+    stage: MatchStage;
     title: string;
     round: number;
     position: number;
@@ -85,181 +81,80 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     handicapP2?: number;
   };
 
-  // Build the bracket rounds
-  let rounds: { title: string; matches: DisplayMatch[] }[] = [];
+  // Construction universelle des tours de l'arbre (2 à 128 joueurs)
+  const bracketSize = getBracketSize(numQualifiers);
+  const bracketRoundDefs = getBracketRounds(bracketSize);
+  const totalRoundsCount = bracketRoundDefs.length;
+
+  let rounds: { title: string; stage: MatchStage; matches: DisplayMatch[] }[] = [];
 
   if (isFinalLaunched) {
-    // Collect from real matches
-    const quarters = finalMatches
-      .filter(m => (m.stage === 'quarter' || m.id.includes('_quarter_')))
-      .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+    // 1. Collecte depuis les vrais matchs en base
+    bracketRoundDefs.forEach((roundDef, rIdx) => {
+      const isLastRound = rIdx === totalRoundsCount - 1;
+      const matchesInThisRound = finalMatches
+        .filter(m => m.stage === roundDef.stage || m.id.includes(`_${roundDef.prefix}_`))
+        .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
 
-    const semis = finalMatches
-      .filter(m => (m.stage === 'semi' || m.id.includes('_semi_')))
-      .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
-
-    const final = finalMatches.find(m => (m.stage === 'final' || m.id.includes('_final_')) && !m.id.includes('_third_place_'));
-    const thirdPlace = finalMatches.find(m => (m.stage === 'third_place' || m.id.includes('_third_place_')));
-
-    if (quarters.length > 0) {
-      rounds.push({
-        title: 'Quarts de Finale',
-        matches: quarters.map((m, idx) => {
-          const isBye = !m.player2Id || m.player2Id === 'BYE';
-          return {
-            id: m.id,
-            stage: 'quarter',
-            title: `1/4 de Finale #${idx + 1}`,
-            round: 1,
-            position: idx,
-            player1Id: m.player1Id,
-            player2Id: isBye ? undefined : m.player2Id,
-            player2Label: isBye ? '⚡ BLANC (Exempt)' : undefined,
-            score1: m.score1,
-            score2: m.score2,
-            status: m.status,
-            winnerId: m.winnerId,
-            tableId: m.tableId,
-            realMatch: m,
-            handicapP1: m.handicapP1,
-            handicapP2: m.handicapP2
-          };
-        })
-      });
-    }
-
-    if (semis.length > 0) {
-      rounds.push({
-        title: 'Demi-Finales',
-        matches: semis.map((m, idx) => {
-          const isBye = (!m.player2Id || m.player2Id === 'BYE') && m.status === 'finished';
-          return {
-            id: m.id,
-            stage: 'semi',
-            title: `Demi-Finale #${idx + 1}`,
-            round: quarters.length > 0 ? 2 : 1,
-            position: idx,
-            player1Id: m.player1Id,
-            player2Id: isBye ? undefined : m.player2Id,
-            player2Label: isBye ? '⚡ BLANC (Exempt)' : undefined,
-            score1: m.score1,
-            score2: m.score2,
-            status: m.status,
-            winnerId: m.winnerId,
-            tableId: m.tableId,
-            realMatch: m,
-            handicapP1: m.handicapP1,
-            handicapP2: m.handicapP2
-          };
-        })
-      });
-    }
-
-    if (final || thirdPlace || semis.length > 0 || quarters.length > 0) {
-      const finalRoundMatches: DisplayMatch[] = [];
-      const finalRoundNumber = quarters.length > 0 ? 3 : (semis.length > 0 ? 2 : 1);
-
-      const semi1 = semis.find(s => s.bracketPosition === 0 || s.id.includes('_semi_1_')) || semis[0];
-      const semi2 = semis.find(s => s.bracketPosition === 1 || s.id.includes('_semi_2_')) || semis[1];
-
-      const getWinnerId = (m?: Match) => {
-        if (!m || m.status !== 'finished') return undefined;
-        return m.winnerId || (m.score1 > m.score2 ? m.player1Id : (m.score2 > m.score1 ? m.player2Id : undefined));
-      };
-
-      const getLoserId = (m?: Match) => {
-        if (!m || m.status !== 'finished') return undefined;
-        const w = getWinnerId(m);
-        if (!w) return undefined;
-        return w === m.player1Id ? m.player2Id : m.player1Id;
-      };
-
-      const s1Winner = getWinnerId(semi1);
-      const s2Winner = getWinnerId(semi2);
-      const s1Loser = getLoserId(semi1);
-      const s2Loser = getLoserId(semi2);
-
-      const finalMatchObj: Partial<Match> = final || {
-        id: `m_final_${activeTournament.id}`,
-        stage: 'final',
-        player1Id: s1Winner || '',
-        player2Id: s2Winner || '',
-        score1: 0,
-        score2: 0,
-        status: 'pending',
-        tournamentId: activeTournament.id
-      };
-
-      const finalP1 = finalMatchObj.player1Id || s1Winner;
-      const finalP2 = finalMatchObj.player2Id || s2Winner;
-      finalRoundMatches.push({
-        id: finalMatchObj.id || `m_final_${activeTournament.id}`,
-        stage: 'final',
-        title: '🏆 Grande Finale (1ère place)',
-        round: finalRoundNumber,
-        position: 0,
-        player1Id: finalP1,
-        player2Id: finalP2,
-        player1Label: finalP1 ? undefined : (semi1?.status === 'finished' ? 'Vainqueur Demi #1' : 'En attente Demi #1'),
-        player2Label: finalP2 ? undefined : (semi2?.status === 'finished' ? 'Vainqueur Demi #2' : 'En attente Demi #2'),
-        score1: finalMatchObj.score1 || 0,
-        score2: finalMatchObj.score2 || 0,
-        status: finalMatchObj.status || 'pending',
-        winnerId: finalMatchObj.winnerId,
-        tableId: finalMatchObj.tableId,
-        realMatch: final,
-        handicapP1: finalMatchObj.handicapP1,
-        handicapP2: finalMatchObj.handicapP2
-      });
-
-      const shouldShowThirdPlace = Boolean(thirdPlace || activeTournament.settings?.hasThirdPlaceMatch);
-      if (shouldShowThirdPlace) {
-        const tpMatchObj: Partial<Match> = thirdPlace || {
-          id: `m_third_place_${activeTournament.id}`,
-          stage: 'third_place',
-          player1Id: s1Loser || '',
-          player2Id: s2Loser || '',
-          score1: 0,
-          score2: 0,
-          status: 'pending',
-          tournamentId: activeTournament.id
+      const displayList: DisplayMatch[] = matchesInThisRound.map((m, idx) => {
+        const isBye = (!m.player2Id || m.player2Id === 'BYE') && m.status === 'finished';
+        return {
+          id: m.id,
+          stage: roundDef.stage,
+          title: roundDef.stage === 'final'
+            ? '🏆 Grande Finale'
+            : `${roundDef.shortTitle} #${idx + 1}`,
+          round: roundDef.roundNumber,
+          position: m.bracketPosition ?? idx,
+          player1Id: m.player1Id,
+          player2Id: isBye ? undefined : m.player2Id,
+          player2Label: isBye ? '⚡ BLANC (Exempt)' : undefined,
+          score1: m.score1,
+          score2: m.score2,
+          status: m.status,
+          winnerId: m.winnerId,
+          tableId: m.tableId,
+          realMatch: m,
+          handicapP1: m.handicapP1,
+          handicapP2: m.handicapP2
         };
-        const tpP1 = tpMatchObj.player1Id || s1Loser;
-        const tpP2 = tpMatchObj.player2Id || s2Loser;
-        finalRoundMatches.push({
-          id: tpMatchObj.id || `m_third_place_${activeTournament.id}`,
-          stage: 'third_place',
-          title: '🥉 Petite Finale (3ème place)',
-          round: finalRoundNumber,
-          position: 1,
-          player1Id: tpP1,
-          player2Id: tpP2,
-          player1Label: tpP1 ? undefined : (semi1?.status === 'finished' ? 'Perdant Demi #1' : 'En attente Demi #1'),
-          player2Label: tpP2 ? undefined : (semi2?.status === 'finished' ? 'Perdant Demi #2' : 'En attente Demi #2'),
-          score1: tpMatchObj.score1 || 0,
-          score2: tpMatchObj.score2 || 0,
-          status: tpMatchObj.status || 'pending',
-          winnerId: tpMatchObj.winnerId,
-          tableId: tpMatchObj.tableId,
-          realMatch: thirdPlace,
-          handicapP1: tpMatchObj.handicapP1,
-          handicapP2: tpMatchObj.handicapP2
-        });
+      });
+
+      // Si dernier tour, inclure la Petite Finale si présente
+      if (isLastRound) {
+        const thirdPlace = finalMatches.find(m => m.stage === 'third_place' || m.id.includes('_third_place_'));
+        if (thirdPlace) {
+          displayList.push({
+            id: thirdPlace.id,
+            stage: 'third_place',
+            title: '🥉 Petite Finale (3ème place)',
+            round: roundDef.roundNumber,
+            position: 1,
+            player1Id: thirdPlace.player1Id,
+            player2Id: thirdPlace.player2Id,
+            score1: thirdPlace.score1,
+            score2: thirdPlace.score2,
+            status: thirdPlace.status,
+            winnerId: thirdPlace.winnerId,
+            tableId: thirdPlace.tableId,
+            realMatch: thirdPlace,
+            handicapP1: thirdPlace.handicapP1,
+            handicapP2: thirdPlace.handicapP2
+          });
+        }
       }
 
-      rounds.push({
-        title: finalRoundMatches.length > 1 ? 'Finales' : 'Grande Finale',
-        matches: finalRoundMatches
-      });
-    }
+      if (displayList.length > 0) {
+        rounds.push({
+          title: isLastRound && displayList.length > 1 ? 'Finales' : roundDef.title,
+          stage: roundDef.stage,
+          matches: displayList
+        });
+      }
+    });
   } else {
-    // Projected Bracket based on live standings
-
-    // Helper: assign playerId to a slot (provisional or sure)
-    const getSlotPlayerId = (playerStat?: PlayerQualifStat) => {
-      return playerStat?.id;
-    };
-
+    // 2. Tableau projeté en direct selon le classement actuel des qualifications
+    const getSlotPlayerId = (playerStat?: PlayerQualifStat) => playerStat?.id;
     const getSlotLabel = (playerStat?: PlayerQualifStat, rankLabel?: string) => {
       if (isFinalLaunched || isQualifAllDone) {
         return playerStat ? (players[playerStat.id]?.name || rankLabel) : (rankLabel || 'En attente...');
@@ -271,261 +166,88 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       return `En attente (${rankLabel || 'Qualifié'})`;
     };
 
-    const bracketSize = numQualifiers > 4 ? 8 : (numQualifiers > 2 ? 4 : 2);
+    const pairs = generateSeedingPairs(bracketSize);
 
-    if (bracketSize === 8) {
-      // 4 Quarts : 1er vs 8eme, 4eme vs 5eme, 2eme vs 7eme, 3eme vs 6eme
-      // Attribution automatique des Blancs (Exempts) si numQualifiers < 8 :
-      const hasQ1Bye = !ranking[7]; // 1er a un blanc en Q1 -> directement en Demi 1
-      const hasQ3Bye = !ranking[6]; // 2ème a un blanc en Q3 -> directement en Demi 2
-      const hasQ4Bye = !ranking[5]; // 3ème a un blanc en Q4 -> directement en Demi 2
+    bracketRoundDefs.forEach((roundDef, rIdx) => {
+      const isFirstRound = rIdx === 0;
+      const isLastRound = rIdx === totalRoundsCount - 1;
+      const displayList: DisplayMatch[] = [];
 
-      const qPairs = [
-        { 
-          p1: getSlotPlayerId(ranking[0]), 
-          p2: hasQ1Bye ? undefined : getSlotPlayerId(ranking[7]), 
-          l1: getSlotLabel(ranking[0], '1er'), 
-          l2: hasQ1Bye ? '⚡ BLANC (Exempt)' : getSlotLabel(ranking[7], '8ème'),
-          isBye: hasQ1Bye
-        },
-        { 
-          p1: getSlotPlayerId(ranking[3]), 
-          p2: getSlotPlayerId(ranking[4]), 
-          l1: getSlotLabel(ranking[3], '4ème'), 
-          l2: getSlotLabel(ranking[4], '5ème'),
-          isBye: false
-        },
-        { 
-          p1: getSlotPlayerId(ranking[1]), 
-          p2: hasQ3Bye ? undefined : getSlotPlayerId(ranking[6]), 
-          l1: getSlotLabel(ranking[1], '2ème'), 
-          l2: hasQ3Bye ? '⚡ BLANC (Exempt)' : getSlotLabel(ranking[6], '7ème'),
-          isBye: hasQ3Bye
-        },
-        { 
-          p1: getSlotPlayerId(ranking[2]), 
-          p2: hasQ4Bye ? undefined : getSlotPlayerId(ranking[5]), 
-          l1: getSlotLabel(ranking[2], '3ème'), 
-          l2: hasQ4Bye ? '⚡ BLANC (Exempt)' : getSlotLabel(ranking[5], '6ème'),
-          isBye: hasQ4Bye
-        },
-      ];
+      if (isFirstRound) {
+        for (let p = 0; p < roundDef.matchCount; p++) {
+          const [seedA, seedB] = pairs[p];
+          const statA = ranking[seedA - 1];
+          const statB = ranking[seedB - 1];
+          const isBye = seedB > numQualifiers || !statB;
 
-      rounds.push({
-        title: 'Quarts de Finale',
-        matches: qPairs.map((pair, idx) => ({
-          id: `proj_q_${idx}`,
-          stage: 'quarter',
-          title: `1/4 de Finale #${idx + 1}`,
-          round: 1,
-          position: idx,
-          player1Id: pair.p1,
-          player2Id: pair.p2,
-          player1Label: pair.l1,
-          player2Label: pair.l2,
-          score1: 0,
-          score2: 0,
-          status: pair.isBye ? 'finished' : 'pending',
-          winnerId: pair.isBye ? pair.p1 : undefined
-        }))
-      });
-
-      const s1P1 = hasQ1Bye ? getSlotPlayerId(ranking[0]) : undefined;
-      const s1P1Label = hasQ1Bye 
-        ? `${ranking[0] ? (players[ranking[0].id]?.name || '1er') : '1er'} (Qualifié d'office)`
-        : 'Vainqueur 1/4 #1';
-
-      const s2P1 = hasQ3Bye ? getSlotPlayerId(ranking[1]) : undefined;
-      const s2P1Label = hasQ3Bye 
-        ? `${ranking[1] ? (players[ranking[1].id]?.name || '2ème') : '2ème'} (Qualifié d'office)`
-        : 'Vainqueur 1/4 #3';
-
-      const s2P2 = hasQ4Bye ? getSlotPlayerId(ranking[2]) : undefined;
-      const s2P2Label = hasQ4Bye 
-        ? `${ranking[2] ? (players[ranking[2].id]?.name || '3ème') : '3ème'} (Qualifié d'office)`
-        : 'Vainqueur 1/4 #4';
-
-      rounds.push({
-        title: 'Demi-Finales',
-        matches: [
-          {
-            id: 'proj_s_0',
-            stage: 'semi',
-            title: 'Demi-Finale #1',
-            round: 2,
-            position: 0,
-            player1Id: s1P1,
-            player1Label: s1P1Label,
-            player2Label: 'Vainqueur 1/4 #2 (4e vs 5e)',
+          displayList.push({
+            id: `proj_${roundDef.prefix}_${p}`,
+            stage: roundDef.stage,
+            title: `${roundDef.shortTitle} #${p + 1}`,
+            round: roundDef.roundNumber,
+            position: p,
+            player1Id: getSlotPlayerId(statA),
+            player2Id: isBye ? undefined : getSlotPlayerId(statB),
+            player1Label: getSlotLabel(statA, `${seedA}e`),
+            player2Label: isBye ? '⚡ BLANC (Exempt)' : getSlotLabel(statB, `${seedB}e`),
             score1: 0,
             score2: 0,
-            status: 'pending'
-          },
-          {
-            id: 'proj_s_1',
-            stage: 'semi',
-            title: 'Demi-Finale #2',
-            round: 2,
-            position: 1,
-            player1Id: s2P1,
-            player2Id: s2P2,
-            player1Label: s2P1Label,
-            player2Label: s2P2Label,
-            score1: 0,
-            score2: 0,
-            status: 'pending'
-          }
-        ]
-      });
-
-      const hasThirdPlace = activeTournament.settings?.hasThirdPlaceMatch ?? true;
-
-      const projFinalMatches8: DisplayMatch[] = [{
-        id: 'proj_f',
-        stage: 'final',
-        title: '🏆 Grande Finale',
-        round: 3,
-        position: 0,
-        player1Label: 'Vainqueur Demi #1',
-        player2Label: 'Vainqueur Demi #2',
-        score1: 0,
-        score2: 0,
-        status: 'pending'
-      }];
-
-      if (hasThirdPlace) {
-        projFinalMatches8.push({
-          id: 'proj_tp',
-          stage: 'third_place',
-          title: '🥉 Petite Finale (3ème place)',
-          round: 3,
-          position: 1,
-          player1Label: 'Perdant Demi #1',
-          player2Label: 'Perdant Demi #2',
-          score1: 0,
-          score2: 0,
-          status: 'pending'
-        });
-      }
-
-      rounds.push({
-        title: hasThirdPlace ? 'Finales' : 'Grande Finale',
-        matches: projFinalMatches8
-      });
-
-    } else if (bracketSize === 4) {
-      const hasThirdPlace = (activeTournament.settings?.hasThirdPlaceMatch ?? true) && numQualifiers >= 4;
-      const hasS1Bye = !ranking[3]; // Si 3 qualifiés, le 1er a un blanc en demi et avance directement en grande finale !
-
-      const s1Pair = {
-        p1: getSlotPlayerId(ranking[0]),
-        p2: hasS1Bye ? undefined : getSlotPlayerId(ranking[3]),
-        l1: getSlotLabel(ranking[0], '1er'),
-        l2: hasS1Bye ? '⚡ BLANC (Exempt)' : getSlotLabel(ranking[3], '4ème'),
-        isBye: hasS1Bye
-      };
-      const s2Pair = {
-        p1: getSlotPlayerId(ranking[1]),
-        p2: getSlotPlayerId(ranking[2]),
-        l1: getSlotLabel(ranking[1], '2ème'),
-        l2: getSlotLabel(ranking[2], '3ème'),
-        isBye: false
-      };
-
-      rounds.push({
-        title: 'Demi-Finales',
-        matches: [
-          {
-            id: 'proj_s_0',
-            stage: 'semi',
-            title: 'Demi-Finale #1',
-            round: 1,
-            position: 0,
-            player1Id: s1Pair.p1,
-            player2Id: s1Pair.p2,
-            player1Label: s1Pair.l1,
-            player2Label: s1Pair.l2,
-            score1: 0,
-            score2: 0,
-            status: hasS1Bye ? 'finished' : 'pending',
-            winnerId: hasS1Bye ? s1Pair.p1 : undefined
-          },
-          {
-            id: 'proj_s_1',
-            stage: 'semi',
-            title: 'Demi-Finale #2',
-            round: 1,
-            position: 1,
-            player1Id: s2Pair.p1,
-            player2Id: s2Pair.p2,
-            player1Label: s2Pair.l1,
-            player2Label: s2Pair.l2,
-            score1: 0,
-            score2: 0,
-            status: 'pending'
-          }
-        ]
-      });
-
-      const finalP1 = hasS1Bye ? getSlotPlayerId(ranking[0]) : undefined;
-      const finalP1Label = hasS1Bye
-        ? `${ranking[0] ? (players[ranking[0].id]?.name || '1er') : '1er'} (Qualifié d'office)`
-        : 'Vainqueur Demi #1';
-
-      const projFinalMatches4: DisplayMatch[] = [{
-        id: 'proj_f',
-        stage: 'final',
-        title: '🏆 Grande Finale',
-        round: 2,
-        position: 0,
-        player1Id: finalP1,
-        player1Label: finalP1Label,
-        player2Label: 'Vainqueur Demi #2',
-        score1: 0,
-        score2: 0,
-        status: 'pending'
-      }];
-
-      if (hasThirdPlace) {
-        projFinalMatches4.push({
-          id: 'proj_tp',
-          stage: 'third_place',
-          title: '🥉 Petite Finale (3ème place)',
-          round: 2,
-          position: 1,
-          player1Label: 'Perdant Demi #1',
-          player2Label: 'Perdant Demi #2',
-          score1: 0,
-          score2: 0,
-          status: 'pending'
-        });
-      }
-
-      rounds.push({
-        title: hasThirdPlace ? 'Finales' : 'Grande Finale',
-        matches: projFinalMatches4
-      });
-
-    } else {
-      // 2 Qualifiés: Grande Finale directe
-      rounds.push({
-        title: 'Grande Finale',
-        matches: [{
-          id: 'proj_f',
+            status: isBye ? 'finished' : 'pending',
+            winnerId: isBye ? getSlotPlayerId(statA) : undefined
+          });
+        }
+      } else if (isLastRound) {
+        displayList.push({
+          id: 'proj_final',
           stage: 'final',
-          title: 'Finale du Tournoi',
-          round: 1,
+          title: '🏆 Grande Finale',
+          round: roundDef.roundNumber,
           position: 0,
-          player1Id: getSlotPlayerId(ranking[0]),
-          player2Id: getSlotPlayerId(ranking[1]),
-          player1Label: getSlotLabel(ranking[0], '1er'),
-          player2Label: getSlotLabel(ranking[1], '2ème'),
+          player1Label: 'Vainqueur 1/2 #1',
+          player2Label: 'Vainqueur 1/2 #2',
           score1: 0,
           score2: 0,
           status: 'pending'
-        }]
+        });
+
+        const hasThirdPlace = Boolean(activeTournament.settings?.hasThirdPlaceMatch ?? true);
+        if (hasThirdPlace && bracketSize >= 4) {
+          displayList.push({
+            id: 'proj_third_place',
+            stage: 'third_place',
+            title: '🥉 Petite Finale (3ème place)',
+            round: roundDef.roundNumber,
+            position: 1,
+            player1Label: 'Perdant 1/2 #1',
+            player2Label: 'Perdant 1/2 #2',
+            score1: 0,
+            score2: 0,
+            status: 'pending'
+          });
+        }
+      } else {
+        for (let p = 0; p < roundDef.matchCount; p++) {
+          displayList.push({
+            id: `proj_${roundDef.prefix}_${p}`,
+            stage: roundDef.stage,
+            title: `${roundDef.shortTitle} #${p + 1}`,
+            round: roundDef.roundNumber,
+            position: p,
+            player1Label: `Vainqueur match #${p * 2 + 1}`,
+            player2Label: `Vainqueur match #${p * 2 + 2}`,
+            score1: 0,
+            score2: 0,
+            status: 'pending'
+          });
+        }
+      }
+
+      rounds.push({
+        title: isLastRound && displayList.length > 1 ? 'Finales' : roundDef.title,
+        stage: roundDef.stage,
+        matches: displayList
       });
-    }
+    });
   }
 
   // Find overall tournament champion and podium if matches are finished
@@ -899,6 +621,47 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       )}
 
       {/* ========================================================================= */}
+      {/* Round Filter Tabs */}
+      {rounds.length > 1 && (
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={() => setSelectedRoundFilter('all')}
+            style={{
+              padding: '0.45rem 1rem',
+              borderRadius: '20px',
+              border: selectedRoundFilter === 'all' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+              background: selectedRoundFilter === 'all' ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.03)',
+              color: selectedRoundFilter === 'all' ? 'var(--accent-primary)' : '#fff',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            🏆 Vue Arbre Complète
+          </button>
+          {rounds.map(r => (
+            <button
+              key={r.title}
+              onClick={() => setSelectedRoundFilter(r.title)}
+              style={{
+                padding: '0.45rem 1rem',
+                borderRadius: '20px',
+                border: selectedRoundFilter === r.title ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: selectedRoundFilter === r.title ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.03)',
+                color: selectedRoundFilter === r.title ? 'var(--accent-primary)' : '#fff',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {r.title} ({r.matches.length})
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* THE BRACKET TREE VISUALIZATION                                             */}
       {/* ========================================================================= */}
       <div style={{
@@ -908,7 +671,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         overflowX: 'auto',
         padding: '1rem 0.5rem 2rem 0.5rem'
       }}>
-        {rounds.map((round, rIdx) => {
+        {rounds.filter(r => selectedRoundFilter === 'all' || r.title === selectedRoundFilter).map((round, rIdx) => {
           const isFinalRound = rIdx === rounds.length - 1;
 
           return (
@@ -954,7 +717,6 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                   const p2 = m.player2Id ? players[m.player2Id] : null;
 
                   const isBye = Boolean(
-                    (m.stage === 'quarter' || m.stage === 'semi') &&
                     (!m.player2Id || m.player2Id === 'BYE' || m.player2Label?.includes('BLANC')) &&
                     (m.status === 'finished' || m.player2Label?.includes('BLANC'))
                   );

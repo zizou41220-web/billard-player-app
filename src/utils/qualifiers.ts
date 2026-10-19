@@ -15,6 +15,8 @@ export type PlayerQualifStat = {
   isSure: boolean;
 };
 
+import { isFinalStageMatch } from './bracket';
+
 export function getTournamentQualificationStatus(
   tournament: Tournament | null,
   matches: Record<string, Match>,
@@ -33,12 +35,6 @@ export function getTournamentQualificationStatus(
     };
   }
 
-  const isFinalStageMatch = (m: Match) => {
-    if (m.stage && m.stage !== 'qualif') return true;
-    if (m.id && (m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_') || m.id.includes('_third_place_'))) return true;
-    return false;
-  };
-
   const allTourMatches = tournament.matches.map(id => matches[id]).filter(Boolean);
   const qualifMatches = allTourMatches.filter(m => !isFinalStageMatch(m));
   const finalMatches = allTourMatches.filter(isFinalStageMatch);
@@ -55,14 +51,8 @@ export function getTournamentQualificationStatus(
   const reqQualifiers = tournament.settings?.qualifNbQualifiers || 4;
   const participantsCount = tournament.participants.length;
 
-  let numQualifiers = 4;
-  if (reqQualifiers >= 8) {
-    numQualifiers = Math.min(8, participantsCount);
-  } else if (reqQualifiers <= 2 || participantsCount < 3) {
-    numQualifiers = Math.min(2, participantsCount);
-  } else {
-    numQualifiers = Math.min(reqQualifiers, participantsCount);
-  }
+  // Supporte 2, 4, 8, 16, 32, 64, 128 qualifiés (ou tout nombre intermédiaire avec gestion des Blancs)
+  const numQualifiers = participantsCount < 2 ? participantsCount : Math.min(Math.max(2, reqQualifiers), participantsCount);
 
   // Stats calculation
   const pStats: Record<string, PlayerQualifStat> = {};

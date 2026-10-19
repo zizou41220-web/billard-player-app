@@ -63,23 +63,28 @@ export const mapDBToMatch = (d: any): Match => {
     else if (d.id.includes('_final_')) stage = 'final';
     else if (d.id.includes('_semi_')) stage = 'semi';
     else if (d.id.includes('_quarter_')) stage = 'quarter';
+    else if (d.id.includes('_round16_') || d.id.includes('_r16_')) stage = 'round_of_16';
+    else if (d.id.includes('_round32_') || d.id.includes('_r32_')) stage = 'round_of_32';
+    else if (d.id.includes('_round64_') || d.id.includes('_r64_')) stage = 'round_of_64';
+    else if (d.id.includes('_round128_') || d.id.includes('_r128_')) stage = 'round_of_128';
     else stage = 'qualif';
   }
 
   let bracketRound = (d.bracket_round !== undefined && d.bracket_round !== null) ? d.bracket_round : undefined;
   let bracketPosition = (d.bracket_position !== undefined && d.bracket_position !== null) ? d.bracket_position : undefined;
   if (bracketRound === undefined && d.id) {
-    if (d.id.includes('_quarter_')) bracketRound = 1;
-    else if (d.id.includes('_semi_')) bracketRound = 2;
-    else if (d.id.includes('_third_place_') || d.id.includes('_final_')) bracketRound = 3;
+    if (d.id.includes('_round128_')) bracketRound = 1;
+    else if (d.id.includes('_round64_')) bracketRound = 2;
+    else if (d.id.includes('_round32_')) bracketRound = 3;
+    else if (d.id.includes('_round16_')) bracketRound = 4;
+    else if (d.id.includes('_quarter_')) bracketRound = 5;
+    else if (d.id.includes('_semi_')) bracketRound = 6;
+    else if (d.id.includes('_third_place_') || d.id.includes('_final_')) bracketRound = 7;
   }
   if (bracketPosition === undefined && d.id) {
-    if (d.id.includes('_quarter_')) {
-      const m = d.id.match(/_quarter_(\d+)/);
-      if (m) bracketPosition = parseInt(m[1], 10) - 1;
-    } else if (d.id.includes('_semi_')) {
-      const m = d.id.match(/_semi_(\d+)/);
-      if (m) bracketPosition = parseInt(m[1], 10) - 1;
+    const m = d.id.match(/_(?:quarter|semi|round16|round32|round64|round128|r16|r32|r64|r128)_(\d+)/);
+    if (m) {
+      bracketPosition = parseInt(m[1], 10) - 1;
     } else if (d.id.includes('_third_place_')) {
       bracketPosition = 1;
     } else if (d.id.includes('_final_')) {

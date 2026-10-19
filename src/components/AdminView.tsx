@@ -1012,17 +1012,18 @@ const AdminView: React.FC = () => {
                     {/* Format Selector */}
                     <div>
                       <label style={{ display: 'block', marginBottom: '0.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>Format de compétition</label>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
                         {[
-                          { id: 'cartesien', label: 'Cartésien' },
-                          { id: 'robin', label: 'Poules Robin' },
-                          { id: 'double_ko', label: 'Double KO' }
+                          { id: 'direct_ko', label: 'Tableau Direct (KO)', badge: 'Arbre immédiat' },
+                          { id: 'cartesien', label: 'Cartésien', badge: 'Poules' },
+                          { id: 'robin', label: 'Poules Robin', badge: 'Championnat' },
+                          { id: 'double_ko', label: 'Double KO', badge: 'Rattrapage' }
                         ].map(fmt => (
                           <div
                             key={fmt.id}
-                            onClick={() => setNewTourFormat(fmt.id)}
+                            onClick={() => setNewTourFormat(fmt.id as any)}
                             style={{
-                              padding: '1.2rem',
+                              padding: '1.1rem 0.8rem',
                               borderRadius: '12px',
                               border: newTourFormat === fmt.id ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
                               background: newTourFormat === fmt.id ? 'rgba(0, 255, 204, 0.12)' : 'rgba(255,255,255,0.02)',
@@ -1031,48 +1032,80 @@ const AdminView: React.FC = () => {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <div style={{ fontWeight: 700, fontSize: '1rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : '#fff' }}>{fmt.label}</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : '#fff' }}>{fmt.label}</div>
+                            <div style={{ fontSize: '0.72rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : 'var(--text-muted)', marginTop: '0.2rem' }}>{fmt.badge}</div>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    {/* Qualif Rules */}
-                    <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-                      <h3 style={{ fontSize: '1.2rem', marginBottom: '1.2rem', color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        Phase de Qualification
-                      </h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Type de match</label>
-                          <select className="input-field" value={qualifIsWinningSets ? 'winning' : 'fixed'} onChange={e => setQualifIsWinningSets(e.target.value === 'winning')} style={{ appearance: 'none', background: '#050816', color: '#fff' }}>
-                            <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
-                            <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
-                          </select>
+                    {/* Notice si Tableau Direct KO */}
+                    {newTourFormat === 'direct_ko' && (
+                      <div style={{ padding: '1.2rem', background: 'rgba(0, 255, 204, 0.08)', borderRadius: '12px', border: '1px solid rgba(0, 255, 204, 0.25)', display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                        <Trophy size={28} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                        <div style={{ fontSize: '0.85rem', color: '#fff', lineHeight: '1.4' }}>
+                          <strong>Format Élimination Directe Immédiate :</strong> L'arbre de compétition (de 2 à 128 joueurs : 32èmes, 16èmes, 8èmes...) est généré directement avec les participants inscrits. Les Blancs éventuels qualifient automatiquement les meilleures têtes de série pour le tour suivant.
                         </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                            Nombre (1 à 20 manches)
-                          </label>
-                          <input 
-                            type="number" 
-                            className="input-field" 
-                            value={qualifNbSets} 
-                            onChange={e => {
-                              const val = parseInt(e.target.value, 10);
-                              setQualifNbSets(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
-                            }} 
-                            min={1} 
-                            max={20} 
-                          />
-                        </div>
-                        {(newTourFormat === 'robin' || newTourFormat === 'cartesien') && (
+                      </div>
+                    )}
+
+                    {/* Qualif Rules (uniquement pour les formats avec poules) */}
+                    {newTourFormat !== 'direct_ko' && (
+                      <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+                        <h3 style={{ fontSize: '1.2rem', marginBottom: '1.2rem', color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          Phase de Qualification
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Type de match</label>
+                            <select className="input-field" value={qualifIsWinningSets ? 'winning' : 'fixed'} onChange={e => setQualifIsWinningSets(e.target.value === 'winning')} style={{ appearance: 'none', background: '#050816', color: '#fff' }}>
+                              <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
+                              <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                              Nombre (1 à 20 manches)
+                            </label>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              value={qualifNbSets} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10);
+                                setQualifNbSets(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                              }} 
+                              min={1} 
+                              max={20} 
+                            />
+                          </div>
                           <div style={{ gridColumn: 'span 2' }}>
                             <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                              Nombre de sortants (qualifiés) pour le tableau final (2 à 8)
+                              Nombre de qualifiés pour le tableau final (2 à 128 joueurs)
                             </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                              {[2, 4, 8, 16, 32, 64, 128].map(n => (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  onClick={() => setQualifNbQualifiers(n)}
+                                  style={{
+                                    padding: '0.35rem 0.75rem',
+                                    borderRadius: '8px',
+                                    border: qualifNbQualifiers === n ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                                    background: qualifNbQualifiers === n ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.04)',
+                                    color: qualifNbQualifiers === n ? 'var(--accent-primary)' : '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700
+                                  }}
+                                >
+                                  {n === 128 ? '128 (64es)' : n === 64 ? '64 (32es)' : n === 32 ? '32 (16es)' : n === 16 ? '16 (8es)' : n === 8 ? '8 (1/4)' : n === 4 ? '4 (1/2)' : '2 (Fin)'}
+                                </button>
+                              ))}
+                            </div>
                             <div style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', marginBottom: '0.5rem', lineHeight: '1.4' }}>
-                              💡 <strong>Gestion des Blancs :</strong> 7 qualifiés = 1 blanc (au 1er) • 6 qualifiés = 2 blancs (au 1er et 2e) • 5 qualifiés = 3 blancs • 3 qualifiés = 1 blanc (au 1er)
+                              💡 <strong>Blancs automatiques :</strong> si le nombre n'est pas une puissance de 2 (ex: 10 qualifiés), l'arbre s'ajuste à la puissance supérieure (16) avec 6 Blancs attribués d'office aux meilleurs classés.
                             </div>
                             <input 
                               type="number" 
@@ -1080,15 +1113,15 @@ const AdminView: React.FC = () => {
                               value={qualifNbQualifiers} 
                               onChange={e => {
                                 const val = parseInt(e.target.value, 10);
-                                setQualifNbQualifiers(isNaN(val) ? 2 : Math.min(8, Math.max(2, val)));
+                                setQualifNbQualifiers(isNaN(val) ? 2 : Math.min(128, Math.max(2, val)));
                               }} 
                               min={2} 
-                              max={8} 
+                              max={128} 
                             />
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Final Rules */}
                     <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>

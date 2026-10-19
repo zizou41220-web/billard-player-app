@@ -32,7 +32,16 @@ export type Table = {
   y?: number;
 };
 
-export type MatchStage = 'qualif' | 'quarter' | 'semi' | 'final' | 'third_place';
+export type MatchStage =
+  | 'qualif'
+  | 'round_of_128'
+  | 'round_of_64'
+  | 'round_of_32'
+  | 'round_of_16'
+  | 'quarter'
+  | 'semi'
+  | 'final'
+  | 'third_place';
 
 export type Match = {
   id: string;
@@ -55,7 +64,7 @@ export type Match = {
   handicapP2?: number;
 };
 
-export type TournamentFormat = 'cartesien' | 'robin' | 'double_ko';
+export type TournamentFormat = 'cartesien' | 'robin' | 'double_ko' | 'direct_ko';
 
 export type TournamentSettings = {
   tableIds: string[]; // IDs des billards physiquement alloués au tournoi
