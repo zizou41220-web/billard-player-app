@@ -67,6 +67,7 @@ export type TournamentSettings = {
   seedByMerit: boolean; // Tirage au mérite
   finalStageLaunched?: boolean;
   handicapAmateurSets?: number; // 0 = aucun, 1 = +1 manche d'avance pour Amateur vs Prestige, etc.
+  hasThirdPlaceMatch?: boolean; // Petite finale pour la 3ème place
 };
 
 export type Tournament = {

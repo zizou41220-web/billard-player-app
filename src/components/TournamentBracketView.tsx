@@ -12,12 +12,13 @@ interface BracketViewProps {
 }
 
 export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTableForQR }) => {
-  const { tournaments, matches, players, tables, launchFinalStage, reseedFinalStage, currentClub } = useStore();
+  const { tournaments, matches, players, tables, launchFinalStage, reseedFinalStage, toggleThirdPlaceMatch, currentClub } = useStore();
 
   const allTournaments = Object.values(tournaments);
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
 
   const [confirmLaunchOpen, setConfirmLaunchOpen] = useState(false);
+  const [modalIncludeThirdPlace, setModalIncludeThirdPlace] = useState(activeTournament?.settings?.hasThirdPlaceMatch ?? true);
 
   if (!activeTournament) {
     return (
@@ -40,7 +41,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
 
   const isFinalStageMatch = (m: Match) => {
     if (m.stage && m.stage !== 'qualif') return true;
-    if (m.id && (m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_'))) return true;
+    if (m.id && (m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_') || m.id.includes('_third_place_'))) return true;
     return false;
   };
 
@@ -59,7 +60,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
   // Active / Projected bracket matches
   type DisplayMatch = {
     id: string;
-    stage: 'quarter' | 'semi' | 'final';
+    stage: 'quarter' | 'semi' | 'final' | 'third_place';
     title: string;
     round: number;
     position: number;
@@ -90,7 +91,8 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       .filter(m => (m.stage === 'semi' || m.id.includes('_semi_')))
       .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
 
-    const final = finalMatches.find(m => (m.stage === 'final' || m.id.includes('_final_')));
+    const final = finalMatches.find(m => (m.stage === 'final' || m.id.includes('_final_')) && !m.id.includes('_third_place_'));
+    const thirdPlace = finalMatches.find(m => (m.stage === 'third_place' || m.id.includes('_third_place_')));
 
     if (quarters.length > 0) {
       rounds.push({
@@ -138,14 +140,16 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       });
     }
 
-    if (final) {
-      rounds.push({
-        title: 'Grande Finale',
-        matches: [{
+    if (final || thirdPlace) {
+      const finalRoundMatches: DisplayMatch[] = [];
+      const finalRoundNumber = quarters.length > 0 ? 3 : (semis.length > 0 ? 2 : 1);
+
+      if (final) {
+        finalRoundMatches.push({
           id: final.id,
           stage: 'final',
-          title: 'Finale du Tournoi',
-          round: quarters.length > 0 ? 3 : (semis.length > 0 ? 2 : 1),
+          title: '🏆 Grande Finale (1ère place)',
+          round: finalRoundNumber,
           position: 0,
           player1Id: final.player1Id,
           player2Id: final.player2Id,
@@ -157,7 +161,32 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           realMatch: final,
           handicapP1: final.handicapP1,
           handicapP2: final.handicapP2
-        }]
+        });
+      }
+
+      if (thirdPlace) {
+        finalRoundMatches.push({
+          id: thirdPlace.id,
+          stage: 'third_place',
+          title: '🥉 Petite Finale (3ème place)',
+          round: finalRoundNumber,
+          position: 1,
+          player1Id: thirdPlace.player1Id,
+          player2Id: thirdPlace.player2Id,
+          score1: thirdPlace.score1,
+          score2: thirdPlace.score2,
+          status: thirdPlace.status,
+          winnerId: thirdPlace.winnerId,
+          tableId: thirdPlace.tableId,
+          realMatch: thirdPlace,
+          handicapP1: thirdPlace.handicapP1,
+          handicapP2: thirdPlace.handicapP2
+        });
+      }
+
+      rounds.push({
+        title: thirdPlace ? 'Finales' : 'Grande Finale',
+        matches: finalRoundMatches
       });
     }
   } else {
@@ -236,23 +265,43 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         ]
       });
 
-      rounds.push({
-        title: 'Grande Finale',
-        matches: [{
-          id: 'proj_f',
-          stage: 'final',
-          title: 'Finale du Tournoi',
+      const hasThirdPlace = activeTournament.settings?.hasThirdPlaceMatch ?? true;
+
+      const projFinalMatches8: DisplayMatch[] = [{
+        id: 'proj_f',
+        stage: 'final',
+        title: '🏆 Grande Finale',
+        round: 3,
+        position: 0,
+        player1Label: 'Vainqueur Demi #1',
+        player2Label: 'Vainqueur Demi #2',
+        score1: 0,
+        score2: 0,
+        status: 'pending'
+      }];
+
+      if (hasThirdPlace) {
+        projFinalMatches8.push({
+          id: 'proj_tp',
+          stage: 'third_place',
+          title: '🥉 Petite Finale (3ème place)',
           round: 3,
-          position: 0,
-          player1Label: 'Vainqueur Demi #1',
-          player2Label: 'Vainqueur Demi #2',
+          position: 1,
+          player1Label: 'Perdant Demi #1',
+          player2Label: 'Perdant Demi #2',
           score1: 0,
           score2: 0,
           status: 'pending'
-        }]
+        });
+      }
+
+      rounds.push({
+        title: hasThirdPlace ? 'Finales' : 'Grande Finale',
+        matches: projFinalMatches8
       });
 
     } else if (numQualifiers === 4) {
+      const hasThirdPlace = activeTournament.settings?.hasThirdPlaceMatch ?? true;
       // 2 Demis : 1er vs 4eme et 2eme vs 3eme (règle universelle de tournoi)
       const s1Pair = {
         p1: getSlotPlayerId(ranking[0]),
@@ -301,20 +350,37 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         ]
       });
 
-      rounds.push({
-        title: 'Grande Finale',
-        matches: [{
-          id: 'proj_f',
-          stage: 'final',
-          title: 'Finale du Tournoi',
+      const projFinalMatches4: DisplayMatch[] = [{
+        id: 'proj_f',
+        stage: 'final',
+        title: '🏆 Grande Finale',
+        round: 2,
+        position: 0,
+        player1Label: 'Vainqueur Demi #1',
+        player2Label: 'Vainqueur Demi #2',
+        score1: 0,
+        score2: 0,
+        status: 'pending'
+      }];
+
+      if (hasThirdPlace) {
+        projFinalMatches4.push({
+          id: 'proj_tp',
+          stage: 'third_place',
+          title: '🥉 Petite Finale (3ème place)',
           round: 2,
-          position: 0,
-          player1Label: 'Vainqueur Demi #1',
-          player2Label: 'Vainqueur Demi #2',
+          position: 1,
+          player1Label: 'Perdant Demi #1',
+          player2Label: 'Perdant Demi #2',
           score1: 0,
           score2: 0,
           status: 'pending'
-        }]
+        });
+      }
+
+      rounds.push({
+        title: hasThirdPlace ? 'Finales' : 'Grande Finale',
+        matches: projFinalMatches4
       });
 
     } else {
@@ -339,10 +405,19 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     }
   }
 
-  // Find overall tournament champion if final match is finished
-  const realFinal = finalMatches.find(m => m.stage === 'final' || m.id.includes('_final_'));
+  // Find overall tournament champion and podium if matches are finished
+  const realFinal = finalMatches.find(m => (m.stage === 'final' || m.id.includes('_final_')) && !m.id.includes('_third_place_'));
   const championId = realFinal?.status === 'finished' ? realFinal.winnerId : undefined;
   const champion = championId ? players[championId] : null;
+
+  const realThirdPlace = finalMatches.find(m => m.stage === 'third_place' || m.id.includes('_third_place_'));
+  const runnerUpId = realFinal?.status === 'finished'
+    ? (realFinal.winnerId === realFinal.player1Id ? realFinal.player2Id : realFinal.player1Id)
+    : undefined;
+  const runnerUp = runnerUpId ? players[runnerUpId] : null;
+
+  const thirdWinnerId = realThirdPlace?.status === 'finished' ? realThirdPlace.winnerId : undefined;
+  const thirdWinner = thirdWinnerId ? players[thirdWinnerId] : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
@@ -454,7 +529,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
               {isQualifAllDone ? 'Valider les Qualifiés & Lancer le Tableau Final' : 'Forcer le Lancement du Tableau Final'}
             </button>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -470,6 +545,27 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                 <ShieldCheck size={18} />
                 Tableau Officiel ({finalMatches.length} matchs)
               </div>
+              {numQualifiers >= 4 && (
+                <button
+                  className="btn btn-outline"
+                  title={finalMatches.some(m => m.stage === 'third_place' || m.id.includes('_third_place_')) ? "Désactiver la petite finale pour la 3ème place" : "Activer la petite finale pour la 3ème place"}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    borderColor: finalMatches.some(m => m.stage === 'third_place' || m.id.includes('_third_place_')) ? '#f59e0b' : 'rgba(255,255,255,0.2)',
+                    color: finalMatches.some(m => m.stage === 'third_place' || m.id.includes('_third_place_')) ? '#f59e0b' : 'var(--text-muted)',
+                    background: finalMatches.some(m => m.stage === 'third_place' || m.id.includes('_third_place_')) ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
+                    padding: '0.5rem 0.9rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => toggleThirdPlaceMatch(activeTournament.id)}
+                >
+                  🥉 {finalMatches.some(m => m.stage === 'third_place' || m.id.includes('_third_place_')) ? 'Petite Finale active' : '+ Petite Finale'}
+                </button>
+              )}
               <button
                 className="btn btn-outline"
                 title="Rétablir les têtes de séries officielles : 1er vs 4ème et 2ème vs 3ème"
@@ -534,6 +630,34 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
               ))}
             </div>
 
+            {numQualifiers >= 4 && (
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.8rem',
+                cursor: 'pointer',
+                background: modalIncludeThirdPlace ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255,255,255,0.03)',
+                padding: '0.8rem 1rem',
+                borderRadius: '10px',
+                border: `1px solid ${modalIncludeThirdPlace ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-color)'}`
+              }}>
+                <input
+                  type="checkbox"
+                  checked={modalIncludeThirdPlace}
+                  onChange={(e) => setModalIncludeThirdPlace(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: '#f59e0b', cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.9rem', color: modalIncludeThirdPlace ? '#f59e0b' : '#fff' }}>
+                    🥉 Petite Finale (Match pour la 3ème place)
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Faire s'affronter les perdants des 1/2 finales pour désigner le 3ème du tournoi
+                  </span>
+                </div>
+              </label>
+            )}
+
             <p style={{ color: '#ffcc00', fontSize: '0.85rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <AlertCircle size={16} /> Les matchs de phase finale seront automatiquement répartis sur les billards disponibles.
             </p>
@@ -547,7 +671,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                 id="btn-confirm-launch-final"
                 onClick={(e) => {
                   e.stopPropagation();
-                  launchFinalStage(activeTournament.id);
+                  launchFinalStage(activeTournament.id, modalIncludeThirdPlace);
                   setConfirmLaunchOpen(false);
                 }}
               >
@@ -960,6 +1084,34 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                 border: '1px solid rgba(0, 255, 170, 0.4)'
               }}>
                 CHAMPION {activeTournament.name}
+              </div>
+            )}
+
+            {(runnerUp || thirdWinner) && (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                width: '100%',
+                marginTop: '0.5rem',
+                background: 'rgba(0,0,0,0.3)',
+                padding: '0.6rem 0.8rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.08)',
+                fontSize: '0.8rem'
+              }}>
+                {runnerUp && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#d1d5db', fontWeight: 700 }}>🥈 2ème</span>
+                    <span style={{ color: '#fff', fontWeight: 600 }}>{runnerUp.name}</span>
+                  </div>
+                )}
+                {thirdWinner && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#f59e0b', fontWeight: 700 }}>🥉 3ème</span>
+                    <span style={{ color: '#fff', fontWeight: 600 }}>{thirdWinner.name}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

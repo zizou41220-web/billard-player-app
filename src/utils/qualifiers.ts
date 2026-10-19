@@ -35,7 +35,7 @@ export function getTournamentQualificationStatus(
 
   const isFinalStageMatch = (m: Match) => {
     if (m.stage && m.stage !== 'qualif') return true;
-    if (m.id && (m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_'))) return true;
+    if (m.id && (m.id.includes('_quarter_') || m.id.includes('_semi_') || m.id.includes('_final_') || m.id.includes('_third_place_'))) return true;
     return false;
   };
 

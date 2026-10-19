@@ -59,7 +59,8 @@ const mapMatchToDB = (m: Match) => {
 const mapDBToMatch = (d: any): Match => {
   let stage: Match['stage'] = d.stage;
   if (!stage && d.id) {
-    if (d.id.includes('_final_')) stage = 'final';
+    if (d.id.includes('_third_place_')) stage = 'third_place';
+    else if (d.id.includes('_final_')) stage = 'final';
     else if (d.id.includes('_semi_')) stage = 'semi';
     else if (d.id.includes('_quarter_')) stage = 'quarter';
     else stage = 'qualif';
@@ -76,6 +77,9 @@ const mapDBToMatch = (d: any): Match => {
       bracketRound = 2;
       const m = d.id.match(/_semi_(\d+)_/);
       if (m) bracketPosition = parseInt(m[1], 10) - 1;
+    } else if (d.id.includes('_third_place_')) {
+      bracketRound = 3;
+      bracketPosition = 1;
     } else if (d.id.includes('_final_')) {
       bracketRound = 3;
       bracketPosition = 0;

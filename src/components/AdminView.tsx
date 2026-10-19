@@ -67,6 +67,7 @@ const AdminView: React.FC = () => {
   const [finalIsWinningSets, setFinalIsWinningSets] = useState(true);
   const [seedByMerit, setSeedByMerit] = useState(true);
   const [handicapAmateurSets, setHandicapAmateurSets] = useState(0);
+  const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(true);
 
   // New Player State
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -1086,6 +1087,13 @@ const AdminView: React.FC = () => {
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Le 1er des qualifiés affronte le dernier, etc.</div>
                           </div>
                         </div>
+                        <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                          <input type="checkbox" checked={hasThirdPlaceMatch} onChange={e => setHasThirdPlaceMatch(e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--accent-primary)' }} />
+                          <div>
+                            <div style={{ fontWeight: 600 }}>🥉 Petite Finale (match pour la 3ème place)</div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Faire s'affronter les deux perdants des demi-finales</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -1219,7 +1227,8 @@ const AdminView: React.FC = () => {
 
                         createTournament(newTourName.trim(), newTourFormat, {
                           tableIds: selectedTables, qualifNbSets, qualifIsWinningSets, qualifNbQualifiers,
-                          finalNbSets, finalIsWinningSets, seedByMerit, handicapAmateurSets
+                          finalNbSets, finalIsWinningSets, seedByMerit, handicapAmateurSets,
+                          hasThirdPlaceMatch
                         }, selectedPlayers);
 
                         setShowNewTourForm(false);
