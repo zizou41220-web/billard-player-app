@@ -256,19 +256,19 @@ const AdminView: React.FC = () => {
             flex: 1,
             width: '100%',
             height: '100%',
-            minHeight: '260px',
+            minHeight: 0,
             backgroundColor: '#050814',
             backgroundImage: 'radial-gradient(circle at center, rgba(18, 32, 60, 0.7) 0%, rgba(4, 7, 16, 0.98) 100%), repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 20px, transparent 20px, transparent 40px)',
             border: '1px solid var(--border-color)',
             borderRadius: '16px',
             position: 'relative',
-            padding: '1.2rem',
+            padding: '0.6rem 1rem',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
             gap: tablesCount <= 2 ? '3.5rem' : '2rem',
             flexWrap: 'wrap',
-            overflow: 'auto',
+            overflow: 'hidden',
             boxShadow: 'inset 0 0 35px rgba(0,0,0,0.85)'
           }}
         >
@@ -1855,7 +1855,7 @@ const AdminView: React.FC = () => {
           }
 
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1.2rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1.2rem', flex: 1, minHeight: 0 }}>
               {/* Alert banner if 1st vs 2nd anomaly detected in semi-finals */}
               {hasInvertedSemi && (
                 <div style={{
@@ -1949,19 +1949,35 @@ const AdminView: React.FC = () => {
                 {/* LEFT: Meta & QR + FILE D'ATTENTE */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: 0 }}>
                   {/* QR Code pour rejoindre l'appli */}
-                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', flexShrink: 0 }}>
-                    <h2 style={{ fontSize: '1.1rem', color: 'var(--accent-primary)', marginBottom: '0.2rem', fontWeight: 800 }}>{activeTournament.name}</h2>
-                    <div style={{ background: '#fff', padding: '8px', borderRadius: '10px', marginBottom: '0.6rem', marginTop: '0.6rem' }}>
-                      <QRCode value={getClubShareUrl()} size={115} />
+                  <div
+                    className="glass-card"
+                    style={{
+                      padding: '1.2rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      textAlign: 'center',
+                      flex: 1,
+                      minHeight: 0,
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <div>
+                      <h2 style={{ fontSize: '1.15rem', color: 'var(--accent-primary)', marginBottom: '0.2rem', fontWeight: 800 }}>{activeTournament.name}</h2>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--card-text-muted)', margin: 0 }}>Scannez pour rejoindre l'application</p>
                     </div>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--card-text-muted)', margin: 0 }}>Scannez pour rejoindre l'application</p>
+
+                    <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 'auto 0' }}>
+                      <QRCode value={getClubShareUrl()} size={125} />
+                    </div>
 
                     <button
                       className="btn btn-outline"
-                      style={{ marginTop: '0.8rem', width: '100%', fontSize: '0.75rem', padding: '0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                      style={{ width: '100%', fontSize: '0.78rem', padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
                       onClick={() => setActiveTab('launcher')}
                     >
-                      <Rocket size={13} /> Gérer dans le Lanceur
+                      <Rocket size={14} /> Gérer dans le Lanceur
                     </button>
                   </div>
 

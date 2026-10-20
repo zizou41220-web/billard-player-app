@@ -26,8 +26,8 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
   const isOccupied = status === 'occupied';
   const tableName = name || `Billard ${number}`;
   const isLarge = size === 'large';
-  const svgWidth = isLarge ? 260 : 160;
-  const svgHeight = isLarge ? 146 : 90;
+  const svgWidth = isLarge ? 240 : 160;
+  const svgHeight = isLarge ? 135 : 90;
 
   return (
     <div
@@ -349,11 +349,11 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
           background: isOccupied ? 'rgba(5, 8, 20, 0.94)' : 'rgba(10, 15, 25, 0.88)',
           backdropFilter: 'blur(8px)',
           border: isOccupied ? '1px solid rgba(0, 255, 170, 0.45)' : '1px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: isLarge ? '12px' : '7px',
-          padding: isLarge ? '6px 12px' : '2px 8px',
+          borderRadius: isLarge ? '10px' : '7px',
+          padding: isLarge ? '4px 10px' : '2px 8px',
           boxShadow: isOccupied ? '0 4px 16px rgba(0, 255, 170, 0.25)' : '0 2px 6px rgba(0,0,0,0.4)',
-          width: isLarge ? '260px' : undefined,
-          maxWidth: isLarge ? '260px' : '150px'
+          width: isLarge ? '240px' : undefined,
+          maxWidth: isLarge ? '240px' : '150px'
         }}
       >
         {/* Table Name + Live/Prêt Indicator */}
