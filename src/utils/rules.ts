@@ -60,13 +60,53 @@ export function getMaxAllowedHandicap(
 }
 
 /**
- * Récupère les règles précises de scoring pour un match donné selon les réglages du tournoi.
+ * Résout le nombre de manches prévu pour une affiche selon les niveaux des 2 joueurs
+ * (Amateur vs Amateur, Prestige vs Prestige, Amateur vs Prestige).
  */
-export function getMatchScoringRules(match: Match, tournament?: Tournament | null): MatchScoringRules {
-  const isFinal = match.stage === 'quarter' || match.stage === 'semi' || match.stage === 'final' || match.stage === 'third_place';
+export function resolveDuelTargetSets(
+  level1?: string,
+  level2?: string,
+  settings?: any | null,
+  isFinalStage: boolean = false
+): number {
+  if (!settings) return 1;
+  const isP1Prestige = level1 === 'Prestige';
+  const isP2Prestige = level2 === 'Prestige';
+
+  if (isP1Prestige && isP2Prestige) {
+    const val = isFinalStage ? settings.finalNbSetsPrestige : settings.qualifNbSetsPrestige;
+    return val && val > 0 ? val : (isFinalStage ? settings.finalNbSets : settings.qualifNbSets);
+  }
+  if (!isP1Prestige && !isP2Prestige) {
+    const val = isFinalStage ? settings.finalNbSetsAmateur : settings.qualifNbSetsAmateur;
+    return val && val > 0 ? val : (isFinalStage ? settings.finalNbSets : settings.qualifNbSets);
+  }
+  const val = isFinalStage ? settings.finalNbSetsMixed : settings.qualifNbSetsMixed;
+  return val && val > 0 ? val : (isFinalStage ? settings.finalNbSets : settings.qualifNbSets);
+}
+
+/**
+ * Récupère les règles précises de scoring pour un match donné selon les réglages du tournoi et les niveaux des joueurs.
+ */
+export function getMatchScoringRules(
+  match: Match,
+  tournament?: Tournament | null,
+  players?: Record<string, { level?: string }>
+): MatchScoringRules {
+  const isFinal = match.stage === 'quarter' || match.stage === 'semi' || match.stage === 'final' || match.stage === 'third_place' || (match.bracketRound !== undefined);
   const settings = tournament?.settings;
 
-  const maxSets = settings ? (isFinal ? settings.finalNbSets : settings.qualifNbSets) : 99;
+  let maxSets = match.targetSets || 0;
+  if (!maxSets || maxSets <= 0) {
+    if (players && match.player1Id && match.player2Id) {
+      const p1 = players[match.player1Id];
+      const p2 = players[match.player2Id];
+      maxSets = resolveDuelTargetSets(p1?.level, p2?.level, settings, isFinal);
+    } else {
+      maxSets = settings ? (isFinal ? settings.finalNbSets : settings.qualifNbSets) : 99;
+    }
+  }
+
   const isWinningSets = settings ? (isFinal ? settings.finalIsWinningSets : settings.qualifIsWinningSets) : true;
   const minScore1 = match.handicapP1 || 0;
   const minScore2 = match.handicapP2 || 0;

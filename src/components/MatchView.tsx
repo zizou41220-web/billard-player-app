@@ -18,7 +18,7 @@ const MatchView: React.FC = () => {
   const score2 = match.score2;
 
   const tournament = match.tournamentId ? tournaments[match.tournamentId] : null;
-  const { maxSets: maxScore, isWinningSets, minScore1, minScore2 } = getMatchScoringRules(match, tournament);
+  const { maxSets: maxScore, isWinningSets, minScore1, minScore2 } = getMatchScoringRules(match, tournament, players);
 
   const canFinish = isWinningSets
     ? (match.score1 >= maxScore || match.score2 >= maxScore)

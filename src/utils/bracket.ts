@@ -1,5 +1,6 @@
 import { Match, MatchStage, Player } from '../types';
 import { getMatchHandicap } from './handicap';
+import { resolveDuelTargetSets } from './rules';
 
 export type BracketRoundDef = {
   roundNumber: number; // 1 à totalRounds
@@ -132,9 +133,9 @@ export function buildBracketMatches(params: {
   finalIsWinningSets?: boolean;
   hasThirdPlaceMatch?: boolean;
   players: Record<string, Player>;
+  tournamentSettings?: any;
 }): { newMatches: Record<string, Match>; newMatchIds: string[]; bracketSize: number; rounds: BracketRoundDef[] } {
-  const { tournamentId, clubId, qualifiers, handicapAmateurSets, finalNbSets, finalIsWinningSets, hasThirdPlaceMatch = true, players } = params;
-  const maxAllowedHandicap = (finalIsWinningSets ?? true) ? Math.max(0, (finalNbSets || 1) - 1) : undefined;
+  const { tournamentId, clubId, qualifiers, handicapAmateurSets, finalNbSets, finalIsWinningSets, hasThirdPlaceMatch = true, players, tournamentSettings } = params;
   const numQualifiers = qualifiers.length;
   const bracketSize = getBracketSize(numQualifiers);
   const rounds = getBracketRounds(bracketSize);
@@ -217,16 +218,19 @@ export function buildBracketMatches(params: {
       }
     } else if (p1Id && p2Id) {
       // Vrai match entre 2 joueurs
+      const targetSets = resolveDuelTargetSets(players[p1Id]?.level, players[p2Id]?.level, tournamentSettings || { finalNbSets }, true);
+      const duelMaxH = (finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
       const { h1, h2 } = getMatchHandicap(
         players[p1Id]?.level,
         players[p2Id]?.level,
         handicapAmateurSets,
-        maxAllowedHandicap
+        duelMaxH
       );
       newMatches[matchId] = {
         ...currentMatch,
         player1Id: p1Id,
         player2Id: p2Id,
+        targetSets,
         score1: h1,
         score2: h2,
         handicapP1: h1 > 0 ? h1 : undefined,
@@ -249,14 +253,17 @@ export function buildBracketMatches(params: {
       const matchId = matchIdGrid[rIdx][p];
       const m = newMatches[matchId];
       if (m.player1Id && m.player2Id && m.status === 'pending') {
+        const targetSets = resolveDuelTargetSets(players[m.player1Id]?.level, players[m.player2Id]?.level, tournamentSettings || { finalNbSets }, true);
+        const duelMaxH = (finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
         const { h1, h2 } = getMatchHandicap(
           players[m.player1Id]?.level,
           players[m.player2Id]?.level,
           handicapAmateurSets,
-          maxAllowedHandicap
+          duelMaxH
         );
         newMatches[matchId] = {
           ...m,
+          targetSets,
           score1: h1,
           score2: h2,
           handicapP1: h1 > 0 ? h1 : undefined,

@@ -62,18 +62,23 @@ const AdminView: React.FC = () => {
   const [newTourFormat, setNewTourFormat] = useState<any>('cartesien');
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
-  const [qualifNbSets, setQualifNbSets] = useState(1);
+  const [qualifNbSetsAmateur, setQualifNbSetsAmateur] = useState(1);
+  const [qualifNbSetsPrestige, setQualifNbSetsPrestige] = useState(1);
+  const [qualifNbSetsMixed, setQualifNbSetsMixed] = useState(1);
   const [qualifIsWinningSets, setQualifIsWinningSets] = useState(true);
   const [qualifNbQualifiers, setQualifNbQualifiers] = useState(2);
-  const [finalNbSets, setFinalNbSets] = useState(3);
+
+  const [finalNbSetsAmateur, setFinalNbSetsAmateur] = useState(3);
+  const [finalNbSetsPrestige, setFinalNbSetsPrestige] = useState(3);
+  const [finalNbSetsMixed, setFinalNbSetsMixed] = useState(3);
   const [finalIsWinningSets, setFinalIsWinningSets] = useState(true);
   const [seedByMerit, setSeedByMerit] = useState(true);
   const [qualifHandicapAmateurSets, setQualifHandicapAmateurSets] = useState(0);
   const [finalHandicapAmateurSets, setFinalHandicapAmateurSets] = useState(0);
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(true);
 
-  const maxAllowedQualifHandicap = getMaxAllowedQualifHandicap(qualifNbSets, qualifIsWinningSets);
-  const maxAllowedFinalHandicap = getMaxAllowedFinalHandicap(finalNbSets, finalIsWinningSets);
+  const maxAllowedQualifHandicap = getMaxAllowedQualifHandicap(qualifNbSetsMixed, qualifIsWinningSets);
+  const maxAllowedFinalHandicap = getMaxAllowedFinalHandicap(finalNbSetsMixed, finalIsWinningSets);
 
   const maxAllowedQualifiers = newTourFormat !== 'direct_ko' && selectedPlayers.length >= 3
     ? selectedPlayers.length - 1
@@ -837,6 +842,21 @@ const AdminView: React.FC = () => {
                         </div>
                       </div>
                     )}
+                    <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1.2rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', fontWeight: 700 }}>Distances des Duels</div>
+                      <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        {activeTournament.format !== 'direct_ko' && (
+                          <div style={{ color: 'var(--accent-primary)' }}>
+                            <span style={{ fontWeight: 700 }}>Poules : </span> 
+                            Am {activeTournament.settings?.qualifNbSetsAmateur ?? activeTournament.settings?.qualifNbSets ?? 2}m • Pre {activeTournament.settings?.qualifNbSetsPrestige ?? activeTournament.settings?.qualifNbSets ?? 3}m • Mixte {activeTournament.settings?.qualifNbSetsMixed ?? activeTournament.settings?.qualifNbSets ?? 3}m
+                          </div>
+                        )}
+                        <div style={{ color: 'var(--accent-secondary)' }}>
+                          <span style={{ fontWeight: 700 }}>Finales : </span> 
+                          Am {activeTournament.settings?.finalNbSetsAmateur ?? activeTournament.settings?.finalNbSets ?? 2}m • Pre {activeTournament.settings?.finalNbSetsPrestige ?? activeTournament.settings?.finalNbSets ?? 3}m • Mixte {activeTournament.settings?.finalNbSetsMixed ?? activeTournament.settings?.finalNbSets ?? 3}m
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1095,25 +1115,60 @@ const AdminView: React.FC = () => {
                         <h3 style={{ fontSize: '1.2rem', marginBottom: '1.2rem', color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           Phase de Qualification
                         </h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                          <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Type de match</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Type de match</label>
                             <select className="input-field" value={qualifIsWinningSets ? 'winning' : 'fixed'} onChange={e => setQualifIsWinningSets(e.target.value === 'winning')} style={{ appearance: 'none', background: '#050816', color: '#fff' }}>
                               <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
                               <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
                             </select>
                           </div>
-                          <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                              Nombre (1 à 20 manches)
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                            <label style={{ display: 'block', marginBottom: '0.3rem', color: '#fff', fontSize: '0.85rem', fontWeight: 700 }}>
+                              🤝 Amateur vs Amateur
                             </label>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Manches (1 à 20)</div>
                             <input 
                               type="number" 
                               className="input-field" 
-                              value={qualifNbSets} 
+                              value={qualifNbSetsAmateur} 
                               onChange={e => {
                                 const val = parseInt(e.target.value, 10);
-                                setQualifNbSets(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                                setQualifNbSetsAmateur(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                              }} 
+                              min={1} 
+                              max={20} 
+                            />
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                            <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--accent-secondary)', fontSize: '0.85rem', fontWeight: 700 }}>
+                              🏆 Prestige vs Prestige
+                            </label>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Manches (1 à 20)</div>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              value={qualifNbSetsPrestige} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10);
+                                setQualifNbSetsPrestige(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                              }} 
+                              min={1} 
+                              max={20} 
+                            />
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                            <label style={{ display: 'block', marginBottom: '0.3rem', color: '#ffd700', fontSize: '0.85rem', fontWeight: 700 }}>
+                              ⚖️ Amateur vs Prestige
+                            </label>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Manches (1 à 20)</div>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              value={qualifNbSetsMixed} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10);
+                                setQualifNbSetsMixed(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
                               }} 
                               min={1} 
                               max={20} 
@@ -1242,7 +1297,7 @@ const AdminView: React.FC = () => {
                                       opacity: isDis ? 0.35 : 1,
                                       cursor: isDis ? 'not-allowed' : 'pointer'
                                     }}
-                                    title={isDis ? `Incompatible avec ${qualifNbSets} manche(s) gagnante(s) : max +${maxAllowedQualifHandicap}.` : opt.label}
+                                    title={isDis ? `Incompatible avec l'affiche mixte (${qualifNbSetsMixed} manche(s)) : max +${maxAllowedQualifHandicap}.` : opt.label}
                                   >
                                     <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{opt.label}</span>
                                     <span style={{ fontSize: '0.68rem', color: isSel ? 'rgba(255,215,0,0.8)' : 'var(--text-muted)', marginTop: '0.2rem' }}>
@@ -1254,7 +1309,7 @@ const AdminView: React.FC = () => {
                             </div>
                             {maxAllowedQualifHandicap === 0 && (
                               <div style={{ marginTop: '0.6rem', padding: '0.6rem 0.8rem', background: 'rgba(255, 100, 100, 0.12)', border: '1px solid rgba(255, 100, 100, 0.35)', borderRadius: '8px', color: '#ffaaaa', fontSize: '0.78rem', lineHeight: '1.4' }}>
-                                ⚠️ <strong>1 manche gagnante en qualification :</strong> aucun handicap ne peut être accordé, sinon l'amateur l'emporterait à 1-0 dès le coup d'envoi sans jouer.
+                                ⚠️ <strong>1 manche gagnante pour l'affiche Amateur vs Prestige :</strong> aucun handicap ne peut être accordé, sinon l'amateur l'emporterait à 1-0 dès le coup d'envoi sans jouer.
                               </div>
                             )}
                           </div>
@@ -1268,28 +1323,65 @@ const AdminView: React.FC = () => {
                         Tableau Final
                       </h3>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                        <div>
+                        <div style={{ gridColumn: 'span 2' }}>
                           <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Type de match</label>
                           <select className="input-field" value={finalIsWinningSets ? 'winning' : 'fixed'} onChange={e => setFinalIsWinningSets(e.target.value === 'winning')} style={{ appearance: 'none', background: '#050816', color: '#fff' }}>
                             <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
                             <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
                           </select>
                         </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                            Nombre (1 à 20 manches max)
-                          </label>
-                          <input 
-                            type="number" 
-                            className="input-field" 
-                            value={finalNbSets} 
-                            onChange={e => {
-                              const val = parseInt(e.target.value, 10);
-                              setFinalNbSets(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
-                            }} 
-                            min={1} 
-                            max={20} 
-                          />
+                        <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                            <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 700 }}>
+                              🎯 Amateur vs Amateur
+                            </label>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Manches (1 à 20)</div>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              value={finalNbSetsAmateur} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10);
+                                setFinalNbSetsAmateur(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                              }} 
+                              min={1} 
+                              max={20} 
+                            />
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                            <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--accent-secondary)', fontSize: '0.85rem', fontWeight: 700 }}>
+                              🏆 Prestige vs Prestige
+                            </label>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Manches (1 à 20)</div>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              value={finalNbSetsPrestige} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10);
+                                setFinalNbSetsPrestige(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                              }} 
+                              min={1} 
+                              max={20} 
+                            />
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                            <label style={{ display: 'block', marginBottom: '0.3rem', color: '#ffd700', fontSize: '0.85rem', fontWeight: 700 }}>
+                              ⚖️ Amateur vs Prestige
+                            </label>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Manches (1 à 20)</div>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              value={finalNbSetsMixed} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10);
+                                setFinalNbSetsMixed(isNaN(val) ? 1 : Math.min(20, Math.max(1, val)));
+                              }} 
+                              min={1} 
+                              max={20} 
+                            />
+                          </div>
                         </div>
                         <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
                           <input type="checkbox" checked={seedByMerit} onChange={e => setSeedByMerit(e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--accent-primary)' }} />
@@ -1348,7 +1440,7 @@ const AdminView: React.FC = () => {
                                     opacity: isDis ? 0.35 : 1,
                                     cursor: isDis ? 'not-allowed' : 'pointer'
                                   }}
-                                  title={isDis ? `Incompatible avec ${finalNbSets} manche(s) gagnante(s) : max +${maxAllowedFinalHandicap}.` : opt.label}
+                                  title={isDis ? `Incompatible avec l'affiche mixte (${finalNbSetsMixed} manche(s)) : max +${maxAllowedFinalHandicap}.` : opt.label}
                                 >
                                   <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{opt.label}</span>
                                   <span style={{ fontSize: '0.68rem', color: isSel ? 'rgba(255,215,0,0.8)' : 'var(--text-muted)', marginTop: '0.2rem' }}>
@@ -1360,7 +1452,7 @@ const AdminView: React.FC = () => {
                           </div>
                           {maxAllowedFinalHandicap === 0 && (
                             <div style={{ marginTop: '0.6rem', padding: '0.6rem 0.8rem', background: 'rgba(255, 100, 100, 0.12)', border: '1px solid rgba(255, 100, 100, 0.35)', borderRadius: '8px', color: '#ffaaaa', fontSize: '0.78rem', lineHeight: '1.4' }}>
-                              ⚠️ <strong>1 manche gagnante en phase finale :</strong> aucun handicap ne peut être accordé, sinon l'amateur l'emporterait à 1-0 dès le coup d'envoi sans jouer.
+                              ⚠️ <strong>1 manche gagnante pour l'affiche Amateur vs Prestige en phase finale :</strong> aucun handicap ne peut être accordé, sinon l'amateur l'emporterait à 1-0 dès le coup d'envoi sans jouer.
                             </div>
                           )}
                         </div>
@@ -1456,15 +1548,18 @@ const AdminView: React.FC = () => {
                         }
 
                         if (newTourFormat !== 'direct_ko' && qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
-                          return alert(`Configuration qualification impossible : avec ${qualifNbSets} manche(s) gagnante(s), le handicap poules doit être de +${maxAllowedQualifHandicap} manche(s) maximum.`);
+                          return alert(`Configuration qualification impossible : avec l'affiche mixte (${qualifNbSetsMixed} manche(s)), le handicap poules doit être de +${maxAllowedQualifHandicap} manche(s) maximum.`);
                         }
                         if (finalHandicapAmateurSets > maxAllowedFinalHandicap) {
-                          return alert(`Configuration tableau final impossible : avec ${finalNbSets} manche(s) gagnante(s), le handicap phase finale doit être de +${maxAllowedFinalHandicap} manche(s) maximum.`);
+                          return alert(`Configuration tableau final impossible : avec l'affiche mixte (${finalNbSetsMixed} manche(s)), le handicap phase finale doit être de +${maxAllowedFinalHandicap} manche(s) maximum.`);
                         }
 
                         createTournament(newTourName.trim(), newTourFormat, {
-                          tableIds: selectedTables, qualifNbSets, qualifIsWinningSets, qualifNbQualifiers,
-                          finalNbSets, finalIsWinningSets, seedByMerit,
+                          tableIds: selectedTables,
+                          qualifNbSets: qualifNbSetsMixed, qualifIsWinningSets, qualifNbQualifiers,
+                          qualifNbSetsAmateur, qualifNbSetsPrestige, qualifNbSetsMixed,
+                          finalNbSets: finalNbSetsMixed, finalIsWinningSets, seedByMerit,
+                          finalNbSetsAmateur, finalNbSetsPrestige, finalNbSetsMixed,
                           qualifHandicapAmateurSets,
                           finalHandicapAmateurSets,
                           handicapAmateurSets: finalHandicapAmateurSets,
@@ -2149,7 +2244,7 @@ const AdminView: React.FC = () => {
 
                               {/* Player 1 & 2 Score Modification */}
                               {(() => {
-                                const matchRules = getMatchScoringRules(m, activeTournament);
+                                const matchRules = getMatchScoringRules(m, activeTournament, players);
                                 const minS1 = m.handicapP1 || 0;
                                 const minS2 = m.handicapP2 || 0;
                                 const canInc1 = matchRules.isWinningSets
@@ -2652,7 +2747,7 @@ const AdminView: React.FC = () => {
                   /* 2. Match already in progress: Allow score adjustment, validation & freeing table */
                   (() => {
                     const matchTour = match.tournamentId ? tournaments[match.tournamentId] : activeTournament;
-                    const scoringRules = getMatchScoringRules(match, matchTour);
+                    const scoringRules = getMatchScoringRules(match, matchTour, players);
                     const { maxSets, isWinningSets, minScore1, minScore2, formatLabel } = scoringRules;
 
                     const isMatchFinished = isWinningSets
