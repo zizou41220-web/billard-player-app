@@ -253,19 +253,22 @@ const AdminView: React.FC = () => {
       return (
         <div
           style={{
+            flex: 1,
+            width: '100%',
+            height: '100%',
+            minHeight: '260px',
             backgroundColor: '#050814',
             backgroundImage: 'radial-gradient(circle at center, rgba(18, 32, 60, 0.7) 0%, rgba(4, 7, 16, 0.98) 100%), repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 20px, transparent 20px, transparent 40px)',
             border: '1px solid var(--border-color)',
             borderRadius: '16px',
             position: 'relative',
-            minHeight: tablesCount <= 2 ? '240px' : '280px',
-            padding: '1.4rem 1.2rem',
+            padding: '1.2rem',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: tablesCount <= 2 ? '4.5rem' : '2.5rem',
+            gap: tablesCount <= 2 ? '3.5rem' : '2rem',
             flexWrap: 'wrap',
-            overflow: 'hidden',
+            overflow: 'auto',
             boxShadow: 'inset 0 0 35px rgba(0,0,0,0.85)'
           }}
         >
@@ -283,7 +286,7 @@ const AdminView: React.FC = () => {
             gap: '0.5rem',
             userSelect: 'none'
           }}>
-            <img src={getClubLogoUrl(currentClub.logoUrl)} alt="Club Crest" style={{ width: '160px', filter: 'grayscale(1)' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
+            <img src={getClubLogoUrl(currentClub.logoUrl)} alt="Club Crest" style={{ width: '180px', filter: 'grayscale(1)' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
           </div>
 
           {tournamentTables.length === 0 ? (
@@ -311,8 +314,7 @@ const AdminView: React.FC = () => {
                   style={{
                     cursor: 'pointer',
                     transition: 'transform 0.2s ease',
-                    transform: 'scale(1.32)',
-                    margin: '0.8rem 1.5rem',
+                    margin: '0.5rem 1rem',
                     zIndex: isPlaying ? 10 : (isAssigned ? 5 : 1)
                   }}
                   onClick={() => setSelectedTableForQR(table.id)}
@@ -325,6 +327,7 @@ const AdminView: React.FC = () => {
                     match={currentMatch}
                     player1={p1}
                     player2={p2}
+                    size="large"
                   />
                 </div>
               );
@@ -1944,9 +1947,9 @@ const AdminView: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr 340px', gap: '1.5rem', flex: 1, minHeight: 0 }}>
 
                 {/* LEFT: Meta & QR + FILE D'ATTENTE */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', height: '100%', overflowY: 'auto', paddingRight: '0.3rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: 0 }}>
                   {/* QR Code pour rejoindre l'appli */}
-                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', flexShrink: 0 }}>
                     <h2 style={{ fontSize: '1.1rem', color: 'var(--accent-primary)', marginBottom: '0.2rem', fontWeight: 800 }}>{activeTournament.name}</h2>
                     <div style={{ background: '#fff', padding: '8px', borderRadius: '10px', marginBottom: '0.6rem', marginTop: '0.6rem' }}>
                       <QRCode value={getClubShareUrl()} size={115} />
@@ -1963,7 +1966,7 @@ const AdminView: React.FC = () => {
                   </div>
 
                   {/* File d'attente (directement sous le QR code) */}
-                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: '280px' }}>
+                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
                       <h3 style={{ fontSize: '1rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
                         <Users size={16} style={{ color: 'var(--accent-secondary)' }} /> File d'attente
@@ -2065,9 +2068,9 @@ const AdminView: React.FC = () => {
                 </div>
 
                 {/* CENTER: Main Operations (Map + Matches) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', height: '100%', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', position: 'relative', padding: '1.2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: 0 }}>
+                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', position: 'relative', padding: '1.2rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexShrink: 0 }}>
                       <h2 style={{ fontSize: '1.3rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
                         <MonitorPlay size={20} style={{ color: 'var(--accent-primary)' }} /> Billards du Tournoi en Live
                         <span style={{ fontSize: '0.8rem', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.3)' }}>
@@ -2078,121 +2081,133 @@ const AdminView: React.FC = () => {
                         Cliquez sur une table pour afficher son QR code ou gérer le match
                       </span>
                     </div>
-                    <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                       {renderMap(false, undefined, true)}
                     </div>
                   </div>
 
                   {/* Matchs à démarrer */}
-                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
-                    <h2 style={{ fontSize: '1.4rem', color: 'var(--card-text-muted)', marginBottom: '1rem' }}>Matchs à démarrer</h2>
-                    {matchesToPlay.length === 0 && <div style={{ color: 'var(--text-muted)' }}>Aucun match prêt à jouer.</div>}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                      {matchesToPlay.map(match => {
-                        const effTableId = getEffectiveTableId(match);
-                        const tableObj = effTableId ? tables[effTableId] : null;
-                        const tableName = tableObj?.name || (effTableId ? `Table ${tableObj?.number || effTableId}` : 'Table');
+                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.2rem 1.4rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexShrink: 0 }}>
+                      <h2 style={{ fontSize: '1.25rem', color: '#fff', margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Matchs à démarrer
+                      </h2>
+                      <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.12)', color: 'var(--accent-secondary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.25)' }}>
+                        {matchesToPlay.length} {matchesToPlay.length > 1 ? 'matchs prêts' : 'match prêt'}
+                      </span>
+                    </div>
+                    {matchesToPlay.length === 0 ? (
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                        Aucun match prêt à jouer.
+                      </div>
+                    ) : (
+                      <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '0.9rem', alignContent: 'start', paddingRight: '0.3rem' }}>
+                        {matchesToPlay.map(match => {
+                          const effTableId = getEffectiveTableId(match);
+                          const tableObj = effTableId ? tables[effTableId] : null;
+                          const tableName = tableObj?.name || (effTableId ? `Table ${tableObj?.number || effTableId}` : 'Table');
 
-                        return (
-                          <div key={match.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                            <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '8px', opacity: match.status === 'playing' ? 0.3 : 1 }}>
-                              <QRCode value={JSON.stringify({ tournamentId: match.tournamentId || activeTournament.id, matchId: match.id, tableId: effTableId || match.tableId || '', clubId: currentClub.id })} size={80} />
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                                <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
-                                {match.stage && match.stage !== 'qualif' && (
-                                  <span style={{
-                                    background: 'rgba(255, 215, 0, 0.2)',
-                                    color: '#ffd700',
-                                    fontSize: '0.68rem',
-                                    fontWeight: 800,
-                                    padding: '1px 6px',
-                                    borderRadius: '4px',
-                                    border: '1px solid rgba(255, 215, 0, 0.4)'
-                                  }}>
-                                    {match.stage === 'final' ? '🏆 Finale' : match.stage === 'semi' ? '⚔️ 1/2 Finale' : '🎯 1/4 Finale'}
-                                  </span>
-                                )}
+                          return (
+                            <div key={match.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                              <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '8px', opacity: match.status === 'playing' ? 0.3 : 1 }}>
+                                <QRCode value={JSON.stringify({ tournamentId: match.tournamentId || activeTournament.id, matchId: match.id, tableId: effTableId || match.tableId || '', clubId: currentClub.id })} size={80} />
                               </div>
-                              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player1Id]?.name}</div>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
-                              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player2Id]?.name}</div>
-                              {match.status === 'playing' ? (
-                                <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                                  <div style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
-                                  {effTableId && (
-                                    <button
-                                      className="btn btn-outline"
-                                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem', width: '100%', justifyContent: 'center' }}
-                                      onClick={() => setSelectedTableForQR(effTableId)}
-                                    >
-                                      Modifier le score
-                                    </button>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                                  <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
+                                  {match.stage && match.stage !== 'qualif' && (
+                                    <span style={{
+                                      background: 'rgba(255, 215, 0, 0.2)',
+                                      color: '#ffd700',
+                                      fontSize: '0.68rem',
+                                      fontWeight: 800,
+                                      padding: '1px 6px',
+                                      borderRadius: '4px',
+                                      border: '1px solid rgba(255, 215, 0, 0.4)'
+                                    }}>
+                                      {match.stage === 'final' ? '🏆 Finale' : match.stage === 'semi' ? '⚔️ 1/2 Finale' : '🎯 1/4 Finale'}
+                                    </span>
                                   )}
                                 </div>
-                              ) : (
-                                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
-                                  <button
-                                    className="btn btn-neon"
-                                    style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#000', fontWeight: 800 }}
-                                    onClick={() => {
-                                      startTournamentMatch(match.id, false);
-                                      if (effTableId) setSelectedTableForQR(effTableId);
-                                    }}
-                                  >
-                                    <Play size={12} /> Démarrer
-                                  </button>
-                                  <button
-                                    className="btn btn-outline"
-                                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                                    onClick={() => {
-                                      if (effTableId && matchesWaiting.length > 0) {
-                                        setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
-                                      } else {
-                                        postponeMatch(match.id);
-                                      }
-                                    }}
-                                  >
-                                    <ArrowUpDown size={12} /> Repousser
-                                  </button>
+                                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player1Id]?.name}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
+                                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player2Id]?.name}</div>
+                                {match.status === 'playing' ? (
+                                  <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                                    <div style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
+                                    {effTableId && (
+                                      <button
+                                        className="btn btn-outline"
+                                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem', width: '100%', justifyContent: 'center' }}
+                                        onClick={() => setSelectedTableForQR(effTableId)}
+                                      >
+                                        Modifier le score
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+                                    <button
+                                      className="btn btn-neon"
+                                      style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#000', fontWeight: 800 }}
+                                      onClick={() => {
+                                        startTournamentMatch(match.id, false);
+                                        if (effTableId) setSelectedTableForQR(effTableId);
+                                      }}
+                                    >
+                                      <Play size={12} /> Démarrer
+                                    </button>
+                                    <button
+                                      className="btn btn-outline"
+                                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                                      onClick={() => {
+                                        if (effTableId && matchesWaiting.length > 0) {
+                                          setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
+                                        } else {
+                                          postponeMatch(match.id);
+                                        }
+                                      }}
+                                    >
+                                      <ArrowUpDown size={12} /> Repousser
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Matchs de qualification non joués (clôturés lors du passage en phase finale) */}
+                        {unplayedQualifMatches.length > 0 && (
+                          <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem', padding: '0.8rem 1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                Matchs de poule restants (non disputés pour passage en phase finale)
+                              </span>
+                              <span style={{ fontSize: '0.7rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '8px' }}>
+                                {unplayedQualifMatches.length} match{unplayedQualifMatches.length > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              {unplayedQualifMatches.map(m => (
+                                <div key={m.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <span style={{ color: '#fff', fontWeight: 600 }}>{players[m.player1Id]?.name || 'J1'}</span>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>VS</span>
+                                  <span style={{ color: '#fff', fontWeight: 600 }}>{players[m.player2Id]?.name || 'J2'}</span>
                                 </div>
-                              )}
+                              ))}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  {/* Matchs de qualification non joués (clôturés lors du passage en phase finale) */}
-                  {unplayedQualifMatches.length > 0 && (
-                    <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700 }}>
-                          Matchs de poule restants (non disputés pour passage en phase finale)
-                        </span>
-                        <span style={{ fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px' }}>
-                          {unplayedQualifMatches.length} match{unplayedQualifMatches.length > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-                        {unplayedQualifMatches.map(m => (
-                          <div key={m.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ color: '#fff', fontWeight: 600 }}>{players[m.player1Id]?.name || 'J1'}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>VS</span>
-                            <span style={{ color: '#fff', fontWeight: 600 }}>{players[m.player2Id]?.name || 'J2'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* RIGHT: Ranking & Results */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', height: '100%' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: 0 }}>
                   {/* Ranking */}
-                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', flex: 1, overflow: 'hidden' }}>
+                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.2rem 1.4rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                     <h2 style={{ fontSize: '1.2rem', color: 'var(--accent-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Trophy size={18} /> Classement Actuel
                     </h2>
@@ -2272,7 +2287,7 @@ const AdminView: React.FC = () => {
                   </div>
 
                   {/* Match Results */}
-                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', flex: 1, overflow: 'hidden' }}>
+                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.2rem 1.4rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                       <h2 style={{ fontSize: '1.2rem', color: 'var(--card-text-muted)', margin: 0 }}>Derniers Résultats</h2>
                       <button

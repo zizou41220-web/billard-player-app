@@ -10,6 +10,7 @@ export interface BilliardTableVisualProps {
   player2?: Player;
   isHovered?: boolean;
   scale?: number;
+  size?: 'normal' | 'large';
 }
 
 export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
@@ -19,10 +20,14 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
   match,
   player1,
   player2,
-  isHovered = false
+  isHovered = false,
+  size = 'normal'
 }) => {
   const isOccupied = status === 'occupied';
   const tableName = name || `Billard ${number}`;
+  const isLarge = size === 'large';
+  const svgWidth = isLarge ? 260 : 160;
+  const svgHeight = isLarge ? 146 : 90;
 
   return (
     <div
@@ -35,17 +40,21 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
         transition: 'transform 0.2s ease, filter 0.2s ease',
         transform: isHovered ? 'scale(1.04)' : 'scale(1)',
         filter: isOccupied
-          ? 'drop-shadow(0 14px 24px rgba(0, 255, 170, 0.25)) drop-shadow(0 6px 12px rgba(0,0,0,0.7))'
-          : 'drop-shadow(0 10px 20px rgba(0,0,0,0.6))'
+          ? (isLarge
+              ? 'drop-shadow(0 16px 28px rgba(0, 255, 170, 0.3)) drop-shadow(0 8px 16px rgba(0,0,0,0.8))'
+              : 'drop-shadow(0 14px 24px rgba(0, 255, 170, 0.25)) drop-shadow(0 6px 12px rgba(0,0,0,0.7))')
+          : (isLarge
+              ? 'drop-shadow(0 14px 24px rgba(0,0,0,0.7))'
+              : 'drop-shadow(0 10px 20px rgba(0,0,0,0.6))')
       }}
     >
       {/* 3D Billiard Table SVG */}
       <svg
-        width="160"
-        height="90"
+        width={svgWidth}
+        height={svgHeight}
         viewBox="0 0 160 90"
         style={{
-          borderRadius: '10px',
+          borderRadius: isLarge ? '14px' : '10px',
           overflow: 'visible',
           display: 'block'
         }}
@@ -329,115 +338,133 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
         )}
       </svg>
 
-      {/* Compact Table Badge & Players / Score Strip */}
+      {/* Table Badge & Players / Score Strip */}
       <div
         style={{
-          marginTop: '4px',
+          marginTop: isLarge ? '8px' : '4px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '2px',
+          gap: isLarge ? '5px' : '2px',
           background: isOccupied ? 'rgba(5, 8, 20, 0.94)' : 'rgba(10, 15, 25, 0.88)',
           backdropFilter: 'blur(8px)',
           border: isOccupied ? '1px solid rgba(0, 255, 170, 0.45)' : '1px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: '7px',
-          padding: '2px 8px',
-          boxShadow: isOccupied ? '0 2px 10px rgba(0, 255, 170, 0.25)' : '0 2px 6px rgba(0,0,0,0.4)',
-          maxWidth: '150px'
+          borderRadius: isLarge ? '12px' : '7px',
+          padding: isLarge ? '6px 12px' : '2px 8px',
+          boxShadow: isOccupied ? '0 4px 16px rgba(0, 255, 170, 0.25)' : '0 2px 6px rgba(0,0,0,0.4)',
+          width: isLarge ? '260px' : undefined,
+          maxWidth: isLarge ? '260px' : '150px'
         }}
       >
-        {/* Table Name + Live Indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span
-            style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: isOccupied ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.35)',
-              boxShadow: isOccupied ? '0 0 6px var(--accent-primary)' : 'none',
-              animation: isOccupied ? 'pulse 1.5s infinite' : 'none',
-              flexShrink: 0
-            }}
-          />
-          <span
-            style={{
-              fontSize: '0.72rem',
-              fontWeight: 800,
-              color: isOccupied ? 'var(--accent-primary)' : '#ffffff',
-              letterSpacing: '0.2px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {tableName}
-          </span>
-          {match?.status === 'playing' && (
+        {/* Table Name + Live/Prêt Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isLarge ? '6px' : '5px' }}>
             <span
               style={{
-                fontSize: '0.58rem',
-                fontWeight: 900,
-                color: '#000',
-                background: 'var(--accent-primary)',
-                padding: '0 4px',
-                borderRadius: '3px',
-                letterSpacing: '0.4px'
+                width: isLarge ? '7px' : '6px',
+                height: isLarge ? '7px' : '6px',
+                borderRadius: '50%',
+                background: isOccupied ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.35)',
+                boxShadow: isOccupied ? '0 0 8px var(--accent-primary)' : 'none',
+                animation: isOccupied ? 'pulse 1.5s infinite' : 'none',
+                flexShrink: 0
               }}
-            >
-              LIVE
-            </span>
-          )}
-          {match?.status === 'pending' && (
+            />
             <span
               style={{
-                fontSize: '0.58rem',
+                fontSize: isLarge ? '0.82rem' : '0.72rem',
                 fontWeight: 800,
-                color: '#00e5ff',
-                background: 'rgba(0, 229, 255, 0.15)',
-                padding: '0 4px',
-                borderRadius: '3px',
-                border: '1px solid rgba(0, 229, 255, 0.3)',
-                letterSpacing: '0.4px'
+                color: isOccupied ? 'var(--accent-primary)' : '#ffffff',
+                letterSpacing: '0.2px',
+                whiteSpace: 'nowrap'
               }}
             >
-              PRÊT
+              {tableName}
             </span>
-          )}
-          {match?.stage && match.stage !== 'qualif' && (
-            <span
-              style={{
-                fontSize: '0.55rem',
-                fontWeight: 900,
-                color: '#ffd700',
-                background: 'rgba(255, 215, 0, 0.2)',
-                padding: '0 4px',
-                borderRadius: '3px',
-                border: '1px solid rgba(255, 215, 0, 0.4)',
-                letterSpacing: '0.3px'
-              }}
-            >
-              {match.stage === 'final' ? 'FINALE' : match.stage === 'semi' ? 'DEMI' : '1/4'}
-            </span>
-          )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {match?.stage && match.stage !== 'qualif' && (
+              <span
+                style={{
+                  fontSize: isLarge ? '0.65rem' : '0.55rem',
+                  fontWeight: 900,
+                  color: '#ffd700',
+                  background: 'rgba(255, 215, 0, 0.2)',
+                  padding: isLarge ? '1px 5px' : '0 4px',
+                  borderRadius: '3px',
+                  border: '1px solid rgba(255, 215, 0, 0.4)',
+                  letterSpacing: '0.3px'
+                }}
+              >
+                {match.stage === 'final' ? '🏆 FINALE' : match.stage === 'semi' ? '⚔️ DEMI' : '🎯 1/4'}
+              </span>
+            )}
+            {match?.status === 'playing' ? (
+              <span
+                style={{
+                  fontSize: isLarge ? '0.65rem' : '0.58rem',
+                  fontWeight: 900,
+                  color: '#000',
+                  background: 'var(--accent-primary)',
+                  padding: isLarge ? '1px 6px' : '0 4px',
+                  borderRadius: '3px',
+                  letterSpacing: '0.4px'
+                }}
+              >
+                LIVE
+              </span>
+            ) : match?.status === 'pending' ? (
+              <span
+                style={{
+                  fontSize: isLarge ? '0.65rem' : '0.58rem',
+                  fontWeight: 800,
+                  color: '#00e5ff',
+                  background: 'rgba(0, 229, 255, 0.15)',
+                  padding: isLarge ? '1px 5px' : '0 4px',
+                  borderRadius: '3px',
+                  border: '1px solid rgba(0, 229, 255, 0.3)',
+                  letterSpacing: '0.4px'
+                }}
+              >
+                PRÊT
+              </span>
+            ) : (
+              <span
+                style={{
+                  fontSize: isLarge ? '0.62rem' : '0.55rem',
+                  fontWeight: 700,
+                  color: 'var(--text-muted)'
+                }}
+              >
+                LIBRE
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Ultra-compact 1-line Match Players & Score */}
-        {match && (
+        {/* Match Players & Score */}
+        {match ? (
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              fontSize: '0.66rem',
+              justifyContent: 'space-between',
+              width: '100%',
+              gap: isLarge ? '6px' : '4px',
+              fontSize: isLarge ? '0.82rem' : '0.66rem',
               fontWeight: 700,
-              color: 'rgba(255,255,255,0.85)',
               whiteSpace: 'nowrap',
               borderTop: '1px solid rgba(255,255,255,0.08)',
-              paddingTop: '2px',
-              marginTop: '1px'
+              paddingTop: isLarge ? '5px' : '2px',
+              marginTop: isLarge ? '2px' : '1px'
             }}
           >
             <span
               style={{
-                maxWidth: '48px',
+                flex: isLarge ? 1 : undefined,
+                textAlign: isLarge ? 'right' : 'left',
+                maxWidth: isLarge ? undefined : '48px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 color: match.score1 > match.score2 ? 'var(--accent-primary)' : '#fff'
@@ -446,15 +473,30 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
             >
               {player1?.name || 'J1'}
             </span>
-            <span style={{ color: 'var(--accent-primary)', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+            <span
+              style={{
+                color: 'var(--accent-primary)',
+                fontWeight: 900,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '2px',
+                padding: isLarge ? '1px 6px' : '0',
+                background: isLarge && match.status === 'playing' ? 'rgba(0, 255, 170, 0.15)' : 'transparent',
+                borderRadius: '4px',
+                fontSize: isLarge ? (match.status === 'playing' ? '0.92rem' : '0.78rem') : 'inherit',
+                flexShrink: 0
+              }}
+            >
               {match.status === 'playing' ? `${match.score1}-${match.score2}` : 'VS'}
               {(Boolean(match.handicapP1) || Boolean(match.handicapP2)) && (
-                <span style={{ fontSize: '0.52rem', color: '#ffd700' }} title="Handicap actif">🎯</span>
+                <span style={{ fontSize: isLarge ? '0.65rem' : '0.52rem', color: '#ffd700' }} title="Handicap actif">🎯</span>
               )}
             </span>
             <span
               style={{
-                maxWidth: '48px',
+                flex: isLarge ? 1 : undefined,
+                textAlign: isLarge ? 'left' : 'left',
+                maxWidth: isLarge ? undefined : '48px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 color: match.score2 > match.score1 ? 'var(--accent-primary)' : '#fff'
@@ -464,6 +506,22 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
               {player2?.name || 'J2'}
             </span>
           </div>
+        ) : (
+          isLarge && (
+            <div
+              style={{
+                width: '100%',
+                textAlign: 'center',
+                fontSize: '0.68rem',
+                color: 'var(--text-muted)',
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+                paddingTop: '3px',
+                marginTop: '1px'
+              }}
+            >
+              Table disponible
+            </div>
+          )
         )}
       </div>
     </div>
