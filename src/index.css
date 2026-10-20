@@ -62,14 +62,30 @@ body {
   display: none; /* Hide scrollbar for sleek look */
 }
 
-/* Glass Card */
+/* Glass Card with subtle athletic jersey halftone texture */
 .glass-card {
-  background: var(--card-bg);
+  position: relative;
+  background-color: var(--card-bg);
+  background-image: 
+    linear-gradient(135deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.04) 45%, transparent 75%),
+    url('./assets/jersey-pattern.svg');
+  background-size: cover;
+  background-position: top left;
+  background-repeat: no-repeat;
   color: var(--card-text);
   border: 1px solid var(--card-border);
   border-radius: 20px;
   padding: 1.25rem;
   box-shadow: 0 10px 25px rgba(15, 118, 110, 0.2);
+}
+
+.jersey-pattern {
+  background-image: 
+    linear-gradient(135deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.04) 45%, transparent 75%),
+    url('./assets/jersey-pattern.svg');
+  background-size: cover;
+  background-position: top left;
+  background-repeat: no-repeat;
 }
 
 /* Buttons */
