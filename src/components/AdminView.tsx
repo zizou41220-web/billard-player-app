@@ -809,7 +809,7 @@ const AdminView: React.FC = () => {
                     </div>
                     {(Boolean(activeTournament.settings?.qualifHandicapAmateurSets) || Boolean(activeTournament.settings?.finalHandicapAmateurSets) || Boolean(activeTournament.settings?.handicapAmateurSets)) && (
                       <div style={{ background: 'rgba(255, 215, 0, 0.12)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.35)' }}>
-                        <div style={{ fontSize: '0.8rem', color: '#ffd700', marginBottom: '0.4rem', fontWeight: 700 }}>🎯 Handicap Niveaux</div>
+                        <div style={{ fontSize: '0.8rem', color: '#ffd700', marginBottom: '0.4rem', fontWeight: 700 }}>Handicap Niveaux</div>
                         <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffd700', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           {activeTournament.format !== 'direct_ko' && (
                             <div>
@@ -1151,7 +1151,7 @@ const AdminView: React.FC = () => {
                           <div style={{ gridColumn: 'span 2', marginTop: '0.5rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                               <label style={{ fontSize: '0.95rem', color: '#ffd700', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                🎯 Handicap Poules / Cartésien (Amateur vs Prestige)
+                                Handicap Poules / Cartésien (Amateur vs Prestige)
                               </label>
                               <span style={{ fontSize: '0.72rem', background: qualifHandicapAmateurSets > 0 ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: qualifHandicapAmateurSets > 0 ? '#ffd700' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(255, 215, 0, 0.3)' }}>
                                 {qualifHandicapAmateurSets > 0 ? `+${qualifHandicapAmateurSets} manche(s) d'avance` : 'Désactivé (0-0)'}
@@ -2626,11 +2626,11 @@ const AdminView: React.FC = () => {
                           </div>
                           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.2rem' }}>
                             <span style={{ fontSize: '0.78rem', background: 'rgba(255,255,255,0.06)', color: 'var(--accent-secondary)', padding: '2px 10px', borderRadius: '12px', border: '1px solid var(--border-color)', fontWeight: 700 }}>
-                              🎯 Format : {formatLabel}
+                              Format : {formatLabel}
                             </span>
                             {(Boolean(match.handicapP1) || Boolean(match.handicapP2)) && (
                               <span style={{ fontSize: '0.78rem', background: 'rgba(255, 215, 0, 0.15)', color: '#ffd700', padding: '2px 10px', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.3)', fontWeight: 700 }}>
-                                🎯 Handicap : +{match.handicapP1 || match.handicapP2} pour {players[match.handicapP1 ? match.player1Id : match.player2Id]?.name}
+                                Handicap : +{match.handicapP1 || match.handicapP2} pour {players[match.handicapP1 ? match.player1Id : match.player2Id]?.name}
                               </span>
                             )}
                           </div>

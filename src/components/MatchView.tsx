@@ -5,15 +5,15 @@ import { getMatchScoringRules } from '../utils/rules';
 
 const MatchView: React.FC = () => {
   const { players, matches, activeMatchId, updateScore, finishMatch, tables, tournaments } = useStore();
-  
+
   if (!activeMatchId) return null;
-  
+
   const match = matches[activeMatchId];
   const table = match.tableId ? tables[match.tableId] : null;
-  
+
   const p1 = match.player1Id;
   const p2 = match.player2Id;
-  
+
   const score1 = match.score1;
   const score2 = match.score2;
 
@@ -73,7 +73,7 @@ const MatchView: React.FC = () => {
               border: '1px solid rgba(0, 255, 170, 0.35)',
               marginLeft: '0.3rem'
             }}>
-              🎯 Handicap actif
+              Handicap actif
             </span>
           )}
         </div>
@@ -99,20 +99,20 @@ const MatchView: React.FC = () => {
           )}
           {Boolean(match.handicapP2 && match.handicapP2 > 0) && (
             <span style={{ fontSize: '0.68rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid var(--accent-primary)' }}>
-              🎯 +{match.handicapP2} Handicap
+              +{match.handicapP2} Handicap
             </span>
           )}
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <button className="btn-surface" onClick={() => handleScore(p2, -1)} style={{ width: '50px', height: '50px', borderRadius: '50%', padding: 0 }}>
             <Minus size={24} />
           </button>
-          
+
           <span style={{ fontSize: '6rem', fontWeight: 800, color: 'var(--text-muted)', lineHeight: 1, width: '100px', textAlign: 'center' }}>
             {score2}
           </span>
-          
+
           <button className="btn-surface" onClick={() => handleScore(p2, 1)} style={{ width: '50px', height: '50px', borderRadius: '50%', padding: 0 }}>
             <Plus size={24} />
           </button>
@@ -121,7 +121,7 @@ const MatchView: React.FC = () => {
 
       {/* Divider */}
       <div style={{ height: '2px', background: 'var(--border-color)', margin: '0 2rem', position: 'relative' }}>
-         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--bg-color)', padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 'bold' }}>VS</div>
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--bg-color)', padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 'bold' }}>VS</div>
       </div>
 
       {/* Player 1 Zone (Bottom half) */}
@@ -141,20 +141,20 @@ const MatchView: React.FC = () => {
           )}
           {Boolean(match.handicapP1 && match.handicapP1 > 0) && (
             <span style={{ fontSize: '0.68rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid var(--accent-primary)' }}>
-              🎯 +{match.handicapP1} Handicap
+              +{match.handicapP1} Handicap
             </span>
           )}
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <button className="btn-surface" onClick={() => handleScore(p1, -1)} style={{ width: '60px', height: '60px', borderRadius: '50%', padding: 0 }}>
             <Minus size={32} />
           </button>
-          
+
           <span className="text-gradient" style={{ fontSize: '7rem', fontWeight: 800, lineHeight: 1, width: '120px', textAlign: 'center' }}>
             {score1}
           </span>
-          
+
           <button className="btn-surface" onClick={() => handleScore(p1, 1)} style={{ width: '60px', height: '60px', borderRadius: '50%', padding: 0 }}>
             <Plus size={32} />
           </button>
@@ -163,12 +163,12 @@ const MatchView: React.FC = () => {
 
       {/* Finish Match Button */}
       <div style={{ padding: '1.5rem', paddingBottom: 'env(safe-area-inset-bottom, 1.5rem)', flexShrink: 0, marginTop: 'auto' }}>
-        <button 
-          className={`btn ${canFinish ? 'btn-neon' : 'btn-outline'}`} 
-          onClick={canFinish ? handleFinishMatch : undefined} 
-          style={{ 
-            width: '100%', 
-            justifyContent: 'center', 
+        <button
+          className={`btn ${canFinish ? 'btn-neon' : 'btn-outline'}`}
+          onClick={canFinish ? handleFinishMatch : undefined}
+          style={{
+            width: '100%',
+            justifyContent: 'center',
             color: canFinish ? '#000' : 'var(--text-muted)',
             borderColor: canFinish ? 'transparent' : 'var(--border-color)',
             opacity: canFinish ? 1 : 0.5,
