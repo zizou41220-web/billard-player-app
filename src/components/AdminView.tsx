@@ -50,7 +50,6 @@ const AdminView: React.FC = () => {
   const [copiedOverlay, setCopiedOverlay] = useState(false);
   const [liveStreamTab, setLiveStreamTab] = useState<'obs' | 'phone' | 'embed'>('obs');
   const [overlayPos, setOverlayPos] = useState<'top' | 'bottom'>('top');
-  const [customStreamUrl, setCustomStreamUrl] = useState('');
   const [dismissedQualifAlertTourId, setDismissedQualifAlertTourId] = useState<string | null>(null);
   const matchStatusAtOpenRef = React.useRef<string | null>(null);
 
