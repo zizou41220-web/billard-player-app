@@ -307,6 +307,37 @@ export const dispatchTournamentMatches = (
     }
   });
 
+  // Rule A0-FinalStage: Si la phase finale d'un tournoi est active, AUCUN match de qualification (cartésien / poule) ne doit occuper de table
+  Object.keys(newMatches).forEach(mId => {
+    const m = newMatches[mId];
+    if (m && m.tournamentId && m.tableId) {
+      const tour = tournaments[m.tournamentId];
+      const isFinalStageActive = Boolean(tour?.finalStageLaunched || tour?.settings?.finalStageLaunched);
+      if (isFinalStageActive && !isFinalStageMatch(m)) {
+        newMatches[mId] = {
+          ...m,
+          tableId: undefined,
+          status: m.status === 'playing' ? 'finished' : m.status
+        };
+      }
+    }
+  });
+
+  // Libérer aussi les tables qui pointaient vers un match de qualification alors que la phase finale est active
+  Object.keys(newTables).forEach(tId => {
+    const table = newTables[tId];
+    if (table.currentMatchId) {
+      const curM = newMatches[table.currentMatchId];
+      if (curM && curM.tournamentId) {
+        const tour = tournaments[curM.tournamentId];
+        const isFinalStageActive = Boolean(tour?.finalStageLaunched || tour?.settings?.finalStageLaunched);
+        if (isFinalStageActive && !isFinalStageMatch(curM)) {
+          newTables[tId] = { ...table, status: 'free', currentMatchId: undefined };
+        }
+      }
+    }
+  });
+
   // Rule A: Each table can have at most ONE match assigned to it
   Object.keys(newTables).forEach(tId => {
     const table = newTables[tId];
@@ -431,16 +462,8 @@ export const dispatchTournamentMatches = (
         if (!m.player1Id || !m.player2Id) return false;
 
         const isFinalStageActive = Boolean(tournament.finalStageLaunched || tournament.settings?.finalStageLaunched);
-        const getMatchStage = (matchObj: Match): string => {
-          if (matchObj.stage) return matchObj.stage;
-          if (matchObj.id?.includes('_final_')) return 'final';
-          if (matchObj.id?.includes('_semi_')) return 'semi';
-          if (matchObj.id?.includes('_quarter_')) return 'quarter';
-          return 'qualif';
-        };
-
         // If final stage launched, do not dispatch unplayed qualif matches
-        if (isFinalStageActive && getMatchStage(m) === 'qualif') return false;
+        if (isFinalStageActive && !isFinalStageMatch(m)) return false;
         return (
           !isPlayerBusy(m.player1Id) &&
           !isPlayerBusy(m.player2Id)
@@ -450,33 +473,26 @@ export const dispatchTournamentMatches = (
         const mb = newMatches[b];
 
         const isFinalStageActive = Boolean(tournament.finalStageLaunched || tournament.settings?.finalStageLaunched);
-        const getMatchStage = (matchObj: Match): string => {
-          if (matchObj.stage) return matchObj.stage;
-          if (matchObj.id?.includes('_final_')) return 'final';
-          if (matchObj.id?.includes('_semi_')) return 'semi';
-          if (matchObj.id?.includes('_quarter_')) return 'quarter';
-          return 'qualif';
-        };
+        if (isFinalStageActive) {
+          const isFinalA = isFinalStageMatch(ma);
+          const isFinalB = isFinalStageMatch(mb);
+          if (isFinalA !== isFinalB) return isFinalA ? -1 : 1;
+        }
 
-        // 1. Stage priority: when final stage is launched, quarter/semi/final take precedence!
-        const stagePriority: Record<string, number> = isFinalStageActive
-          ? { quarter: 1, semi: 2, third_place: 3, final: 4, qualif: 999 }
-          : { qualif: 1, quarter: 2, semi: 3, third_place: 4, final: 5 };
-        const sA = stagePriority[getMatchStage(ma)] || 1;
-        const sB = stagePriority[getMatchStage(mb)] || 1;
-        if (sA !== sB) return sA - sB;
-
-        // 2. Bracket round if defined
+        // 1. Bracket round if defined (round 1 before round 2, etc.)
         if (ma.bracketRound !== undefined && mb.bracketRound !== undefined && ma.bracketRound !== mb.bracketRound) {
           return ma.bracketRound - mb.bracketRound;
         }
+        if (ma.bracketPosition !== undefined && mb.bracketPosition !== undefined && ma.bracketPosition !== mb.bracketPosition) {
+          return ma.bracketPosition - mb.bracketPosition;
+        }
 
-        // 3. Player fairness (fewest matches played)
+        // 2. Player fairness (fewest matches played)
         const pa = (playCount[ma.player1Id] || 0) + (playCount[ma.player2Id] || 0);
         const pb = (playCount[mb.player1Id] || 0) + (playCount[mb.player2Id] || 0);
         if (pa !== pb) return pa - pb;
 
-        // 4. Preserve original match order in tournament
+        // 3. Preserve original match order in tournament
         return tournament.matches.indexOf(a) - tournament.matches.indexOf(b);
       });
 
@@ -1061,6 +1077,15 @@ export const useStore = create<AppState>((set, get) => ({
         return state;
       }
 
+      if (match.tournamentId) {
+        const tour = state.tournaments[match.tournamentId];
+        const isFinalStageActive = Boolean(tour?.finalStageLaunched || tour?.settings?.finalStageLaunched);
+        if (isFinalStageActive && !isFinalStageMatch(match)) {
+          result = { success: false, reason: 'La phase finale est active : les matchs de qualification ne peuvent plus être placés sur les billards.' };
+          return state;
+        }
+      }
+
       const newMatches = { ...state.matches };
       const newTables = { ...state.tables };
 
@@ -1376,6 +1401,18 @@ export const useStore = create<AppState>((set, get) => ({
 
       Object.assign(newMatches, bracketMatches);
 
+      // 1.5. Libérer IMPÉRATIVEMENT tous les matchs de qualification (cartésien / poules) de toute table
+      qualifMatchIdsOnly.forEach(mId => {
+        const m = newMatches[mId];
+        if (m && m.tableId) {
+          newMatches[mId] = {
+            ...m,
+            tableId: undefined,
+            status: m.status === 'playing' ? 'finished' : m.status
+          };
+        }
+      });
+
       // 2. Clear all tournament tables so they are immediately available for the bracket matches
       const clearedTables = { ...state.tables };
       const tournamentTableIds = tournament.settings?.tableIds?.length ? tournament.settings.tableIds : Object.keys(clearedTables);
@@ -1444,10 +1481,14 @@ export const useStore = create<AppState>((set, get) => ({
         }
       }
 
+      const activeMatch = state.activeMatchId ? state.matches[state.activeMatchId] : null;
+      const shouldClearActiveMatch = activeMatch && !isFinalStageMatch(activeMatch) && activeMatch.tournamentId === tournamentId;
+
       return {
         matches: dispatchedMatches,
         tables: dispatchedTables,
-        tournaments: updatedTournaments
+        tournaments: updatedTournaments,
+        activeMatchId: shouldClearActiveMatch ? null : state.activeMatchId
       };
     });
   },
@@ -1491,9 +1532,21 @@ export const useStore = create<AppState>((set, get) => ({
 
       Object.assign(newMatches, reseededMatches);
 
+      // Libérer IMPÉRATIVEMENT tous les matchs de qualification de toute table
+      qualifMatchIdsOnly.forEach(mId => {
+        const m = newMatches[mId];
+        if (m && m.tableId) {
+          newMatches[mId] = {
+            ...m,
+            tableId: undefined,
+            status: m.status === 'playing' ? 'finished' : m.status
+          };
+        }
+      });
+
       const newTables = { ...state.tables };
       Object.values(newTables).forEach(t => {
-        if (t.currentMatchId && !newMatches[t.currentMatchId]) {
+        if (t.currentMatchId && (!newMatches[t.currentMatchId] || !isFinalStageMatch(newMatches[t.currentMatchId]))) {
           newTables[t.id] = { ...t, status: 'free', currentMatchId: undefined };
         }
       });

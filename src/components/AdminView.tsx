@@ -13,6 +13,7 @@ import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules } from '../utils/rules';
+import { isFinalStageMatch } from '../utils/bracket';
 
 const AdminView: React.FC = () => {
   const {
@@ -143,11 +144,6 @@ const AdminView: React.FC = () => {
     setSelectedTables(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
   };
 
-  const activeMatches = activeTournament ? Object.values(matches).filter(m => activeTournament.matches.includes(m.id) && m.status === 'playing') : [];
-  const allTourMatches = activeTournament ? Object.values(matches).filter(m => activeTournament.matches.includes(m.id)) : [];
-  const pendingTourMatches = allTourMatches.filter(m => m.status !== 'finished');
-  const finishedTourMatches = allTourMatches.filter(m => m.status === 'finished');
-
   const qualifStatus = getTournamentQualificationStatus(activeTournament, matches, players);
   const { hasSureQualifiers } = qualifStatus;
 
@@ -156,6 +152,19 @@ const AdminView: React.FC = () => {
     activeTournament?.settings?.finalStageLaunched ||
     qualifStatus.isFinalLaunched
   );
+
+  const allTourMatches = activeTournament ? Object.values(matches).filter(m => activeTournament.matches.includes(m.id)) : [];
+  const activeMatches = allTourMatches.filter(m => {
+    if (m.status !== 'playing') return false;
+    if (isFinalStageActive && !isFinalStageMatch(m)) return false;
+    return true;
+  });
+  const pendingTourMatches = allTourMatches.filter(m => {
+    if (m.status === 'finished') return false;
+    if (isFinalStageActive && !isFinalStageMatch(m)) return false;
+    return true;
+  });
+  const finishedTourMatches = allTourMatches.filter(m => m.status === 'finished');
 
   const hasInvertedSemi = Boolean(isFinalStageActive && qualifStatus.ranking.length >= 2 && (() => {
     const tourMatches = activeTournament ? activeTournament.matches.map(id => matches[id]).filter(Boolean) : [];
@@ -272,10 +281,13 @@ const AdminView: React.FC = () => {
             </div>
           ) : (
             tournamentTables.map(table => {
-              // Ensure match strictly belongs to active tournament
-              const currentMatch = (table.currentMatchId && matches[table.currentMatchId]?.tournamentId === activeTournament?.id)
+              // Ensure match strictly belongs to active tournament and respects final stage
+              const candidateMatch = (table.currentMatchId && matches[table.currentMatchId]?.tournamentId === activeTournament?.id)
                 ? matches[table.currentMatchId]
                 : Object.values(matches).find(m => m.tournamentId === activeTournament?.id && m.tableId === table.id && m.status !== 'finished');
+              const currentMatch = (candidateMatch && isFinalStageActive && !isFinalStageMatch(candidateMatch))
+                ? undefined
+                : candidateMatch;
 
               const p1 = currentMatch ? players[currentMatch.player1Id] : undefined;
               const p2 = currentMatch ? players[currentMatch.player2Id] : undefined;
@@ -2692,6 +2704,9 @@ const AdminView: React.FC = () => {
         let candidateMatch = table.currentMatchId ? matches[table.currentMatchId] : null;
         if (!candidateMatch || candidateMatch.status === 'finished') {
           candidateMatch = Object.values(matches).find(m => m.tableId === table.id && m.status !== 'finished') || null;
+        }
+        if (candidateMatch && isFinalStageActive && !isFinalStageMatch(candidateMatch)) {
+          candidateMatch = null;
         }
         const match = (candidateMatch && candidateMatch.status !== 'finished') ? candidateMatch : null;
 
