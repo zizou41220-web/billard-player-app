@@ -1197,7 +1197,7 @@ const AdminView: React.FC = () => {
                           </div>
                           <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                             <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--accent-secondary)', fontSize: '0.85rem', fontWeight: 700 }}>
-                              🏆 Prestige vs Prestige
+                              Prestige vs Prestige
                             </label>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Manches (1 à 20)</div>
                             <input
@@ -1625,7 +1625,7 @@ const AdminView: React.FC = () => {
                         setActiveTab('dashboard');
                       }}
                     >
-                      <Rocket size={22} /> Démarrer le Tournoi & Ouvrir la Vue d'ensemble
+                      Démarrer le Tournoi & Ouvrir la Vue d'ensemble
                     </button>
 
                   </div>
