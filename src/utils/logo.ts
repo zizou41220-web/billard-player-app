@@ -7,16 +7,30 @@ export { defaultClubLogo };
  * Évite les erreurs 404 sur GitHub Pages (/billard-player-app/ vs /logo.png).
  */
 export function getClubLogoUrl(logoUrl?: string | null): string {
-  if (!logoUrl || logoUrl === '/logo.png' || logoUrl === 'logo.png' || logoUrl === './logo.png') {
+  if (!logoUrl) return defaultClubLogo;
+  const cleaned = logoUrl.trim();
+  const lower = cleaned.toLowerCase();
+
+  // Si le chemin fait référence au logo par défaut ou au logo local (insensible à la casse)
+  if (
+    !lower ||
+    lower === 'null' ||
+    lower === 'undefined' ||
+    lower === '/logo.png' ||
+    lower === 'logo.png' ||
+    lower === './logo.png' ||
+    lower.includes('logo.png') ||
+    lower.includes('logo_club') ||
+    lower.includes('billard club') ||
+    lower === '/logo' ||
+    lower === 'logo'
+  ) {
     return defaultClubLogo;
   }
-  // Si le chemin fait référence au logo local
-  if (logoUrl.includes('logo.png') || logoUrl.includes('logo_club_41')) {
-    return defaultClubLogo;
-  }
+
   // Si c'est un chemin absolu commençant par / mais hébergé sous un sous-dossier (GitHub Pages)
-  if (logoUrl.startsWith('/') && !logoUrl.startsWith('//') && !logoUrl.startsWith('http')) {
-    return logoUrl.slice(1);
+  if (cleaned.startsWith('/') && !cleaned.startsWith('//') && !cleaned.startsWith('http')) {
+    return cleaned.slice(1);
   }
-  return logoUrl;
+  return cleaned;
 }
