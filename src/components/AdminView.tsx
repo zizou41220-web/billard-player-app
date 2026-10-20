@@ -1248,7 +1248,7 @@ const AdminView: React.FC = () => {
                         <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
                           <input type="checkbox" checked={hasThirdPlaceMatch} onChange={e => setHasThirdPlaceMatch(e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--accent-primary)' }} />
                           <div>
-                            <div style={{ fontWeight: 600 }}>🥉 Petite Finale (match pour la 3ème place)</div>
+                            <div style={{ fontWeight: 600 }}>Petite Finale (match pour la 3ème place)</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Faire s'affronter les deux perdants des demi-finales</div>
                           </div>
                         </div>
@@ -1257,7 +1257,7 @@ const AdminView: React.FC = () => {
                         <div style={{ gridColumn: 'span 2', marginTop: '0.5rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                             <label style={{ fontSize: '0.95rem', color: '#ffd700', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              🎯 Handicap Tableau Final (Amateur vs Prestige)
+                              Handicap Tableau Final (Amateur vs Prestige)
                             </label>
                             <span style={{ fontSize: '0.72rem', background: finalHandicapAmateurSets > 0 ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: finalHandicapAmateurSets > 0 ? '#ffd700' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(255, 215, 0, 0.3)' }}>
                               {finalHandicapAmateurSets > 0 ? `+${finalHandicapAmateurSets} manche(s) d'avance` : 'Désactivé (0-0)'}

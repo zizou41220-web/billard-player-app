@@ -128,7 +128,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           displayList.push({
             id: thirdPlace.id,
             stage: 'third_place',
-            title: '🥉 Petite Finale (3ème place)',
+            title: 'Petite Finale (3ème place)',
             round: roundDef.roundNumber,
             position: 1,
             player1Id: thirdPlace.player1Id,
@@ -190,7 +190,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
             player1Id: getSlotPlayerId(statA),
             player2Id: isBye ? undefined : getSlotPlayerId(statB),
             player1Label: getSlotLabel(statA, `${seedA}e`),
-            player2Label: isBye ? '⚡ BLANC (Exempt)' : getSlotLabel(statB, `${seedB}e`),
+            player2Label: isBye ? 'BLANC (Exempt)' : getSlotLabel(statB, `${seedB}e`),
             score1: 0,
             score2: 0,
             status: isBye ? 'finished' : 'pending',
@@ -216,7 +216,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           displayList.push({
             id: 'proj_third_place',
             stage: 'third_place',
-            title: '🥉 Petite Finale (3ème place)',
+            title: 'Petite Finale (3ème place)',
             round: roundDef.roundNumber,
             position: 1,
             player1Label: 'Perdant 1/2 #1',
@@ -520,7 +520,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                 />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontWeight: 800, fontSize: '0.9rem', color: modalIncludeThirdPlace ? '#f59e0b' : '#fff' }}>
-                    🥉 Petite Finale (Match pour la 3ème place)
+                    Petite Finale (Match pour la 3ème place)
                   </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     Faire s'affronter les perdants des 1/2 finales pour désigner le 3ème du tournoi
