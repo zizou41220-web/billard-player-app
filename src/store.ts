@@ -3,7 +3,13 @@ import { Club, Player, PlayerLevel, Table, Match, Tournament, TournamentFormat, 
 import { getMatchHandicap } from './utils/handicap';
 import { getTournamentQualificationStatus } from './utils/qualifiers';
 import { buildBracketMatches, isFinalStageMatch } from './utils/bracket';
-import { getMatchScoringRules, clampMatchScores, getMaxAllowedHandicap } from './utils/rules';
+import {
+  getMatchScoringRules,
+  clampMatchScores,
+  getMaxAllowedQualifHandicap,
+  getMaxAllowedFinalHandicap,
+  getTournamentPhaseHandicap
+} from './utils/rules';
 
 interface AppState {
   currentClub: Club;
@@ -133,7 +139,9 @@ export const healAndAdvanceBracketMatches = (
         const p1 = qWinners[0] || semi1.player1Id;
         const p2 = qWinners[1] || semi1.player2Id;
         if (p1 !== semi1.player1Id || p2 !== semi1.player2Id) {
-          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
+          const finalH = getTournamentPhaseHandicap(tour.settings, true);
+          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, (tour.settings?.finalNbSets || 1) - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, finalH, maxH);
           newMatches[semi1.id] = {
             ...semi1,
             player1Id: p1 || '',
@@ -151,7 +159,9 @@ export const healAndAdvanceBracketMatches = (
         const p1 = qWinners[2] || semi2.player1Id;
         const p2 = qWinners[3] || semi2.player2Id;
         if (p1 !== semi2.player1Id || p2 !== semi2.player2Id) {
-          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
+          const finalH = getTournamentPhaseHandicap(tour.settings, true);
+          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, (tour.settings?.finalNbSets || 1) - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, finalH, maxH);
           newMatches[semi2.id] = {
             ...semi2,
             player1Id: p1 || '',
@@ -572,16 +582,31 @@ export const useStore = create<AppState>((set, get) => ({
     const newMatches: Record<string, Match> = {};
     const matchIds: string[] = [];
 
-    const maxAllowedHandicap = getMaxAllowedHandicap(
+    const maxAllowedQualifHandicap = getMaxAllowedQualifHandicap(
       settings?.qualifNbSets || 1,
-      settings?.qualifIsWinningSets ?? true,
-      settings?.finalNbSets || 3,
-      settings?.finalIsWinningSets ?? true,
-      format === 'direct_ko'
+      settings?.qualifIsWinningSets ?? true
     );
+    const maxAllowedFinalHandicap = getMaxAllowedFinalHandicap(
+      settings?.finalNbSets || 3,
+      settings?.finalIsWinningSets ?? true
+    );
+
+    const rawQualifHandicap = settings?.qualifHandicapAmateurSets !== undefined
+      ? settings.qualifHandicapAmateurSets
+      : (settings?.handicapAmateurSets || 0);
+
+    const rawFinalHandicap = settings?.finalHandicapAmateurSets !== undefined
+      ? settings.finalHandicapAmateurSets
+      : (settings?.handicapAmateurSets || 0);
+
+    const cleanQualifHandicap = Math.min(rawQualifHandicap, maxAllowedQualifHandicap);
+    const cleanFinalHandicap = Math.min(rawFinalHandicap, maxAllowedFinalHandicap);
+
     const cleanSettings: TournamentSettings = {
       ...settings,
-      handicapAmateurSets: Math.min(settings?.handicapAmateurSets || 0, maxAllowedHandicap)
+      qualifHandicapAmateurSets: cleanQualifHandicap,
+      finalHandicapAmateurSets: cleanFinalHandicap,
+      handicapAmateurSets: cleanFinalHandicap
     };
 
     if (format === 'direct_ko') {
@@ -590,7 +615,7 @@ export const useStore = create<AppState>((set, get) => ({
         tournamentId: tourId,
         clubId: get().currentClub.id,
         qualifiers: participants,
-        handicapAmateurSets: cleanSettings.handicapAmateurSets,
+        handicapAmateurSets: cleanFinalHandicap,
         finalNbSets: cleanSettings.finalNbSets,
         finalIsWinningSets: cleanSettings.finalIsWinningSets,
         hasThirdPlaceMatch: cleanSettings.hasThirdPlaceMatch ?? true,
@@ -609,7 +634,7 @@ export const useStore = create<AppState>((set, get) => ({
           const matchId = `m_${Date.now()}_${i}_${j}`;
           const p1 = playersState[shuffled[i]];
           const p2 = playersState[shuffled[j]];
-          const { h1, h2 } = getMatchHandicap(p1?.level, p2?.level, cleanSettings.handicapAmateurSets, maxQualifHandicap);
+          const { h1, h2 } = getMatchHandicap(p1?.level, p2?.level, cleanQualifHandicap, maxQualifHandicap);
 
           newMatches[matchId] = {
             id: matchId,
@@ -931,10 +956,13 @@ export const useStore = create<AppState>((set, get) => ({
         // If next match now has both players and hasn't started, apply handicap
         if (nextM.player1Id && nextM.player2Id && nextM.status === 'pending') {
           const tour = match.tournamentId ? state.tournaments[match.tournamentId] : null;
+          const finalH = getTournamentPhaseHandicap(tour?.settings, true);
+          const maxH = (tour?.settings?.finalIsWinningSets ?? true) ? Math.max(0, (tour?.settings?.finalNbSets || 1) - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(
             state.players[nextM.player1Id]?.level,
             state.players[nextM.player2Id]?.level,
-            tour?.settings?.handicapAmateurSets
+            finalH,
+            maxH
           );
           nextM = {
             ...nextM,
@@ -962,10 +990,13 @@ export const useStore = create<AppState>((set, get) => ({
           }
           if (tpM.player1Id && tpM.player2Id && tpM.status === 'pending') {
             const tour = state.tournaments[match.tournamentId];
+            const finalH = getTournamentPhaseHandicap(tour?.settings, true);
+            const maxH = (tour?.settings?.finalIsWinningSets ?? true) ? Math.max(0, (tour?.settings?.finalNbSets || 1) - 1) : undefined;
             const { h1, h2 } = getMatchHandicap(
               state.players[tpM.player1Id]?.level,
               state.players[tpM.player2Id]?.level,
-              tour?.settings?.handicapAmateurSets
+              finalH,
+              maxH
             );
             tpM = {
               ...tpM,
@@ -1127,10 +1158,13 @@ export const useStore = create<AppState>((set, get) => ({
         // If next match now has both players and hasn't started, apply handicap
         if (nextM.player1Id && nextM.player2Id && nextM.status === 'pending') {
           const tour = match.tournamentId ? state.tournaments[match.tournamentId] : null;
+          const finalH = getTournamentPhaseHandicap(tour?.settings, true);
+          const maxH = (tour?.settings?.finalIsWinningSets ?? true) ? Math.max(0, (tour?.settings?.finalNbSets || 1) - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(
             state.players[nextM.player1Id]?.level,
             state.players[nextM.player2Id]?.level,
-            tour?.settings?.handicapAmateurSets
+            finalH,
+            maxH
           );
           nextM = {
             ...nextM,
@@ -1158,10 +1192,13 @@ export const useStore = create<AppState>((set, get) => ({
           }
           if (tpM.player1Id && tpM.player2Id && tpM.status === 'pending') {
             const tour = state.tournaments[match.tournamentId];
+            const finalH = getTournamentPhaseHandicap(tour?.settings, true);
+            const maxH = (tour?.settings?.finalIsWinningSets ?? true) ? Math.max(0, (tour?.settings?.finalNbSets || 1) - 1) : undefined;
             const { h1, h2 } = getMatchHandicap(
               state.players[tpM.player1Id]?.level,
               state.players[tpM.player2Id]?.level,
-              tour?.settings?.handicapAmateurSets
+              finalH,
+              maxH
             );
             tpM = {
               ...tpM,
@@ -1284,11 +1321,12 @@ export const useStore = create<AppState>((set, get) => ({
       });
 
       // Construction de l'arbre universel (2 à 128 joueurs) avec Byes (Blancs) automatiques
+      const finalHandicap = getTournamentPhaseHandicap(tournament.settings, true);
       const { newMatches: bracketMatches, newMatchIds } = buildBracketMatches({
         tournamentId,
         clubId: state.currentClub.id,
         qualifiers,
-        handicapAmateurSets: tournament.settings?.handicapAmateurSets,
+        handicapAmateurSets: finalHandicap,
         finalNbSets: tournament.settings?.finalNbSets,
         finalIsWinningSets: tournament.settings?.finalIsWinningSets,
         hasThirdPlaceMatch: shouldIncludeThirdPlace,
@@ -1398,11 +1436,12 @@ export const useStore = create<AppState>((set, get) => ({
         }
       });
 
+      const finalHandicap = getTournamentPhaseHandicap(tournament.settings, true);
       const { newMatches: reseededMatches, newMatchIds } = buildBracketMatches({
         tournamentId,
         clubId: state.currentClub.id,
         qualifiers: effectiveQualifiers,
-        handicapAmateurSets: tournament.settings?.handicapAmateurSets,
+        handicapAmateurSets: finalHandicap,
         finalNbSets: tournament.settings?.finalNbSets,
         finalIsWinningSets: tournament.settings?.finalIsWinningSets,
         hasThirdPlaceMatch: tournament.settings?.hasThirdPlaceMatch ?? true,

@@ -9,8 +9,35 @@ export interface MatchScoringRules {
 }
 
 /**
+ * Calcule le handicap maximum admissible pour les qualifications
+ */
+export function getMaxAllowedQualifHandicap(qualifNbSets: number, qualifIsWinningSets: boolean): number {
+  return qualifIsWinningSets ? Math.max(0, qualifNbSets - 1) : 3;
+}
+
+/**
+ * Calcule le handicap maximum admissible pour les phases finales
+ */
+export function getMaxAllowedFinalHandicap(finalNbSets: number, finalIsWinningSets: boolean): number {
+  return finalIsWinningSets ? Math.max(0, finalNbSets - 1) : 3;
+}
+
+/**
+ * Récupère le handicap configuré pour une phase spécifique (Qualifications ou Phases Finales).
+ */
+export function getTournamentPhaseHandicap(settings?: any | null, isFinalStage: boolean = false): number {
+  if (!settings) return 0;
+  if (isFinalStage) {
+    if (settings.finalHandicapAmateurSets !== undefined) return settings.finalHandicapAmateurSets;
+    return settings.handicapAmateurSets || 0;
+  } else {
+    if (settings.qualifHandicapAmateurSets !== undefined) return settings.qualifHandicapAmateurSets;
+    return settings.handicapAmateurSets || 0;
+  }
+}
+
+/**
  * Calcule le handicap maximum admissible pour éviter qu'un joueur l'emporte d'office
- * (ex: 1 manche gagnante avec +1 manche d'avance = match déjà gagné à 1-0).
  */
 export function getMaxAllowedHandicap(
   qualifNbSets: number,

@@ -12,7 +12,7 @@ import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
-import { getMaxAllowedHandicap, getMatchScoringRules } from '../utils/rules';
+import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules } from '../utils/rules';
 
 const AdminView: React.FC = () => {
   const {
@@ -68,22 +68,24 @@ const AdminView: React.FC = () => {
   const [finalNbSets, setFinalNbSets] = useState(3);
   const [finalIsWinningSets, setFinalIsWinningSets] = useState(true);
   const [seedByMerit, setSeedByMerit] = useState(true);
-  const [handicapAmateurSets, setHandicapAmateurSets] = useState(0);
+  const [qualifHandicapAmateurSets, setQualifHandicapAmateurSets] = useState(0);
+  const [finalHandicapAmateurSets, setFinalHandicapAmateurSets] = useState(0);
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(true);
 
-  const maxAllowedHandicap = getMaxAllowedHandicap(
-    qualifNbSets,
-    qualifIsWinningSets,
-    finalNbSets,
-    finalIsWinningSets,
-    newTourFormat === 'direct_ko'
-  );
+  const maxAllowedQualifHandicap = getMaxAllowedQualifHandicap(qualifNbSets, qualifIsWinningSets);
+  const maxAllowedFinalHandicap = getMaxAllowedFinalHandicap(finalNbSets, finalIsWinningSets);
 
   React.useEffect(() => {
-    if (handicapAmateurSets > maxAllowedHandicap) {
-      setHandicapAmateurSets(maxAllowedHandicap);
+    if (qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
+      setQualifHandicapAmateurSets(maxAllowedQualifHandicap);
     }
-  }, [maxAllowedHandicap, handicapAmateurSets]);
+  }, [maxAllowedQualifHandicap, qualifHandicapAmateurSets]);
+
+  React.useEffect(() => {
+    if (finalHandicapAmateurSets > maxAllowedFinalHandicap) {
+      setFinalHandicapAmateurSets(maxAllowedFinalHandicap);
+    }
+  }, [maxAllowedFinalHandicap, finalHandicapAmateurSets]);
 
   // New Player State
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -805,11 +807,20 @@ const AdminView: React.FC = () => {
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Progression Matchs</div>
                       <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{finishedTourMatches.length} <span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>/ {allTourMatches.length}</span></div>
                     </div>
-                    {Boolean(activeTournament.settings?.handicapAmateurSets) && (
+                    {(Boolean(activeTournament.settings?.qualifHandicapAmateurSets) || Boolean(activeTournament.settings?.finalHandicapAmateurSets) || Boolean(activeTournament.settings?.handicapAmateurSets)) && (
                       <div style={{ background: 'rgba(255, 215, 0, 0.12)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.35)' }}>
-                        <div style={{ fontSize: '0.8rem', color: '#ffd700', marginBottom: '0.3rem', fontWeight: 700 }}>🎯 Handicap Niveaux</div>
-                        <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffd700' }}>
-                          +{activeTournament.settings?.handicapAmateurSets} <span style={{ fontSize: '1rem', color: 'rgba(255, 215, 0, 0.8)' }}>manche(s)</span>
+                        <div style={{ fontSize: '0.8rem', color: '#ffd700', marginBottom: '0.4rem', fontWeight: 700 }}>🎯 Handicap Niveaux</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffd700', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          {activeTournament.format !== 'direct_ko' && (
+                            <div>
+                              <span style={{ fontSize: '0.8rem', color: 'rgba(255, 215, 0, 0.8)', fontWeight: 600 }}>Poules : </span>
+                              +{activeTournament.settings?.qualifHandicapAmateurSets ?? activeTournament.settings?.handicapAmateurSets ?? 0} m.
+                            </div>
+                          )}
+                          <div>
+                            <span style={{ fontSize: '0.8rem', color: 'rgba(255, 215, 0, 0.8)', fontWeight: 600 }}>Phases finales : </span>
+                            +{activeTournament.settings?.finalHandicapAmateurSets ?? activeTournament.settings?.handicapAmateurSets ?? 0} m.
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1135,6 +1146,65 @@ const AdminView: React.FC = () => {
                               max={128} 
                             />
                           </div>
+
+                          {/* Handicap Qualification (Amateur vs Prestige) */}
+                          <div style={{ gridColumn: 'span 2', marginTop: '0.5rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <label style={{ fontSize: '0.95rem', color: '#ffd700', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                🎯 Handicap Poules / Cartésien (Amateur vs Prestige)
+                              </label>
+                              <span style={{ fontSize: '0.72rem', background: qualifHandicapAmateurSets > 0 ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: qualifHandicapAmateurSets > 0 ? '#ffd700' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(255, 215, 0, 0.3)' }}>
+                                {qualifHandicapAmateurSets > 0 ? `+${qualifHandicapAmateurSets} manche(s) d'avance` : 'Désactivé (0-0)'}
+                              </span>
+                            </div>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0 0 0.8rem 0', lineHeight: '1.4' }}>
+                              Avance accordée à l'Amateur contre un Prestige pendant les matchs de qualification.
+                            </p>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.6rem' }}>
+                              {[
+                                { val: 0, label: '0 (Aucun)', sub: 'Départ 0-0' },
+                                { val: 1, label: '+1 manche', sub: 'Départ 1-0' },
+                                { val: 2, label: '+2 manches', sub: 'Départ 2-0' },
+                                { val: 3, label: '+3 manches', sub: 'Départ 3-0' }
+                              ].map(opt => {
+                                const isSel = qualifHandicapAmateurSets === opt.val;
+                                const isDis = opt.val > maxAllowedQualifHandicap;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={opt.val}
+                                    disabled={isDis}
+                                    onClick={() => !isDis && setQualifHandicapAmateurSets(opt.val)}
+                                    className="btn"
+                                    style={{
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      padding: '0.7rem 0.5rem',
+                                      borderRadius: '10px',
+                                      border: isSel ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
+                                      background: isSel ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.02)',
+                                      color: isSel ? '#ffd700' : (isDis ? 'rgba(255,255,255,0.3)' : '#fff'),
+                                      boxShadow: isSel ? '0 0 12px rgba(255, 215, 0, 0.25)' : 'none',
+                                      opacity: isDis ? 0.35 : 1,
+                                      cursor: isDis ? 'not-allowed' : 'pointer'
+                                    }}
+                                    title={isDis ? `Incompatible avec ${qualifNbSets} manche(s) gagnante(s) : max +${maxAllowedQualifHandicap}.` : opt.label}
+                                  >
+                                    <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{opt.label}</span>
+                                    <span style={{ fontSize: '0.68rem', color: isSel ? 'rgba(255,215,0,0.8)' : 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                      {isDis ? 'Incompatible' : opt.sub}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {maxAllowedQualifHandicap === 0 && (
+                              <div style={{ marginTop: '0.6rem', padding: '0.6rem 0.8rem', background: 'rgba(255, 100, 100, 0.12)', border: '1px solid rgba(255, 100, 100, 0.35)', borderRadius: '8px', color: '#ffaaaa', fontSize: '0.78rem', lineHeight: '1.4' }}>
+                                ⚠️ <strong>1 manche gagnante en qualification :</strong> aucun handicap ne peut être accordé, sinon l'amateur l'emporterait à 1-0 dès le coup d'envoi sans jouer.
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1182,74 +1252,66 @@ const AdminView: React.FC = () => {
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Faire s'affronter les deux perdants des demi-finales</div>
                           </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Handicap Rules (Amateur vs Prestige) */}
-                    <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <h3 style={{ fontSize: '1.2rem', color: '#ffd700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
-                          🎯 Handicap Niveaux (Amateur vs Prestige)
-                        </h3>
-                        <span style={{ fontSize: '0.75rem', background: handicapAmateurSets > 0 ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: handicapAmateurSets > 0 ? '#ffd700' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(255, 215, 0, 0.3)' }}>
-                          {handicapAmateurSets > 0 ? `+${handicapAmateurSets} manche(s) d'avance` : 'Désactivé (Égalité)'}
-                        </span>
-                      </div>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0 0 1.2rem 0', lineHeight: '1.4' }}>
-                        Donne automatiquement un avantage de score au joueur Amateur lorsqu'il affronte un joueur Prestige. Les duels entre deux joueurs du même niveau démarrent normalement à 0-0.
-                      </p>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.8rem' }}>
-                        {[
-                          { val: 0, label: '0 (Aucun)', sub: 'Départ à 0 - 0' },
-                          { val: 1, label: '+1 manche', sub: 'Amateur démarre à 1 - 0' },
-                          { val: 2, label: '+2 manches', sub: 'Amateur démarre à 2 - 0' },
-                          { val: 3, label: '+3 manches', sub: 'Amateur démarre à 3 - 0' }
-                        ].map(opt => {
-                          const isSel = handicapAmateurSets === opt.val;
-                          const isDis = opt.val > maxAllowedHandicap;
-                          return (
-                            <button
-                              type="button"
-                              key={opt.val}
-                              disabled={isDis}
-                              onClick={() => !isDis && setHandicapAmateurSets(opt.val)}
-                              className="btn"
-                              style={{
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '0.9rem 0.6rem',
-                                borderRadius: '10px',
-                                border: isSel ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
-                                background: isSel ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.02)',
-                                color: isSel ? '#ffd700' : (isDis ? 'rgba(255,255,255,0.3)' : '#fff'),
-                                boxShadow: isSel ? '0 0 15px rgba(255, 215, 0, 0.25)' : 'none',
-                                opacity: isDis ? 0.35 : 1,
-                                cursor: isDis ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                              title={isDis ? `Incompatible avec le format : le handicap doit être strictement inférieur au nombre de manches gagnantes (${maxAllowedHandicap === 0 ? 'désactivé pour 1 manche gagnante' : `max +${maxAllowedHandicap}`}).` : opt.label}
-                            >
-                              <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{opt.label}</span>
-                              <span style={{ fontSize: '0.7rem', color: isSel ? 'rgba(255,215,0,0.8)' : 'var(--text-muted)', marginTop: '0.2rem' }}>
-                                {isDis ? 'Incompatible' : opt.sub}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {maxAllowedHandicap === 0 && (
-                        <div style={{ marginTop: '0.9rem', padding: '0.8rem 1rem', background: 'rgba(255, 100, 100, 0.12)', border: '1px solid rgba(255, 100, 100, 0.35)', borderRadius: '10px', color: '#ffaaaa', fontSize: '0.82rem', lineHeight: '1.4' }}>
-                          ⚠️ <strong>Règle de cohérence :</strong> vous avez sélectionné <strong>1 manche gagnante</strong>. Aucun handicap d'avance ne peut être accordé (+1, +2...), sinon le joueur amateur l'emporterait à 1-0 immédiatement au coup d'envoi sans jouer !
+                        {/* Handicap Tableau Final (Amateur vs Prestige) */}
+                        <div style={{ gridColumn: 'span 2', marginTop: '0.5rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <label style={{ fontSize: '0.95rem', color: '#ffd700', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              🎯 Handicap Tableau Final (Amateur vs Prestige)
+                            </label>
+                            <span style={{ fontSize: '0.72rem', background: finalHandicapAmateurSets > 0 ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: finalHandicapAmateurSets > 0 ? '#ffd700' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(255, 215, 0, 0.3)' }}>
+                              {finalHandicapAmateurSets > 0 ? `+${finalHandicapAmateurSets} manche(s) d'avance` : 'Désactivé (0-0)'}
+                            </span>
+                          </div>
+                          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0 0 0.8rem 0', lineHeight: '1.4' }}>
+                            Avance accordée à l'Amateur contre un Prestige pendant les matchs des phases finales.
+                          </p>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.6rem' }}>
+                            {[
+                              { val: 0, label: '0 (Aucun)', sub: 'Départ 0-0' },
+                              { val: 1, label: '+1 manche', sub: 'Départ 1-0' },
+                              { val: 2, label: '+2 manches', sub: 'Départ 2-0' },
+                              { val: 3, label: '+3 manches', sub: 'Départ 3-0' }
+                            ].map(opt => {
+                              const isSel = finalHandicapAmateurSets === opt.val;
+                              const isDis = opt.val > maxAllowedFinalHandicap;
+                              return (
+                                <button
+                                  type="button"
+                                  key={opt.val}
+                                  disabled={isDis}
+                                  onClick={() => !isDis && setFinalHandicapAmateurSets(opt.val)}
+                                  className="btn"
+                                  style={{
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '0.7rem 0.5rem',
+                                    borderRadius: '10px',
+                                    border: isSel ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
+                                    background: isSel ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.02)',
+                                    color: isSel ? '#ffd700' : (isDis ? 'rgba(255,255,255,0.3)' : '#fff'),
+                                    boxShadow: isSel ? '0 0 12px rgba(255, 215, 0, 0.25)' : 'none',
+                                    opacity: isDis ? 0.35 : 1,
+                                    cursor: isDis ? 'not-allowed' : 'pointer'
+                                  }}
+                                  title={isDis ? `Incompatible avec ${finalNbSets} manche(s) gagnante(s) : max +${maxAllowedFinalHandicap}.` : opt.label}
+                                >
+                                  <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{opt.label}</span>
+                                  <span style={{ fontSize: '0.68rem', color: isSel ? 'rgba(255,215,0,0.8)' : 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                    {isDis ? 'Incompatible' : opt.sub}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {maxAllowedFinalHandicap === 0 && (
+                            <div style={{ marginTop: '0.6rem', padding: '0.6rem 0.8rem', background: 'rgba(255, 100, 100, 0.12)', border: '1px solid rgba(255, 100, 100, 0.35)', borderRadius: '8px', color: '#ffaaaa', fontSize: '0.78rem', lineHeight: '1.4' }}>
+                              ⚠️ <strong>1 manche gagnante en phase finale :</strong> aucun handicap ne peut être accordé, sinon l'amateur l'emporterait à 1-0 dès le coup d'envoi sans jouer.
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {maxAllowedHandicap > 0 && maxAllowedHandicap < 3 && (
-                        <div style={{ marginTop: '0.9rem', padding: '0.8rem 1rem', background: 'rgba(255, 215, 0, 0.08)', border: '1px solid rgba(255, 215, 0, 0.25)', borderRadius: '10px', color: '#ffd700', fontSize: '0.82rem', lineHeight: '1.4' }}>
-                          💡 <strong>Limite de handicap :</strong> le handicap est plafonné à <strong>+{maxAllowedHandicap} manche(s)</strong> pour rester strictement inférieur au nombre de manches gagnantes.
-                        </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Tables Allocation */}
@@ -1330,13 +1392,19 @@ const AdminView: React.FC = () => {
                         if (!newTourName.trim()) return alert('Veuillez entrer un nom pour le tournoi.');
                         if (selectedPlayers.length < 2) return alert('Veuillez sélectionner au moins 2 joueurs inscrits.');
                         if (selectedTables.length === 0) return alert('Veuillez sélectionner au moins 1 billard.');
-                        if (handicapAmateurSets > maxAllowedHandicap) {
-                          return alert(`Configuration impossible : avec 1 manche gagnante (ou handicap >= nombre de manches gagnantes), l'amateur gagnerait instantanément sans jouer. Veuillez choisir un handicap de +${maxAllowedHandicap} manche(s) maximum.`);
+                        if (newTourFormat !== 'direct_ko' && qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
+                          return alert(`Configuration qualification impossible : avec ${qualifNbSets} manche(s) gagnante(s), le handicap poules doit être de +${maxAllowedQualifHandicap} manche(s) maximum.`);
+                        }
+                        if (finalHandicapAmateurSets > maxAllowedFinalHandicap) {
+                          return alert(`Configuration tableau final impossible : avec ${finalNbSets} manche(s) gagnante(s), le handicap phase finale doit être de +${maxAllowedFinalHandicap} manche(s) maximum.`);
                         }
 
                         createTournament(newTourName.trim(), newTourFormat, {
                           tableIds: selectedTables, qualifNbSets, qualifIsWinningSets, qualifNbQualifiers,
-                          finalNbSets, finalIsWinningSets, seedByMerit, handicapAmateurSets,
+                          finalNbSets, finalIsWinningSets, seedByMerit,
+                          qualifHandicapAmateurSets,
+                          finalHandicapAmateurSets,
+                          handicapAmateurSets: finalHandicapAmateurSets,
                           hasThirdPlaceMatch
                         }, selectedPlayers);
 

@@ -71,11 +71,13 @@ export type TournamentSettings = {
   qualifNbSets: number;
   qualifIsWinningSets: boolean; // true = "première à X", false = "jouer X manches fixes"
   qualifNbQualifiers: number; // sortants par poule / qualifiés
+  qualifHandicapAmateurSets?: number; // 0 = aucun, 1 = +1 manche d'avance pour Amateur vs Prestige en qualif
   finalNbSets: number;
   finalIsWinningSets: boolean;
+  finalHandicapAmateurSets?: number; // 0 = aucun, 1 = +1 manche d'avance pour Amateur vs Prestige en phase finale
   seedByMerit: boolean; // Tirage au mérite
   finalStageLaunched?: boolean;
-  handicapAmateurSets?: number; // 0 = aucun, 1 = +1 manche d'avance pour Amateur vs Prestige, etc.
+  handicapAmateurSets?: number; // Rétrocompatibilité globale
   hasThirdPlaceMatch?: boolean; // Petite finale pour la 3ème place
 };
 
