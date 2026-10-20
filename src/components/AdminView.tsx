@@ -32,6 +32,14 @@ const AdminView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'launcher' | 'dashboard' | 'admin'>(() => {
     return isTournamentActive ? 'dashboard' : 'launcher';
   });
+  const hasAutoSwitchedToDashboard = React.useRef(false);
+  React.useEffect(() => {
+    if (isTournamentActive && !hasAutoSwitchedToDashboard.current) {
+      hasAutoSwitchedToDashboard.current = true;
+      setActiveTab('dashboard');
+    }
+  }, [isTournamentActive]);
+
   const [dashboardSubTab, setDashboardSubTab] = useState<'live' | 'bracket'>('live');
   const [adminSubTab, setAdminSubTab] = useState<'map' | 'players' | 'club'>('map');
   const [showNewTourForm, setShowNewTourForm] = useState(false);
@@ -165,6 +173,9 @@ const AdminView: React.FC = () => {
     return true;
   });
   const finishedTourMatches = allTourMatches.filter(m => m.status === 'finished');
+  const unplayedQualifMatches = (isFinalStageActive && activeTournament)
+    ? allTourMatches.filter(m => !isFinalStageMatch(m) && m.status !== 'finished')
+    : [];
 
   const hasInvertedSemi = Boolean(isFinalStageActive && qualifStatus.ranking.length >= 2 && (() => {
     const tourMatches = activeTournament ? activeTournament.matches.map(id => matches[id]).filter(Boolean) : [];
@@ -292,6 +303,7 @@ const AdminView: React.FC = () => {
               const p1 = currentMatch ? players[currentMatch.player1Id] : undefined;
               const p2 = currentMatch ? players[currentMatch.player2Id] : undefined;
               const isPlaying = currentMatch?.status === 'playing';
+              const isAssigned = Boolean(currentMatch);
 
               return (
                 <div
@@ -301,7 +313,7 @@ const AdminView: React.FC = () => {
                     transition: 'transform 0.2s ease',
                     transform: 'scale(1.32)',
                     margin: '0.8rem 1.5rem',
-                    zIndex: isPlaying ? 10 : 1
+                    zIndex: isPlaying ? 10 : (isAssigned ? 5 : 1)
                   }}
                   onClick={() => setSelectedTableForQR(table.id)}
                   title={`Cliquer pour voir le match de ${table.name || `Table ${table.number}`}`}
@@ -309,7 +321,7 @@ const AdminView: React.FC = () => {
                   <BilliardTableVisual
                     number={table.number}
                     name={table.name}
-                    status={isPlaying ? 'occupied' : 'free'}
+                    status={isAssigned ? 'occupied' : 'free'}
                     match={currentMatch}
                     player1={p1}
                     player2={p2}
@@ -868,6 +880,30 @@ const AdminView: React.FC = () => {
                           Am {activeTournament.settings?.finalNbSetsAmateur ?? activeTournament.settings?.finalNbSets ?? 2}m • Pre {activeTournament.settings?.finalNbSetsPrestige ?? activeTournament.settings?.finalNbSets ?? 3}m • Mixte {activeTournament.settings?.finalNbSetsMixed ?? activeTournament.settings?.finalNbSets ?? 3}m
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Participants inscrits au tournoi en cours */}
+                  <div style={{ marginTop: '1.2rem', background: 'rgba(0,0,0,0.25)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Users size={16} style={{ color: 'var(--accent-primary)' }} />
+                      Joueurs inscrits dans ce tournoi ({activeTournament.participants.length}) :
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                      {activeTournament.participants.map(pId => {
+                        const p = players[pId];
+                        if (!p) return null;
+                        const isPrestige = p.level === 'Prestige' || p.level === 'Confirmé';
+                        return (
+                          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.04)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <img src={p.avatarUrl} alt={p.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{p.name}</span>
+                            <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: isPrestige ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.08)', color: isPrestige ? '#ffd700' : 'var(--text-muted)', fontWeight: isPrestige ? 800 : 600 }}>
+                              {isPrestige ? '👑 Prestige' : 'Amateur'}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1595,8 +1631,25 @@ const AdminView: React.FC = () => {
                         {selectedPlayers.length}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Cochez pour inscrire :</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', fontSize: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
+                          onClick={() => setSelectedPlayers(Object.keys(players))}
+                        >
+                          Tout cocher
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
+                          onClick={() => setSelectedPlayers([])}
+                        >
+                          Tout décocher
+                        </button>
+                      </div>
                       <button
                         className="btn"
                         style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', background: 'rgba(255,255,255,0.06)' }}
@@ -2111,6 +2164,29 @@ const AdminView: React.FC = () => {
                     })}
                   </div>
                 </div>
+
+                {/* Matchs de qualification non joués (clôturés lors du passage en phase finale) */}
+                {unplayedQualifMatches.length > 0 && (
+                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                        Matchs de poule restants (non disputés pour passage en phase finale)
+                      </span>
+                      <span style={{ fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px' }}>
+                        {unplayedQualifMatches.length} match{unplayedQualifMatches.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                      {unplayedQualifMatches.map(m => (
+                        <div key={m.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ color: '#fff', fontWeight: 600 }}>{players[m.player1Id]?.name || 'J1'}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>VS</span>
+                          <span style={{ color: '#fff', fontWeight: 600 }}>{players[m.player2Id]?.name || 'J2'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* RIGHT: Ranking & Results */}
