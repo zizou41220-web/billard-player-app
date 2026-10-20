@@ -51,8 +51,15 @@ export function getTournamentQualificationStatus(
   const reqQualifiers = tournament.settings?.qualifNbQualifiers || 4;
   const participantsCount = tournament.participants.length;
 
+  // Règle d'élimination : en qualification (poules / cartésien), il doit y avoir au moins 1 éliminé (max = participants - 1)
+  const maxAllowedQualifiers = tournament.format !== 'direct_ko' && participantsCount >= 3
+    ? participantsCount - 1
+    : participantsCount;
+
   // Supporte 2, 4, 8, 16, 32, 64, 128 qualifiés (ou tout nombre intermédiaire avec gestion des Blancs)
-  const numQualifiers = participantsCount < 2 ? participantsCount : Math.min(Math.max(2, reqQualifiers), participantsCount);
+  const numQualifiers = participantsCount < 2 
+    ? participantsCount 
+    : Math.min(Math.max(2, reqQualifiers), maxAllowedQualifiers);
 
   // Stats calculation
   const pStats: Record<string, PlayerQualifStat> = {};

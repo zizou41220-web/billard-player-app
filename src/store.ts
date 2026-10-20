@@ -602,8 +602,13 @@ export const useStore = create<AppState>((set, get) => ({
     const cleanQualifHandicap = Math.min(rawQualifHandicap, maxAllowedQualifHandicap);
     const cleanFinalHandicap = Math.min(rawFinalHandicap, maxAllowedFinalHandicap);
 
+    const cleanQualifNbQualifiers = (format !== 'direct_ko' && participants.length >= 3)
+      ? Math.max(2, Math.min(participants.length - 1, settings?.qualifNbQualifiers || 2))
+      : (settings?.qualifNbQualifiers || 2);
+
     const cleanSettings: TournamentSettings = {
       ...settings,
+      qualifNbQualifiers: cleanQualifNbQualifiers,
       qualifHandicapAmateurSets: cleanQualifHandicap,
       finalHandicapAmateurSets: cleanFinalHandicap,
       handicapAmateurSets: cleanFinalHandicap
@@ -1289,14 +1294,18 @@ export const useStore = create<AppState>((set, get) => ({
       const qualifStatus = getTournamentQualificationStatus(tournament, state.matches, state.players);
       const participantsCount = tournament.participants.length;
 
+      const maxAllowedQualifiers = tournament.format !== 'direct_ko' && participantsCount >= 3
+        ? participantsCount - 1
+        : participantsCount;
+
       let numQualifiers = qualifStatus.numQualifiers;
-      if (numQualifiers < 2) numQualifiers = Math.min(2, participantsCount);
-      numQualifiers = Math.min(numQualifiers, participantsCount);
+      if (numQualifiers < 2) numQualifiers = Math.min(2, maxAllowedQualifiers);
+      numQualifiers = Math.min(numQualifiers, maxAllowedQualifiers);
 
       const qualifiers = qualifStatus.ranking.slice(0, numQualifiers).map(r => r.id);
 
       // Si pas assez de qualifiés, compléter avec les participants restants
-      while (qualifiers.length < numQualifiers && qualifiers.length < participantsCount) {
+      while (qualifiers.length < numQualifiers && qualifiers.length < maxAllowedQualifiers) {
         const nextP = tournament.participants.find(p => !qualifiers.includes(p));
         if (nextP) qualifiers.push(nextP);
         else break;
@@ -1420,8 +1429,7 @@ export const useStore = create<AppState>((set, get) => ({
       const qualifiers = qualifStatus.ranking.map(r => r.id);
       if (qualifiers.length < 2) return state;
 
-      const reqCount = tournament.settings?.qualifNbQualifiers || qualifiers.length;
-      const effectiveQualifiers = qualifiers.slice(0, reqCount);
+      const effectiveQualifiers = qualifiers.slice(0, qualifStatus.numQualifiers);
 
       const qualifMatchIdsOnly = tournament.matches.filter(mId => {
         const m = state.matches[mId];

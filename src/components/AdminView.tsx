@@ -75,6 +75,19 @@ const AdminView: React.FC = () => {
   const maxAllowedQualifHandicap = getMaxAllowedQualifHandicap(qualifNbSets, qualifIsWinningSets);
   const maxAllowedFinalHandicap = getMaxAllowedFinalHandicap(finalNbSets, finalIsWinningSets);
 
+  const maxAllowedQualifiers = newTourFormat !== 'direct_ko' && selectedPlayers.length >= 3
+    ? selectedPlayers.length - 1
+    : (newTourFormat !== 'direct_ko' && selectedPlayers.length === 2 ? 2 : 128);
+
+  React.useEffect(() => {
+    if (newTourFormat !== 'direct_ko' && selectedPlayers.length >= 3) {
+      const maxSortants = selectedPlayers.length - 1;
+      if (qualifNbQualifiers > maxSortants) {
+        setQualifNbQualifiers(Math.max(2, maxSortants));
+      }
+    }
+  }, [selectedPlayers.length, newTourFormat, qualifNbQualifiers]);
+
   React.useEffect(() => {
     if (qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
       setQualifHandicapAmateurSets(maxAllowedQualifHandicap);
@@ -1107,32 +1120,72 @@ const AdminView: React.FC = () => {
                             />
                           </div>
                           <div style={{ gridColumn: 'span 2' }}>
-                            <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                              Nombre de qualifiés pour le tableau final (2 à 128 joueurs)
-                            </label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                              <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>
+                                Nombre de qualifiés pour le tableau final (2 à {maxAllowedQualifiers} joueurs)
+                              </label>
+                              {selectedPlayers.length >= 3 && (
+                                <span style={{ fontSize: '0.75rem', background: 'rgba(0, 255, 204, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 204, 0.3)' }}>
+                                  Max : {maxAllowedQualifiers} qualifiés ({selectedPlayers.length} inscrits - 1)
+                                </span>
+                              )}
+                            </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.6rem' }}>
-                              {[2, 4, 8, 16, 32, 64, 128].map(n => (
+                              {[2, 4, 8, 16, 32, 64, 128].map(n => {
+                                const isDis = selectedPlayers.length >= 3 && n > maxAllowedQualifiers;
+                                return (
+                                  <button
+                                    key={n}
+                                    type="button"
+                                    disabled={isDis}
+                                    onClick={() => !isDis && setQualifNbQualifiers(n)}
+                                    style={{
+                                      padding: '0.35rem 0.75rem',
+                                      borderRadius: '8px',
+                                      border: qualifNbQualifiers === n ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                                      background: qualifNbQualifiers === n ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.04)',
+                                      color: qualifNbQualifiers === n ? 'var(--accent-primary)' : (isDis ? 'rgba(255,255,255,0.25)' : '#fff'),
+                                      cursor: isDis ? 'not-allowed' : 'pointer',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 700,
+                                      opacity: isDis ? 0.35 : 1
+                                    }}
+                                    title={isDis ? `Impossible avec ${selectedPlayers.length} inscrits : il faut au moins 1 éliminé (max ${maxAllowedQualifiers} qualifiés)` : undefined}
+                                  >
+                                    {n === 128 ? '128 (64es)' : n === 64 ? '64 (32es)' : n === 32 ? '32 (16es)' : n === 16 ? '16 (8es)' : n === 8 ? '8 (1/4)' : n === 4 ? '4 (1/2)' : '2 (Fin)'}
+                                  </button>
+                                );
+                              })}
+                              {selectedPlayers.length >= 3 && ![2, 4, 8, 16, 32, 64, 128].includes(maxAllowedQualifiers) && (
                                 <button
-                                  key={n}
                                   type="button"
-                                  onClick={() => setQualifNbQualifiers(n)}
+                                  onClick={() => setQualifNbQualifiers(maxAllowedQualifiers)}
                                   style={{
                                     padding: '0.35rem 0.75rem',
                                     borderRadius: '8px',
-                                    border: qualifNbQualifiers === n ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                                    background: qualifNbQualifiers === n ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.04)',
-                                    color: qualifNbQualifiers === n ? 'var(--accent-primary)' : '#fff',
+                                    border: qualifNbQualifiers === maxAllowedQualifiers ? '1px solid var(--accent-primary)' : '1px solid rgba(0, 255, 204, 0.3)',
+                                    background: qualifNbQualifiers === maxAllowedQualifiers ? 'rgba(0, 255, 204, 0.25)' : 'rgba(0, 255, 204, 0.08)',
+                                    color: 'var(--accent-primary)',
                                     cursor: 'pointer',
                                     fontSize: '0.8rem',
                                     fontWeight: 700
                                   }}
                                 >
-                                  {n === 128 ? '128 (64es)' : n === 64 ? '64 (32es)' : n === 32 ? '32 (16es)' : n === 16 ? '16 (8es)' : n === 8 ? '8 (1/4)' : n === 4 ? '4 (1/2)' : '2 (Fin)'}
+                                  {maxAllowedQualifiers} (Max : {selectedPlayers.length - 1})
                                 </button>
-                              ))}
+                              )}
                             </div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', marginBottom: '0.5rem', lineHeight: '1.4' }}>
-                              💡 <strong>Blancs automatiques :</strong> si le nombre n'est pas une puissance de 2 (ex: 10 qualifiés), l'arbre s'ajuste à la puissance supérieure (16) avec 6 Blancs attribués d'office aux meilleurs classés.
+                            <div style={{ fontSize: '0.78rem', color: selectedPlayers.length < 3 ? '#ffcc00' : 'var(--accent-primary)', marginBottom: '0.5rem', lineHeight: '1.4' }}>
+                              {selectedPlayers.length >= 3 ? (
+                                <span>
+                                  💡 <strong>Règle d'élimination :</strong> Sur {selectedPlayers.length} joueurs inscrits, il doit y avoir au moins 1 éliminé (maximum {maxAllowedQualifiers} qualifiés).
+                                  {qualifNbQualifiers % 2 !== 0 && ' Les Blancs éventuels seront automatiquement attribués aux premiers du classement.'}
+                                </span>
+                              ) : (
+                                <span>
+                                  💡 <strong>Règle d'élimination :</strong> En poules / cartésien, au moins 1 joueur doit être éliminé pour que la phase de qualification ait un sens (max qualifiés = inscrits - 1).
+                                </span>
+                              )}
                             </div>
                             <input 
                               type="number" 
@@ -1140,10 +1193,10 @@ const AdminView: React.FC = () => {
                               value={qualifNbQualifiers} 
                               onChange={e => {
                                 const val = parseInt(e.target.value, 10);
-                                setQualifNbQualifiers(isNaN(val) ? 2 : Math.min(128, Math.max(2, val)));
+                                setQualifNbQualifiers(isNaN(val) ? 2 : Math.min(maxAllowedQualifiers, Math.max(2, val)));
                               }} 
                               min={2} 
-                              max={128} 
+                              max={maxAllowedQualifiers} 
                             />
                           </div>
 
@@ -1392,6 +1445,16 @@ const AdminView: React.FC = () => {
                         if (!newTourName.trim()) return alert('Veuillez entrer un nom pour le tournoi.');
                         if (selectedPlayers.length < 2) return alert('Veuillez sélectionner au moins 2 joueurs inscrits.');
                         if (selectedTables.length === 0) return alert('Veuillez sélectionner au moins 1 billard.');
+
+                        if (newTourFormat !== 'direct_ko') {
+                          if (selectedPlayers.length < 3) {
+                            return alert(`Pour un format avec phase de qualification (poules / cartésien), il faut au moins 3 joueurs inscrits (au moins 1 joueur éliminé et 2 finalistes). Avec ${selectedPlayers.length} participant(s), veuillez sélectionner le format "Élimination Directe".`);
+                          }
+                          if (qualifNbQualifiers >= selectedPlayers.length) {
+                            return alert(`Configuration impossible : avec ${selectedPlayers.length} joueurs inscrits, le nombre de qualifiés (${qualifNbQualifiers}) doit être d'au maximum ${selectedPlayers.length - 1} personnes afin qu'il y ait au moins un éliminé en qualification.`);
+                          }
+                        }
+
                         if (newTourFormat !== 'direct_ko' && qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
                           return alert(`Configuration qualification impossible : avec ${qualifNbSets} manche(s) gagnante(s), le handicap poules doit être de +${maxAllowedQualifHandicap} manche(s) maximum.`);
                         }
