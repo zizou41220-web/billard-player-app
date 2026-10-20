@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../store';
 import { Trophy, Crosshair, Swords } from 'lucide-react';
+import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 const ProfileView: React.FC = () => {
   const { currentUser, players, currentClub } = useStore();
@@ -25,7 +26,7 @@ const ProfileView: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
           <span style={{ color: 'var(--accent-primary)', fontSize: '0.9rem', letterSpacing: '1px', fontWeight: 700 }}>STATUT: PRESTIGE</span>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '2px 8px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', marginTop: '4px' }}>
-            <img src={currentClub.logoUrl || '/logo.png'} alt={currentClub.name} style={{ height: '18px', objectFit: 'contain' }} />
+            <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '18px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#000' }}>{currentClub.name}</span>
           </div>
         </div>

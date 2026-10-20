@@ -38,6 +38,8 @@ interface AppState {
   autoDispatchMatches: () => void;
 }
 
+import { defaultClubLogo, getClubLogoUrl } from './utils/logo';
+
 const getInitialClub = (): Club => {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
@@ -47,7 +49,7 @@ const getInitialClub = (): Club => {
       return {
         id: clubParam,
         name: savedName || (clubParam === 'bc41' ? 'Billard Club 41' : `Club ${clubParam.toUpperCase()}`),
-        logoUrl: localStorage.getItem(`mb_club_logo_${clubParam}`) || '/logo.png'
+        logoUrl: getClubLogoUrl(localStorage.getItem(`mb_club_logo_${clubParam}`))
       };
     }
     const savedId = localStorage.getItem('mb_current_club_id');
@@ -55,14 +57,14 @@ const getInitialClub = (): Club => {
       return {
         id: savedId,
         name: localStorage.getItem(`mb_club_name_${savedId}`) || (savedId === 'bc41' ? 'Billard Club 41' : `Club ${savedId.toUpperCase()}`),
-        logoUrl: localStorage.getItem(`mb_club_logo_${savedId}`) || '/logo.png'
+        logoUrl: getClubLogoUrl(localStorage.getItem(`mb_club_logo_${savedId}`))
       };
     }
   }
   return {
     id: 'bc41',
     name: 'Billard Club 41',
-    logoUrl: '/logo.png'
+    logoUrl: defaultClubLogo
   };
 };
 

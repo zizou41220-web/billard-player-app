@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { Activity, Clock, Trophy, Lock } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
+import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 const FeedView: React.FC = () => {
   const { matches, players, tables, tournaments, currentClub } = useStore();
@@ -39,7 +40,7 @@ const FeedView: React.FC = () => {
             display: 'flex',
             alignItems: 'center'
           }}>
-            <img src={currentClub.logoUrl || '/logo.png'} alt={currentClub.name} style={{ height: '38px', objectFit: 'contain' }} />
+            <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '38px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
           </div>
           <div>
             <div style={{ fontWeight: 900, fontSize: '1.2rem', color: 'var(--accent-primary)', letterSpacing: '-0.3px' }}>

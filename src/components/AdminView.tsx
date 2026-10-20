@@ -11,6 +11,7 @@ import TournamentBracketView from './TournamentBracketView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
+import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 const AdminView: React.FC = () => {
   const {
@@ -42,7 +43,7 @@ const AdminView: React.FC = () => {
   // Club Configuration State
   const [clubNameInput, setClubNameInput] = useState(currentClub.name);
   const [clubIdInput, setClubIdInput] = useState(currentClub.id);
-  const [clubLogoInput, setClubLogoInput] = useState(currentClub.logoUrl || '/logo.png');
+  const [clubLogoInput, setClubLogoInput] = useState(currentClub.logoUrl || defaultClubLogo);
   const [clubSavedFeedback, setClubSavedFeedback] = useState(false);
   const [copiedClubUrl, setCopiedClubUrl] = useState(false);
 
@@ -227,7 +228,7 @@ const AdminView: React.FC = () => {
             gap: '0.5rem',
             userSelect: 'none'
           }}>
-            <img src={currentClub.logoUrl || '/logo.png'} alt="Club Crest" style={{ width: '160px', filter: 'grayscale(1)' }} />
+            <img src={getClubLogoUrl(currentClub.logoUrl)} alt="Club Crest" style={{ width: '160px', filter: 'grayscale(1)' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
           </div>
 
           {tournamentTables.length === 0 ? (
@@ -326,7 +327,7 @@ const AdminView: React.FC = () => {
           gap: '1rem',
           userSelect: 'none'
         }}>
-          <img src={currentClub.logoUrl || '/logo.png'} alt="Club Crest" style={{ width: '220px', filter: 'grayscale(1)' }} />
+          <img src={getClubLogoUrl(currentClub.logoUrl)} alt="Club Crest" style={{ width: '220px', filter: 'grayscale(1)' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
           <div style={{ fontSize: '1.8rem', fontWeight: 900, letterSpacing: '6px', color: '#fff', textTransform: 'uppercase' }}>
             {currentClub.name}
           </div>
@@ -416,7 +417,7 @@ const AdminView: React.FC = () => {
             boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
             flexShrink: 0
           }}>
-            <img src={currentClub.logoUrl || '/logo.png'} alt={currentClub.name} style={{ height: '44px', objectFit: 'contain' }} />
+            <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '44px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
           </div>
           <div>
             <h1 style={{ fontSize: '1.6rem', margin: 0, fontWeight: 900, color: 'var(--accent-primary)', letterSpacing: '-0.5px' }}>
@@ -2317,7 +2318,7 @@ const AdminView: React.FC = () => {
                         setClub({
                           name: trimmedName,
                           id: trimmedId,
-                          logoUrl: clubLogoInput.trim() || '/logo.png'
+                          logoUrl: clubLogoInput.trim() || defaultClubLogo
                         });
                         setClubSavedFeedback(true);
                         setTimeout(() => setClubSavedFeedback(false), 3000);

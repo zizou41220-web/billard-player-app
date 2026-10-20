@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getTournamentQualificationStatus, PlayerQualifStat } from '../utils/qualifiers';
 import { getBracketSize, getBracketRounds, isFinalStageMatch, generateSeedingPairs } from '../utils/bracket';
+import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 interface BracketViewProps {
   onSelectTableForQR?: (tableId: string) => void;
@@ -294,7 +295,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
             boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
             flexShrink: 0
           }}>
-            <img src={currentClub.logoUrl || '/logo.png'} alt={currentClub.name} style={{ height: '48px', objectFit: 'contain' }} />
+            <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '48px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
           </div>
 
           <div style={{

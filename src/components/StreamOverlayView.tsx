@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { Match, Table, Tournament } from '../types';
+import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 interface StreamOverlayViewProps {
   tableParam: string;
@@ -93,7 +94,12 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 alignItems: 'center',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
               }}>
-                <img src={currentClub.logoUrl || '/logo.png'} alt={currentClub.name} style={{ height: '22px', objectFit: 'contain' }} />
+                <img 
+                  src={getClubLogoUrl(currentClub.logoUrl)} 
+                  alt={currentClub.name} 
+                  style={{ height: '22px', objectFit: 'contain' }} 
+                  onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
+                />
               </div>
               <span style={{ 
                 display: 'inline-flex', 
@@ -330,7 +336,12 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
             flexShrink: 0
           }}>
-            <img src={currentClub.logoUrl || '/logo.png'} alt={currentClub.name} style={{ height: '36px', objectFit: 'contain' }} />
+            <img 
+              src={getClubLogoUrl(currentClub.logoUrl)} 
+              alt={currentClub.name} 
+              style={{ height: '36px', objectFit: 'contain' }} 
+              onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
+            />
           </div>
           <div>
             <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--accent-primary, #00ffcc)' }}>

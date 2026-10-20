@@ -4,6 +4,7 @@ import { ScanLine, Loader2 } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { initSync, mapDBToMatch } from '../sync';
 import { supabase } from '../supabase';
+import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 const ScanView: React.FC = () => {
   const { startTournamentMatch, currentClub, setClub } = useStore();
@@ -169,7 +170,7 @@ const ScanView: React.FC = () => {
           boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
           marginBottom: '1rem'
         }}>
-          <img src={currentClub.logoUrl || '/logo.png'} alt={currentClub.name} style={{ height: '64px', objectFit: 'contain' }} />
+          <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '64px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
         </div>
         <h1 className="text-gradient" style={{ fontSize: '2.2rem', margin: 0, fontWeight: 900 }}>{currentClub.name.toUpperCase()}</h1>
         <p style={{ color: 'var(--text-muted)', marginTop: '0.4rem' }}>Scannez le QR code de votre match sur le billard pour démarrer</p>
