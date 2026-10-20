@@ -1,6 +1,6 @@
 import React from 'react';
 import { useStore } from '../store';
-import { Flag, Minus, Plus } from 'lucide-react';
+import { Flag, Minus, Plus, Radio } from 'lucide-react';
 import { getMatchScoringRules } from '../utils/rules';
 
 const MatchView: React.FC = () => {
@@ -10,6 +10,7 @@ const MatchView: React.FC = () => {
 
   const match = matches[activeMatchId];
   const table = match.tableId ? tables[match.tableId] : null;
+  const streamUrl = match.liveStreamUrl || table?.liveStreamUrl;
 
   const p1 = match.player1Id;
   const p2 = match.player2Id;
@@ -75,6 +76,29 @@ const MatchView: React.FC = () => {
             }}>
               Handicap actif
             </span>
+          )}
+          {streamUrl && (
+            <a
+              href={streamUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#ff2244',
+                color: '#fff',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                textDecoration: 'none',
+                boxShadow: '0 0 10px rgba(255, 34, 68, 0.4)',
+                marginLeft: '0.3rem'
+              }}
+            >
+              <Radio size={12} /> Live Vidéo
+            </a>
           )}
         </div>
         <div style={{ background: 'var(--bg-surface)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700 }}>

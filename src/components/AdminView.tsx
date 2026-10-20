@@ -5,7 +5,8 @@ import {
   Trophy, Users, MonitorPlay, Settings, Rocket,
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
-  XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw
+  XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
+  Radio, Tv, Smartphone, Globe, ExternalLink
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
@@ -22,7 +23,7 @@ const AdminView: React.FC = () => {
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
     assignMatchToTable, updateFinishedMatchScore, startTournamentMatch,
-    launchFinalStage, reseedFinalStage
+    launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream
   } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -47,6 +48,9 @@ const AdminView: React.FC = () => {
   const [selectedTableForQR, setSelectedTableForQR] = useState<string | null>(null);
   const [justScannedMatchId, setJustScannedMatchId] = useState<string | null>(null);
   const [copiedOverlay, setCopiedOverlay] = useState(false);
+  const [liveStreamTab, setLiveStreamTab] = useState<'obs' | 'phone' | 'embed'>('obs');
+  const [overlayPos, setOverlayPos] = useState<'top' | 'bottom'>('top');
+  const [customStreamUrl, setCustomStreamUrl] = useState('');
   const [dismissedQualifAlertTourId, setDismissedQualifAlertTourId] = useState<string | null>(null);
   const matchStatusAtOpenRef = React.useRef<string | null>(null);
 
@@ -328,6 +332,7 @@ const AdminView: React.FC = () => {
                     player1={p1}
                     player2={p2}
                     size="large"
+                    hasLiveStream={Boolean(table.liveStreamUrl || currentMatch?.liveStreamUrl)}
                   />
                 </div>
               );
@@ -3149,55 +3154,254 @@ const AdminView: React.FC = () => {
                 </div>
               )}
 
-              {/* Live Streaming Overlay Section */}
+              {/* ========================================================= */}
+              {/* LIVE & STREAMING HUB                                      */}
+              {/* ========================================================= */}
               <div style={{
-                background: 'rgba(0, 255, 170, 0.05)',
-                border: '1px solid rgba(0, 255, 170, 0.25)',
-                borderRadius: '14px',
+                background: 'rgba(5, 12, 28, 0.92)',
+                border: '1px solid rgba(0, 255, 170, 0.35)',
+                borderRadius: '16px',
                 padding: '1.2rem',
                 width: '100%',
                 boxSizing: 'border-box',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.8rem'
+                gap: '0.9rem',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.6)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.95rem' }}>
-                    <MonitorPlay size={18} /> Overlay Streaming (OBS / Prism)
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 900, color: 'var(--accent-primary)', fontSize: '1.05rem' }}>
+                    <Radio size={20} style={{ color: '#ff2244', animation: 'pulse 1.5s infinite' }} /> Régie Live & Streaming
                   </div>
-                  <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px' }}>
-                    Facebook & YouTube
-                  </span>
+                  {Boolean(table.liveStreamUrl || match?.liveStreamUrl) ? (
+                    <span style={{ fontSize: '0.72rem', background: '#ff2244', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fff' }} />
+                      STREAM CONNECTÉ
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px' }}>
+                      En attente de diffusion
+                    </span>
+                  )}
                 </div>
 
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                  Incrustez le score en temps réel par-dessus votre caméra dans <b>OBS Studio</b> ou <b>Prism Live Studio</b> (Source Navigateur avec fond transparent).
-                </p>
-
-                <div style={{ display: 'flex', gap: '0.6rem' }}>
+                {/* Sub-tabs for Streaming Modes */}
+                <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(255,255,255,0.05)', padding: '3px', borderRadius: '10px' }}>
                   <button
-                    className="btn btn-neon"
-                    style={{ flex: 1, fontSize: '0.85rem', padding: '0.6rem', justifyContent: 'center' }}
-                    onClick={() => {
-                      const origin = window.location.hostname === 'localhost' ? 'https://192.168.1.15:5173' : window.location.origin;
-                      const overlayUrl = `${origin}?overlay=${table.id}`;
-                      navigator.clipboard.writeText(overlayUrl);
-                      setCopiedOverlay(true);
-                      setTimeout(() => setCopiedOverlay(false), 2500);
+                    type="button"
+                    onClick={() => setLiveStreamTab('obs')}
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: liveStreamTab === 'obs' ? 'var(--accent-primary)' : 'transparent',
+                      color: liveStreamTab === 'obs' ? '#000' : 'rgba(255,255,255,0.7)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.35rem'
                     }}
                   >
-                    {copiedOverlay ? '✓ Lien copié !' : '📋 Copier le lien Overlay'}
+                    <Tv size={14} /> 1. Overlay OBS
                   </button>
-                  <a
-                    href={`?overlay=${table.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-outline"
-                    style={{ fontSize: '0.85rem', padding: '0.6rem 1rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  <button
+                    type="button"
+                    onClick={() => setLiveStreamTab('phone')}
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: liveStreamTab === 'phone' ? 'var(--accent-primary)' : 'transparent',
+                      color: liveStreamTab === 'phone' ? '#000' : 'rgba(255,255,255,0.7)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.35rem'
+                    }}
                   >
-                    👁️ Tester
-                  </a>
+                    <Smartphone size={14} /> 2. Caméra Smartphone
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLiveStreamTab('embed')}
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: liveStreamTab === 'embed' ? 'var(--accent-primary)' : 'transparent',
+                      color: liveStreamTab === 'embed' ? '#000' : 'rgba(255,255,255,0.7)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.35rem'
+                    }}
+                  >
+                    <Globe size={14} /> 3. Lien YouTube / Twitch
+                  </button>
                 </div>
+
+                {/* TAB 1: OBS OVERLAY */}
+                {liveStreamTab === 'obs' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                      Incrustez le score en direct sur votre caméra dans <b>OBS Studio</b> ou <b>Prism Live Studio</b> (Source Navigateur transparente).
+                    </p>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <span>Position du bandeau de score :</span>
+                      <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '2px 8px',
+                            background: overlayPos === 'top' ? 'rgba(0, 255, 170, 0.2)' : 'transparent',
+                            borderColor: overlayPos === 'top' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)'
+                          }}
+                          onClick={() => setOverlayPos('top')}
+                        >
+                          ⬆ Haut
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '2px 8px',
+                            background: overlayPos === 'bottom' ? 'rgba(0, 255, 170, 0.2)' : 'transparent',
+                            borderColor: overlayPos === 'bottom' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)'
+                          }}
+                          onClick={() => setOverlayPos('bottom')}
+                        >
+                          ⬇ Bas
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-neon"
+                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.6rem', justifyContent: 'center' }}
+                        onClick={() => {
+                          const origin = window.location.hostname === 'localhost' ? 'https://192.168.1.15:5173' : window.location.origin;
+                          const overlayUrl = `${origin}?overlay=${table.id}&pos=${overlayPos}`;
+                          navigator.clipboard.writeText(overlayUrl);
+                          setCopiedOverlay(true);
+                          setTimeout(() => setCopiedOverlay(false), 2500);
+                        }}
+                      >
+                        {copiedOverlay ? '✓ URL copiée pour OBS !' : '📋 Copier URL Source Navigateur OBS'}
+                      </button>
+                      <a
+                        href={`?overlay=${table.id}&pos=${overlayPos}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-outline"
+                        style={{ fontSize: '0.82rem', padding: '0.6rem 1rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                      >
+                        <ExternalLink size={14} /> Tester
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 2: SMARTPHONE WIRELESS CAMERA */}
+                {liveStreamTab === 'phone' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'center', textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                      Posez un smartphone sur un trépied au bout du billard. Flashez ce QR code pour <b>streamer la caméra sans fil et sans installer d'application</b> (WebRTC VDO.Ninja).
+                    </p>
+
+                    <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'inline-block' }}>
+                      <QRCode value={`https://vdo.ninja/?push=MCB_${currentClub.id}_${table.id}&webcam&autostart`} size={120} />
+                    </div>
+
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.75rem', textAlign: 'left', background: 'rgba(255,255,255,0.03)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>Source Réceptrice OBS (à ajouter dans OBS Studio) :</span>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        <code style={{ fontSize: '0.7rem', color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          https://vdo.ninja/?view=MCB_{currentClub.id}_{table.id}
+                        </code>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.68rem', padding: '2px 6px' }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(`https://vdo.ninja/?view=MCB_${currentClub.id}_${table.id}`);
+                            alert('Lien récepteur OBS copié !');
+                          }}
+                        >
+                          Copier
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: PUBLIC LIVE LINK (YouTube / Twitch / Facebook) */}
+                {liveStreamTab === 'embed' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                      Associez un lien de stream (YouTube Live, Twitch, Kick, Facebook) pour activer le badge <b>🔴 EN DIRECT</b> et afficher le flux aux joueurs et spectateurs dans l'application.
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="url"
+                        className="input-field"
+                        placeholder="https://www.youtube.com/watch?v=... ou https://twitch.tv/..."
+                        defaultValue={table.liveStreamUrl || match?.liveStreamUrl || ''}
+                        id={`stream-input-${table.id}`}
+                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.5rem 0.8rem' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-neon"
+                        style={{ fontSize: '0.8rem', padding: '0.5rem 1rem', whiteSpace: 'nowrap' }}
+                        onClick={() => {
+                          const input = document.getElementById(`stream-input-${table.id}`) as HTMLInputElement;
+                          const trimmed = input?.value.trim() || '';
+                          setTableLiveStream(table.id, trimmed || undefined);
+                          if (match) setMatchLiveStream(match.id, trimmed || undefined);
+                          alert(trimmed ? 'Lien de Live enregistré sur cette table !' : 'Lien de Live retiré.');
+                        }}
+                      >
+                        Enregistrer
+                      </button>
+                    </div>
+
+                    {Boolean(table.liveStreamUrl || match?.liveStreamUrl) && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255, 34, 68, 0.1)', border: '1px solid rgba(255, 34, 68, 0.3)', padding: '0.5rem 0.8rem', borderRadius: '8px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#ff7b88', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
+                          🔴 Direct actif : {table.liveStreamUrl || match?.liveStreamUrl}
+                        </span>
+                        <a
+                          href={table.liveStreamUrl || match?.liveStreamUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.7rem', padding: '2px 8px', textDecoration: 'none' }}
+                        >
+                          Ouvrir ➔
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <button className="btn btn-outline" onClick={() => setSelectedTableForQR(null)}>Fermer</button>

@@ -35,7 +35,8 @@ const mapDBToTable = (d: any): Table => ({
   status: d.status,
   currentMatchId: d.current_match_id || undefined,
   x: d.x || undefined,
-  y: d.y || undefined
+  y: d.y || undefined,
+  liveStreamUrl: d.live_stream_url || undefined
 });
 
 const mapMatchToDB = (m: Match) => {
@@ -120,7 +121,8 @@ export const mapDBToMatch = (d: any): Match => {
     stage,
     bracketRound,
     bracketPosition,
-    nextMatchId
+    nextMatchId,
+    liveStreamUrl: d.live_stream_url || undefined
   };
 };
 

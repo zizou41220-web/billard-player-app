@@ -30,6 +30,7 @@ export type Table = {
   currentMatchId?: string;
   x?: number;
   y?: number;
+  liveStreamUrl?: string;
 };
 
 export type MatchStage =
@@ -63,6 +64,7 @@ export type Match = {
   targetSets?: number; // Nombre de manches spécifiques allouées à ce duel
   handicapP1?: number;
   handicapP2?: number;
+  liveStreamUrl?: string;
 };
 
 export type TournamentFormat = 'cartesien' | 'robin' | 'double_ko' | 'direct_ko';

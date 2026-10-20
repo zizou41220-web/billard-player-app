@@ -45,6 +45,8 @@ interface AppState {
   endTournament: (tournamentId: string) => void;
   deleteTournament: (tournamentId: string) => void;
   autoDispatchMatches: () => void;
+  setTableLiveStream: (tableId: string, liveStreamUrl?: string) => void;
+  setMatchLiveStream: (matchId: string, liveStreamUrl?: string) => void;
 }
 
 import { defaultClubLogo, getClubLogoUrl } from './utils/logo';
@@ -1890,6 +1892,32 @@ export const useStore = create<AppState>((set, get) => ({
         };
       }
       return state;
+    });
+  },
+
+  setTableLiveStream: (tableId, liveStreamUrl) => {
+    set((state) => {
+      const table = state.tables[tableId];
+      if (!table) return state;
+      return {
+        tables: {
+          ...state.tables,
+          [tableId]: { ...table, liveStreamUrl }
+        }
+      };
+    });
+  },
+
+  setMatchLiveStream: (matchId, liveStreamUrl) => {
+    set((state) => {
+      const match = state.matches[matchId];
+      if (!match) return state;
+      return {
+        matches: {
+          ...state.matches,
+          [matchId]: { ...match, liveStreamUrl }
+        }
+      };
     });
   }
 }));

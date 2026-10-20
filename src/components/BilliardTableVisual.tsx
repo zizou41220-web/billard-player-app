@@ -11,6 +11,7 @@ export interface BilliardTableVisualProps {
   isHovered?: boolean;
   scale?: number;
   size?: 'normal' | 'large';
+  hasLiveStream?: boolean;
 }
 
 export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
@@ -21,7 +22,8 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
   player1,
   player2,
   isHovered = false,
-  size = 'normal'
+  size = 'normal',
+  hasLiveStream = false
 }) => {
   const isOccupied = status === 'occupied';
   const tableName = name || `Billard ${number}`;
@@ -438,6 +440,26 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
                 }}
               >
                 LIBRE
+              </span>
+            )}
+            {(hasLiveStream || Boolean(match?.liveStreamUrl)) && (
+              <span
+                style={{
+                  fontSize: isLarge ? '0.62rem' : '0.54rem',
+                  fontWeight: 900,
+                  color: '#fff',
+                  background: '#ff2244',
+                  padding: isLarge ? '1px 5px' : '0 3px',
+                  borderRadius: '3px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  boxShadow: '0 0 8px rgba(255, 34, 68, 0.6)'
+                }}
+                title="Diffusion vidéo en direct"
+              >
+                <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
+                STREAM
               </span>
             )}
           </div>
