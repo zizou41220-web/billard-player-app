@@ -12,6 +12,7 @@ import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
+import { getMaxAllowedHandicap, getMatchScoringRules } from '../utils/rules';
 
 const AdminView: React.FC = () => {
   const {
@@ -69,6 +70,20 @@ const AdminView: React.FC = () => {
   const [seedByMerit, setSeedByMerit] = useState(true);
   const [handicapAmateurSets, setHandicapAmateurSets] = useState(0);
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(true);
+
+  const maxAllowedHandicap = getMaxAllowedHandicap(
+    qualifNbSets,
+    qualifIsWinningSets,
+    finalNbSets,
+    finalIsWinningSets,
+    newTourFormat === 'direct_ko'
+  );
+
+  React.useEffect(() => {
+    if (handicapAmateurSets > maxAllowedHandicap) {
+      setHandicapAmateurSets(maxAllowedHandicap);
+    }
+  }, [maxAllowedHandicap, handicapAmateurSets]);
 
   // New Player State
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -1192,11 +1207,13 @@ const AdminView: React.FC = () => {
                           { val: 3, label: '+3 manches', sub: 'Amateur démarre à 3 - 0' }
                         ].map(opt => {
                           const isSel = handicapAmateurSets === opt.val;
+                          const isDis = opt.val > maxAllowedHandicap;
                           return (
                             <button
                               type="button"
                               key={opt.val}
-                              onClick={() => setHandicapAmateurSets(opt.val)}
+                              disabled={isDis}
+                              onClick={() => !isDis && setHandicapAmateurSets(opt.val)}
                               className="btn"
                               style={{
                                 flexDirection: 'column',
@@ -1206,17 +1223,33 @@ const AdminView: React.FC = () => {
                                 borderRadius: '10px',
                                 border: isSel ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
                                 background: isSel ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.02)',
-                                color: isSel ? '#ffd700' : '#fff',
+                                color: isSel ? '#ffd700' : (isDis ? 'rgba(255,255,255,0.3)' : '#fff'),
                                 boxShadow: isSel ? '0 0 15px rgba(255, 215, 0, 0.25)' : 'none',
+                                opacity: isDis ? 0.35 : 1,
+                                cursor: isDis ? 'not-allowed' : 'pointer',
                                 transition: 'all 0.15s ease'
                               }}
+                              title={isDis ? `Incompatible avec le format : le handicap doit être strictement inférieur au nombre de manches gagnantes (${maxAllowedHandicap === 0 ? 'désactivé pour 1 manche gagnante' : `max +${maxAllowedHandicap}`}).` : opt.label}
                             >
                               <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{opt.label}</span>
-                              <span style={{ fontSize: '0.7rem', color: isSel ? 'rgba(255,215,0,0.8)' : 'var(--text-muted)', marginTop: '0.2rem' }}>{opt.sub}</span>
+                              <span style={{ fontSize: '0.7rem', color: isSel ? 'rgba(255,215,0,0.8)' : 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                {isDis ? 'Incompatible' : opt.sub}
+                              </span>
                             </button>
                           );
                         })}
                       </div>
+
+                      {maxAllowedHandicap === 0 && (
+                        <div style={{ marginTop: '0.9rem', padding: '0.8rem 1rem', background: 'rgba(255, 100, 100, 0.12)', border: '1px solid rgba(255, 100, 100, 0.35)', borderRadius: '10px', color: '#ffaaaa', fontSize: '0.82rem', lineHeight: '1.4' }}>
+                          ⚠️ <strong>Règle de cohérence :</strong> vous avez sélectionné <strong>1 manche gagnante</strong>. Aucun handicap d'avance ne peut être accordé (+1, +2...), sinon le joueur amateur l'emporterait à 1-0 immédiatement au coup d'envoi sans jouer !
+                        </div>
+                      )}
+                      {maxAllowedHandicap > 0 && maxAllowedHandicap < 3 && (
+                        <div style={{ marginTop: '0.9rem', padding: '0.8rem 1rem', background: 'rgba(255, 215, 0, 0.08)', border: '1px solid rgba(255, 215, 0, 0.25)', borderRadius: '10px', color: '#ffd700', fontSize: '0.82rem', lineHeight: '1.4' }}>
+                          💡 <strong>Limite de handicap :</strong> le handicap est plafonné à <strong>+{maxAllowedHandicap} manche(s)</strong> pour rester strictement inférieur au nombre de manches gagnantes.
+                        </div>
+                      )}
                     </div>
 
                     {/* Tables Allocation */}
@@ -1297,6 +1330,9 @@ const AdminView: React.FC = () => {
                         if (!newTourName.trim()) return alert('Veuillez entrer un nom pour le tournoi.');
                         if (selectedPlayers.length < 2) return alert('Veuillez sélectionner au moins 2 joueurs inscrits.');
                         if (selectedTables.length === 0) return alert('Veuillez sélectionner au moins 1 billard.');
+                        if (handicapAmateurSets > maxAllowedHandicap) {
+                          return alert(`Configuration impossible : avec 1 manche gagnante (ou handicap >= nombre de manches gagnantes), l'amateur gagnerait instantanément sans jouer. Veuillez choisir un handicap de +${maxAllowedHandicap} manche(s) maximum.`);
+                        }
 
                         createTournament(newTourName.trim(), newTourFormat, {
                           tableIds: selectedTables, qualifNbSets, qualifIsWinningSets, qualifNbQualifiers,
@@ -1980,49 +2016,76 @@ const AdminView: React.FC = () => {
                                 ✏️ Modification du score
                               </div>
 
-                              {/* Player 1 */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{players[m.player1Id]?.name}</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                  <button
-                                    className="btn btn-outline"
-                                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
-                                    onClick={() => setEditFinishedScore1(Math.max(0, editFinishedScore1 - 1))}
-                                  >
-                                    -
-                                  </button>
-                                  <span style={{ fontWeight: 800, minWidth: '1.5rem', textAlign: 'center' }}>{editFinishedScore1}</span>
-                                  <button
-                                    className="btn btn-outline"
-                                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
-                                    onClick={() => setEditFinishedScore1(editFinishedScore1 + 1)}
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
+                              {/* Player 1 & 2 Score Modification */}
+                              {(() => {
+                                const matchRules = getMatchScoringRules(m, activeTournament);
+                                const minS1 = m.handicapP1 || 0;
+                                const minS2 = m.handicapP2 || 0;
+                                const canInc1 = matchRules.isWinningSets
+                                  ? (editFinishedScore1 < matchRules.maxSets && editFinishedScore2 < matchRules.maxSets)
+                                  : ((editFinishedScore1 + editFinishedScore2) < matchRules.maxSets);
+                                const canDec1 = editFinishedScore1 > minS1;
+                                const canInc2 = matchRules.isWinningSets
+                                  ? (editFinishedScore2 < matchRules.maxSets && editFinishedScore1 < matchRules.maxSets)
+                                  : ((editFinishedScore1 + editFinishedScore2) < matchRules.maxSets);
+                                const canDec2 = editFinishedScore2 > minS2;
 
-                              {/* Player 2 */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{players[m.player2Id]?.name}</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                  <button
-                                    className="btn btn-outline"
-                                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
-                                    onClick={() => setEditFinishedScore2(Math.max(0, editFinishedScore2 - 1))}
-                                  >
-                                    -
-                                  </button>
-                                  <span style={{ fontWeight: 800, minWidth: '1.5rem', textAlign: 'center' }}>{editFinishedScore2}</span>
-                                  <button
-                                    className="btn btn-outline"
-                                    style={{ padding: '2px 8px', fontSize: '0.8rem' }}
-                                    onClick={() => setEditFinishedScore2(editFinishedScore2 + 1)}
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
+                                return (
+                                  <>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                                      Format : {matchRules.formatLabel}
+                                    </div>
+
+                                    {/* Player 1 */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{players[m.player1Id]?.name}</span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <button
+                                          className="btn btn-outline"
+                                          disabled={!canDec1}
+                                          style={{ padding: '2px 8px', fontSize: '0.8rem', opacity: canDec1 ? 1 : 0.3, cursor: canDec1 ? 'pointer' : 'not-allowed' }}
+                                          onClick={() => canDec1 && setEditFinishedScore1(editFinishedScore1 - 1)}
+                                        >
+                                          -
+                                        </button>
+                                        <span style={{ fontWeight: 800, minWidth: '1.5rem', textAlign: 'center' }}>{editFinishedScore1}</span>
+                                        <button
+                                          className="btn btn-outline"
+                                          disabled={!canInc1}
+                                          style={{ padding: '2px 8px', fontSize: '0.8rem', opacity: canInc1 ? 1 : 0.3, cursor: canInc1 ? 'pointer' : 'not-allowed' }}
+                                          onClick={() => canInc1 && setEditFinishedScore1(editFinishedScore1 + 1)}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Player 2 */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{players[m.player2Id]?.name}</span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <button
+                                          className="btn btn-outline"
+                                          disabled={!canDec2}
+                                          style={{ padding: '2px 8px', fontSize: '0.8rem', opacity: canDec2 ? 1 : 0.3, cursor: canDec2 ? 'pointer' : 'not-allowed' }}
+                                          onClick={() => canDec2 && setEditFinishedScore2(editFinishedScore2 - 1)}
+                                        >
+                                          -
+                                        </button>
+                                        <span style={{ fontWeight: 800, minWidth: '1.5rem', textAlign: 'center' }}>{editFinishedScore2}</span>
+                                        <button
+                                          className="btn btn-outline"
+                                          disabled={!canInc2}
+                                          style={{ padding: '2px 8px', fontSize: '0.8rem', opacity: canInc2 ? 1 : 0.3, cursor: canInc2 ? 'pointer' : 'not-allowed' }}
+                                          onClick={() => canInc2 && setEditFinishedScore2(editFinishedScore2 + 1)}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </>
+                                );
+                              })()}
 
                               {/* Actions */}
                               <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
@@ -2456,105 +2519,221 @@ const AdminView: React.FC = () => {
               ) : match ? (
                 match.status === 'playing' ? (
                   /* 2. Match already in progress: Allow score adjustment, validation & freeing table */
-                  <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem', width: '100%' }}>
-                    <div style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '6px',
-                      background: 'rgba(0, 255, 170, 0.15)', color: 'var(--accent-primary)',
-                      padding: '6px 16px', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem',
-                      border: '1px solid rgba(0, 255, 170, 0.3)'
-                    }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 1.5s infinite' }} />
-                      MATCH EN DIRECT
-                    </div>
+                  (() => {
+                    const matchTour = match.tournamentId ? tournaments[match.tournamentId] : activeTournament;
+                    const scoringRules = getMatchScoringRules(match, matchTour);
+                    const { maxSets, isWinningSets, minScore1, minScore2, formatLabel } = scoringRules;
 
-                    {/* Players & Scores with interactive adjustments */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-                      width: '100%', background: 'rgba(255, 255, 255, 0.03)',
-                      padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)'
-                    }}>
-                      {/* Player 1 */}
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                          {players[match.player1Id]?.name}
+                    const isMatchFinished = isWinningSets
+                      ? (match.score1 >= maxSets || match.score2 >= maxSets)
+                      : ((match.score1 + match.score2) >= maxSets);
+
+                    const canP1Increment = isWinningSets
+                      ? (!isMatchFinished && match.score1 < maxSets)
+                      : ((match.score1 + match.score2) < maxSets);
+
+                    const canP1Decrement = match.score1 > minScore1;
+
+                    const canP2Increment = isWinningSets
+                      ? (!isMatchFinished && match.score2 < maxSets)
+                      : ((match.score1 + match.score2) < maxSets);
+
+                    const canP2Decrement = match.score2 > minScore2;
+
+                    const leadingPlayerId = isWinningSets
+                      ? (match.score1 >= maxSets ? match.player1Id : (match.score2 >= maxSets ? match.player2Id : undefined))
+                      : (isMatchFinished ? (match.score1 > match.score2 ? match.player1Id : (match.score2 > match.score1 ? match.player2Id : undefined)) : undefined);
+
+                    return (
+                      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem', width: '100%' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
+                          <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '6px',
+                            background: 'rgba(0, 255, 170, 0.15)', color: 'var(--accent-primary)',
+                            padding: '6px 16px', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem',
+                            border: '1px solid rgba(0, 255, 170, 0.3)'
+                          }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 1.5s infinite' }} />
+                            MATCH EN DIRECT
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.2rem' }}>
+                            <span style={{ fontSize: '0.78rem', background: 'rgba(255,255,255,0.06)', color: 'var(--accent-secondary)', padding: '2px 10px', borderRadius: '12px', border: '1px solid var(--border-color)', fontWeight: 700 }}>
+                              🎯 Format : {formatLabel}
+                            </span>
+                            {(Boolean(match.handicapP1) || Boolean(match.handicapP2)) && (
+                              <span style={{ fontSize: '0.78rem', background: 'rgba(255, 215, 0, 0.15)', color: '#ffd700', padding: '2px 10px', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.3)', fontWeight: 700 }}>
+                                🎯 Handicap : +{match.handicapP1 || match.handicapP2} pour {players[match.handicapP1 ? match.player1Id : match.player2Id]?.name}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+                        {/* Players & Scores with interactive adjustments */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+                          width: '100%', background: 'rgba(255, 255, 255, 0.03)',
+                          padding: '1.2rem 1rem', borderRadius: '16px', border: '1px solid var(--border-color)'
+                        }}>
+                          {/* Player 1 */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                              {players[match.player1Id]?.name}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <button
+                                className="btn-surface"
+                                disabled={!canP1Decrement}
+                                style={{
+                                  width: '34px', height: '34px', borderRadius: '50%', padding: 0,
+                                  opacity: canP1Decrement ? 1 : 0.3, cursor: canP1Decrement ? 'pointer' : 'not-allowed'
+                                }}
+                                title={!canP1Decrement ? (minScore1 > 0 ? "Score minimum (Handicap actif)" : "Score minimum (0)") : "Retirer une manche"}
+                                onClick={() => canP1Decrement && updateMatchScore(match.id, match.score1 - 1, match.score2)}
+                              >
+                                <Minus size={16} />
+                              </button>
+                              <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
+                                {match.score1}
+                              </span>
+                              <button
+                                className="btn-surface"
+                                disabled={!canP1Increment}
+                                style={{
+                                  width: '34px', height: '34px', borderRadius: '50%', padding: 0,
+                                  opacity: canP1Increment ? 1 : 0.3, cursor: canP1Increment ? 'pointer' : 'not-allowed'
+                                }}
+                                title={!canP1Increment ? (isMatchFinished ? "Match terminé (score max atteint)" : "Score max atteint") : "Ajouter une manche"}
+                                onClick={() => canP1Increment && updateMatchScore(match.id, match.score1 + 1, match.score2)}
+                              >
+                                <Plus size={16} />
+                              </button>
+                            </div>
+                            {minScore1 > 0 && (
+                              <span style={{ fontSize: '0.68rem', color: '#ffd700', fontWeight: 700 }}>
+                                (dont +{minScore1} handicap)
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-muted)' }}>VS</div>
+
+                          {/* Player 2 */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>
+                              {players[match.player2Id]?.name}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <button
+                                className="btn-surface"
+                                disabled={!canP2Decrement}
+                                style={{
+                                  width: '34px', height: '34px', borderRadius: '50%', padding: 0,
+                                  opacity: canP2Decrement ? 1 : 0.3, cursor: canP2Decrement ? 'pointer' : 'not-allowed'
+                                }}
+                                title={!canP2Decrement ? (minScore2 > 0 ? "Score minimum (Handicap actif)" : "Score minimum (0)") : "Retirer une manche"}
+                                onClick={() => canP2Decrement && updateMatchScore(match.id, match.score1, match.score2 - 1)}
+                              >
+                                <Minus size={16} />
+                              </button>
+                              <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
+                                {match.score2}
+                              </span>
+                              <button
+                                className="btn-surface"
+                                disabled={!canP2Increment}
+                                style={{
+                                  width: '34px', height: '34px', borderRadius: '50%', padding: 0,
+                                  opacity: canP2Increment ? 1 : 0.3, cursor: canP2Increment ? 'pointer' : 'not-allowed'
+                                }}
+                                title={!canP2Increment ? (isMatchFinished ? "Match terminé (score max atteint)" : "Score max atteint") : "Ajouter une manche"}
+                                onClick={() => canP2Increment && updateMatchScore(match.id, match.score1, match.score2 + 1)}
+                              >
+                                <Plus size={16} />
+                              </button>
+                            </div>
+                            {minScore2 > 0 && (
+                              <span style={{ fontSize: '0.68rem', color: '#ffd700', fontWeight: 700 }}>
+                                (dont +{minScore2} handicap)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Progression or Finish Banner */}
+                        {isMatchFinished ? (
+                          <div style={{
+                            background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(0, 255, 170, 0.2))',
+                            border: '1px solid #ffd700',
+                            borderRadius: '12px',
+                            padding: '0.7rem 1.2rem',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            color: '#ffd700',
+                            fontWeight: 900,
+                            fontSize: '0.95rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            boxShadow: '0 0 15px rgba(255, 215, 0, 0.2)'
+                          }}>
+                            <Trophy size={18} />
+                            {leadingPlayerId
+                              ? `Victoire de ${players[leadingPlayerId]?.name} (${match.score1} - ${match.score2})`
+                              : `Match terminé sur une Égalité (${match.score1} - ${match.score2})`}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {isWinningSets
+                              ? `Progression : premier joueur à atteindre ${maxSets} point${maxSets > 1 ? 's' : ''}`
+                              : `Progression : ${match.score1 + match.score2} / ${maxSets} manche${maxSets > 1 ? 's' : ''} jouée${maxSets > 1 ? 's' : ''}`}
+                          </div>
+                        )}
+
+                        {/* Admin Actions */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%' }}>
                           <button
-                            className="btn-surface"
-                            style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0 }}
-                            onClick={() => updateMatchScore(match.id, match.score1 - 1, match.score2)}
+                            className="btn btn-neon"
+                            style={{
+                              width: '100%', justifyContent: 'center', padding: '0.9rem',
+                              fontWeight: 800, fontSize: '1rem', color: '#000',
+                              background: isMatchFinished ? 'var(--accent-primary)' : 'rgba(0, 255, 170, 0.75)'
+                            }}
+                            onClick={() => {
+                              if (!isMatchFinished) {
+                                const confirmEarly = window.confirm(
+                                  `Attention : le match n'est pas encore terminé selon les paramètres (${formatLabel}).\n\nScore actuel : ${match.score1} - ${match.score2}\n\nVoulez-vous vraiment valider ce match maintenant ?`
+                                );
+                                if (!confirmEarly) return;
+                              }
+                              if (match.stage && match.stage !== 'qualif' && match.score1 === match.score2) {
+                                alert("Impossible de terminer un match de phase finale sur une égalité ! Un joueur doit remporter le match pour avancer.");
+                                return;
+                              }
+                              finishMatch(match.id);
+                              setSelectedTableForQR(null);
+                            }}
                           >
-                            <Minus size={16} />
+                            <CheckCircle2 size={20} />
+                            {isMatchFinished ? 'Valider le score & Terminer le match' : 'Valider le score actuel & Terminer'}
                           </button>
-                          <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
-                            {match.score1}
-                          </span>
+
                           <button
-                            className="btn-surface"
-                            style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0 }}
-                            onClick={() => updateMatchScore(match.id, match.score1 + 1, match.score2)}
+                            className="btn btn-outline"
+                            style={{ width: '100%', justifyContent: 'center', color: '#ff4466', borderColor: 'rgba(255, 68, 102, 0.4)', fontSize: '0.85rem' }}
+                            onClick={() => {
+                              if (window.confirm("Forcer la libération de ce billard ? Le match sera remis en attente.")) {
+                                freeTable(table.id);
+                                setSelectedTableForQR(null);
+                              }
+                            }}
                           >
-                            <Plus size={16} />
+                            <XCircle size={16} /> Forcer la libération de ce billard
                           </button>
                         </div>
                       </div>
-
-                      <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-muted)' }}>VS</div>
-
-                      {/* Player 2 */}
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>
-                          {players[match.player2Id]?.name}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <button
-                            className="btn-surface"
-                            style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0 }}
-                            onClick={() => updateMatchScore(match.id, match.score1, match.score2 - 1)}
-                          >
-                            <Minus size={16} />
-                          </button>
-                          <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
-                            {match.score2}
-                          </span>
-                          <button
-                            className="btn-surface"
-                            style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0 }}
-                            onClick={() => updateMatchScore(match.id, match.score1, match.score2 + 1)}
-                          >
-                            <Plus size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Admin Actions */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%' }}>
-                      <button
-                        className="btn btn-neon"
-                        style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontWeight: 800, fontSize: '1rem', color: '#000' }}
-                        onClick={() => {
-                          finishMatch(match.id);
-                          setSelectedTableForQR(null);
-                        }}
-                      >
-                        <CheckCircle2 size={20} /> Valider le score & Terminer le match
-                      </button>
-
-                      <button
-                        className="btn btn-outline"
-                        style={{ width: '100%', justifyContent: 'center', color: '#ff4466', borderColor: 'rgba(255, 68, 102, 0.4)', fontSize: '0.85rem' }}
-                        onClick={() => {
-                          if (window.confirm("Forcer la libération de ce billard ? Le match sera remis en attente.")) {
-                            freeTable(table.id);
-                            setSelectedTableForQR(null);
-                          }
-                        }}
-                      >
-                        <XCircle size={16} /> Forcer la libération de ce billard
-                      </button>
-                    </div>
-                  </div>
+                    );
+                  })()
                 ) : (
                   /* 3. Match pending: Show QR code to scan */
                   <>

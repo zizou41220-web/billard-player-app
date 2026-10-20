@@ -128,10 +128,13 @@ export function buildBracketMatches(params: {
   clubId: string;
   qualifiers: string[]; // Liste ordonnée par mérite [Seed 1, Seed 2, ...]
   handicapAmateurSets?: number;
+  finalNbSets?: number;
+  finalIsWinningSets?: boolean;
   hasThirdPlaceMatch?: boolean;
   players: Record<string, Player>;
 }): { newMatches: Record<string, Match>; newMatchIds: string[]; bracketSize: number; rounds: BracketRoundDef[] } {
-  const { tournamentId, clubId, qualifiers, handicapAmateurSets, hasThirdPlaceMatch = true, players } = params;
+  const { tournamentId, clubId, qualifiers, handicapAmateurSets, finalNbSets, finalIsWinningSets, hasThirdPlaceMatch = true, players } = params;
+  const maxAllowedHandicap = (finalIsWinningSets ?? true) ? Math.max(0, (finalNbSets || 1) - 1) : undefined;
   const numQualifiers = qualifiers.length;
   const bracketSize = getBracketSize(numQualifiers);
   const rounds = getBracketRounds(bracketSize);
@@ -217,7 +220,8 @@ export function buildBracketMatches(params: {
       const { h1, h2 } = getMatchHandicap(
         players[p1Id]?.level,
         players[p2Id]?.level,
-        handicapAmateurSets
+        handicapAmateurSets,
+        maxAllowedHandicap
       );
       newMatches[matchId] = {
         ...currentMatch,
@@ -248,7 +252,8 @@ export function buildBracketMatches(params: {
         const { h1, h2 } = getMatchHandicap(
           players[m.player1Id]?.level,
           players[m.player2Id]?.level,
-          handicapAmateurSets
+          handicapAmateurSets,
+          maxAllowedHandicap
         );
         newMatches[matchId] = {
           ...m,

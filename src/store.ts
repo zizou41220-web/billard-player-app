@@ -3,6 +3,7 @@ import { Club, Player, PlayerLevel, Table, Match, Tournament, TournamentFormat, 
 import { getMatchHandicap } from './utils/handicap';
 import { getTournamentQualificationStatus } from './utils/qualifiers';
 import { buildBracketMatches, isFinalStageMatch } from './utils/bracket';
+import { getMatchScoringRules, clampMatchScores, getMaxAllowedHandicap } from './utils/rules';
 
 interface AppState {
   currentClub: Club;
@@ -571,14 +572,28 @@ export const useStore = create<AppState>((set, get) => ({
     const newMatches: Record<string, Match> = {};
     const matchIds: string[] = [];
 
+    const maxAllowedHandicap = getMaxAllowedHandicap(
+      settings?.qualifNbSets || 1,
+      settings?.qualifIsWinningSets ?? true,
+      settings?.finalNbSets || 3,
+      settings?.finalIsWinningSets ?? true,
+      format === 'direct_ko'
+    );
+    const cleanSettings: TournamentSettings = {
+      ...settings,
+      handicapAmateurSets: Math.min(settings?.handicapAmateurSets || 0, maxAllowedHandicap)
+    };
+
     if (format === 'direct_ko') {
       // Arbre à élimination directe immédiat (de 2 à 128 joueurs)
       const { newMatches: bracketMatches, newMatchIds } = buildBracketMatches({
         tournamentId: tourId,
         clubId: get().currentClub.id,
         qualifiers: participants,
-        handicapAmateurSets: settings?.handicapAmateurSets,
-        hasThirdPlaceMatch: settings?.hasThirdPlaceMatch ?? true,
+        handicapAmateurSets: cleanSettings.handicapAmateurSets,
+        finalNbSets: cleanSettings.finalNbSets,
+        finalIsWinningSets: cleanSettings.finalIsWinningSets,
+        hasThirdPlaceMatch: cleanSettings.hasThirdPlaceMatch ?? true,
         players: get().players
       });
       Object.assign(newMatches, bracketMatches);
@@ -587,12 +602,14 @@ export const useStore = create<AppState>((set, get) => ({
       // Qualifications en Poule / Round Robin
       const shuffled = [...participants].sort(() => 0.5 - Math.random());
       const playersState = get().players;
+      const maxQualifHandicap = (cleanSettings.qualifIsWinningSets ?? true) ? Math.max(0, (cleanSettings.qualifNbSets || 1) - 1) : undefined;
+
       for (let i = 0; i < shuffled.length; i++) {
         for (let j = i + 1; j < shuffled.length; j++) {
           const matchId = `m_${Date.now()}_${i}_${j}`;
           const p1 = playersState[shuffled[i]];
           const p2 = playersState[shuffled[j]];
-          const { h1, h2 } = getMatchHandicap(p1?.level, p2?.level, settings?.handicapAmateurSets);
+          const { h1, h2 } = getMatchHandicap(p1?.level, p2?.level, cleanSettings.handicapAmateurSets, maxQualifHandicap);
 
           newMatches[matchId] = {
             id: matchId,
@@ -631,7 +648,7 @@ export const useStore = create<AppState>((set, get) => ({
         status: 'ongoing' as const,
         participants,
         settings: {
-          ...settings,
+          ...cleanSettings,
           finalStageLaunched: format === 'direct_ko' ? true : undefined
         },
         matches: matchIds,
@@ -704,22 +721,35 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateScore: (playerId, delta) => {
-    const { activeMatchId, matches } = get();
+    const { activeMatchId, matches, tournaments } = get();
     if (!activeMatchId) return;
     const match = matches[activeMatchId];
     if (!match) return;
 
     const isPlayer1 = match.player1Id === playerId;
-    const minScore1 = match.handicapP1 || 0;
-    const minScore2 = match.handicapP2 || 0;
-    
+    const targetScore1 = isPlayer1 ? match.score1 + delta : match.score1;
+    const targetScore2 = !isPlayer1 ? match.score2 + delta : match.score2;
+
+    const tour = match.tournamentId ? tournaments[match.tournamentId] : undefined;
+    const rules = getMatchScoringRules(match, tour);
+    const clamped = clampMatchScores(
+      targetScore1,
+      targetScore2,
+      match.score1,
+      match.score2,
+      rules,
+      match.player1Id,
+      match.player2Id
+    );
+
     set((state) => ({
       matches: {
         ...state.matches,
         [activeMatchId]: {
           ...match,
-          score1: isPlayer1 ? Math.max(minScore1, match.score1 + delta) : match.score1,
-          score2: !isPlayer1 ? Math.max(minScore2, match.score2 + delta) : match.score2
+          score1: clamped.score1,
+          score2: clamped.score2,
+          winnerId: clamped.winnerId || match.winnerId
         }
       }
     }));
@@ -821,10 +851,28 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => {
       const match = state.matches[matchId];
       if (!match) return state;
+
+      const tour = match.tournamentId ? state.tournaments[match.tournamentId] : undefined;
+      const rules = getMatchScoringRules(match, tour);
+      const clamped = clampMatchScores(
+        score1,
+        score2,
+        match.score1,
+        match.score2,
+        rules,
+        match.player1Id,
+        match.player2Id
+      );
+
       return {
         matches: {
           ...state.matches,
-          [matchId]: { ...match, score1: Math.max(0, score1), score2: Math.max(0, score2) }
+          [matchId]: {
+            ...match,
+            score1: clamped.score1,
+            score2: clamped.score2,
+            winnerId: clamped.winnerId || match.winnerId
+          }
         }
       };
     });
@@ -835,9 +883,21 @@ export const useStore = create<AppState>((set, get) => ({
       const match = state.matches[matchId];
       if (!match) return state;
 
-      const s1 = Math.max(0, score1);
-      const s2 = Math.max(0, score2);
-      const newWinnerId = s1 > s2 ? match.player1Id : (s2 > s1 ? match.player2Id : undefined);
+      const tour = match.tournamentId ? state.tournaments[match.tournamentId] : undefined;
+      const rules = getMatchScoringRules(match, tour);
+      const clamped = clampMatchScores(
+        score1,
+        score2,
+        match.score1,
+        match.score2,
+        rules,
+        match.player1Id,
+        match.player2Id
+      );
+
+      const s1 = clamped.score1;
+      const s2 = clamped.score2;
+      const newWinnerId = clamped.winnerId || (s1 > s2 ? match.player1Id : (s2 > s1 ? match.player2Id : undefined));
 
       const newMatches = {
         ...state.matches,
@@ -1229,6 +1289,8 @@ export const useStore = create<AppState>((set, get) => ({
         clubId: state.currentClub.id,
         qualifiers,
         handicapAmateurSets: tournament.settings?.handicapAmateurSets,
+        finalNbSets: tournament.settings?.finalNbSets,
+        finalIsWinningSets: tournament.settings?.finalIsWinningSets,
         hasThirdPlaceMatch: shouldIncludeThirdPlace,
         players: state.players
       });
@@ -1341,6 +1403,8 @@ export const useStore = create<AppState>((set, get) => ({
         clubId: state.currentClub.id,
         qualifiers: effectiveQualifiers,
         handicapAmateurSets: tournament.settings?.handicapAmateurSets,
+        finalNbSets: tournament.settings?.finalNbSets,
+        finalIsWinningSets: tournament.settings?.finalIsWinningSets,
         hasThirdPlaceMatch: tournament.settings?.hasThirdPlaceMatch ?? true,
         players: state.players
       });

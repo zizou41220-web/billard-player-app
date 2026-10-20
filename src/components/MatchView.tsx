@@ -1,9 +1,10 @@
 import React from 'react';
 import { useStore } from '../store';
 import { Flag, Minus, Plus } from 'lucide-react';
+import { getMatchScoringRules } from '../utils/rules';
 
 const MatchView: React.FC = () => {
-  const { players, matches, activeMatchId, updateScore, finishMatch, tables } = useStore();
+  const { players, matches, activeMatchId, updateScore, finishMatch, tables, tournaments } = useStore();
   
   if (!activeMatchId) return null;
   
@@ -16,20 +17,12 @@ const MatchView: React.FC = () => {
   const score1 = match.score1;
   const score2 = match.score2;
 
-  const tournament = match.tournamentId ? useStore.getState().tournaments[match.tournamentId] : null;
-  const settings = tournament?.settings;
-  const isFinal = match.stage === 'quarter' || match.stage === 'semi' || match.stage === 'final' || match.stage === 'third_place';
-  const maxScore = settings ? (isFinal ? settings.finalNbSets : settings.qualifNbSets) : 99;
-  const isWinningSets = settings ? (isFinal ? settings.finalIsWinningSets : settings.qualifIsWinningSets) : true;
+  const tournament = match.tournamentId ? tournaments[match.tournamentId] : null;
+  const { maxSets: maxScore, isWinningSets, minScore1, minScore2 } = getMatchScoringRules(match, tournament);
 
-  let canFinish = true;
-  if (settings) {
-    if (isWinningSets) {
-      canFinish = (match.score1 >= maxScore || match.score2 >= maxScore);
-    } else {
-      canFinish = ((match.score1 + match.score2) >= maxScore);
-    }
-  }
+  const canFinish = isWinningSets
+    ? (match.score1 >= maxScore || match.score2 >= maxScore)
+    : ((match.score1 + match.score2) >= maxScore);
 
   const handleScore = (playerId: string, delta: number) => {
     // Prevent exceeding max score for fixed sets, or winning sets
@@ -38,8 +31,8 @@ const MatchView: React.FC = () => {
       if (!isWinningSets && (score1 + score2) >= maxScore) return;
     }
     if (delta < 0) {
-      if (playerId === p1 && score1 <= (match.handicapP1 || 0)) return;
-      if (playerId === p2 && score2 <= (match.handicapP2 || 0)) return;
+      if (playerId === p1 && score1 <= minScore1) return;
+      if (playerId === p2 && score2 <= minScore2) return;
     }
     updateScore(playerId, delta);
   };
