@@ -114,6 +114,25 @@ const ScanView: React.FC = () => {
             const fetched = mapDBToMatch(dbTableMatches[0]);
             match = fetched;
             useStore.setState(s => ({ matches: { ...s.matches, [fetched.id]: fetched } }));
+          } else {
+            // Check if tournoi2_tables has current_match_id set for this table
+            const { data: dbTable } = await supabase
+              .from('tournoi2_tables')
+              .select('current_match_id')
+              .eq('id', tableId)
+              .maybeSingle();
+            if (dbTable?.current_match_id) {
+              const { data: dbTargetMatch } = await supabase
+                .from('tournoi2_matches')
+                .select('*')
+                .eq('id', dbTable.current_match_id)
+                .maybeSingle();
+              if (dbTargetMatch) {
+                const fetched = mapDBToMatch(dbTargetMatch);
+                match = fetched;
+                useStore.setState(s => ({ matches: { ...s.matches, [fetched.id]: fetched } }));
+              }
+            }
           }
         } catch (dbErr) {
           console.warn("Erreur fetch table match Supabase:", dbErr);

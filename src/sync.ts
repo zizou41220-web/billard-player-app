@@ -42,8 +42,8 @@ const mapMatchToDB = (m: Match) => {
   const data: any = {
     id: m.id,
     table_id: m.status === 'finished' ? null : (m.tableId || null),
-    player1_id: m.player1Id || null,
-    player2_id: m.player2Id || null,
+    player1_id: m.player1Id || '',
+    player2_id: m.player2Id || '',
     score1: m.score1,
     score2: m.score2,
     status: m.status,

@@ -47,9 +47,13 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     numQualifiers
   } = getTournamentQualificationStatus(activeTournament, matches, players);
 
-  const allTourMatches = Object.values(matches).filter(m =>
-    Boolean(m && (m.tournamentId === activeTournament.id || activeTournament.matches.includes(m.id)))
-  );
+  const allTourMatches = Object.values(matches).filter(m => {
+    if (!m) return false;
+    if (activeTournament.matches && activeTournament.matches.length > 0) {
+      return activeTournament.matches.includes(m.id);
+    }
+    return m.tournamentId === activeTournament.id;
+  });
   const finalMatches = allTourMatches.filter(isFinalStageMatch);
 
   // Check if active final matches have an inverted 1st vs 2nd pairing in semi 1
@@ -93,8 +97,31 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     // 1. Collecte depuis les vrais matchs en base
     bracketRoundDefs.forEach((roundDef, rIdx) => {
       const isLastRound = rIdx === totalRoundsCount - 1;
-      const matchesInThisRound = finalMatches
-        .filter(m => m.stage === roundDef.stage || m.id.includes(`_${roundDef.prefix}_`))
+      const matchesInThisRoundRaw = finalMatches
+        .filter(m => (m.stage === roundDef.stage || m.id.includes(`_${roundDef.prefix}_`)) && !m.id.includes('_third_place_'));
+
+      // Déduplication par position de tableau (1 seul match par bracketPosition)
+      const byPos = new Map<number, Match>();
+      matchesInThisRoundRaw.forEach(m => {
+        const pos = m.bracketPosition ?? 0;
+        const existing = byPos.get(pos);
+        if (!existing) {
+          byPos.set(pos, m);
+        } else {
+          const mInOfficial = activeTournament.matches?.includes(m.id);
+          const existingInOfficial = activeTournament.matches?.includes(existing.id);
+          if (mInOfficial && !existingInOfficial) {
+            byPos.set(pos, m);
+          } else if (!existingInOfficial && m.status !== 'pending' && existing.status === 'pending') {
+            byPos.set(pos, m);
+          } else if (!existingInOfficial && (m.startTime > existing.startTime)) {
+            byPos.set(pos, m);
+          }
+        }
+      });
+
+      const matchesInThisRound = Array.from(byPos.values())
+        .slice(0, roundDef.matchCount)
         .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
 
       const displayList: DisplayMatch[] = matchesInThisRound.map((m, idx) => {
@@ -121,9 +148,10 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         };
       });
 
-      // Si dernier tour, inclure la Petite Finale si présente
+      // Si dernier tour, inclure la Petite Finale si présente (dédupliquée)
       if (isLastRound) {
-        const thirdPlace = finalMatches.find(m => m.stage === 'third_place' || m.id.includes('_third_place_'));
+        const thirdPlaceMatches = finalMatches.filter(m => m.stage === 'third_place' || m.id.includes('_third_place_'));
+        const thirdPlace = thirdPlaceMatches.find(m => activeTournament.matches?.includes(m.id)) || thirdPlaceMatches[0];
         if (thirdPlace) {
           displayList.push({
             id: thirdPlace.id,

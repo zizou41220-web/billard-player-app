@@ -11,6 +11,7 @@ import {
   getTournamentPhaseHandicap,
   resolveDuelTargetSets
 } from './utils/rules';
+import { supabase } from './supabase';
 
 interface AppState {
   currentClub: Club;
@@ -106,8 +107,67 @@ export const healAndAdvanceBracketMatches = (
   );
 
   for (const tour of finalStageTournaments) {
-    const tourMatches = Object.values(newMatches).filter(m => m.tournamentId === tour.id || tour.matches?.includes(m.id));
+    const tourMatches = Object.values(newMatches).filter(m => {
+      if (!m) return false;
+      if (tour.matches && tour.matches.length > 0) {
+        return tour.matches.includes(m.id);
+      }
+      return m.tournamentId === tour.id;
+    });
     if (tourMatches.length === 0) continue;
+
+    // 0. Dédupliquer les finales orphelines ou en doublon
+    const allFinals = tourMatches.filter(m => (m.stage === 'final' || m.id.includes('_final_')) && !m.id.includes('_third_place_'));
+    if (allFinals.length > 1) {
+      allFinals.sort((a, b) => {
+        const aInTour = tour.matches?.includes(a.id) ? 1 : 0;
+        const bInTour = tour.matches?.includes(b.id) ? 1 : 0;
+        if (aInTour !== bInTour) return bInTour - aInTour;
+        if (a.status !== b.status) {
+          if (a.status === 'playing' || a.status === 'finished') return -1;
+          if (b.status === 'playing' || b.status === 'finished') return 1;
+        }
+        return b.startTime - a.startTime;
+      });
+      const dupFinalIds: string[] = [];
+      for (let i = 1; i < allFinals.length; i++) {
+        dupFinalIds.push(allFinals[i].id);
+        delete newMatches[allFinals[i].id];
+        if (tour.matches) {
+          tour.matches = tour.matches.filter(id => id !== allFinals[i].id);
+        }
+        updated = true;
+      }
+      if (dupFinalIds.length > 0) {
+        supabase.from('tournoi2_matches').delete().in('id', dupFinalIds).then();
+      }
+    }
+
+    const allThirdPlaces = tourMatches.filter(m => m.stage === 'third_place' || m.id.includes('_third_place_'));
+    if (allThirdPlaces.length > 1) {
+      allThirdPlaces.sort((a, b) => {
+        const aInTour = tour.matches?.includes(a.id) ? 1 : 0;
+        const bInTour = tour.matches?.includes(b.id) ? 1 : 0;
+        if (aInTour !== bInTour) return bInTour - aInTour;
+        if (a.status !== b.status) {
+          if (a.status === 'playing' || a.status === 'finished') return -1;
+          if (b.status === 'playing' || b.status === 'finished') return 1;
+        }
+        return b.startTime - a.startTime;
+      });
+      const dupThirdIds: string[] = [];
+      for (let i = 1; i < allThirdPlaces.length; i++) {
+        dupThirdIds.push(allThirdPlaces[i].id);
+        delete newMatches[allThirdPlaces[i].id];
+        if (tour.matches) {
+          tour.matches = tour.matches.filter(id => id !== allThirdPlaces[i].id);
+        }
+        updated = true;
+      }
+      if (dupThirdIds.length > 0) {
+        supabase.from('tournoi2_matches').delete().in('id', dupThirdIds).then();
+      }
+    }
 
     const quarters = tourMatches
       .filter(m => m.stage === 'quarter' || m.id.includes('_quarter_'))
@@ -130,7 +190,7 @@ export const healAndAdvanceBracketMatches = (
       return w === m.player1Id ? m.player2Id : m.player1Id;
     };
 
-    // 1. Quarters -> Semis
+    // 1. Quarts -> Demis
     if (quarters.length === 4 && semis.length >= 2) {
       const qWinners = quarters.map(q => getWinner(q));
       const semi1 = semis.find(s => s.bracketPosition === 0 || s.id.includes('_semi_1_')) || semis[0];
@@ -141,12 +201,16 @@ export const healAndAdvanceBracketMatches = (
         const p2 = qWinners[1] || semi1.player2Id;
         if (p1 !== semi1.player1Id || p2 !== semi1.player2Id) {
           const finalH = getTournamentPhaseHandicap(tour.settings, true);
-          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, (tour.settings?.finalNbSets || 1) - 1) : undefined;
-          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, finalH, maxH);
+          const p1Level = players[p1]?.level;
+          const p2Level = players[p2]?.level;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true);
+          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
           newMatches[semi1.id] = {
             ...semi1,
             player1Id: p1 || '',
             player2Id: p2 || '',
+            targetSets,
             score1: (p1 && p2) ? h1 : semi1.score1,
             score2: (p1 && p2) ? h2 : semi1.score2,
             handicapP1: h1 > 0 ? h1 : undefined,
@@ -161,12 +225,16 @@ export const healAndAdvanceBracketMatches = (
         const p2 = qWinners[3] || semi2.player2Id;
         if (p1 !== semi2.player1Id || p2 !== semi2.player2Id) {
           const finalH = getTournamentPhaseHandicap(tour.settings, true);
-          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, (tour.settings?.finalNbSets || 1) - 1) : undefined;
-          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, finalH, maxH);
+          const p1Level = players[p1]?.level;
+          const p2Level = players[p2]?.level;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true);
+          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
           newMatches[semi2.id] = {
             ...semi2,
             player1Id: p1 || '',
             player2Id: p2 || '',
+            targetSets,
             score1: (p1 && p2) ? h1 : semi2.score1,
             score2: (p1 && p2) ? h2 : semi2.score2,
             handicapP1: h1 > 0 ? h1 : undefined,
@@ -177,7 +245,7 @@ export const healAndAdvanceBracketMatches = (
       }
     }
 
-    // 2. Semis -> Final & Petite Finale
+    // 2. Demis -> Finale & Petite Finale
     if (semis.length >= 2) {
       const semi1 = semis.find(s => s.bracketPosition === 0 || s.id.includes('_semi_1_')) || semis[0];
       const semi2 = semis.find(s => s.bracketPosition === 1 || s.id.includes('_semi_2_')) || semis[1];
@@ -189,7 +257,13 @@ export const healAndAdvanceBracketMatches = (
 
       // Finale du Tournoi
       let targetFinal = final;
-      if (!targetFinal && semis.length >= 2) {
+      const registeredFinalId = tour.matches?.find(id => (id.includes('_final_') || newMatches[id]?.stage === 'final') && !id.includes('_third_place_'));
+      if (!targetFinal && registeredFinalId && newMatches[registeredFinalId]) {
+        targetFinal = newMatches[registeredFinalId];
+      }
+
+      // N'instancier une nouvelle finale QUE si absolument aucune finale n'a été pré-générée
+      if (!targetFinal && !registeredFinalId && semis.length >= 2) {
         const finalId = `m_final_${Date.now()}`;
         targetFinal = {
           id: finalId,
@@ -216,11 +290,17 @@ export const healAndAdvanceBracketMatches = (
         const p1 = s1Winner || targetFinal.player1Id;
         const p2 = s2Winner || targetFinal.player2Id;
         if (p1 !== targetFinal.player1Id || p2 !== targetFinal.player2Id) {
-          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
+          const finalH = getTournamentPhaseHandicap(tour.settings, true);
+          const p1Level = players[p1]?.level;
+          const p2Level = players[p2]?.level;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true);
+          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
           newMatches[targetFinal.id] = {
             ...targetFinal,
             player1Id: p1 || '',
             player2Id: p2 || '',
+            targetSets,
             score1: (p1 && p2) ? h1 : targetFinal.score1,
             score2: (p1 && p2) ? h2 : targetFinal.score2,
             handicapP1: h1 > 0 ? h1 : undefined,
@@ -232,8 +312,13 @@ export const healAndAdvanceBracketMatches = (
 
       // Petite Finale (3ème place)
       let targetThirdPlace = thirdPlace;
+      const registeredThirdId = tour.matches?.find(id => id.includes('_third_place_') || newMatches[id]?.stage === 'third_place');
+      if (!targetThirdPlace && registeredThirdId && newMatches[registeredThirdId]) {
+        targetThirdPlace = newMatches[registeredThirdId];
+      }
+
       const shouldIncludeThirdPlace = Boolean(tour.settings?.hasThirdPlaceMatch ?? true);
-      if (!targetThirdPlace && shouldIncludeThirdPlace && semis.length >= 2) {
+      if (!targetThirdPlace && !registeredThirdId && shouldIncludeThirdPlace && semis.length >= 2) {
         const tpId = `m_third_place_${Date.now()}`;
         targetThirdPlace = {
           id: tpId,
@@ -260,11 +345,17 @@ export const healAndAdvanceBracketMatches = (
         const p1 = s1Loser || targetThirdPlace.player1Id;
         const p2 = s2Loser || targetThirdPlace.player2Id;
         if (p1 !== targetThirdPlace.player1Id || p2 !== targetThirdPlace.player2Id) {
-          const { h1, h2 } = getMatchHandicap(players[p1]?.level, players[p2]?.level, tour.settings?.handicapAmateurSets);
+          const finalH = getTournamentPhaseHandicap(tour.settings, true);
+          const p1Level = players[p1]?.level;
+          const p2Level = players[p2]?.level;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true);
+          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
           newMatches[targetThirdPlace.id] = {
             ...targetThirdPlace,
             player1Id: p1 || '',
             player2Id: p2 || '',
+            targetSets,
             score1: (p1 && p2) ? h1 : targetThirdPlace.score1,
             score2: (p1 && p2) ? h2 : targetThirdPlace.score2,
             handicapP1: h1 > 0 ? h1 : undefined,
@@ -1371,19 +1462,24 @@ export const useStore = create<AppState>((set, get) => ({
         ? hasThirdPlaceMatch
         : Boolean(tournament.settings?.hasThirdPlaceMatch ?? true);
 
-      // Nettoyer les anciens matchs de phase finale si relance
-      const qualifMatchIdsOnly = tournament.matches.filter(mId => {
-        const m = state.matches[mId];
-        return m && !isFinalStageMatch(m);
-      });
-
-      const newMatches = { ...state.matches };
-      tournament.matches.forEach(mId => {
-        const m = state.matches[mId];
-        if (m && isFinalStageMatch(m)) {
-          delete newMatches[mId];
+      // Nettoyer tous les anciens matchs de phase finale si relance
+      const oldFinalMatchIds: string[] = [];
+      Object.values(state.matches).forEach(m => {
+        if ((m.tournamentId === tournamentId || tournament.matches.includes(m.id)) && isFinalStageMatch(m)) {
+          oldFinalMatchIds.push(m.id);
         }
       });
+
+      const qualifMatchIdsOnly = tournament.matches.filter(mId => !oldFinalMatchIds.includes(mId));
+
+      const newMatches = { ...state.matches };
+      oldFinalMatchIds.forEach(mId => {
+        delete newMatches[mId];
+      });
+
+      if (oldFinalMatchIds.length > 0) {
+        supabase.from('tournoi2_matches').delete().in('id', oldFinalMatchIds).then();
+      }
 
       // Construction de l'arbre universel (2 à 128 joueurs) avec Byes (Blancs) automatiques
       const finalHandicap = getTournamentPhaseHandicap(tournament.settings, true);
@@ -1504,18 +1600,24 @@ export const useStore = create<AppState>((set, get) => ({
 
       const effectiveQualifiers = qualifiers.slice(0, qualifStatus.numQualifiers);
 
-      const qualifMatchIdsOnly = tournament.matches.filter(mId => {
-        const m = state.matches[mId];
-        return m && !isFinalStageMatch(m);
-      });
-
-      const newMatches = { ...state.matches };
-      tournament.matches.forEach(mId => {
-        const m = state.matches[mId];
-        if (m && isFinalStageMatch(m)) {
-          delete newMatches[mId];
+      // Nettoyer tous les anciens matchs de phase finale si relance
+      const oldFinalMatchIds: string[] = [];
+      Object.values(state.matches).forEach(m => {
+        if ((m.tournamentId === tournamentId || tournament.matches.includes(m.id)) && isFinalStageMatch(m)) {
+          oldFinalMatchIds.push(m.id);
         }
       });
+
+      const qualifMatchIdsOnly = tournament.matches.filter(mId => !oldFinalMatchIds.includes(mId));
+
+      const newMatches = { ...state.matches };
+      oldFinalMatchIds.forEach(mId => {
+        delete newMatches[mId];
+      });
+
+      if (oldFinalMatchIds.length > 0) {
+        supabase.from('tournoi2_matches').delete().in('id', oldFinalMatchIds).then();
+      }
 
       const finalHandicap = getTournamentPhaseHandicap(tournament.settings, true);
       const { newMatches: reseededMatches, newMatchIds } = buildBracketMatches({
