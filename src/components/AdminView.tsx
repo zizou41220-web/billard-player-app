@@ -202,9 +202,11 @@ const AdminView: React.FC = () => {
     const newMatches = { ...matches };
     Object.values(tables).forEach(t => {
       if (t.status === 'occupied' && t.currentMatchId && newMatches[t.currentMatchId]) {
-        if (newMatches[t.currentMatchId].tableId !== t.id) {
-          newMatches[t.currentMatchId] = { ...newMatches[t.currentMatchId], tableId: t.id };
-          changed = true;
+        if (newMatches[t.currentMatchId].status !== 'finished') {
+          if (newMatches[t.currentMatchId].tableId !== t.id) {
+            newMatches[t.currentMatchId] = { ...newMatches[t.currentMatchId], tableId: t.id };
+            changed = true;
+          }
         }
       }
     });
@@ -299,7 +301,7 @@ const AdminView: React.FC = () => {
           ) : (
             tournamentTables.map(table => {
               // Ensure match strictly belongs to active tournament and respects final stage
-              const candidateMatch = (table.currentMatchId && matches[table.currentMatchId]?.tournamentId === activeTournament?.id)
+              const candidateMatch = (table.currentMatchId && matches[table.currentMatchId]?.tournamentId === activeTournament?.id && matches[table.currentMatchId]?.status !== 'finished')
                 ? matches[table.currentMatchId]
                 : Object.values(matches).find(m => m.tournamentId === activeTournament?.id && m.tableId === table.id && m.status !== 'finished');
               const currentMatch = (candidateMatch && isFinalStageActive && !isFinalStageMatch(candidateMatch))
@@ -402,7 +404,7 @@ const AdminView: React.FC = () => {
         {Object.values(tables)
           .filter(t => !showOnlyTournamentTables || !activeTournament || activeTournament.settings?.tableIds.includes(t.id))
           .map(table => {
-            const currentMatch = table.currentMatchId ? matches[table.currentMatchId] : undefined;
+            const currentMatch = (table.currentMatchId && matches[table.currentMatchId]?.status !== 'finished') ? matches[table.currentMatchId] : undefined;
             const p1 = currentMatch ? players[currentMatch.player1Id] : undefined;
             const p2 = currentMatch ? players[currentMatch.player2Id] : undefined;
 
@@ -1721,6 +1723,7 @@ const AdminView: React.FC = () => {
                 <div className="glass-card" style={{ maxWidth: '600px', padding: '3.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', border: '1px solid var(--border-color)' }}>
                   <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(0, 255, 170, 0.1)', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Rocket size={40} style={{ color: 'var(--accent-primary)' }} />
+
                   </div>
                   <div>
                     <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.5rem', color: '#fff' }}>Aucun tournoi en cours</h2>

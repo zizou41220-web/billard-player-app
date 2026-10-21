@@ -855,6 +855,33 @@ export const useStore = create<AppState>((set, get) => ({
       if (!effectiveTableId) return state; // Should have a table assigned
       
       const startTime = match.status === 'playing' ? match.startTime : Date.now();
+
+      // Direct push for match start
+      supabase.from('tournoi2_matches').upsert({
+        id: matchId,
+        table_id: effectiveTableId,
+        player1_id: match.player1Id || '',
+        player2_id: match.player2Id || '',
+        score1: match.score1,
+        score2: match.score2,
+        status: 'playing',
+        start_time: startTime,
+        end_time: null,
+        winner_id: null,
+        tournament_id: match.tournamentId || null,
+        club_id: match.clubId || state.currentClub.id
+      }).then();
+
+      supabase.from('tournoi2_tables').upsert({
+        id: effectiveTableId,
+        number: state.tables[effectiveTableId]?.number,
+        name: state.tables[effectiveTableId]?.name,
+        status: 'occupied',
+        current_match_id: matchId,
+        x: state.tables[effectiveTableId]?.x || null,
+        y: state.tables[effectiveTableId]?.y || null,
+        club_id: state.tables[effectiveTableId]?.clubId || state.currentClub.id
+      }).then();
       
       return {
         matches: { 
@@ -875,7 +902,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateScore: (playerId, delta) => {
-    const { activeMatchId, matches, tournaments } = get();
+    const { activeMatchId, matches, tournaments, players, currentClub } = get();
     if (!activeMatchId) return;
     const match = matches[activeMatchId];
     if (!match) return;
@@ -885,7 +912,7 @@ export const useStore = create<AppState>((set, get) => ({
     const targetScore2 = !isPlayer1 ? match.score2 + delta : match.score2;
 
     const tour = match.tournamentId ? tournaments[match.tournamentId] : undefined;
-    const rules = getMatchScoringRules(match, tour);
+    const rules = getMatchScoringRules(match, tour, players);
     const clamped = clampMatchScores(
       targetScore1,
       targetScore2,
@@ -896,15 +923,32 @@ export const useStore = create<AppState>((set, get) => ({
       match.player2Id
     );
 
+    const updatedM = {
+      ...match,
+      score1: clamped.score1,
+      score2: clamped.score2,
+      winnerId: clamped.winnerId || match.winnerId
+    };
+
+    supabase.from('tournoi2_matches').upsert({
+      id: updatedM.id,
+      table_id: updatedM.tableId || null,
+      player1_id: updatedM.player1Id || '',
+      player2_id: updatedM.player2Id || '',
+      score1: updatedM.score1,
+      score2: updatedM.score2,
+      status: updatedM.status,
+      start_time: updatedM.startTime || Date.now(),
+      end_time: updatedM.endTime || null,
+      winner_id: updatedM.winnerId || null,
+      tournament_id: updatedM.tournamentId || null,
+      club_id: updatedM.clubId || currentClub.id
+    }).then();
+
     set((state) => ({
       matches: {
         ...state.matches,
-        [activeMatchId]: {
-          ...match,
-          score1: clamped.score1,
-          score2: clamped.score2,
-          winnerId: clamped.winnerId || match.winnerId
-        }
+        [activeMatchId]: updatedM
       }
     }));
   },
@@ -1385,6 +1429,83 @@ export const useStore = create<AppState>((set, get) => ({
         match.tournamentId,
         state.players
       );
+
+      // Direct explicit sync to Supabase for the finished match and table
+      const finishedRecord = dispatchedMatches[activeId];
+      if (finishedRecord) {
+        supabase.from('tournoi2_matches').upsert({
+          id: finishedRecord.id,
+          table_id: null,
+          player1_id: finishedRecord.player1Id || '',
+          player2_id: finishedRecord.player2Id || '',
+          score1: finishedRecord.score1,
+          score2: finishedRecord.score2,
+          status: 'finished',
+          start_time: finishedRecord.startTime || Date.now(),
+          end_time: finishedRecord.endTime || Date.now(),
+          winner_id: finishedRecord.winnerId || null,
+          tournament_id: finishedRecord.tournamentId || null,
+          club_id: finishedRecord.clubId || state.currentClub.id
+        }).then(({ error }) => {
+          if (error) console.error("Supabase direct match finish sync error:", error);
+        });
+      }
+
+      if (freedTableId && dispatchedTables[freedTableId]) {
+        const tbl = dispatchedTables[freedTableId];
+        supabase.from('tournoi2_tables').upsert({
+          id: tbl.id,
+          number: tbl.number,
+          name: tbl.name,
+          status: tbl.status,
+          current_match_id: tbl.currentMatchId || null,
+          x: tbl.x || null,
+          y: tbl.y || null,
+          club_id: tbl.clubId || state.currentClub.id
+        }).then(({ error }) => {
+          if (error) console.error("Supabase direct table sync error:", error);
+        });
+      }
+
+      const nextAssigned = Object.values(dispatchedMatches).find(m => m.tableId === freedTableId && m.status !== 'finished');
+      if (nextAssigned) {
+        supabase.from('tournoi2_matches').upsert({
+          id: nextAssigned.id,
+          table_id: freedTableId,
+          player1_id: nextAssigned.player1Id || '',
+          player2_id: nextAssigned.player2Id || '',
+          score1: nextAssigned.score1,
+          score2: nextAssigned.score2,
+          status: nextAssigned.status,
+          start_time: nextAssigned.startTime || Date.now(),
+          end_time: null,
+          winner_id: null,
+          tournament_id: nextAssigned.tournamentId || null,
+          club_id: nextAssigned.clubId || state.currentClub.id
+        }).then(({ error }) => {
+          if (error) console.error("Supabase direct next match sync error:", error);
+        });
+      }
+
+      if (targetNextId && dispatchedMatches[targetNextId]) {
+        const nextM = dispatchedMatches[targetNextId];
+        supabase.from('tournoi2_matches').upsert({
+          id: nextM.id,
+          table_id: nextM.tableId || null,
+          player1_id: nextM.player1Id || '',
+          player2_id: nextM.player2Id || '',
+          score1: nextM.score1,
+          score2: nextM.score2,
+          status: nextM.status,
+          start_time: nextM.startTime || Date.now(),
+          end_time: nextM.endTime || null,
+          winner_id: nextM.winnerId || null,
+          tournament_id: nextM.tournamentId || null,
+          club_id: nextM.clubId || state.currentClub.id
+        }).then(({ error }) => {
+          if (error) console.error("Supabase direct bracket advance sync error:", error);
+        });
+      }
 
       return {
         matches: dispatchedMatches,

@@ -19,7 +19,7 @@ const MatchView: React.FC = () => {
   const score2 = match.score2;
 
   const tournament = match.tournamentId ? tournaments[match.tournamentId] : null;
-  const { maxSets: maxScore, isWinningSets, minScore1, minScore2 } = getMatchScoringRules(match, tournament, players);
+  const { maxSets: maxScore, isWinningSets, minScore1, minScore2, formatLabel } = getMatchScoringRules(match, tournament, players);
 
   const canFinish = isWinningSets
     ? (match.score1 >= maxScore || match.score2 >= maxScore)
@@ -39,6 +39,12 @@ const MatchView: React.FC = () => {
   };
 
   const handleFinishMatch = () => {
+    if (!canFinish) {
+      const confirmEarly = window.confirm(
+        `Le match n'a pas encore atteint le score prévu (${formatLabel || `${maxScore} manches`}).\n\nScore actuel : ${match.score1} - ${match.score2}\n\nVoulez-vous valider et terminer ce match maintenant ?`
+      );
+      if (!confirmEarly) return;
+    }
     finishMatch();
   };
 
@@ -189,17 +195,17 @@ const MatchView: React.FC = () => {
       <div style={{ padding: '1.5rem', paddingBottom: 'env(safe-area-inset-bottom, 1.5rem)', flexShrink: 0, marginTop: 'auto' }}>
         <button
           className={`btn ${canFinish ? 'btn-neon' : 'btn-outline'}`}
-          onClick={canFinish ? handleFinishMatch : undefined}
+          onClick={handleFinishMatch}
           style={{
             width: '100%',
             justifyContent: 'center',
-            color: canFinish ? '#000' : 'var(--text-muted)',
-            borderColor: canFinish ? 'transparent' : 'var(--border-color)',
-            opacity: canFinish ? 1 : 0.5,
-            cursor: canFinish ? 'pointer' : 'not-allowed'
+            color: canFinish ? '#000' : 'var(--accent-primary)',
+            borderColor: canFinish ? 'transparent' : 'rgba(0, 255, 170, 0.4)',
+            opacity: 1,
+            cursor: 'pointer'
           }}
         >
-          <Flag size={20} /> {canFinish ? "Terminer le match" : `Score incomplet (${isWinningSets ? `1er à ${maxScore}` : `${maxScore} manches au total`})`}
+          <Flag size={20} /> {canFinish ? "Terminer le match" : `Valider la fin du match (${match.score1} - ${match.score2})`}
         </button>
       </div>
     </div>

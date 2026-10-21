@@ -21,7 +21,7 @@ const mapDBToPlayer = (d: any): Player => ({
   stats: d.stats
 });
 
-const mapTableToDB = (t: Table) => {
+export const mapTableToDB = (t: Table) => {
   const data: any = { id: t.id, number: t.number, name: t.name, status: t.status, current_match_id: t.currentMatchId || null, x: t.x || null, y: t.y || null };
   if (hasClubColumn) data.club_id = t.clubId || useStore.getState().currentClub.id;
   return data;
@@ -39,7 +39,7 @@ const mapDBToTable = (d: any): Table => ({
   liveStreamUrl: d.live_stream_url || undefined
 });
 
-const mapMatchToDB = (m: Match) => {
+export const mapMatchToDB = (m: Match) => {
   const data: any = {
     id: m.id,
     table_id: m.status === 'finished' ? null : (m.tableId || null),
@@ -48,9 +48,9 @@ const mapMatchToDB = (m: Match) => {
     score1: m.score1,
     score2: m.score2,
     status: m.status,
-    start_time: m.startTime,
-    end_time: m.endTime || null,
-    winner_id: m.winnerId || null,
+    start_time: m.startTime || Date.now(),
+    end_time: m.status === 'finished' ? (m.endTime || Date.now()) : null,
+    winner_id: m.status === 'finished' ? (m.winnerId || null) : null,
     tournament_id: m.tournamentId || null
   };
   if (hasClubColumn) data.club_id = m.clubId || useStore.getState().currentClub.id;
@@ -231,9 +231,14 @@ export const initSync = async () => {
   // Rule 1: Fix table.currentMatchId -> match.tableId consistency
   Object.values(updatedTables).forEach(table => {
     if (table.status === 'occupied' && table.currentMatchId && updatedMatches[table.currentMatchId]) {
-      if (updatedMatches[table.currentMatchId].tableId !== table.id) {
+      const curM = updatedMatches[table.currentMatchId];
+      if (curM.status === 'finished') {
+        updatedTables[table.id] = { ...table, status: 'free', currentMatchId: undefined };
+        tablesNeedUpdate = true;
+        supabase.from('tournoi2_tables').upsert(mapTableToDB(updatedTables[table.id])).then();
+      } else if (curM.tableId !== table.id) {
         updatedMatches[table.currentMatchId] = {
-          ...updatedMatches[table.currentMatchId],
+          ...curM,
           tableId: table.id
         };
         matchesNeedUpdate = true;
@@ -294,72 +299,98 @@ export const initSync = async () => {
         isReceiving = true;
         const storeKey = table.replace('tournoi2_', '') as 'players' | 'tables' | 'matches' | 'tournaments';
         
-        useStore.setState(state => {
-          if (payload.eventType === 'DELETE') {
-            const newState = { ...state[storeKey] } as any;
-            delete newState[payload.old.id];
-            return { [storeKey]: newState };
-          }
-          
-          const data = payload.new;
-          if (hasClubColumn && data.club_id && data.club_id !== state.currentClub.id) {
-            return state;
-          }
-          let mappedData: any;
-          if (storeKey === 'players') mappedData = mapDBToPlayer(data);
-          if (storeKey === 'tables') mappedData = mapDBToTable(data);
-          if (storeKey === 'matches') {
-            const existingM = state.matches[data.id];
-            mappedData = {
-              ...existingM,
-              ...mapDBToMatch(data),
-              stage: mapDBToMatch(data).stage || existingM?.stage,
-              bracketRound: mapDBToMatch(data).bracketRound ?? existingM?.bracketRound,
-              bracketPosition: mapDBToMatch(data).bracketPosition ?? existingM?.bracketPosition,
-              nextMatchId: mapDBToMatch(data).nextMatchId || existingM?.nextMatchId
-            };
-          }
-          if (storeKey === 'tournaments') {
-            const existingT = state.tournaments[data.id];
-            const parsedT = mapDBToTournament(data);
-            mappedData = {
-              ...existingT,
-              ...parsedT,
-              finalStageLaunched: parsedT.finalStageLaunched || existingT?.finalStageLaunched
-            };
-          }
-
-          if (storeKey === 'tables' && mappedData.status === 'occupied' && mappedData.currentMatchId) {
-            const currentM = state.matches[mappedData.currentMatchId];
-            if (currentM && currentM.tableId !== mappedData.id) {
-              const healedMatch = { ...currentM, tableId: mappedData.id };
-              supabase.from('tournoi2_matches').upsert(mapMatchToDB(healedMatch)).then();
-              return {
-                tables: { ...state.tables, [mappedData.id]: mappedData },
-                matches: { ...state.matches, [currentM.id]: healedMatch }
-              };
+        try {
+          useStore.setState(state => {
+            if (payload.eventType === 'DELETE') {
+              const newState = { ...state[storeKey] } as any;
+              delete newState[payload.old.id];
+              return { [storeKey]: newState };
             }
-          }
+            
+            const data = payload.new;
+            if (hasClubColumn && data.club_id && data.club_id !== state.currentClub.id) {
+              return state;
+            }
+            let mappedData: any;
+            if (storeKey === 'players') mappedData = mapDBToPlayer(data);
+            if (storeKey === 'tables') mappedData = mapDBToTable(data);
+            if (storeKey === 'matches') {
+              const existingM = state.matches[data.id];
+              mappedData = {
+                ...existingM,
+                ...mapDBToMatch(data),
+                stage: mapDBToMatch(data).stage || existingM?.stage,
+                bracketRound: mapDBToMatch(data).bracketRound ?? existingM?.bracketRound,
+                bracketPosition: mapDBToMatch(data).bracketPosition ?? existingM?.bracketPosition,
+                nextMatchId: mapDBToMatch(data).nextMatchId || existingM?.nextMatchId
+              };
 
-          return {
-            [storeKey]: {
-              ...state[storeKey],
-              [mappedData.id]: {
-                ...(state[storeKey]?.[mappedData.id] || {}),
-                ...mappedData
+              // If match is finished, immediately clear tableId and free any table pointing to this match!
+              if (mappedData.status === 'finished') {
+                mappedData.tableId = undefined;
+                const newTables = { ...state.tables };
+                let tableFreed = false;
+                Object.keys(newTables).forEach(tId => {
+                  if (newTables[tId].currentMatchId === data.id) {
+                    newTables[tId] = { ...newTables[tId], status: 'free', currentMatchId: undefined };
+                    tableFreed = true;
+                  }
+                });
+                return {
+                  matches: {
+                    ...state.matches,
+                    [mappedData.id]: mappedData
+                  },
+                  ...(tableFreed ? { tables: newTables } : {})
+                };
               }
             }
-          };
-        });
-        
-        // Small delay to prevent echo loops and dispatch next matches if a match finished or table was freed
-        setTimeout(() => {
+            if (storeKey === 'tournaments') {
+              const existingT = state.tournaments[data.id];
+              const parsedT = mapDBToTournament(data);
+              mappedData = {
+                ...existingT,
+                ...parsedT,
+                finalStageLaunched: parsedT.finalStageLaunched || existingT?.finalStageLaunched
+              };
+            }
+
+            if (storeKey === 'tables' && mappedData.status === 'occupied' && mappedData.currentMatchId) {
+              const currentM = state.matches[mappedData.currentMatchId];
+              if (currentM && currentM.status === 'finished') {
+                // Table was marked occupied by a finished match -> force free it
+                mappedData = { ...mappedData, status: 'free', currentMatchId: undefined };
+              } else if (currentM && currentM.tableId !== mappedData.id) {
+                const healedMatch = { ...currentM, tableId: mappedData.id };
+                supabase.from('tournoi2_matches').upsert(mapMatchToDB(healedMatch)).then();
+                return {
+                  tables: { ...state.tables, [mappedData.id]: mappedData },
+                  matches: { ...state.matches, [currentM.id]: healedMatch }
+                };
+              }
+            }
+
+            return {
+              [storeKey]: {
+                ...state[storeKey],
+                [mappedData.id]: {
+                  ...(state[storeKey]?.[mappedData.id] || {}),
+                  ...mappedData
+                }
+              }
+            };
+          });
+        } finally {
           isReceiving = false;
-          const data: any = payload.new;
-          if ((storeKey === 'matches' && data?.status === 'finished') || (storeKey === 'tables' && data?.status === 'free')) {
+        }
+        
+        // Dispatch next matches if a match finished or table was freed
+        const data: any = payload.new;
+        if ((storeKey === 'matches' && data?.status === 'finished') || (storeKey === 'tables' && data?.status === 'free')) {
+          setTimeout(() => {
             useStore.getState().autoDispatchMatches();
-          }
-        }, 120);
+          }, 60);
+        }
       }).subscribe();
   });
 };
