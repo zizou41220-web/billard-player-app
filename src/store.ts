@@ -12,6 +12,7 @@ import {
   resolveDuelTargetSets,
   getPhaseRules
 } from './utils/rules';
+import { computeAllPlayersStats, createDefaultPlayerStats } from './utils/playerStats';
 import { supabase } from './supabase';
 
 interface AppState {
@@ -50,6 +51,7 @@ interface AppState {
   autoDispatchMatches: () => void;
   setTableLiveStream: (tableId: string, liveStreamUrl?: string) => void;
   setMatchLiveStream: (matchId: string, liveStreamUrl?: string) => void;
+  recomputePlayerStats: () => void;
 }
 
 import { defaultClubLogo, getClubLogoUrl } from './utils/logo';
@@ -83,10 +85,10 @@ const getInitialClub = (): Club => {
 };
 
 const MOCK_PLAYERS: Record<string, Player> = {
-  'p1': { id: 'p1', clubId: 'bc41', name: 'Sébastien T.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p1', stats: { matchesPlayed: 142, wins: 89, winRate: 62.6, nemesisId: 'p3', bestFriendId: 'p2' } },
-  'p2': { id: 'p2', clubId: 'bc41', name: 'Alexandre D.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p2', stats: { matchesPlayed: 98, wins: 45, winRate: 45.9 } },
-  'p3': { id: 'p3', clubId: 'bc41', name: 'Maxime R.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p3', stats: { matchesPlayed: 210, wins: 156, winRate: 74.2 } },
-  'p4': { id: 'p4', clubId: 'bc41', name: 'Sophie L.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p4', stats: { matchesPlayed: 56, wins: 30, winRate: 53.5 } },
+  'p1': { id: 'p1', clubId: 'bc41', name: 'Sébastien T.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p1', stats: { ...createDefaultPlayerStats(), matchesPlayed: 142, wins: 89, losses: 53, winRate: 62.6, nemesisId: 'p3', bestFriendId: 'p2' } },
+  'p2': { id: 'p2', clubId: 'bc41', name: 'Alexandre D.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p2', stats: { ...createDefaultPlayerStats(), matchesPlayed: 98, wins: 45, losses: 53, winRate: 45.9 } },
+  'p3': { id: 'p3', clubId: 'bc41', name: 'Maxime R.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p3', stats: { ...createDefaultPlayerStats(), matchesPlayed: 210, wins: 156, losses: 54, winRate: 74.2 } },
+  'p4': { id: 'p4', clubId: 'bc41', name: 'Sophie L.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p4', stats: { ...createDefaultPlayerStats(), matchesPlayed: 56, wins: 30, losses: 26, winRate: 53.5 } },
 };
 
 const MOCK_TABLES: Record<string, Table> = {
@@ -658,7 +660,7 @@ export const useStore = create<AppState>((set, get) => ({
           name,
           level,
           avatarUrl: photoUrl || `https://i.pravatar.cc/150?u=${id}`,
-          stats: { matchesPlayed: 0, wins: 0, winRate: 0 }
+          stats: createDefaultPlayerStats()
         }
       }
     }));
@@ -1239,7 +1241,8 @@ export const useStore = create<AppState>((set, get) => ({
         state.players
       );
 
-      return { matches: dispatchedMatches, tables: dispatchedTables };
+      const updatedPlayers = computeAllPlayersStats(state.players, dispatchedMatches, state.tournaments);
+      return { matches: dispatchedMatches, tables: dispatchedTables, players: updatedPlayers };
     });
   },
 
@@ -1548,9 +1551,12 @@ export const useStore = create<AppState>((set, get) => ({
         });
       }
 
+      const updatedPlayers = computeAllPlayersStats(state.players, dispatchedMatches, state.tournaments);
+
       return {
         matches: dispatchedMatches,
         tables: dispatchedTables,
+        players: updatedPlayers,
         activeMatchId: state.activeMatchId === activeId ? null : state.activeMatchId
       };
     });
@@ -2213,6 +2219,13 @@ export const useStore = create<AppState>((set, get) => ({
           [matchId]: { ...match, liveStreamUrl }
         }
       };
+    });
+  },
+
+  recomputePlayerStats: () => {
+    set((state) => {
+      const updatedPlayers = computeAllPlayersStats(state.players, state.matches, state.tournaments);
+      return { players: updatedPlayers };
     });
   }
 }));

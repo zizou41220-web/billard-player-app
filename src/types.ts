@@ -6,19 +6,31 @@ export type Club = {
   logoUrl?: string;
 };
 
+export type PlayerStats = {
+  matchesPlayed: number;
+  wins: number;
+  losses?: number;
+  winRate: number;
+  setsWon?: number;
+  setsLost?: number;
+  setDiff?: number;
+  tournamentsPlayed?: number;
+  tournamentsWon?: number;
+  nemesisId?: string; // Player they lose the most to
+  nemesisLosses?: number;
+  nemesisLossRate?: number;
+  bestFriendId?: string; // Player they play the most with
+  bestFriendMatches?: number;
+  recentForm?: ('W' | 'L')[];
+};
+
 export type Player = {
   id: string;
   clubId?: string;
   name: string;
   level: PlayerLevel;
   avatarUrl?: string;
-  stats: {
-    matchesPlayed: number;
-    wins: number;
-    nemesisId?: string; // Player they lose the most to
-    bestFriendId?: string; // Player they play the most with
-    winRate: number;
-  };
+  stats: PlayerStats;
 };
 
 export type Table = {

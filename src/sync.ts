@@ -1,24 +1,25 @@
 import { supabase } from './supabase';
 import { useStore } from './store';
 import { Match, Player, Table, Tournament } from './types';
+import { computeAllPlayersStats, createDefaultPlayerStats } from './utils/playerStats';
 
 let isReceiving = false;
 let hasClubColumn = false;
 
 // Helpers to map camelCase <-> snake_case
-const mapPlayerToDB = (p: Player) => {
+export const mapPlayerToDB = (p: Player) => {
   const data: any = { id: p.id, name: p.name, level: p.level, avatar_url: p.avatarUrl, stats: p.stats };
   if (hasClubColumn) data.club_id = p.clubId || useStore.getState().currentClub.id;
   return data;
 };
 
-const mapDBToPlayer = (d: any): Player => ({
+export const mapDBToPlayer = (d: any): Player => ({
   id: d.id,
   clubId: d.club_id || undefined,
   name: d.name,
   level: d.level,
   avatarUrl: d.avatar_url,
-  stats: d.stats
+  stats: d.stats || createDefaultPlayerStats()
 });
 
 export const mapTableToDB = (t: Table) => {
@@ -194,29 +195,43 @@ export const initSync = async () => {
     tourQuery
   ]);
 
+  const rawPlayers: Record<string, Player> = {};
   if (playersRes.data && playersRes.data.length > 0) {
-    const players: Record<string, Player> = {};
-    playersRes.data.forEach(d => players[d.id] = mapDBToPlayer(d));
-    useStore.setState({ players });
+    playersRes.data.forEach(d => rawPlayers[d.id] = mapDBToPlayer(d));
+  } else {
+    Object.assign(rawPlayers, useStore.getState().players);
   }
 
+  const rawTables: Record<string, Table> = {};
   if (tablesRes.data && tablesRes.data.length > 0) {
-    const tables: Record<string, Table> = {};
-    tablesRes.data.forEach(d => tables[d.id] = mapDBToTable(d));
-    useStore.setState({ tables });
+    tablesRes.data.forEach(d => rawTables[d.id] = mapDBToTable(d));
+  } else {
+    Object.assign(rawTables, useStore.getState().tables);
   }
 
+  const rawMatches: Record<string, Match> = {};
   if (matchesRes.data && matchesRes.data.length > 0) {
-    const matches: Record<string, Match> = {};
-    matchesRes.data.forEach(d => matches[d.id] = mapDBToMatch(d));
-    useStore.setState({ matches });
+    matchesRes.data.forEach(d => rawMatches[d.id] = mapDBToMatch(d));
+  } else {
+    Object.assign(rawMatches, useStore.getState().matches);
   }
 
+  const rawTournaments: Record<string, Tournament> = {};
   if (tournamentsRes.data && tournamentsRes.data.length > 0) {
-    const tournaments: Record<string, Tournament> = {};
-    tournamentsRes.data.forEach(d => tournaments[d.id] = mapDBToTournament(d));
-    useStore.setState({ tournaments });
+    tournamentsRes.data.forEach(d => rawTournaments[d.id] = mapDBToTournament(d));
+  } else {
+    Object.assign(rawTournaments, useStore.getState().tournaments);
   }
+
+  // Calcul dynamique et complet des statistiques de tous les joueurs depuis les matchs
+  const computedPlayers = computeAllPlayersStats(rawPlayers, rawMatches, rawTournaments);
+
+  useStore.setState({
+    players: computedPlayers,
+    tables: rawTables,
+    matches: rawMatches,
+    tournaments: rawTournaments
+  });
 
   // Auto-heal table <-> match associations if desynced
   const currentTables = useStore.getState().tables;
@@ -325,7 +340,7 @@ export const initSync = async () => {
                 nextMatchId: mapDBToMatch(data).nextMatchId || existingM?.nextMatchId
               };
 
-              // If match is finished, immediately clear tableId and free any table pointing to this match!
+              // If match is finished, immediately clear tableId, free table, and recompute player stats!
               if (mappedData.status === 'finished') {
                 mappedData.tableId = undefined;
                 const newTables = { ...state.tables };
@@ -336,11 +351,16 @@ export const initSync = async () => {
                     tableFreed = true;
                   }
                 });
+
+                const updatedMatches = {
+                  ...state.matches,
+                  [mappedData.id]: mappedData
+                };
+                const updatedPlayers = computeAllPlayersStats(state.players, updatedMatches, state.tournaments);
+
                 return {
-                  matches: {
-                    ...state.matches,
-                    [mappedData.id]: mappedData
-                  },
+                  matches: updatedMatches,
+                  players: updatedPlayers,
                   ...(tableFreed ? { tables: newTables } : {})
                 };
               }

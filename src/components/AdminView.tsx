@@ -24,7 +24,7 @@ const AdminView: React.FC = () => {
     endTournament, finishMatch, freeTable, updateMatchScore,
     assignMatchToTable, updateFinishedMatchScore, startTournamentMatch,
     launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream,
-    updateTournamentSettings
+    updateTournamentSettings, recomputePlayerStats
   } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -2080,7 +2080,9 @@ const AdminView: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.stats.matchesPlayed} matchs • {p.stats.winRate}% vict.</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {p.stats.matchesPlayed} matchs • {p.stats.winRate}% vict. ({p.stats.wins}V - {p.stats.losses ?? (p.stats.matchesPlayed - p.stats.wins)}D)
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -2923,13 +2925,33 @@ const AdminView: React.FC = () => {
             {adminSubTab === 'players' && (
               <div style={{ display: 'grid', gridTemplateColumns: isAdminUnlocked ? '1fr 360px' : '1fr', gap: '2.5rem', height: '100%', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
                       <h2 style={{ fontSize: '1.8rem', margin: '0 0 0.3rem 0' }}>Pédigré des Joueurs ({Object.keys(players).length})</h2>
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        {isAdminUnlocked ? "Mode Édition: Modifiez les fiches joueurs ou ajoutez de nouveaux membres." : "Mode Lecture: Consulter les statistiques et niveaux des joueurs."}
+                        {isAdminUnlocked ? "Mode Édition: Modifiez les fiches joueurs ou ajoutez de nouveaux membres." : "Mode Lecture: Statistiques complètes calculées depuis l'historique des matchs."}
                       </span>
                     </div>
+                    <button
+                      className="btn btn-outline"
+                      id="btn-recompute-stats"
+                      onClick={() => {
+                        recomputePlayerStats();
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.85rem',
+                        borderColor: 'var(--accent-primary)',
+                        color: 'var(--accent-primary)',
+                        padding: '0.5rem 1rem',
+                        cursor: 'pointer'
+                      }}
+                      title="Recalculer et synchroniser les statistiques depuis l'ensemble des matchs terminés"
+                    >
+                      <RefreshCw size={15} /> Actualiser les stats
+                    </button>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem', overflowY: 'auto' }}>
@@ -2974,9 +2996,85 @@ const AdminView: React.FC = () => {
                               }}>
                                 {(p.level === 'Prestige' || p.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
                               </div>
-                              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem' }}>
-                                <div><span style={{ color: 'var(--text-muted)' }}>Matchs:</span> <b>{p.stats.matchesPlayed}</b></div>
-                                <div><span style={{ color: 'var(--text-muted)' }}>Victoires:</span> <b>{p.stats.winRate}%</b></div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', marginTop: '0.3rem' }}>
+                                {/* Row 1: Matchs & Victoires */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.04)', padding: '0.35rem 0.6rem', borderRadius: '6px' }}>
+                                  <div>
+                                    <span style={{ color: 'var(--text-muted)' }}>Matchs:</span> <b>{p.stats.matchesPlayed}</b>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginLeft: '5px' }}>
+                                      ({p.stats.wins}V - {p.stats.losses ?? (p.stats.matchesPlayed - p.stats.wins)}D)
+                                    </span>
+                                  </div>
+                                  <div style={{
+                                    fontWeight: 800,
+                                    fontSize: '0.85rem',
+                                    color: p.stats.winRate >= 60 ? 'var(--accent-primary)' : (p.stats.winRate >= 45 ? '#ffcc00' : '#ff7777'),
+                                    background: p.stats.winRate >= 60 ? 'rgba(0,255,170,0.12)' : 'rgba(255,255,255,0.06)',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px'
+                                  }}>
+                                    {p.stats.winRate}% vict.
+                                  </div>
+                                </div>
+
+                                {/* Row 2: Manches & Titres */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  <div>
+                                    Manches: <b style={{ color: '#fff' }}>{p.stats.setsWon ?? 0}</b>/<b style={{ color: '#fff' }}>{p.stats.setsLost ?? 0}</b>
+                                    <span style={{ color: (p.stats.setDiff ?? 0) >= 0 ? 'var(--accent-primary)' : '#ff6666', fontWeight: 700, marginLeft: '4px' }}>
+                                      ({(p.stats.setDiff ?? 0) >= 0 ? `+${p.stats.setDiff ?? 0}` : p.stats.setDiff})
+                                    </span>
+                                  </div>
+                                  {Boolean(p.stats.tournamentsWon && p.stats.tournamentsWon > 0) && (
+                                    <span style={{ color: '#ffd700', fontWeight: 800 }}>
+                                      🏆 {p.stats.tournamentsWon} {(p.stats.tournamentsWon ?? 0) > 1 ? 'titres' : 'titre'}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Row 3: Bête Noire & Rival habituel si existant */}
+                                {(p.stats.nemesisId || p.stats.bestFriendId) && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.72rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.35rem' }}>
+                                    {p.stats.nemesisId && players[p.stats.nemesisId] && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                                        <span>Bête noire: <span style={{ color: '#ff7777', fontWeight: 700 }}>{players[p.stats.nemesisId].name}</span></span>
+                                        <span style={{ color: '#ff7777', fontWeight: 700 }}>
+                                          {p.stats.nemesisLosses ? `${p.stats.nemesisLosses} déf.` : `${p.stats.nemesisLossRate}%`}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {p.stats.bestFriendId && players[p.stats.bestFriendId] && p.stats.bestFriendId !== p.stats.nemesisId && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                                        <span>Rival habituel: <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{players[p.stats.bestFriendId].name}</span></span>
+                                        <span style={{ fontWeight: 700 }}>{p.stats.bestFriendMatches} m.</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Row 4: Mini badges Forme récente */}
+                                {p.stats.recentForm && p.stats.recentForm.length > 0 && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Forme:</span>
+                                    {p.stats.recentForm.map((f, i) => (
+                                      <span key={i} style={{
+                                        width: '16px',
+                                        height: '16px',
+                                        borderRadius: '50%',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.62rem',
+                                        fontWeight: 900,
+                                        background: f === 'W' ? 'rgba(0, 255, 170, 0.2)' : 'rgba(255, 68, 68, 0.2)',
+                                        color: f === 'W' ? 'var(--accent-primary)' : '#ff4444',
+                                        border: `1px solid ${f === 'W' ? 'rgba(0, 255, 170, 0.5)' : 'rgba(255, 68, 68, 0.5)'}`
+                                      }}>
+                                        {f === 'W' ? 'V' : 'D'}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             {isAdminUnlocked && (
