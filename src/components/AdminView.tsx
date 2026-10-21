@@ -2989,7 +2989,10 @@ const AdminView: React.FC = () => {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                color: (p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : 'var(--text-muted)',
+                                color: (p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : '#CCFBF1',
+                                background: (p.level === 'Prestige' || p.level === 'Confirmé') ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 255, 255, 0.12)',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
                                 fontSize: '0.85rem',
                                 marginBottom: '0.4rem',
                                 fontWeight: 700
@@ -2998,18 +3001,18 @@ const AdminView: React.FC = () => {
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', marginTop: '0.3rem' }}>
                                 {/* Row 1: Matchs & Victoires */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.04)', padding: '0.35rem 0.6rem', borderRadius: '6px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.08)', padding: '0.35rem 0.6rem', borderRadius: '6px' }}>
                                   <div>
-                                    <span style={{ color: 'var(--text-muted)' }}>Matchs:</span> <b>{p.stats.matchesPlayed}</b>
-                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginLeft: '5px' }}>
+                                    <span style={{ color: '#CCFBF1', fontWeight: 600 }}>Matchs:</span> <b style={{ color: '#fff' }}>{p.stats.matchesPlayed}</b>
+                                    <span style={{ color: '#CCFBF1', fontSize: '0.75rem', marginLeft: '5px' }}>
                                       ({p.stats.wins}V - {p.stats.losses ?? (p.stats.matchesPlayed - p.stats.wins)}D)
                                     </span>
                                   </div>
                                   <div style={{
                                     fontWeight: 800,
                                     fontSize: '0.85rem',
-                                    color: p.stats.winRate >= 60 ? 'var(--accent-primary)' : (p.stats.winRate >= 45 ? '#ffcc00' : '#ff7777'),
-                                    background: p.stats.winRate >= 60 ? 'rgba(0,255,170,0.12)' : 'rgba(255,255,255,0.06)',
+                                    color: p.stats.winRate >= 60 ? 'var(--accent-primary)' : (p.stats.winRate >= 45 ? '#ffcc00' : '#ff9999'),
+                                    background: p.stats.winRate >= 60 ? 'rgba(0,255,170,0.18)' : 'rgba(255,255,255,0.1)',
                                     padding: '2px 8px',
                                     borderRadius: '6px'
                                   }}>
@@ -3018,10 +3021,10 @@ const AdminView: React.FC = () => {
                                 </div>
 
                                 {/* Row 2: Manches & Titres */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#CCFBF1' }}>
                                   <div>
-                                    Manches: <b style={{ color: '#fff' }}>{p.stats.setsWon ?? 0}</b>/<b style={{ color: '#fff' }}>{p.stats.setsLost ?? 0}</b>
-                                    <span style={{ color: (p.stats.setDiff ?? 0) >= 0 ? 'var(--accent-primary)' : '#ff6666', fontWeight: 700, marginLeft: '4px' }}>
+                                    <span style={{ color: '#CCFBF1' }}>Manches:</span> <b style={{ color: '#fff' }}>{p.stats.setsWon ?? 0}</b>/<b style={{ color: '#fff' }}>{p.stats.setsLost ?? 0}</b>
+                                    <span style={{ color: (p.stats.setDiff ?? 0) >= 0 ? '#00ffaa' : '#ff7777', fontWeight: 700, marginLeft: '4px' }}>
                                       ({(p.stats.setDiff ?? 0) >= 0 ? `+${p.stats.setDiff ?? 0}` : p.stats.setDiff})
                                     </span>
                                   </div>
@@ -3034,19 +3037,19 @@ const AdminView: React.FC = () => {
 
                                 {/* Row 3: Bête Noire & Rival habituel si existant */}
                                 {(p.stats.nemesisId || p.stats.bestFriendId) && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.72rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.35rem' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.72rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.35rem' }}>
                                     {p.stats.nemesisId && players[p.stats.nemesisId] && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                                        <span>Bête noire: <span style={{ color: '#ff7777', fontWeight: 700 }}>{players[p.stats.nemesisId].name}</span></span>
-                                        <span style={{ color: '#ff7777', fontWeight: 700 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#CCFBF1' }}>
+                                        <span>Bête noire: <span style={{ color: '#ffa4a4', fontWeight: 700 }}>{players[p.stats.nemesisId].name}</span></span>
+                                        <span style={{ color: '#ffa4a4', fontWeight: 700 }}>
                                           {p.stats.nemesisLosses ? `${p.stats.nemesisLosses} déf.` : `${p.stats.nemesisLossRate}%`}
                                         </span>
                                       </div>
                                     )}
                                     {p.stats.bestFriendId && players[p.stats.bestFriendId] && p.stats.bestFriendId !== p.stats.nemesisId && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#CCFBF1' }}>
                                         <span>Rival habituel: <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{players[p.stats.bestFriendId].name}</span></span>
-                                        <span style={{ fontWeight: 700 }}>{p.stats.bestFriendMatches} m.</span>
+                                        <span style={{ fontWeight: 700, color: '#fff' }}>{p.stats.bestFriendMatches} m.</span>
                                       </div>
                                     )}
                                   </div>
@@ -3055,7 +3058,7 @@ const AdminView: React.FC = () => {
                                 {/* Row 4: Mini badges Forme récente */}
                                 {p.stats.recentForm && p.stats.recentForm.length > 0 && (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Forme:</span>
+                                    <span style={{ fontSize: '0.72rem', color: '#CCFBF1', fontWeight: 600 }}>Forme:</span>
                                     {p.stats.recentForm.map((f, i) => (
                                       <span key={i} style={{
                                         width: '16px',

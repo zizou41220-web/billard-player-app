@@ -8,14 +8,15 @@
   --accent-secondary: #10B981;
   --text-primary: #0F172A;
   /* Dark for main body */
-  --text-muted: #64748B;
+  --text-muted: #CBD5E1;
+  /* High visibility light silver-slate */
   --border-color: rgba(15, 118, 110, 0.2);
   --shadow-neon: 0 4px 12px rgba(245, 158, 11, 0.3);
 
   --card-bg: #0F766E;
   --card-text: #FFFFFF;
-  --card-text-muted: #99F6E4;
-  /* Light teal for muted inside cards */
+  --card-text-muted: #CCFBF1;
+  /* Luminous ice-mint for maximum contrast on duck green */
   --card-border: #115E59;
 }
 
@@ -73,6 +74,7 @@ body {
 
 /* Glass Card */
 .glass-card {
+  --text-muted: var(--card-text-muted);
   background: var(--card-bg);
   color: var(--card-text);
   border: 1px solid var(--card-border);
@@ -115,9 +117,10 @@ body {
 }
 
 .btn-surface {
+  --text-muted: var(--card-text-muted);
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  color: var(--card-text);
 }
 
 /* Typography */
