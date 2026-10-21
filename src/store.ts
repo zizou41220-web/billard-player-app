@@ -9,7 +9,8 @@ import {
   getMaxAllowedQualifHandicap,
   getMaxAllowedFinalHandicap,
   getTournamentPhaseHandicap,
-  resolveDuelTargetSets
+  resolveDuelTargetSets,
+  getPhaseRules
 } from './utils/rules';
 import { supabase } from './supabase';
 
@@ -39,9 +40,11 @@ interface AppState {
   addTable: (name: string) => void;
   removeTable: (tableId: string) => void;
   postponeMatch: (matchId: string, replacementMatchId?: string) => void;
-  launchFinalStage: (tournamentId: string, hasThirdPlaceMatch?: boolean) => void;
+  launchFinalStage: (tournamentId: string, hasThirdPlaceMatch?: boolean, customSettings?: Partial<TournamentSettings>) => void;
   reseedFinalStage: (tournamentId: string) => void;
   toggleThirdPlaceMatch: (tournamentId: string) => void;
+  updateTournamentSettings: (tournamentId: string, newSettings: Partial<TournamentSettings>) => void;
+  updateMatchSettings: (matchId: string, targetSets: number, handicapP1?: number, handicapP2?: number) => void;
   endTournament: (tournamentId: string) => void;
   deleteTournament: (tournamentId: string) => void;
   autoDispatchMatches: () => void;
@@ -202,11 +205,11 @@ export const healAndAdvanceBracketMatches = (
         const p1 = qWinners[0] || semi1.player1Id;
         const p2 = qWinners[1] || semi1.player2Id;
         if (p1 !== semi1.player1Id || p2 !== semi1.player2Id) {
-          const finalH = getTournamentPhaseHandicap(tour.settings, true);
+          const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour.settings, 'semi');
           const p1Level = players[p1]?.level;
           const p2Level = players[p2]?.level;
-          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true);
-          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true, 'semi');
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
           newMatches[semi1.id] = {
             ...semi1,
@@ -226,11 +229,11 @@ export const healAndAdvanceBracketMatches = (
         const p1 = qWinners[2] || semi2.player1Id;
         const p2 = qWinners[3] || semi2.player2Id;
         if (p1 !== semi2.player1Id || p2 !== semi2.player2Id) {
-          const finalH = getTournamentPhaseHandicap(tour.settings, true);
+          const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour.settings, 'semi');
           const p1Level = players[p1]?.level;
           const p2Level = players[p2]?.level;
-          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true);
-          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true, 'semi');
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
           newMatches[semi2.id] = {
             ...semi2,
@@ -292,11 +295,11 @@ export const healAndAdvanceBracketMatches = (
         const p1 = s1Winner || targetFinal.player1Id;
         const p2 = s2Winner || targetFinal.player2Id;
         if (p1 !== targetFinal.player1Id || p2 !== targetFinal.player2Id) {
-          const finalH = getTournamentPhaseHandicap(tour.settings, true);
+          const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour.settings, 'final');
           const p1Level = players[p1]?.level;
           const p2Level = players[p2]?.level;
-          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true);
-          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true, 'final');
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
           newMatches[targetFinal.id] = {
             ...targetFinal,
@@ -347,11 +350,11 @@ export const healAndAdvanceBracketMatches = (
         const p1 = s1Loser || targetThirdPlace.player1Id;
         const p2 = s2Loser || targetThirdPlace.player2Id;
         if (p1 !== targetThirdPlace.player1Id || p2 !== targetThirdPlace.player2Id) {
-          const finalH = getTournamentPhaseHandicap(tour.settings, true);
+          const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour.settings, 'third_place');
           const p1Level = players[p1]?.level;
           const p2Level = players[p2]?.level;
-          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true);
-          const maxH = (tour.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour.settings, true, 'third_place');
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
           newMatches[targetThirdPlace.id] = {
             ...targetThirdPlace,
@@ -715,6 +718,26 @@ export const useStore = create<AppState>((set, get) => ({
     const cleanQualifHandicap = Math.min(rawQualifHandicap, maxAllowedQualifHandicap);
     const cleanFinalHandicap = Math.min(rawFinalHandicap, maxAllowedFinalHandicap);
 
+    const grandFinalMixed = settings?.grandFinalNbSetsMixed || settings?.grandFinalNbSets || finalNbSetsMixed;
+    const maxAllowedGrandFinalHandicap = getMaxAllowedFinalHandicap(
+      grandFinalMixed,
+      settings?.grandFinalIsWinningSets ?? settings?.finalIsWinningSets ?? true
+    );
+    const rawGrandFinalH = settings?.grandFinalHandicapAmateurSets !== undefined
+      ? settings.grandFinalHandicapAmateurSets
+      : cleanFinalHandicap;
+    const cleanGrandFinalH = Math.min(rawGrandFinalH, maxAllowedGrandFinalHandicap);
+
+    const thirdPlaceMixed = settings?.thirdPlaceNbSetsMixed || settings?.thirdPlaceNbSets || finalNbSetsMixed;
+    const maxAllowedThirdPlaceHandicap = getMaxAllowedFinalHandicap(
+      thirdPlaceMixed,
+      settings?.thirdPlaceIsWinningSets ?? settings?.finalIsWinningSets ?? true
+    );
+    const rawThirdPlaceH = settings?.thirdPlaceHandicapAmateurSets !== undefined
+      ? settings.thirdPlaceHandicapAmateurSets
+      : cleanFinalHandicap;
+    const cleanThirdPlaceH = Math.min(rawThirdPlaceH, maxAllowedThirdPlaceHandicap);
+
     const cleanQualifNbQualifiers = (format !== 'direct_ko' && participants.length >= 3)
       ? Math.max(2, Math.min(participants.length - 1, settings?.qualifNbQualifiers || 2))
       : (settings?.qualifNbQualifiers || 2);
@@ -732,7 +755,23 @@ export const useStore = create<AppState>((set, get) => ({
       qualifNbQualifiers: cleanQualifNbQualifiers,
       qualifHandicapAmateurSets: cleanQualifHandicap,
       finalHandicapAmateurSets: cleanFinalHandicap,
-      handicapAmateurSets: cleanFinalHandicap
+      handicapAmateurSets: cleanFinalHandicap,
+
+      grandFinalCustom: Boolean(settings?.grandFinalCustom),
+      grandFinalIsWinningSets: settings?.grandFinalIsWinningSets ?? (settings?.finalIsWinningSets ?? true),
+      grandFinalNbSets: grandFinalMixed,
+      grandFinalNbSetsAmateur: settings?.grandFinalNbSetsAmateur || settings?.finalNbSetsAmateur || 3,
+      grandFinalNbSetsPrestige: settings?.grandFinalNbSetsPrestige || settings?.finalNbSetsPrestige || 3,
+      grandFinalNbSetsMixed: grandFinalMixed,
+      grandFinalHandicapAmateurSets: cleanGrandFinalH,
+
+      thirdPlaceCustom: Boolean(settings?.thirdPlaceCustom),
+      thirdPlaceIsWinningSets: settings?.thirdPlaceIsWinningSets ?? (settings?.finalIsWinningSets ?? true),
+      thirdPlaceNbSets: thirdPlaceMixed,
+      thirdPlaceNbSetsAmateur: settings?.thirdPlaceNbSetsAmateur || settings?.finalNbSetsAmateur || 3,
+      thirdPlaceNbSetsPrestige: settings?.thirdPlaceNbSetsPrestige || settings?.finalNbSetsPrestige || 3,
+      thirdPlaceNbSetsMixed: thirdPlaceMixed,
+      thirdPlaceHandicapAmateurSets: cleanThirdPlaceH
     };
 
     if (format === 'direct_ko') {
@@ -1129,11 +1168,12 @@ export const useStore = create<AppState>((set, get) => ({
         // If next match now has both players and hasn't started, apply handicap and target sets
         if (nextM.player1Id && nextM.player2Id && nextM.status === 'pending') {
           const tour = match.tournamentId ? state.tournaments[match.tournamentId] : null;
-          const finalH = getTournamentPhaseHandicap(tour?.settings, true);
+          const nextStage = nextM.stage || (nextM.id.includes('_final_') ? 'final' : undefined);
+          const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour?.settings, nextStage);
           const p1Level = state.players[nextM.player1Id]?.level;
           const p2Level = state.players[nextM.player2Id]?.level;
-          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true);
-          const maxH = (tour?.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true, nextStage);
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(
             p1Level,
             p2Level,
@@ -1167,11 +1207,11 @@ export const useStore = create<AppState>((set, get) => ({
           }
           if (tpM.player1Id && tpM.player2Id && tpM.status === 'pending') {
             const tour = state.tournaments[match.tournamentId];
-            const finalH = getTournamentPhaseHandicap(tour?.settings, true);
+            const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour?.settings, 'third_place');
             const p1Level = state.players[tpM.player1Id]?.level;
             const p2Level = state.players[tpM.player2Id]?.level;
-            const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true);
-            const maxH = (tour?.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+            const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true, 'third_place');
+            const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
             const { h1, h2 } = getMatchHandicap(
               p1Level,
               p2Level,
@@ -1348,11 +1388,12 @@ export const useStore = create<AppState>((set, get) => ({
         // If next match now has both players and hasn't started, apply handicap and target sets
         if (nextM.player1Id && nextM.player2Id && nextM.status === 'pending') {
           const tour = match.tournamentId ? state.tournaments[match.tournamentId] : null;
-          const finalH = getTournamentPhaseHandicap(tour?.settings, true);
+          const nextStage = nextM.stage || (nextM.id.includes('_final_') ? 'final' : undefined);
+          const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour?.settings, nextStage);
           const p1Level = state.players[nextM.player1Id]?.level;
           const p2Level = state.players[nextM.player2Id]?.level;
-          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true);
-          const maxH = (tour?.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true, nextStage);
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(
             p1Level,
             p2Level,
@@ -1386,11 +1427,11 @@ export const useStore = create<AppState>((set, get) => ({
           }
           if (tpM.player1Id && tpM.player2Id && tpM.status === 'pending') {
             const tour = state.tournaments[match.tournamentId];
-            const finalH = getTournamentPhaseHandicap(tour?.settings, true);
+            const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour?.settings, 'third_place');
             const p1Level = state.players[tpM.player1Id]?.level;
             const p2Level = state.players[tpM.player2Id]?.level;
-            const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true);
-            const maxH = (tour?.settings?.finalIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+            const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true, 'third_place');
+            const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
             const { h1, h2 } = getMatchHandicap(
               p1Level,
               p2Level,
@@ -1555,7 +1596,7 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  launchFinalStage: (tournamentId: string, hasThirdPlaceMatch?: boolean) => {
+  launchFinalStage: (tournamentId: string, hasThirdPlaceMatch?: boolean, customSettings?: Partial<TournamentSettings>) => {
     set((state) => {
       const tournament = state.tournaments[tournamentId];
       if (!tournament) return state;
@@ -1604,18 +1645,26 @@ export const useStore = create<AppState>((set, get) => ({
         supabase.from('tournoi2_matches').delete().in('id', oldFinalMatchIds).then();
       }
 
+      const mergedSettings: TournamentSettings = {
+        ...(tournament.settings || {} as TournamentSettings),
+        ...(customSettings || {}),
+        hasThirdPlaceMatch: shouldIncludeThirdPlace,
+        finalStageLaunched: true,
+        seedByMerit: true
+      };
+
       // Construction de l'arbre universel (2 à 128 joueurs) avec Byes (Blancs) automatiques
-      const finalHandicap = getTournamentPhaseHandicap(tournament.settings, true);
+      const finalHandicap = getTournamentPhaseHandicap(mergedSettings, true);
       const { newMatches: bracketMatches, newMatchIds } = buildBracketMatches({
         tournamentId,
         clubId: state.currentClub.id,
         qualifiers,
         handicapAmateurSets: finalHandicap,
-        finalNbSets: tournament.settings?.finalNbSets,
-        finalIsWinningSets: tournament.settings?.finalIsWinningSets,
+        finalNbSets: mergedSettings.finalNbSets,
+        finalIsWinningSets: mergedSettings.finalIsWinningSets,
         hasThirdPlaceMatch: shouldIncludeThirdPlace,
         players: state.players,
-        tournamentSettings: tournament.settings
+        tournamentSettings: mergedSettings
       });
 
       Object.assign(newMatches, bracketMatches);
@@ -1645,31 +1694,25 @@ export const useStore = create<AppState>((set, get) => ({
         }
       });
 
+      const finalSettingsToSave: TournamentSettings = {
+        ...mergedSettings,
+        tableIds: tournamentTableIds
+      };
+
       const updatedTournaments: Record<string, Tournament> = {
         ...state.tournaments,
         [tournamentId]: {
           ...tournament,
           matches: [...qualifMatchIdsOnly, ...newMatchIds],
           finalStageLaunched: true,
-          settings: tournament.settings ? {
-            ...tournament.settings,
-            tableIds: tournamentTableIds,
-            finalStageLaunched: true,
-            seedByMerit: true,
-            hasThirdPlaceMatch: shouldIncludeThirdPlace
-          } : {
-            tableIds: tournamentTableIds,
-            qualifNbSets: 1,
-            qualifIsWinningSets: true,
-            qualifNbQualifiers: numQualifiers,
-            finalNbSets: 1,
-            finalIsWinningSets: true,
-            seedByMerit: true,
-            finalStageLaunched: true,
-            hasThirdPlaceMatch: shouldIncludeThirdPlace
-          }
+          settings: finalSettingsToSave
         }
       };
+
+      supabase.from('tournoi2_tournaments').update({
+        settings: finalSettingsToSave,
+        matches: [...qualifMatchIdsOnly, ...newMatchIds]
+      }).eq('id', tournamentId).then();
 
       // 3. Auto-assign free tables to ready final matches with dispatchTournamentMatches
       const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
@@ -1835,8 +1878,13 @@ export const useStore = create<AppState>((set, get) => ({
           p2Id = semi2.winnerId === semi2.player1Id ? semi2.player2Id : semi2.player1Id;
         }
 
+        const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tournament.settings, 'third_place');
+        const p1Level = state.players[p1Id]?.level;
+        const p2Level = state.players[p2Id]?.level;
+        const targetSets = resolveDuelTargetSets(p1Level, p2Level, tournament.settings, true, 'third_place');
+        const duelMaxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
         const { h1, h2 } = (p1Id && p2Id)
-          ? getMatchHandicap(state.players[p1Id]?.level, state.players[p2Id]?.level, tournament.settings?.handicapAmateurSets)
+          ? getMatchHandicap(p1Level, p2Level, finalH, duelMaxH)
           : { h1: 0, h2: 0 };
 
         newMatches[thirdPlaceId] = {
@@ -1844,6 +1892,7 @@ export const useStore = create<AppState>((set, get) => ({
           clubId: state.currentClub.id,
           player1Id: p1Id,
           player2Id: p2Id,
+          targetSets,
           score1: h1,
           score2: h2,
           handicapP1: h1 > 0 ? h1 : undefined,
@@ -1864,6 +1913,29 @@ export const useStore = create<AppState>((set, get) => ({
             hasThirdPlaceMatch: true
           } as any
         };
+
+        supabase.from('tournoi2_tournaments').update({
+          settings: updatedTournament.settings,
+          matches: updatedTournament.matches
+        }).eq('id', tournamentId).then();
+
+        supabase.from('tournoi2_matches').insert({
+          id: thirdPlaceId,
+          club_id: state.currentClub.id,
+          tournament_id: tournamentId,
+          stage: 'third_place',
+          bracket_round: 2,
+          bracket_position: 1,
+          player1_id: p1Id || null,
+          player2_id: p2Id || null,
+          target_sets: targetSets,
+          score1: h1,
+          score2: h2,
+          handicap_p1: h1 > 0 ? h1 : null,
+          handicap_p2: h2 > 0 ? h2 : null,
+          status: 'pending',
+          start_time: timestamp
+        }).then();
 
         const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
           state.tables,
@@ -1891,6 +1963,13 @@ export const useStore = create<AppState>((set, get) => ({
           } as any
         };
 
+        supabase.from('tournoi2_tournaments').update({
+          settings: updatedTournament.settings,
+          matches: updatedTournament.matches
+        }).eq('id', tournamentId).then();
+
+        supabase.from('tournoi2_matches').delete().eq('id', thirdPlaceId).then();
+
         const newTables = { ...state.tables };
         Object.keys(newTables).forEach(tId => {
           if (newTables[tId].currentMatchId === thirdPlaceId) {
@@ -1904,6 +1983,101 @@ export const useStore = create<AppState>((set, get) => ({
           tournaments: { ...state.tournaments, [tournamentId]: updatedTournament }
         };
       }
+    });
+  },
+
+  updateTournamentSettings: (tournamentId: string, newSettings: Partial<TournamentSettings>) => {
+    set((state) => {
+      const tour = state.tournaments[tournamentId];
+      if (!tour) return state;
+
+      const mergedSettings: TournamentSettings = {
+        ...(tour.settings || {} as TournamentSettings),
+        ...newSettings
+      };
+
+      const newMatches = { ...state.matches };
+      let matchesUpdated = false;
+
+      // Met à jour les targetSets et handicaps des matchs en attente non commencés
+      tour.matches.forEach(mId => {
+        const m = newMatches[mId];
+        if (m && m.status === 'pending' && m.player1Id && m.player2Id) {
+          const matchStage = m.stage || (m.id.includes('_third_place_') ? 'third_place' : (m.id.includes('_final_') ? 'final' : undefined));
+          const { isWinningSets: matchWinning, handicap: matchH } = getPhaseRules(mergedSettings, matchStage);
+          const p1Level = state.players[m.player1Id]?.level;
+          const p2Level = state.players[m.player2Id]?.level;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, mergedSettings, true, matchStage);
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(p1Level, p2Level, matchH, maxH);
+          newMatches[mId] = {
+            ...m,
+            targetSets,
+            score1: h1,
+            score2: h2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+          matchesUpdated = true;
+          supabase.from('tournoi2_matches').update({
+            target_sets: targetSets,
+            score1: h1,
+            score2: h2,
+            handicap_p1: h1 > 0 ? h1 : null,
+            handicap_p2: h2 > 0 ? h2 : null
+          }).eq('id', mId).then();
+        }
+      });
+
+      const updatedTournament = {
+        ...tour,
+        settings: mergedSettings
+      };
+
+      supabase.from('tournoi2_tournaments').update({
+        settings: mergedSettings
+      }).eq('id', tournamentId).then();
+
+      return {
+        tournaments: {
+          ...state.tournaments,
+          [tournamentId]: updatedTournament
+        },
+        matches: matchesUpdated ? newMatches : state.matches
+      };
+    });
+  },
+
+  updateMatchSettings: (matchId: string, targetSets: number, handicapP1?: number, handicapP2?: number) => {
+    set((state) => {
+      const m = state.matches[matchId];
+      if (!m) return state;
+
+      const h1 = handicapP1 || 0;
+      const h2 = handicapP2 || 0;
+      const updatedMatch: Match = {
+        ...m,
+        targetSets,
+        handicapP1: h1 > 0 ? h1 : undefined,
+        handicapP2: h2 > 0 ? h2 : undefined,
+        score1: m.status === 'pending' ? h1 : m.score1,
+        score2: m.status === 'pending' ? h2 : m.score2
+      };
+
+      supabase.from('tournoi2_matches').update({
+        target_sets: targetSets,
+        handicap_p1: h1 > 0 ? h1 : null,
+        handicap_p2: h2 > 0 ? h2 : null,
+        score1: updatedMatch.score1,
+        score2: updatedMatch.score2
+      }).eq('id', matchId).then();
+
+      return {
+        matches: {
+          ...state.matches,
+          [matchId]: updatedMatch
+        }
+      };
     });
   },
 

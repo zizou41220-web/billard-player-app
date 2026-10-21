@@ -88,6 +88,24 @@ export type TournamentSettings = {
   finalStageLaunched?: boolean;
   handicapAmateurSets?: number; // Rétrocompatibilité globale
   hasThirdPlaceMatch?: boolean; // Petite finale pour la 3ème place
+
+  // Configuration spécifique Grande Finale
+  grandFinalCustom?: boolean;
+  grandFinalIsWinningSets?: boolean;
+  grandFinalNbSets?: number;
+  grandFinalNbSetsAmateur?: number;
+  grandFinalNbSetsPrestige?: number;
+  grandFinalNbSetsMixed?: number;
+  grandFinalHandicapAmateurSets?: number;
+
+  // Configuration spécifique Petite Finale (3ème place)
+  thirdPlaceCustom?: boolean;
+  thirdPlaceIsWinningSets?: boolean;
+  thirdPlaceNbSets?: number;
+  thirdPlaceNbSetsAmateur?: number;
+  thirdPlaceNbSetsPrestige?: number;
+  thirdPlaceNbSetsMixed?: number;
+  thirdPlaceHandicapAmateurSets?: number;
 };
 
 export type Tournament = {

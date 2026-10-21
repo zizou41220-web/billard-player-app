@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Match, MatchStage } from '../types';
+import { Match, MatchStage, TournamentSettings } from '../types';
 import {
   Trophy, Swords, CheckCircle2, Clock, Sparkles,
-  Users, AlertCircle, ShieldCheck, QrCode, RefreshCw
+  Users, AlertCircle, ShieldCheck, QrCode, RefreshCw, Settings
 } from 'lucide-react';
 import { getTournamentQualificationStatus, PlayerQualifStat } from '../utils/qualifiers';
 import { getBracketSize, getBracketRounds, isFinalStageMatch, generateSeedingPairs } from '../utils/bracket';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
+import { getMatchScoringRules, resolveDuelTargetSets, getPhaseRules } from '../utils/rules';
 
 interface BracketViewProps {
   onSelectTableForQR?: (tableId: string) => void;
+  onOpenEditRules?: () => void;
 }
 
-export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTableForQR }) => {
+export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTableForQR, onOpenEditRules }) => {
   const { tournaments, matches, players, tables, launchFinalStage, reseedFinalStage, toggleThirdPlaceMatch, autoDispatchMatches, currentClub } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -22,6 +24,41 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
   const [confirmLaunchOpen, setConfirmLaunchOpen] = useState(false);
   const [modalIncludeThirdPlace, setModalIncludeThirdPlace] = useState(activeTournament?.settings?.hasThirdPlaceMatch ?? true);
   const [selectedRoundFilter, setSelectedRoundFilter] = useState<string>('all');
+
+  // Custom finals settings for launch modal
+  const [modalGfCustom, setModalGfCustom] = useState(false);
+  const [modalGfIsWinning, setModalGfIsWinning] = useState(true);
+  const [modalGfAmateur, setModalGfAmateur] = useState(3);
+  const [modalGfPrestige, setModalGfPrestige] = useState(3);
+  const [modalGfMixed, setModalGfMixed] = useState(3);
+  const [modalGfHandicap, setModalGfHandicap] = useState(0);
+
+  const [modalTpCustom, setModalTpCustom] = useState(false);
+  const [modalTpIsWinning, setModalTpIsWinning] = useState(true);
+  const [modalTpAmateur, setModalTpAmateur] = useState(3);
+  const [modalTpPrestige, setModalTpPrestige] = useState(3);
+  const [modalTpMixed, setModalTpMixed] = useState(3);
+  const [modalTpHandicap, setModalTpHandicap] = useState(0);
+
+  const handleOpenLaunchModal = () => {
+    const s = activeTournament?.settings;
+    setModalIncludeThirdPlace(s?.hasThirdPlaceMatch ?? true);
+    setModalGfCustom(s?.grandFinalCustom ?? false);
+    setModalGfIsWinning(s?.grandFinalIsWinningSets ?? s?.finalIsWinningSets ?? true);
+    setModalGfAmateur(s?.grandFinalNbSetsAmateur ?? s?.finalNbSetsAmateur ?? s?.finalNbSets ?? 3);
+    setModalGfPrestige(s?.grandFinalNbSetsPrestige ?? s?.finalNbSetsPrestige ?? s?.finalNbSets ?? 3);
+    setModalGfMixed(s?.grandFinalNbSetsMixed ?? s?.finalNbSetsMixed ?? s?.finalNbSets ?? 3);
+    setModalGfHandicap(s?.grandFinalHandicapAmateurSets ?? s?.finalHandicapAmateurSets ?? 0);
+
+    setModalTpCustom(s?.thirdPlaceCustom ?? false);
+    setModalTpIsWinning(s?.thirdPlaceIsWinningSets ?? s?.finalIsWinningSets ?? true);
+    setModalTpAmateur(s?.thirdPlaceNbSetsAmateur ?? s?.finalNbSetsAmateur ?? s?.finalNbSets ?? 3);
+    setModalTpPrestige(s?.thirdPlaceNbSetsPrestige ?? s?.finalNbSetsPrestige ?? s?.finalNbSets ?? 3);
+    setModalTpMixed(s?.thirdPlaceNbSetsMixed ?? s?.finalNbSetsMixed ?? s?.finalNbSets ?? 3);
+    setModalTpHandicap(s?.thirdPlaceHandicapAmateurSets ?? s?.finalHandicapAmateurSets ?? 0);
+
+    setConfirmLaunchOpen(true);
+  };
 
   React.useEffect(() => {
     // Auto-dispatch / advance any ready bracket matches to ensure sync with DB
@@ -378,7 +415,30 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         </div>
 
         {/* Action button if not launched */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          {onOpenEditRules && (
+            <button
+              className="btn btn-outline"
+              id="btn-bracket-edit-rules"
+              title="Modifier les règles et distances des finales et du tournoi"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                borderColor: '#ffd700',
+                color: '#ffd700',
+                background: 'rgba(255, 215, 0, 0.1)',
+                padding: '0.6rem 1rem',
+                fontSize: '0.88rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+              onClick={onOpenEditRules}
+            >
+              <Settings size={16} /> Règles & Distances
+            </button>
+          )}
+
           {!isFinalLaunched ? (
             <button
               className="btn btn-neon"
@@ -396,7 +456,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                setConfirmLaunchOpen(true);
+                handleOpenLaunchModal();
               }}
             >
               <Sparkles size={18} />
@@ -479,25 +539,28 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           justifyContent: 'center',
           zIndex: 10000
         }}>
-          <div className="glass-card" style={{ maxWidth: '520px', width: '90%', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '1px solid var(--accent-primary)' }}>
+          <div className="glass-card" style={{ maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', width: '92%', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.4rem', border: '1px solid var(--accent-primary)', background: '#070b1e' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0, 255, 170, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0, 255, 170, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)', flexShrink: 0 }}>
                 <Swords size={22} />
               </div>
-              <h3 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 800 }}>Confirmer le lancement des Phases Finales</h3>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>Confirmer le lancement des Phases Finales</h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Vérifiez les qualifiés et les règles de distance des finales</span>
+              </div>
             </div>
 
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: 0, lineHeight: '1.5' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0, lineHeight: '1.5' }}>
               Les <strong>{numQualifiers} premiers joueurs</strong> du classement actuel seront officiellement qualifiés et inscrits dans l'arbre d'élimination directe :
             </p>
 
-            <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '10px', padding: '1rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '10px', padding: '0.8rem 1rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '140px', overflowY: 'auto' }}>
               {ranking.slice(0, numQualifiers).map((p, i) => (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                   <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
                     #{i + 1} {p.name}
                   </span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                     {p.pts} pts ({p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa})
                   </span>
                 </div>
@@ -505,25 +568,25 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
             </div>
 
             {numQualifiers === 7 && (
-              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.5rem 0.8rem', fontSize: '0.8rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>⚡</span>
                 <span><strong>1 Blanc (exempt)</strong> sera automatiquement attribué au 1er (#{ranking[0]?.name}) directement en demi-finale !</span>
               </div>
             )}
             {numQualifiers === 6 && (
-              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.5rem 0.8rem', fontSize: '0.8rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>⚡</span>
                 <span><strong>2 Blancs (exempts)</strong> attribués au 1er (#{ranking[0]?.name}) et 2ème (#{ranking[1]?.name}) directement en demi-finale !</span>
               </div>
             )}
             {numQualifiers === 5 && (
-              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.5rem 0.8rem', fontSize: '0.8rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>⚡</span>
                 <span><strong>3 Blancs (exempts)</strong> attribués au 1er, 2ème et 3ème directement en demi-finale !</span>
               </div>
             )}
             {numQualifiers === 3 && (
-              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px', padding: '0.5rem 0.8rem', fontSize: '0.8rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>⚡</span>
                 <span><strong>1 Blanc (exempt)</strong> attribué au 1er (#{ranking[0]?.name}) directement en grande finale !</span>
               </div>
@@ -536,7 +599,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                 gap: '0.8rem',
                 cursor: 'pointer',
                 background: modalIncludeThirdPlace ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255,255,255,0.03)',
-                padding: '0.8rem 1rem',
+                padding: '0.7rem 0.9rem',
                 borderRadius: '10px',
                 border: `1px solid ${modalIncludeThirdPlace ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-color)'}`
               }}>
@@ -547,21 +610,244 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                   style={{ width: '18px', height: '18px', accentColor: '#f59e0b', cursor: 'pointer' }}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontWeight: 800, fontSize: '0.9rem', color: modalIncludeThirdPlace ? '#f59e0b' : '#fff' }}>
-                    Petite Finale (Match pour la 3ème place)
+                  <span style={{ fontWeight: 800, fontSize: '0.88rem', color: modalIncludeThirdPlace ? '#f59e0b' : '#fff' }}>
+                    🥉 Petite Finale (Match pour la 3ème place)
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                     Faire s'affronter les perdants des 1/2 finales pour désigner le 3ème du tournoi
                   </span>
                 </div>
               </label>
             )}
 
-            <p style={{ color: '#ffcc00', fontSize: '0.85rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {/* SECTION PARAMÉTRAGE DES FINALES */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>⚙️</span>
+                  <span>Distances personnalisées des Finales</span>
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  (Optionnel • défaut = distances du tableau final)
+                </span>
+              </div>
+
+              {/* GRANDE FINALE CARD */}
+              <div style={{
+                background: modalGfCustom ? 'rgba(255, 215, 0, 0.08)' : 'rgba(0, 0, 0, 0.25)',
+                border: `1px solid ${modalGfCustom ? 'rgba(255, 215, 0, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                borderRadius: '10px',
+                padding: '0.8rem 1rem'
+              }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', marginBottom: modalGfCustom ? '0.8rem' : 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={modalGfCustom}
+                    onChange={(e) => setModalGfCustom(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#ffd700' }}
+                  />
+                  <span style={{ fontWeight: 800, fontSize: '0.88rem', color: modalGfCustom ? '#ffd700' : '#fff' }}>
+                    🏆 Personnaliser la Grande Finale
+                  </span>
+                </label>
+
+                {modalGfCustom && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(255, 215, 0, 0.25)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Format :</span>
+                      <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <button
+                          type="button"
+                          className={`btn ${modalGfIsWinning ? 'btn-neon' : 'btn-outline'}`}
+                          style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}
+                          onClick={() => setModalGfIsWinning(true)}
+                        >
+                          Gagnantes
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${!modalGfIsWinning ? 'btn-neon' : 'btn-outline'}`}
+                          style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}
+                          onClick={() => setModalGfIsWinning(false)}
+                        >
+                          Fixes
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                      <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: '6px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Amateur vs Amat.</div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={modalGfAmateur}
+                          onChange={(e) => setModalGfAmateur(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="input"
+                          style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
+                        />
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: '6px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Prestige vs Prest.</div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={modalGfPrestige}
+                          onChange={(e) => setModalGfPrestige(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="input"
+                          style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
+                        />
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: '6px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Mixte (Amat./Prest.)</div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={modalGfMixed}
+                          onChange={(e) => setModalGfMixed(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="input"
+                          style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Handicap Amateur en duel Mixte :</span>
+                      <select
+                        value={modalGfHandicap}
+                        onChange={(e) => setModalGfHandicap(parseInt(e.target.value) || 0)}
+                        className="input"
+                        style={{ width: '120px', padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
+                      >
+                        <option value={0}>Aucun (0)</option>
+                        <option value={1}>+1 manche</option>
+                        <option value={2}>+2 manches</option>
+                        <option value={3}>+3 manches</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* PETITE FINALE CARD */}
+              {modalIncludeThirdPlace && (
+                <div style={{
+                  background: modalTpCustom ? 'rgba(245, 158, 11, 0.08)' : 'rgba(0, 0, 0, 0.25)',
+                  border: `1px solid ${modalTpCustom ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                  borderRadius: '10px',
+                  padding: '0.8rem 1rem'
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', marginBottom: modalTpCustom ? '0.8rem' : 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={modalTpCustom}
+                      onChange={(e) => setModalTpCustom(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#f59e0b' }}
+                    />
+                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: modalTpCustom ? '#f59e0b' : '#fff' }}>
+                      🥉 Personnaliser la Petite Finale
+                    </span>
+                  </label>
+
+                  {modalTpCustom && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(245, 158, 11, 0.25)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Format :</span>
+                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                          <button
+                            type="button"
+                            className={`btn ${modalTpIsWinning ? 'btn-neon' : 'btn-outline'}`}
+                            style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}
+                            onClick={() => setModalTpIsWinning(true)}
+                          >
+                            Gagnantes
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn ${!modalTpIsWinning ? 'btn-neon' : 'btn-outline'}`}
+                            style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}
+                            onClick={() => setModalTpIsWinning(false)}
+                          >
+                            Fixes
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: '6px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Amateur vs Amat.</div>
+                          <input
+                            type="number"
+                            min={1}
+                            max={15}
+                            value={modalTpAmateur}
+                            onChange={(e) => setModalTpAmateur(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="input"
+                            style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
+                          />
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: '6px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Prestige vs Prest.</div>
+                          <input
+                            type="number"
+                            min={1}
+                            max={15}
+                            value={modalTpPrestige}
+                            onChange={(e) => setModalTpPrestige(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="input"
+                            style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
+                          />
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: '6px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Mixte (Amat./Prest.)</div>
+                          <input
+                            type="number"
+                            min={1}
+                            max={15}
+                            value={modalTpMixed}
+                            onChange={(e) => setModalTpMixed(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="input"
+                            style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Handicap Amateur en duel Mixte :</span>
+                        <select
+                          value={modalTpHandicap}
+                          onChange={(e) => setModalTpHandicap(parseInt(e.target.value) || 0)}
+                          className="input"
+                          style={{ width: '120px', padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
+                        >
+                          <option value={0}>Aucun (0)</option>
+                          <option value={1}>+1 manche</option>
+                          <option value={2}>+2 manches</option>
+                          <option value={3}>+3 manches</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <p style={{ color: '#ffcc00', fontSize: '0.82rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <AlertCircle size={16} /> Les matchs de phase finale seront automatiquement répartis sur les billards disponibles.
             </p>
 
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.3rem' }}>
               <button className="btn btn-outline" onClick={() => setConfirmLaunchOpen(false)}>
                 Annuler
               </button>
@@ -570,7 +856,22 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                 id="btn-confirm-launch-final"
                 onClick={(e) => {
                   e.stopPropagation();
-                  launchFinalStage(activeTournament.id, modalIncludeThirdPlace);
+                  const customSettings: Partial<TournamentSettings> = {
+                    hasThirdPlaceMatch: modalIncludeThirdPlace,
+                    grandFinalCustom: modalGfCustom,
+                    grandFinalIsWinningSets: modalGfIsWinning,
+                    grandFinalNbSetsAmateur: modalGfAmateur,
+                    grandFinalNbSetsPrestige: modalGfPrestige,
+                    grandFinalNbSetsMixed: modalGfMixed,
+                    grandFinalHandicapAmateurSets: modalGfHandicap,
+                    thirdPlaceCustom: modalTpCustom,
+                    thirdPlaceIsWinningSets: modalTpIsWinning,
+                    thirdPlaceNbSetsAmateur: modalTpAmateur,
+                    thirdPlaceNbSetsPrestige: modalTpPrestige,
+                    thirdPlaceNbSetsMixed: modalTpMixed,
+                    thirdPlaceHandicapAmateurSets: modalTpHandicap
+                  };
+                  launchFinalStage(activeTournament.id, modalIncludeThirdPlace, customSettings);
                   setConfirmLaunchOpen(false);
                 }}
               >
@@ -758,6 +1059,18 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
 
                   const isPlaying = m.status === 'playing';
 
+                  const scoringRules = m.realMatch
+                    ? getMatchScoringRules(m.realMatch, activeTournament, players)
+                    : (() => {
+                        const { isWinningSets } = getPhaseRules(activeTournament.settings, m.stage);
+                        const target = resolveDuelTargetSets(p1?.level, p2?.level, activeTournament.settings, true, m.stage);
+                        return {
+                          formatLabel: isWinningSets
+                            ? `${target} manche${target > 1 ? 's' : ''} gagnante${target > 1 ? 's' : ''}`
+                            : `${target} manche${target > 1 ? 's' : ''} fixe${target > 1 ? 's' : ''}`
+                        };
+                      })();
+
                   return (
                     <div
                       key={m.id}
@@ -785,9 +1098,24 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                     >
                       {/* Match Header Tag */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', fontSize: '0.75rem' }}>
-                        <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>
-                          {m.title}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>
+                            {m.title}
+                          </span>
+                          {!isBye && scoringRules?.formatLabel && (
+                            <span style={{
+                              fontSize: '0.66rem',
+                              color: m.stage === 'final' ? '#ffd700' : (m.stage === 'third_place' ? '#f59e0b' : 'var(--accent-primary)'),
+                              background: m.stage === 'final' ? 'rgba(255, 215, 0, 0.12)' : (m.stage === 'third_place' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(0, 255, 170, 0.08)'),
+                              border: `1px solid ${m.stage === 'final' ? 'rgba(255, 215, 0, 0.3)' : (m.stage === 'third_place' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(0, 255, 170, 0.2)')}`,
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 700
+                            }}>
+                              {scoringRules.formatLabel}
+                            </span>
+                          )}
+                        </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           {tableName && (

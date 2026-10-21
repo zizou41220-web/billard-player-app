@@ -23,7 +23,8 @@ const AdminView: React.FC = () => {
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
     assignMatchToTable, updateFinishedMatchScore, startTournamentMatch,
-    launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream
+    launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream,
+    updateTournamentSettings
   } = useStore();
 
   const allTournaments = Object.values(tournaments);
@@ -89,8 +90,30 @@ const AdminView: React.FC = () => {
   const [finalHandicapAmateurSets, setFinalHandicapAmateurSets] = useState(0);
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(true);
 
+  // Configuration spécifique Grande Finale
+  const [grandFinalCustom, setGrandFinalCustom] = useState(false);
+  const [grandFinalIsWinningSets, setGrandFinalIsWinningSets] = useState(true);
+  const [grandFinalNbSetsAmateur, setGrandFinalNbSetsAmateur] = useState(4);
+  const [grandFinalNbSetsPrestige, setGrandFinalNbSetsPrestige] = useState(5);
+  const [grandFinalNbSetsMixed, setGrandFinalNbSetsMixed] = useState(5);
+  const [grandFinalHandicapAmateurSets, setGrandFinalHandicapAmateurSets] = useState(0);
+
+  // Configuration spécifique Petite Finale (3ème place)
+  const [thirdPlaceCustom, setThirdPlaceCustom] = useState(false);
+  const [thirdPlaceIsWinningSets, setThirdPlaceIsWinningSets] = useState(true);
+  const [thirdPlaceNbSetsAmateur, setThirdPlaceNbSetsAmateur] = useState(3);
+  const [thirdPlaceNbSetsPrestige, setThirdPlaceNbSetsPrestige] = useState(3);
+  const [thirdPlaceNbSetsMixed, setThirdPlaceNbSetsMixed] = useState(3);
+  const [thirdPlaceHandicapAmateurSets, setThirdPlaceHandicapAmateurSets] = useState(0);
+
+  // Modal d'édition des règles pour tournoi actif
+  const [showEditRulesModal, setShowEditRulesModal] = useState(false);
+  const [editTourSettings, setEditTourSettings] = useState<any>(null);
+
   const maxAllowedQualifHandicap = getMaxAllowedQualifHandicap(qualifNbSetsMixed, qualifIsWinningSets);
   const maxAllowedFinalHandicap = getMaxAllowedFinalHandicap(finalNbSetsMixed, finalIsWinningSets);
+  const maxAllowedGrandFinalHandicap = getMaxAllowedFinalHandicap(grandFinalNbSetsMixed, grandFinalIsWinningSets);
+  const maxAllowedThirdPlaceHandicap = getMaxAllowedFinalHandicap(thirdPlaceNbSetsMixed, thirdPlaceIsWinningSets);
 
   const maxAllowedQualifiers = newTourFormat !== 'direct_ko' && selectedPlayers.length >= 3
     ? selectedPlayers.length - 1
@@ -116,6 +139,18 @@ const AdminView: React.FC = () => {
       setFinalHandicapAmateurSets(maxAllowedFinalHandicap);
     }
   }, [maxAllowedFinalHandicap, finalHandicapAmateurSets]);
+
+  React.useEffect(() => {
+    if (grandFinalHandicapAmateurSets > maxAllowedGrandFinalHandicap) {
+      setGrandFinalHandicapAmateurSets(maxAllowedGrandFinalHandicap);
+    }
+  }, [maxAllowedGrandFinalHandicap, grandFinalHandicapAmateurSets]);
+
+  React.useEffect(() => {
+    if (thirdPlaceHandicapAmateurSets > maxAllowedThirdPlaceHandicap) {
+      setThirdPlaceHandicapAmateurSets(maxAllowedThirdPlaceHandicap);
+    }
+  }, [maxAllowedThirdPlaceHandicap, thirdPlaceHandicapAmateurSets]);
 
   // New Player State
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -876,18 +911,44 @@ const AdminView: React.FC = () => {
                       </div>
                     )}
                     <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1.2rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', fontWeight: 700 }}>Distances des Duels</div>
-                      <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700 }}>Distances des Duels & Règles</div>
+                        <button
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.4)', background: 'rgba(255, 215, 0, 0.08)' }}
+                          onClick={() => {
+                            if (activeTournament.settings) {
+                              setEditTourSettings({ ...activeTournament.settings });
+                              setShowEditRulesModal(true);
+                            }
+                          }}
+                        >
+                          ⚙️ Modifier les règles
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                         {activeTournament.format !== 'direct_ko' && (
                           <div style={{ color: 'var(--accent-primary)' }}>
                             <span style={{ fontWeight: 700 }}>Poules : </span>
-                            Am {activeTournament.settings?.qualifNbSetsAmateur ?? activeTournament.settings?.qualifNbSets ?? 2}m • Pre {activeTournament.settings?.qualifNbSetsPrestige ?? activeTournament.settings?.qualifNbSets ?? 3}m • Mixte {activeTournament.settings?.qualifNbSetsMixed ?? activeTournament.settings?.qualifNbSets ?? 3}m
+                            Am {activeTournament.settings?.qualifNbSetsAmateur ?? activeTournament.settings?.qualifNbSets ?? 2}m • Pre {activeTournament.settings?.qualifNbSetsPrestige ?? activeTournament.settings?.qualifNbSets ?? 3}m • Mixte {activeTournament.settings?.qualifNbSetsMixed ?? activeTournament.settings?.qualifNbSets ?? 3}m ({activeTournament.settings?.qualifIsWinningSets ? 'gagnantes' : 'fixes'})
                           </div>
                         )}
                         <div style={{ color: 'var(--accent-secondary)' }}>
-                          <span style={{ fontWeight: 700 }}>Finales : </span>
-                          Am {activeTournament.settings?.finalNbSetsAmateur ?? activeTournament.settings?.finalNbSets ?? 2}m • Pre {activeTournament.settings?.finalNbSetsPrestige ?? activeTournament.settings?.finalNbSets ?? 3}m • Mixte {activeTournament.settings?.finalNbSetsMixed ?? activeTournament.settings?.finalNbSets ?? 3}m
+                          <span style={{ fontWeight: 700 }}>Tableau Final : </span>
+                          Am {activeTournament.settings?.finalNbSetsAmateur ?? activeTournament.settings?.finalNbSets ?? 2}m • Pre {activeTournament.settings?.finalNbSetsPrestige ?? activeTournament.settings?.finalNbSets ?? 3}m • Mixte {activeTournament.settings?.finalNbSetsMixed ?? activeTournament.settings?.finalNbSets ?? 3}m ({activeTournament.settings?.finalIsWinningSets ? 'gagnantes' : 'fixes'})
                         </div>
+                        {activeTournament.settings?.grandFinalCustom ? (
+                          <div style={{ color: '#ffd700' }}>
+                            <span style={{ fontWeight: 700 }}>🏆 Grande Finale : </span>
+                            Am {activeTournament.settings?.grandFinalNbSetsAmateur ?? 3}m • Pre {activeTournament.settings?.grandFinalNbSetsPrestige ?? 3}m • Mixte {activeTournament.settings?.grandFinalNbSetsMixed ?? 3}m ({activeTournament.settings?.grandFinalIsWinningSets ? 'gagnantes' : 'fixes'}, h+{activeTournament.settings?.grandFinalHandicapAmateurSets ?? 0})
+                          </div>
+                        ) : null}
+                        {activeTournament.settings?.hasThirdPlaceMatch && activeTournament.settings?.thirdPlaceCustom ? (
+                          <div style={{ color: '#f59e0b' }}>
+                            <span style={{ fontWeight: 700 }}>🥉 Petite Finale : </span>
+                            Am {activeTournament.settings?.thirdPlaceNbSetsAmateur ?? 3}m • Pre {activeTournament.settings?.thirdPlaceNbSetsPrestige ?? 3}m • Mixte {activeTournament.settings?.thirdPlaceNbSetsMixed ?? 3}m ({activeTournament.settings?.thirdPlaceIsWinningSets ? 'gagnantes' : 'fixes'}, h+{activeTournament.settings?.thirdPlaceHandicapAmateurSets ?? 0})
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1513,6 +1574,306 @@ const AdminView: React.FC = () => {
                             </div>
                           )}
                         </div>
+
+                        {/* ======================================================== */}
+                        {/* Paramètres Spécifiques Grande Finale                    */}
+                        {/* ======================================================== */}
+                        <div style={{
+                          gridColumn: 'span 2',
+                          marginTop: '0.8rem',
+                          padding: '1.2rem',
+                          background: grandFinalCustom ? 'rgba(255, 215, 0, 0.05)' : 'rgba(255,255,255,0.02)',
+                          borderRadius: '12px',
+                          border: grandFinalCustom ? '1px solid rgba(255, 215, 0, 0.35)' : '1px solid rgba(255,255,255,0.08)',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', cursor: 'pointer', margin: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={grandFinalCustom}
+                                onChange={e => setGrandFinalCustom(e.target.checked)}
+                                style={{ width: '18px', height: '18px', accentColor: '#ffd700', cursor: 'pointer' }}
+                              />
+                              <div>
+                                <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffd700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  🏆 Grande Finale (Match pour le titre)
+                                </span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>
+                                  {grandFinalCustom ? 'Règles et distance spécifiques activées' : 'Hérite par défaut des règles générales du tableau final'}
+                                </span>
+                              </div>
+                            </label>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              fontWeight: 700,
+                              background: grandFinalCustom ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.05)',
+                              color: grandFinalCustom ? '#ffd700' : 'var(--text-muted)',
+                              border: `1px solid ${grandFinalCustom ? 'rgba(255, 215, 0, 0.4)' : 'rgba(255,255,255,0.1)'}`
+                            }}>
+                              {grandFinalCustom ? '⚙️ Personnalisée' : 'Standard'}
+                            </span>
+                          </div>
+
+                          {grandFinalCustom && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(255,215,0,0.15)' }}>
+                              <div>
+                                <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Type de match pour la Finale</label>
+                                <select
+                                  className="input-field"
+                                  value={grandFinalIsWinningSets ? 'winning' : 'fixed'}
+                                  onChange={e => setGrandFinalIsWinningSets(e.target.value === 'winning')}
+                                  style={{ appearance: 'none', background: '#050816', color: '#fff' }}
+                                >
+                                  <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
+                                  <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
+                                </select>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.8rem' }}>
+                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                  <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 700 }}>
+                                    Finale : Am vs Am
+                                  </label>
+                                  <input
+                                    type="number"
+                                    className="input-field"
+                                    value={grandFinalNbSetsAmateur}
+                                    onChange={e => {
+                                      const val = parseInt(e.target.value, 10);
+                                      setGrandFinalNbSetsAmateur(isNaN(val) ? 1 : Math.min(25, Math.max(1, val)));
+                                    }}
+                                    min={1}
+                                    max={25}
+                                  />
+                                </div>
+                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                  <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--accent-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>
+                                    Finale : Pre vs Pre
+                                  </label>
+                                  <input
+                                    type="number"
+                                    className="input-field"
+                                    value={grandFinalNbSetsPrestige}
+                                    onChange={e => {
+                                      const val = parseInt(e.target.value, 10);
+                                      setGrandFinalNbSetsPrestige(isNaN(val) ? 1 : Math.min(25, Math.max(1, val)));
+                                    }}
+                                    min={1}
+                                    max={25}
+                                  />
+                                </div>
+                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                  <label style={{ display: 'block', marginBottom: '0.2rem', color: '#ffd700', fontSize: '0.8rem', fontWeight: 700 }}>
+                                    Finale : Am vs Pre
+                                  </label>
+                                  <input
+                                    type="number"
+                                    className="input-field"
+                                    value={grandFinalNbSetsMixed}
+                                    onChange={e => {
+                                      const val = parseInt(e.target.value, 10);
+                                      setGrandFinalNbSetsMixed(isNaN(val) ? 1 : Math.min(25, Math.max(1, val)));
+                                    }}
+                                    min={1}
+                                    max={25}
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                                  <label style={{ fontSize: '0.82rem', color: '#ffd700', fontWeight: 700 }}>
+                                    Handicap Amateur vs Prestige en Finale
+                                  </label>
+                                  <span style={{ fontSize: '0.72rem', color: grandFinalHandicapAmateurSets > 0 ? '#ffd700' : 'var(--text-muted)', fontWeight: 700 }}>
+                                    +{grandFinalHandicapAmateurSets} manche(s)
+                                  </span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                                  {[0, 1, 2, 3].map(v => {
+                                    const isDis = v > maxAllowedGrandFinalHandicap;
+                                    const isSel = grandFinalHandicapAmateurSets === v;
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={v}
+                                        disabled={isDis}
+                                        onClick={() => setGrandFinalHandicapAmateurSets(v)}
+                                        className="btn"
+                                        style={{
+                                          padding: '0.45rem',
+                                          fontSize: '0.78rem',
+                                          fontWeight: 700,
+                                          borderRadius: '8px',
+                                          border: isSel ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
+                                          background: isSel ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.02)',
+                                          color: isSel ? '#ffd700' : (isDis ? 'rgba(255,255,255,0.3)' : '#fff'),
+                                          opacity: isDis ? 0.35 : 1
+                                        }}
+                                      >
+                                        {v === 0 ? 'Aucun (0)' : `+${v}`}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ======================================================== */}
+                        {/* Paramètres Spécifiques Petite Finale                    */}
+                        {/* ======================================================== */}
+                        {hasThirdPlaceMatch && (
+                          <div style={{
+                            gridColumn: 'span 2',
+                            marginTop: '0.5rem',
+                            padding: '1.2rem',
+                            background: thirdPlaceCustom ? 'rgba(245, 158, 11, 0.05)' : 'rgba(255,255,255,0.02)',
+                            borderRadius: '12px',
+                            border: thirdPlaceCustom ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(255,255,255,0.08)',
+                            transition: 'all 0.2s ease'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', cursor: 'pointer', margin: 0 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={thirdPlaceCustom}
+                                  onChange={e => setThirdPlaceCustom(e.target.checked)}
+                                  style={{ width: '18px', height: '18px', accentColor: '#f59e0b', cursor: 'pointer' }}
+                                />
+                                <div>
+                                  <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    🥉 Petite Finale (Match pour la 3ème place)
+                                  </span>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>
+                                    {thirdPlaceCustom ? 'Règles et distance spécifiques activées' : 'Hérite par défaut des règles générales du tableau final'}
+                                  </span>
+                                </div>
+                              </label>
+                              <span style={{
+                                fontSize: '0.72rem',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                fontWeight: 700,
+                                background: thirdPlaceCustom ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.05)',
+                                color: thirdPlaceCustom ? '#f59e0b' : 'var(--text-muted)',
+                                border: `1px solid ${thirdPlaceCustom ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255,255,255,0.1)'}`
+                              }}>
+                                {thirdPlaceCustom ? '⚙️ Personnalisée' : 'Standard'}
+                              </span>
+                            </div>
+
+                            {thirdPlaceCustom && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(245, 158, 11, 0.15)' }}>
+                                <div>
+                                  <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Type de match pour la Petite Finale</label>
+                                  <select
+                                    className="input-field"
+                                    value={thirdPlaceIsWinningSets ? 'winning' : 'fixed'}
+                                    onChange={e => setThirdPlaceIsWinningSets(e.target.value === 'winning')}
+                                    style={{ appearance: 'none', background: '#050816', color: '#fff' }}
+                                  >
+                                    <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
+                                    <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
+                                  </select>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.8rem' }}>
+                                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 700 }}>
+                                      Petite Finale : Am vs Am
+                                    </label>
+                                    <input
+                                      type="number"
+                                      className="input-field"
+                                      value={thirdPlaceNbSetsAmateur}
+                                      onChange={e => {
+                                        const val = parseInt(e.target.value, 10);
+                                        setThirdPlaceNbSetsAmateur(isNaN(val) ? 1 : Math.min(25, Math.max(1, val)));
+                                      }}
+                                      min={1}
+                                      max={25}
+                                    />
+                                  </div>
+                                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--accent-secondary)', fontSize: '0.8rem', fontWeight: 700 }}>
+                                      Petite Finale : Pre vs Pre
+                                    </label>
+                                    <input
+                                      type="number"
+                                      className="input-field"
+                                      value={thirdPlaceNbSetsPrestige}
+                                      onChange={e => {
+                                        const val = parseInt(e.target.value, 10);
+                                        setThirdPlaceNbSetsPrestige(isNaN(val) ? 1 : Math.min(25, Math.max(1, val)));
+                                      }}
+                                      min={1}
+                                      max={25}
+                                    />
+                                  </div>
+                                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.2rem', color: '#ffd700', fontSize: '0.8rem', fontWeight: 700 }}>
+                                      Petite Finale : Am vs Pre
+                                    </label>
+                                    <input
+                                      type="number"
+                                      className="input-field"
+                                      value={thirdPlaceNbSetsMixed}
+                                      onChange={e => {
+                                        const val = parseInt(e.target.value, 10);
+                                        setThirdPlaceNbSetsMixed(isNaN(val) ? 1 : Math.min(25, Math.max(1, val)));
+                                      }}
+                                      min={1}
+                                      max={25}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                                    <label style={{ fontSize: '0.82rem', color: '#f59e0b', fontWeight: 700 }}>
+                                      Handicap Amateur vs Prestige en Petite Finale
+                                    </label>
+                                    <span style={{ fontSize: '0.72rem', color: thirdPlaceHandicapAmateurSets > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: 700 }}>
+                                      +{thirdPlaceHandicapAmateurSets} manche(s)
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                                    {[0, 1, 2, 3].map(v => {
+                                      const isDis = v > maxAllowedThirdPlaceHandicap;
+                                      const isSel = thirdPlaceHandicapAmateurSets === v;
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={v}
+                                          disabled={isDis}
+                                          onClick={() => setThirdPlaceHandicapAmateurSets(v)}
+                                          className="btn"
+                                          style={{
+                                            padding: '0.45rem',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 700,
+                                            borderRadius: '8px',
+                                            border: isSel ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
+                                            background: isSel ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.02)',
+                                            color: isSel ? '#f59e0b' : (isDis ? 'rgba(255,255,255,0.3)' : '#fff'),
+                                            opacity: isDis ? 0.35 : 1
+                                          }}
+                                        >
+                                          {v === 0 ? 'Aucun (0)' : `+${v}`}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1610,6 +1971,12 @@ const AdminView: React.FC = () => {
                         if (finalHandicapAmateurSets > maxAllowedFinalHandicap) {
                           return alert(`Configuration tableau final impossible : avec l'affiche mixte (${finalNbSetsMixed} manche(s)), le handicap phase finale doit être de +${maxAllowedFinalHandicap} manche(s) maximum.`);
                         }
+                        if (grandFinalCustom && grandFinalHandicapAmateurSets > maxAllowedGrandFinalHandicap) {
+                          return alert(`Configuration Grande Finale impossible : avec l'affiche mixte (${grandFinalNbSetsMixed} manche(s)), le handicap finale doit être de +${maxAllowedGrandFinalHandicap} manche(s) maximum.`);
+                        }
+                        if (hasThirdPlaceMatch && thirdPlaceCustom && thirdPlaceHandicapAmateurSets > maxAllowedThirdPlaceHandicap) {
+                          return alert(`Configuration Petite Finale impossible : avec l'affiche mixte (${thirdPlaceNbSetsMixed} manche(s)), le handicap petite finale doit être de +${maxAllowedThirdPlaceHandicap} manche(s) maximum.`);
+                        }
 
                         createTournament(newTourName.trim(), newTourFormat, {
                           tableIds: selectedTables,
@@ -1620,7 +1987,23 @@ const AdminView: React.FC = () => {
                           qualifHandicapAmateurSets,
                           finalHandicapAmateurSets,
                           handicapAmateurSets: finalHandicapAmateurSets,
-                          hasThirdPlaceMatch
+                          hasThirdPlaceMatch,
+
+                          grandFinalCustom,
+                          grandFinalIsWinningSets,
+                          grandFinalNbSets: grandFinalNbSetsMixed,
+                          grandFinalNbSetsAmateur,
+                          grandFinalNbSetsPrestige,
+                          grandFinalNbSetsMixed,
+                          grandFinalHandicapAmateurSets,
+
+                          thirdPlaceCustom,
+                          thirdPlaceIsWinningSets,
+                          thirdPlaceNbSets: thirdPlaceNbSetsMixed,
+                          thirdPlaceNbSetsAmateur,
+                          thirdPlaceNbSetsPrestige,
+                          thirdPlaceNbSetsMixed,
+                          thirdPlaceHandicapAmateurSets
                         }, selectedPlayers);
 
                         setShowNewTourForm(false);
@@ -1856,7 +2239,13 @@ const AdminView: React.FC = () => {
           if (dashboardSubTab === 'bracket') {
             return (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflowY: 'auto' }}>
-                <TournamentBracketView onSelectTableForQR={setSelectedTableForQR} />
+                <TournamentBracketView
+                  onSelectTableForQR={setSelectedTableForQR}
+                  onOpenEditRules={() => {
+                    setEditTourSettings({ ...activeTournament.settings });
+                    setShowEditRulesModal(true);
+                  }}
+                />
               </div>
             );
           }
@@ -3715,6 +4104,418 @@ const AdminView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL : MODIFIER LES RÈGLES / DISTANCES DU TOURNOI EN COURS                */}
+      {/* ========================================================================= */}
+      {showEditRulesModal && activeTournament && editTourSettings && (() => {
+        const modalMaxFinalH = getMaxAllowedFinalHandicap(
+          editTourSettings.finalNbSetsMixed ?? 3,
+          editTourSettings.finalIsWinningSets ?? true
+        );
+        const modalMaxGrandFinalH = getMaxAllowedFinalHandicap(
+          editTourSettings.grandFinalNbSetsMixed ?? editTourSettings.finalNbSetsMixed ?? 3,
+          editTourSettings.grandFinalIsWinningSets ?? editTourSettings.finalIsWinningSets ?? true
+        );
+        const modalMaxThirdPlaceH = getMaxAllowedFinalHandicap(
+          editTourSettings.thirdPlaceNbSetsMixed ?? editTourSettings.finalNbSetsMixed ?? 3,
+          editTourSettings.thirdPlaceIsWinningSets ?? editTourSettings.finalIsWinningSets ?? true
+        );
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.85)',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem'
+            }}
+            onClick={() => setShowEditRulesModal(false)}
+          >
+            <div
+              className="glass-card"
+              style={{
+                width: '100%',
+                maxWidth: '650px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '2rem',
+                border: '1px solid rgba(255, 215, 0, 0.4)',
+                background: '#070b1e',
+                boxShadow: '0 0 40px rgba(255, 215, 0, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.2rem'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 800, color: '#ffd700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    ⚙️ Règles du Tournoi
+                  </h3>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {activeTournament.name}
+                  </div>
+                </div>
+                <button
+                  className="btn btn-outline"
+                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                  onClick={() => setShowEditRulesModal(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* SECTION 1: TABLEAU FINAL (GÉNÉRAL / 1/4 & 1/2) */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-secondary)', marginBottom: '0.6rem' }}>
+                  Tableau Final (Quarts, Demis...)
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.8rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Type de match</label>
+                    <select
+                      className="input-field"
+                      value={editTourSettings.finalIsWinningSets ? 'winning' : 'fixed'}
+                      onChange={e => setEditTourSettings({ ...editTourSettings, finalIsWinningSets: e.target.value === 'winning' })}
+                      style={{ appearance: 'none', background: '#050816', color: '#fff' }}
+                    >
+                      <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
+                      <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 700, display: 'block' }}>Am vs Am</label>
+                      <input
+                        type="number"
+                        className="input-field"
+                        value={editTourSettings.finalNbSetsAmateur ?? 3}
+                        onChange={e => setEditTourSettings({ ...editTourSettings, finalNbSetsAmateur: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                        min={1}
+                        max={25}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--accent-secondary)', fontWeight: 700, display: 'block' }}>Pre vs Pre</label>
+                      <input
+                        type="number"
+                        className="input-field"
+                        value={editTourSettings.finalNbSetsPrestige ?? 3}
+                        onChange={e => setEditTourSettings({ ...editTourSettings, finalNbSetsPrestige: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                        min={1}
+                        max={25}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#ffd700', fontWeight: 700, display: 'block' }}>Am vs Pre</label>
+                      <input
+                        type="number"
+                        className="input-field"
+                        value={editTourSettings.finalNbSetsMixed ?? 3}
+                        onChange={e => setEditTourSettings({ ...editTourSettings, finalNbSetsMixed: Math.max(1, parseInt(e.target.value, 10) || 1), finalNbSets: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                        min={1}
+                        max={25}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: '#ffd700', fontWeight: 700, display: 'block', marginBottom: '0.3rem' }}>
+                      Handicap Amateur vs Prestige : +{editTourSettings.finalHandicapAmateurSets ?? 0}
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
+                      {[0, 1, 2, 3].map(v => (
+                        <button
+                          key={v}
+                          type="button"
+                          disabled={v > modalMaxFinalH}
+                          onClick={() => setEditTourSettings({ ...editTourSettings, finalHandicapAmateurSets: v, handicapAmateurSets: v })}
+                          className="btn"
+                          style={{
+                            padding: '0.4rem', fontSize: '0.78rem', fontWeight: 700,
+                            border: (editTourSettings.finalHandicapAmateurSets ?? 0) === v ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
+                            background: (editTourSettings.finalHandicapAmateurSets ?? 0) === v ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.02)',
+                            color: (editTourSettings.finalHandicapAmateurSets ?? 0) === v ? '#ffd700' : (v > modalMaxFinalH ? 'rgba(255,255,255,0.25)' : '#fff')
+                          }}
+                        >
+                          {v === 0 ? '0 (Aucun)' : `+${v}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: 🏆 GRANDE FINALE */}
+              <div style={{
+                background: editTourSettings.grandFinalCustom ? 'rgba(255, 215, 0, 0.06)' : 'rgba(255,255,255,0.03)',
+                padding: '1rem',
+                borderRadius: '10px',
+                border: editTourSettings.grandFinalCustom ? '1px solid rgba(255, 215, 0, 0.4)' : '1px solid var(--border-color)'
+              }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', cursor: 'pointer', marginBottom: editTourSettings.grandFinalCustom ? '0.8rem' : 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editTourSettings.grandFinalCustom)}
+                    onChange={e => setEditTourSettings({
+                      ...editTourSettings,
+                      grandFinalCustom: e.target.checked,
+                      grandFinalNbSetsAmateur: editTourSettings.grandFinalNbSetsAmateur ?? editTourSettings.finalNbSetsAmateur ?? 4,
+                      grandFinalNbSetsPrestige: editTourSettings.grandFinalNbSetsPrestige ?? editTourSettings.finalNbSetsPrestige ?? 5,
+                      grandFinalNbSetsMixed: editTourSettings.grandFinalNbSetsMixed ?? editTourSettings.finalNbSetsMixed ?? 5,
+                      grandFinalIsWinningSets: editTourSettings.grandFinalIsWinningSets ?? editTourSettings.finalIsWinningSets ?? true
+                    })}
+                    style={{ width: '18px', height: '18px', accentColor: '#ffd700', cursor: 'pointer' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 800, color: '#ffd700', fontSize: '0.95rem' }}>🏆 Grande Finale (Match pour le titre)</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {editTourSettings.grandFinalCustom ? 'Règles spécifiques activées pour la finale' : 'Hérite des règles générales ci-dessus'}
+                    </div>
+                  </div>
+                </label>
+
+                {editTourSettings.grandFinalCustom && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,215,0,0.15)' }}>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Type de match</label>
+                      <select
+                        className="input-field"
+                        value={editTourSettings.grandFinalIsWinningSets ? 'winning' : 'fixed'}
+                        onChange={e => setEditTourSettings({ ...editTourSettings, grandFinalIsWinningSets: e.target.value === 'winning' })}
+                        style={{ appearance: 'none', background: '#050816', color: '#fff' }}
+                      >
+                        <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
+                        <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 700, display: 'block' }}>Finale Am vs Am</label>
+                        <input
+                          type="number"
+                          className="input-field"
+                          value={editTourSettings.grandFinalNbSetsAmateur ?? 4}
+                          onChange={e => setEditTourSettings({ ...editTourSettings, grandFinalNbSetsAmateur: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                          min={1}
+                          max={25}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--accent-secondary)', fontWeight: 700, display: 'block' }}>Finale Pre vs Pre</label>
+                        <input
+                          type="number"
+                          className="input-field"
+                          value={editTourSettings.grandFinalNbSetsPrestige ?? 5}
+                          onChange={e => setEditTourSettings({ ...editTourSettings, grandFinalNbSetsPrestige: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                          min={1}
+                          max={25}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#ffd700', fontWeight: 700, display: 'block' }}>Finale Am vs Pre</label>
+                        <input
+                          type="number"
+                          className="input-field"
+                          value={editTourSettings.grandFinalNbSetsMixed ?? 5}
+                          onChange={e => setEditTourSettings({ ...editTourSettings, grandFinalNbSetsMixed: Math.max(1, parseInt(e.target.value, 10) || 1), grandFinalNbSets: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                          min={1}
+                          max={25}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.78rem', color: '#ffd700', fontWeight: 700, display: 'block', marginBottom: '0.3rem' }}>
+                        Handicap Finale (Am vs Pre) : +{editTourSettings.grandFinalHandicapAmateurSets ?? 0}
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
+                        {[0, 1, 2, 3].map(v => (
+                          <button
+                            key={v}
+                            type="button"
+                            disabled={v > modalMaxGrandFinalH}
+                            onClick={() => setEditTourSettings({ ...editTourSettings, grandFinalHandicapAmateurSets: v })}
+                            className="btn"
+                            style={{
+                              padding: '0.4rem', fontSize: '0.78rem', fontWeight: 700,
+                              border: (editTourSettings.grandFinalHandicapAmateurSets ?? 0) === v ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
+                              background: (editTourSettings.grandFinalHandicapAmateurSets ?? 0) === v ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.02)',
+                              color: (editTourSettings.grandFinalHandicapAmateurSets ?? 0) === v ? '#ffd700' : (v > modalMaxGrandFinalH ? 'rgba(255,255,255,0.25)' : '#fff')
+                            }}
+                          >
+                            {v === 0 ? '0 (Aucun)' : `+${v}`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 3: 🥉 PETITE FINALE */}
+              <div style={{
+                background: editTourSettings.thirdPlaceCustom ? 'rgba(245, 158, 11, 0.06)' : 'rgba(255,255,255,0.03)',
+                padding: '1rem',
+                borderRadius: '10px',
+                border: editTourSettings.thirdPlaceCustom ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-color)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: editTourSettings.hasThirdPlaceMatch ? '0.6rem' : 0 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editTourSettings.hasThirdPlaceMatch ?? true)}
+                      onChange={e => setEditTourSettings({ ...editTourSettings, hasThirdPlaceMatch: e.target.checked })}
+                      style={{ width: '18px', height: '18px', accentColor: '#f59e0b', cursor: 'pointer' }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 800, color: '#f59e0b', fontSize: '0.95rem' }}>🥉 Petite Finale (3ème place)</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {editTourSettings.hasThirdPlaceMatch ? 'Match pour la 3ème place activé' : 'Match désactivé'}
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {editTourSettings.hasThirdPlaceMatch && (
+                  <div style={{ marginTop: '0.5rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(245, 158, 11, 0.15)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', cursor: 'pointer', marginBottom: editTourSettings.thirdPlaceCustom ? '0.8rem' : 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(editTourSettings.thirdPlaceCustom)}
+                        onChange={e => setEditTourSettings({
+                          ...editTourSettings,
+                          thirdPlaceCustom: e.target.checked,
+                          thirdPlaceNbSetsAmateur: editTourSettings.thirdPlaceNbSetsAmateur ?? editTourSettings.finalNbSetsAmateur ?? 3,
+                          thirdPlaceNbSetsPrestige: editTourSettings.thirdPlaceNbSetsPrestige ?? editTourSettings.finalNbSetsPrestige ?? 3,
+                          thirdPlaceNbSetsMixed: editTourSettings.thirdPlaceNbSetsMixed ?? editTourSettings.finalNbSetsMixed ?? 3,
+                          thirdPlaceIsWinningSets: editTourSettings.thirdPlaceIsWinningSets ?? editTourSettings.finalIsWinningSets ?? true
+                        })}
+                        style={{ width: '16px', height: '16px', accentColor: '#f59e0b', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>
+                        Personnaliser spécifiquement les distances de la Petite Finale
+                      </span>
+                    </label>
+
+                    {editTourSettings.thirdPlaceCustom && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '0.6rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Type de match</label>
+                          <select
+                            className="input-field"
+                            value={editTourSettings.thirdPlaceIsWinningSets ? 'winning' : 'fixed'}
+                            onChange={e => setEditTourSettings({ ...editTourSettings, thirdPlaceIsWinningSets: e.target.value === 'winning' })}
+                            style={{ appearance: 'none', background: '#050816', color: '#fff' }}
+                          >
+                            <option value="winning" style={{ color: '#000' }}>Nb de Manches gagnantes</option>
+                            <option value="fixed" style={{ color: '#000' }}>Nb de Manches fixes</option>
+                          </select>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 700, display: 'block' }}>Petite Finale Am vs Am</label>
+                            <input
+                              type="number"
+                              className="input-field"
+                              value={editTourSettings.thirdPlaceNbSetsAmateur ?? 3}
+                              onChange={e => setEditTourSettings({ ...editTourSettings, thirdPlaceNbSetsAmateur: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                              min={1}
+                              max={25}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--accent-secondary)', fontWeight: 700, display: 'block' }}>Petite Finale Pre vs Pre</label>
+                            <input
+                              type="number"
+                              className="input-field"
+                              value={editTourSettings.thirdPlaceNbSetsPrestige ?? 3}
+                              onChange={e => setEditTourSettings({ ...editTourSettings, thirdPlaceNbSetsPrestige: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                              min={1}
+                              max={25}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', color: '#ffd700', fontWeight: 700, display: 'block' }}>Petite Finale Am vs Pre</label>
+                            <input
+                              type="number"
+                              className="input-field"
+                              value={editTourSettings.thirdPlaceNbSetsMixed ?? 3}
+                              onChange={e => setEditTourSettings({ ...editTourSettings, thirdPlaceNbSetsMixed: Math.max(1, parseInt(e.target.value, 10) || 1), thirdPlaceNbSets: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                              min={1}
+                              max={25}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 700, display: 'block', marginBottom: '0.3rem' }}>
+                            Handicap Petite Finale (Am vs Pre) : +{editTourSettings.thirdPlaceHandicapAmateurSets ?? 0}
+                          </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
+                            {[0, 1, 2, 3].map(v => (
+                              <button
+                                key={v}
+                                type="button"
+                                disabled={v > modalMaxThirdPlaceH}
+                                onClick={() => setEditTourSettings({ ...editTourSettings, thirdPlaceHandicapAmateurSets: v })}
+                                className="btn"
+                                style={{
+                                  padding: '0.4rem', fontSize: '0.78rem', fontWeight: 700,
+                                  border: (editTourSettings.thirdPlaceHandicapAmateurSets ?? 0) === v ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
+                                  background: (editTourSettings.thirdPlaceHandicapAmateurSets ?? 0) === v ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.02)',
+                                  color: (editTourSettings.thirdPlaceHandicapAmateurSets ?? 0) === v ? '#f59e0b' : (v > modalMaxThirdPlaceH ? 'rgba(255,255,255,0.25)' : '#fff')
+                                }}
+                              >
+                                {v === 0 ? '0 (Aucun)' : `+${v}`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowEditRulesModal(false)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-neon"
+                  style={{ color: '#000', fontWeight: 800 }}
+                  onClick={() => {
+                    updateTournamentSettings(activeTournament.id, editTourSettings);
+                    setShowEditRulesModal(false);
+                  }}
+                >
+                  ✓ Appliquer les règles
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

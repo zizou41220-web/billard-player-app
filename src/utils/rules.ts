@@ -23,17 +23,67 @@ export function getMaxAllowedFinalHandicap(finalNbSets: number, finalIsWinningSe
 }
 
 /**
- * Récupère le handicap configuré pour une phase spécifique (Qualifications ou Phases Finales).
+ * Récupère le handicap configuré pour une phase spécifique (Qualifications, Phases Finales, Grande Finale ou Petite Finale).
  */
-export function getTournamentPhaseHandicap(settings?: any | null, isFinalStage: boolean = false): number {
+export function getTournamentPhaseHandicap(
+  settings?: any | null,
+  isFinalStage: boolean = false,
+  stage?: string
+): number {
   if (!settings) return 0;
-  if (isFinalStage) {
+
+  const isGrandFinal = stage === 'final' || (typeof stage === 'string' && stage.includes('_final_') && !stage.includes('_third_place_'));
+  const isThirdPlace = stage === 'third_place' || (typeof stage === 'string' && stage.includes('_third_place_'));
+
+  if (isGrandFinal && settings.grandFinalCustom) {
+    if (settings.grandFinalHandicapAmateurSets !== undefined) return settings.grandFinalHandicapAmateurSets;
+    return settings.finalHandicapAmateurSets ?? 0;
+  }
+  if (isThirdPlace && settings.thirdPlaceCustom) {
+    if (settings.thirdPlaceHandicapAmateurSets !== undefined) return settings.thirdPlaceHandicapAmateurSets;
+    return settings.finalHandicapAmateurSets ?? 0;
+  }
+
+  if (isFinalStage || isGrandFinal || isThirdPlace) {
     if (settings.finalHandicapAmateurSets !== undefined) return settings.finalHandicapAmateurSets;
     return settings.handicapAmateurSets || 0;
   } else {
     if (settings.qualifHandicapAmateurSets !== undefined) return settings.qualifHandicapAmateurSets;
     return settings.handicapAmateurSets || 0;
   }
+}
+
+/**
+ * Retourne le type de manche (gagnantes/fixes) et le handicap pour une phase ou affiche spécifique.
+ */
+export function getPhaseRules(settings?: any | null, stage?: string): { isWinningSets: boolean; handicap: number } {
+  if (!settings) return { isWinningSets: true, handicap: 0 };
+  const isGrandFinal = stage === 'final' || (typeof stage === 'string' && stage.includes('_final_') && !stage.includes('_third_place_'));
+  const isThirdPlace = stage === 'third_place' || (typeof stage === 'string' && stage.includes('_third_place_'));
+  const isFinalStage = isGrandFinal || isThirdPlace || stage === 'semi' || stage === 'quarter' || (typeof stage === 'string' && (stage.startsWith('round_') || stage.includes('_semi_') || stage.includes('_quarter_')));
+
+  if (isGrandFinal && settings.grandFinalCustom) {
+    return {
+      isWinningSets: settings.grandFinalIsWinningSets ?? settings.finalIsWinningSets ?? true,
+      handicap: settings.grandFinalHandicapAmateurSets !== undefined ? settings.grandFinalHandicapAmateurSets : (settings.finalHandicapAmateurSets ?? 0)
+    };
+  }
+  if (isThirdPlace && settings.thirdPlaceCustom) {
+    return {
+      isWinningSets: settings.thirdPlaceIsWinningSets ?? settings.finalIsWinningSets ?? true,
+      handicap: settings.thirdPlaceHandicapAmateurSets !== undefined ? settings.thirdPlaceHandicapAmateurSets : (settings.finalHandicapAmateurSets ?? 0)
+    };
+  }
+  if (isFinalStage) {
+    return {
+      isWinningSets: settings.finalIsWinningSets ?? true,
+      handicap: settings.finalHandicapAmateurSets ?? settings.handicapAmateurSets ?? 0
+    };
+  }
+  return {
+    isWinningSets: settings.qualifIsWinningSets ?? true,
+    handicap: settings.qualifHandicapAmateurSets ?? settings.handicapAmateurSets ?? 0
+  };
 }
 
 /**
@@ -67,22 +117,63 @@ export function resolveDuelTargetSets(
   level1?: string,
   level2?: string,
   settings?: any | null,
-  isFinalStage: boolean = false
+  isFinalStage: boolean = false,
+  stage?: string
 ): number {
   if (!settings) return 1;
   const isP1Prestige = level1 === 'Prestige';
   const isP2Prestige = level2 === 'Prestige';
 
+  const isGrandFinal = stage === 'final' || (typeof stage === 'string' && stage.includes('_final_') && !stage.includes('_third_place_'));
+  const isThirdPlace = stage === 'third_place' || (typeof stage === 'string' && stage.includes('_third_place_'));
+
+  // Configuration spécifique Grande Finale
+  if (isGrandFinal && settings.grandFinalCustom) {
+    if (isP1Prestige && isP2Prestige) {
+      const val = settings.grandFinalNbSetsPrestige;
+      if (val && val > 0) return val;
+    } else if (!isP1Prestige && !isP2Prestige) {
+      const val = settings.grandFinalNbSetsAmateur;
+      if (val && val > 0) return val;
+    } else {
+      const val = settings.grandFinalNbSetsMixed;
+      if (val && val > 0) return val;
+    }
+    if (settings.grandFinalNbSets && settings.grandFinalNbSets > 0) {
+      return settings.grandFinalNbSets;
+    }
+  }
+
+  // Configuration spécifique Petite Finale (3ème place)
+  if (isThirdPlace && settings.thirdPlaceCustom) {
+    if (isP1Prestige && isP2Prestige) {
+      const val = settings.thirdPlaceNbSetsPrestige;
+      if (val && val > 0) return val;
+    } else if (!isP1Prestige && !isP2Prestige) {
+      const val = settings.thirdPlaceNbSetsAmateur;
+      if (val && val > 0) return val;
+    } else {
+      const val = settings.thirdPlaceNbSetsMixed;
+      if (val && val > 0) return val;
+    }
+    if (settings.thirdPlaceNbSets && settings.thirdPlaceNbSets > 0) {
+      return settings.thirdPlaceNbSets;
+    }
+  }
+
+  // Phase finale standard ou qualifications
+  const effectiveFinalStage = isFinalStage || isGrandFinal || isThirdPlace;
+
   if (isP1Prestige && isP2Prestige) {
-    const val = isFinalStage ? settings.finalNbSetsPrestige : settings.qualifNbSetsPrestige;
-    return val && val > 0 ? val : (isFinalStage ? settings.finalNbSets : settings.qualifNbSets);
+    const val = effectiveFinalStage ? settings.finalNbSetsPrestige : settings.qualifNbSetsPrestige;
+    return val && val > 0 ? val : (effectiveFinalStage ? settings.finalNbSets : settings.qualifNbSets);
   }
   if (!isP1Prestige && !isP2Prestige) {
-    const val = isFinalStage ? settings.finalNbSetsAmateur : settings.qualifNbSetsAmateur;
-    return val && val > 0 ? val : (isFinalStage ? settings.finalNbSets : settings.qualifNbSets);
+    const val = effectiveFinalStage ? settings.finalNbSetsAmateur : settings.qualifNbSetsAmateur;
+    return val && val > 0 ? val : (effectiveFinalStage ? settings.finalNbSets : settings.qualifNbSets);
   }
-  const val = isFinalStage ? settings.finalNbSetsMixed : settings.qualifNbSetsMixed;
-  return val && val > 0 ? val : (isFinalStage ? settings.finalNbSets : settings.qualifNbSets);
+  const val = effectiveFinalStage ? settings.finalNbSetsMixed : settings.qualifNbSetsMixed;
+  return val && val > 0 ? val : (effectiveFinalStage ? settings.finalNbSets : settings.qualifNbSets);
 }
 
 /**
@@ -93,7 +184,10 @@ export function getMatchScoringRules(
   tournament?: Tournament | null,
   players?: Record<string, { level?: string }>
 ): MatchScoringRules {
-  const isFinal = match.stage === 'quarter' || match.stage === 'semi' || match.stage === 'final' || match.stage === 'third_place' || (match.bracketRound !== undefined);
+  const stage = match.stage || (match.id.includes('_third_place_') ? 'third_place' : (match.id.includes('_final_') ? 'final' : undefined));
+  const isGrandFinal = stage === 'final';
+  const isThirdPlace = stage === 'third_place';
+  const isFinal = isGrandFinal || isThirdPlace || match.stage === 'quarter' || match.stage === 'semi' || (match.bracketRound !== undefined);
   const settings = tournament?.settings;
 
   let maxSets = match.targetSets || 0;
@@ -101,13 +195,31 @@ export function getMatchScoringRules(
     if (players && match.player1Id && match.player2Id) {
       const p1 = players[match.player1Id];
       const p2 = players[match.player2Id];
-      maxSets = resolveDuelTargetSets(p1?.level, p2?.level, settings, isFinal);
+      maxSets = resolveDuelTargetSets(p1?.level, p2?.level, settings, isFinal, stage);
     } else {
-      maxSets = settings ? (isFinal ? settings.finalNbSets : settings.qualifNbSets) : 99;
+      if (isGrandFinal && settings?.grandFinalCustom) {
+        maxSets = settings.grandFinalNbSetsMixed || settings.grandFinalNbSets || settings.finalNbSets || 3;
+      } else if (isThirdPlace && settings?.thirdPlaceCustom) {
+        maxSets = settings.thirdPlaceNbSetsMixed || settings.thirdPlaceNbSets || settings.finalNbSets || 3;
+      } else {
+        maxSets = settings ? (isFinal ? settings.finalNbSets : settings.qualifNbSets) : 99;
+      }
     }
   }
 
-  const isWinningSets = settings ? (isFinal ? settings.finalIsWinningSets : settings.qualifIsWinningSets) : true;
+  let isWinningSets = true;
+  if (settings) {
+    if (isGrandFinal && settings.grandFinalCustom && settings.grandFinalIsWinningSets !== undefined) {
+      isWinningSets = settings.grandFinalIsWinningSets;
+    } else if (isThirdPlace && settings.thirdPlaceCustom && settings.thirdPlaceIsWinningSets !== undefined) {
+      isWinningSets = settings.thirdPlaceIsWinningSets;
+    } else if (isFinal) {
+      isWinningSets = settings.finalIsWinningSets;
+    } else {
+      isWinningSets = settings.qualifIsWinningSets;
+    }
+  }
+
   const minScore1 = match.handicapP1 || 0;
   const minScore2 = match.handicapP2 || 0;
 
