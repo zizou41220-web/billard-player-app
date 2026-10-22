@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Activity, Clock, Trophy, Lock } from 'lucide-react';
+import { Activity, Clock, Trophy, Lock, Award } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
+import LeaderboardView from './LeaderboardView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 const FeedView: React.FC = () => {
   const { matches, players, tables, tournaments, currentClub } = useStore();
-  const [subTab, setSubTab] = useState<'live' | 'bracket'>('live');
+  const [subTab, setSubTab] = useState<'live' | 'bracket' | 'leaderboard'>('live');
 
   const allTournaments = Object.values(tournaments);
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
@@ -121,11 +122,36 @@ const FeedView: React.FC = () => {
           {hasSureQualifiers ? <Trophy size={16} /> : <Lock size={16} />}
           Phases Finales
         </button>
+        <button
+          onClick={() => setSubTab('leaderboard')}
+          style={{
+            flex: 1,
+            background: subTab === 'leaderboard' ? 'var(--accent-primary)' : 'transparent',
+            color: subTab === 'leaderboard' ? '#000' : 'var(--text-muted)',
+            fontWeight: 800,
+            border: 'none',
+            padding: '0.6rem',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.4rem',
+            fontSize: '0.85rem',
+            transition: 'all 0.2s'
+          }}
+        >
+          <Award size={16} /> Classement
+        </button>
       </div>
 
       {subTab === 'bracket' ? (
         <div style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
           <TournamentBracketView />
+        </div>
+      ) : subTab === 'leaderboard' ? (
+        <div style={{ paddingBottom: '1rem' }}>
+          <LeaderboardView compact={true} />
         </div>
       ) : (
         <>

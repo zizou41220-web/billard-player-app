@@ -85,10 +85,10 @@ const getInitialClub = (): Club => {
 };
 
 const MOCK_PLAYERS: Record<string, Player> = {
-  'p1': { id: 'p1', clubId: 'bc41', name: 'Sébastien T.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p1', stats: { ...createDefaultPlayerStats(), matchesPlayed: 142, wins: 89, losses: 53, winRate: 62.6, nemesisId: 'p3', bestFriendId: 'p2' } },
-  'p2': { id: 'p2', clubId: 'bc41', name: 'Alexandre D.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p2', stats: { ...createDefaultPlayerStats(), matchesPlayed: 98, wins: 45, losses: 53, winRate: 45.9 } },
-  'p3': { id: 'p3', clubId: 'bc41', name: 'Maxime R.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p3', stats: { ...createDefaultPlayerStats(), matchesPlayed: 210, wins: 156, losses: 54, winRate: 74.2 } },
-  'p4': { id: 'p4', clubId: 'bc41', name: 'Sophie L.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p4', stats: { ...createDefaultPlayerStats(), matchesPlayed: 56, wins: 30, losses: 26, winRate: 53.5 } },
+  'p1': { id: 'p1', clubId: 'bc41', name: 'Sébastien T.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p1', stats: { ...createDefaultPlayerStats(), matchesPlayed: 142, wins: 89, losses: 53, winRate: 62.6, setsWon: 290, setsLost: 210, setDiff: 80, tournamentsPlayed: 12, tournamentsWon: 3, points: 489, nemesisId: 'p3', bestFriendId: 'p2' } },
+  'p2': { id: 'p2', clubId: 'bc41', name: 'Alexandre D.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p2', stats: { ...createDefaultPlayerStats(), matchesPlayed: 98, wins: 45, losses: 53, winRate: 45.9, setsWon: 180, setsLost: 195, setDiff: -15, tournamentsPlayed: 8, tournamentsWon: 1, points: 243 } },
+  'p3': { id: 'p3', clubId: 'bc41', name: 'Maxime R.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p3', stats: { ...createDefaultPlayerStats(), matchesPlayed: 210, wins: 156, losses: 54, winRate: 74.2, setsWon: 450, setsLost: 240, setDiff: 210, tournamentsPlayed: 18, tournamentsWon: 6, points: 948 } },
+  'p4': { id: 'p4', clubId: 'bc41', name: 'Sophie L.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p4', stats: { ...createDefaultPlayerStats(), matchesPlayed: 56, wins: 30, losses: 26, winRate: 53.5, setsWon: 110, setsLost: 102, setDiff: 8, tournamentsPlayed: 5, tournamentsWon: 0, points: 154 } },
 };
 
 const MOCK_TABLES: Record<string, Table> = {

@@ -12,6 +12,7 @@ export type FullPlayerStats = Required<
     | 'setDiff'
     | 'tournamentsPlayed'
     | 'tournamentsWon'
+    | 'points'
   >
 > &
   Omit<
@@ -25,6 +26,7 @@ export type FullPlayerStats = Required<
     | 'setDiff'
     | 'tournamentsPlayed'
     | 'tournamentsWon'
+    | 'points'
   >;
 
 export function createDefaultPlayerStats(): FullPlayerStats {
@@ -38,6 +40,7 @@ export function createDefaultPlayerStats(): FullPlayerStats {
     setDiff: 0,
     tournamentsPlayed: 0,
     tournamentsWon: 0,
+    points: 0,
     recentForm: []
   };
 }
@@ -178,6 +181,8 @@ export function computeAllPlayersStats(
     s.winRate = s.matchesPlayed > 0 ? Math.round((s.wins / s.matchesPlayed) * 1000) / 10 : 0;
     s.tournamentsPlayed = tourMap[pId]?.size || 0;
     s.tournamentsWon = wonTourMap[pId]?.size || 0;
+    // Points club : 3 pts / victoire + 1 pt / match disputé + 10 pts / tournoi gagné + bonus diff manches positives
+    s.points = (s.wins * 3) + s.matchesPlayed + (s.tournamentsWon * 10) + Math.max(0, s.setDiff);
 
     // Forme récente (derniers 5 matchs)
     const recents = recentMatchesMap[pId] || [];

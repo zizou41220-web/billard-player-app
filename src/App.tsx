@@ -6,7 +6,8 @@ import ProfileView from './components/ProfileView';
 import FeedView from './components/FeedView';
 import AdminView from './components/AdminView';
 import StreamOverlayView from './components/StreamOverlayView';
-import { QrCode, User, Activity, Settings } from 'lucide-react';
+import KioskView from './components/KioskView';
+import { QrCode, User, Activity, Settings, Tv } from 'lucide-react';
 import { initSync } from './sync';
 import { APP_VERSION } from './version';
 
@@ -15,9 +16,13 @@ export type Tab = 'scan' | 'feed' | 'profile';
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const overlayTableParam = urlParams.get('overlay') || urlParams.get('stream');
+  const kioskParam = urlParams.get('kiosk') || urlParams.get('tv');
 
   const isDesktop = window.innerWidth > 768;
-  const [appMode, setAppMode] = useState<'player' | 'admin'>(isDesktop ? 'admin' : 'player');
+  const [appMode, setAppMode] = useState<'player' | 'admin' | 'kiosk'>(() => {
+    if (kioskParam) return 'kiosk';
+    return isDesktop ? 'admin' : 'player';
+  });
   const [activeTab, setActiveTab] = useState<Tab>('scan');
   const { activeMatchId } = useStore();
 
@@ -30,10 +35,14 @@ function App() {
     return <StreamOverlayView tableParam={overlayTableParam} />;
   }
 
+  if (appMode === 'kiosk') {
+    return <KioskView onExit={() => setAppMode(isDesktop ? 'admin' : 'player')} />;
+  }
+
   if (appMode === 'admin') {
     return (
       <div style={{ position: 'relative', width: '100vw', height: '100dvh' }}>
-        <AdminView />
+        <AdminView onOpenKiosk={() => setAppMode('kiosk')} />
       </div>
     );
   }
@@ -70,6 +79,13 @@ function App() {
           }}>
             {APP_VERSION}
           </span>
+          <button 
+            onClick={() => setAppMode('kiosk')}
+            className="btn btn-outline"
+            style={{ background: '#050816', color: 'var(--accent-primary)', borderColor: 'rgba(0, 255, 170, 0.4)' }}
+          >
+            <Tv size={18} style={{marginRight: '0.5rem'}}/> Mode Kiosque TV
+          </button>
           <button 
             onClick={() => setAppMode('admin')}
             className="btn btn-outline"

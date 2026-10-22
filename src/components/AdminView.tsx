@@ -9,6 +9,7 @@ import {
   Radio, Tv, Smartphone, Globe, ExternalLink
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
+import LeaderboardView from './LeaderboardView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
@@ -16,7 +17,11 @@ import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules } from '../utils/rules';
 import { isFinalStageMatch } from '../utils/bracket';
 
-const AdminView: React.FC = () => {
+interface AdminViewProps {
+  onOpenKiosk?: () => void;
+}
+
+const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const {
     tournaments, matches, players, tables, currentClub, setClub,
     createTournament, addPlayer, updatePlayer, deletePlayer,
@@ -31,7 +36,7 @@ const AdminView: React.FC = () => {
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
   const isTournamentActive = Boolean(activeTournament);
 
-  const [activeTab, setActiveTab] = useState<'launcher' | 'dashboard' | 'admin'>(() => {
+  const [activeTab, setActiveTab] = useState<'launcher' | 'dashboard' | 'admin' | 'leaderboard'>(() => {
     return isTournamentActive ? 'dashboard' : 'launcher';
   });
   const hasAutoSwitchedToDashboard = React.useRef(false);
@@ -586,6 +591,33 @@ const AdminView: React.FC = () => {
           >
             <Settings size={18} /> Administration
           </button>
+
+          <button
+            className={`btn ${activeTab === 'leaderboard' ? 'btn-neon' : 'btn-outline'}`}
+            onClick={() => setActiveTab('leaderboard')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+          >
+            <Trophy size={18} /> Classement Club
+          </button>
+
+          {onOpenKiosk && (
+            <button
+              className="btn btn-outline"
+              onClick={onOpenKiosk}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontWeight: 700,
+                color: 'var(--accent-primary)',
+                borderColor: 'rgba(0, 255, 170, 0.4)',
+                background: 'rgba(0, 255, 170, 0.08)'
+              }}
+              title="Lancer le mode plein écran pour le grand écran TV du club"
+            >
+              <Tv size={18} /> Mode Kiosque TV
+            </button>
+          )}
         </div>
       </header>
 
@@ -3296,6 +3328,15 @@ const AdminView: React.FC = () => {
 
               </div>
             )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 4. CLUB LEADERBOARD TAB                                                   */}
+        {/* ========================================================================= */}
+        {activeTab === 'leaderboard' && (
+          <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <LeaderboardView compact={false} />
           </div>
         )}
 

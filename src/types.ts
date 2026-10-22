@@ -16,6 +16,7 @@ export type PlayerStats = {
   setDiff?: number;
   tournamentsPlayed?: number;
   tournamentsWon?: number;
+  points?: number; // Points de classement général du club
   nemesisId?: string; // Player they lose the most to
   nemesisLosses?: number;
   nemesisLossRate?: number;
