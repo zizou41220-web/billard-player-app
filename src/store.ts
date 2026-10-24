@@ -562,6 +562,8 @@ export const dispatchTournamentMatches = (
         const isFinalStageActive = Boolean(tournament.finalStageLaunched || tournament.settings?.finalStageLaunched);
         // If final stage launched, do not dispatch unplayed qualif matches
         if (isFinalStageActive && !isFinalStageMatch(m)) return false;
+        // If tournament has qualifications and final stage not launched, do not dispatch final stage matches
+        if (!isFinalStageActive && isFinalStageMatch(m) && tournament.format !== 'direct_ko') return false;
         return (
           !isPlayerBusy(m.player1Id) &&
           !isPlayerBusy(m.player2Id)

@@ -5,7 +5,7 @@ import {
   Trophy, Swords, CheckCircle2, Clock, Sparkles,
   Users, AlertCircle, ShieldCheck, QrCode, RefreshCw, Settings
 } from 'lucide-react';
-import { getTournamentQualificationStatus, PlayerQualifStat } from '../utils/qualifiers';
+import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { getBracketSize, getBracketRounds, isFinalStageMatch, generateSeedingPairs } from '../utils/bracket';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMatchScoringRules, resolveDuelTargetSets, getPhaseRules } from '../utils/rules';
@@ -81,7 +81,8 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
     hasSureQualifiers,
     sureQualifiers,
     ranking,
-    numQualifiers
+    numQualifiers,
+    areAllQualifiersKnown
   } = getTournamentQualificationStatus(activeTournament, matches, players);
 
   const allTourMatches = Object.values(matches).filter(m => {
@@ -219,17 +220,22 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       }
     });
   } else {
-    // 2. Tableau projeté en direct selon le classement actuel des qualifications
-    const getSlotPlayerId = (playerStat?: PlayerQualifStat) => playerStat?.id;
-    const getSlotLabel = (playerStat?: PlayerQualifStat, rankLabel?: string) => {
-      if (isFinalLaunched || isQualifAllDone) {
-        return playerStat ? (players[playerStat.id]?.name || rankLabel) : (rankLabel || 'En attente...');
+    // 2. Tableau projeté selon le statut des qualifications
+    // RÈGLE : Tant que les sortants ne sont pas connus (areAllQualifiersKnown = false),
+    // ne pas commencer à remplir le tableau de phase finale avec des joueurs !
+    // Les cases doivent rester neutres ("1er Qualifié", "2e Qualifié", etc.) sans ID joueur.
+    const getSlotLabel = (seed: number, isBye: boolean) => {
+      if (isBye) return 'BLANC (Exempt)';
+      const rankSuffix = seed === 1 ? 'er' : 'e';
+      if (!areAllQualifiersKnown) {
+        return `${seed}${rankSuffix} Qualifié`;
       }
-      if (playerStat) {
-        const playerName = players[playerStat.id]?.name || 'Joueur';
-        return playerStat.isSure ? `${playerName} (Qualifié)` : `${playerName} (Provisoire ${rankLabel})`;
+      const stat = ranking[seed - 1];
+      if (stat) {
+        const playerName = players[stat.id]?.name || 'Joueur';
+        return `${playerName} (Qualifié #${seed})`;
       }
-      return `En attente (${rankLabel || 'Qualifié'})`;
+      return `${seed}${rankSuffix} Qualifié`;
     };
 
     const pairs = generateSeedingPairs(bracketSize);
@@ -242,9 +248,11 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
       if (isFirstRound) {
         for (let p = 0; p < roundDef.matchCount; p++) {
           const [seedA, seedB] = pairs[p];
-          const statA = ranking[seedA - 1];
-          const statB = ranking[seedB - 1];
-          const isBye = seedB > numQualifiers || !statB;
+          const isBye = seedB > numQualifiers;
+          
+          // Associer les joueurs aux slots UNIQUEMENT si les sortants sont tous connus
+          const statA = areAllQualifiersKnown ? ranking[seedA - 1] : undefined;
+          const statB = (areAllQualifiersKnown && !isBye) ? ranking[seedB - 1] : undefined;
 
           displayList.push({
             id: `proj_${roundDef.prefix}_${p}`,
@@ -252,14 +260,14 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
             title: `${roundDef.shortTitle} #${p + 1}`,
             round: roundDef.roundNumber,
             position: p,
-            player1Id: getSlotPlayerId(statA),
-            player2Id: isBye ? undefined : getSlotPlayerId(statB),
-            player1Label: getSlotLabel(statA, `${seedA}e`),
-            player2Label: isBye ? 'BLANC (Exempt)' : getSlotLabel(statB, `${seedB}e`),
+            player1Id: statA?.id,
+            player2Id: statB?.id,
+            player1Label: getSlotLabel(seedA, false),
+            player2Label: getSlotLabel(seedB, isBye),
             score1: 0,
             score2: 0,
-            status: isBye ? 'finished' : 'pending',
-            winnerId: isBye ? getSlotPlayerId(statA) : undefined
+            status: (isBye && areAllQualifiersKnown) ? 'finished' : 'pending',
+            winnerId: (isBye && areAllQualifiersKnown) ? statA?.id : undefined
           });
         }
       } else if (isLastRound) {
@@ -367,12 +375,12 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
             width: '52px',
             height: '52px',
             borderRadius: '14px',
-            background: isFinalLaunched ? 'rgba(0, 255, 170, 0.15)' : (hasSureQualifiers ? 'rgba(255, 204, 0, 0.15)' : 'rgba(255, 255, 255, 0.05)'),
-            border: `2px solid ${isFinalLaunched ? 'var(--accent-primary)' : (hasSureQualifiers ? '#ffcc00' : 'var(--border-color)')}`,
+            background: isFinalLaunched ? 'rgba(0, 255, 170, 0.15)' : (areAllQualifiersKnown ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)'),
+            border: `2px solid ${isFinalLaunched ? 'var(--accent-primary)' : (areAllQualifiersKnown ? 'var(--accent-secondary)' : 'var(--border-color)')}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: isFinalLaunched ? 'var(--accent-primary)' : (hasSureQualifiers ? '#ffcc00' : 'var(--text-muted)'),
+            color: isFinalLaunched ? 'var(--accent-primary)' : (areAllQualifiersKnown ? 'var(--accent-secondary)' : 'var(--text-muted)'),
             flexShrink: 0
           }}>
             <Trophy size={26} />
@@ -381,8 +389,12 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.2rem' }}>
               <span style={{
-                background: isFinalLaunched ? 'rgba(0, 255, 170, 0.2)' : (hasSureQualifiers ? 'rgba(255, 204, 0, 0.2)' : 'rgba(255, 255, 255, 0.1)'),
-                color: isFinalLaunched ? 'var(--accent-primary)' : (hasSureQualifiers ? '#ffcc00' : 'var(--text-muted)'),
+                background: isFinalLaunched
+                  ? 'rgba(0, 255, 170, 0.2)'
+                  : (areAllQualifiersKnown ? 'rgba(0, 229, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'),
+                color: isFinalLaunched
+                  ? 'var(--accent-primary)'
+                  : (areAllQualifiersKnown ? 'var(--accent-secondary)' : 'var(--text-muted)'),
                 padding: '2px 8px',
                 borderRadius: '6px',
                 fontSize: '0.75rem',
@@ -395,13 +407,15 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                   width: '6px',
                   height: '6px',
                   borderRadius: '50%',
-                  background: isFinalLaunched ? 'var(--accent-primary)' : (hasSureQualifiers ? '#ffcc00' : 'var(--text-muted)')
+                  background: isFinalLaunched
+                    ? 'var(--accent-primary)'
+                    : (areAllQualifiersKnown ? 'var(--accent-secondary)' : 'var(--text-muted)')
                 }} />
                 {isFinalLaunched
                   ? 'PHASES FINALES OFFICIELLES'
-                  : (hasSureQualifiers
-                    ? `QUALIFIÉS ASSURÉS (${sureQualifiers.length}/${numQualifiers})`
-                    : 'EN ATTENTE DE QUALIFIÉS SÛRS')}
+                  : (areAllQualifiersKnown
+                    ? `QUALIFIÉS CONNUS (${numQualifiers}/${numQualifiers})`
+                    : `EN ATTENTE DES SORTANTS (${sureQualifiers.length}/${numQualifiers} assurés)`)}
               </span>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 {activeTournament.settings?.seedByMerit ? 'Tirage au Mérite (1er vs dernier)' : 'Tirage Classique'}
@@ -926,25 +940,33 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         </div>
       )}
 
-      {/* Information Banner if no sure qualifiers */}
-      {!hasSureQualifiers && !isFinalLaunched && (
+      {/* Information Banner if qualifs ongoing or qualifiers known */}
+      {!isFinalLaunched && (
         <div style={{
-          background: 'rgba(255, 204, 0, 0.08)',
-          border: '1px solid rgba(255, 204, 0, 0.35)',
+          background: areAllQualifiersKnown
+            ? 'linear-gradient(135deg, rgba(0, 255, 170, 0.12), rgba(0, 229, 255, 0.08))'
+            : 'rgba(255, 204, 0, 0.08)',
+          border: areAllQualifiersKnown
+            ? '1px solid rgba(0, 255, 170, 0.4)'
+            : '1px solid rgba(255, 204, 0, 0.35)',
           borderRadius: '12px',
           padding: '1rem 1.5rem',
           display: 'flex',
           alignItems: 'center',
           gap: '1rem',
-          color: '#ffcc00'
+          color: areAllQualifiersKnown ? 'var(--accent-primary)' : '#ffcc00'
         }}>
-          <AlertCircle size={24} style={{ flexShrink: 0 }} />
+          {areAllQualifiersKnown ? <CheckCircle2 size={24} style={{ flexShrink: 0 }} /> : <AlertCircle size={24} style={{ flexShrink: 0 }} />}
           <div>
-            <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffcc00' }}>
-              Tableau projeté en direct selon le classement provisoire
+            <div style={{ fontWeight: 800, fontSize: '0.95rem', color: areAllQualifiersKnown ? '#00ffaa' : '#ffcc00' }}>
+              {areAllQualifiersKnown
+                ? `Les ${numQualifiers} sortants sont connus !`
+                : 'Qualifications en cours — En attente des sortants'}
             </div>
             <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', marginTop: '2px' }}>
-              Les cases du tableau ci-dessous affichent les qualifiés projetés selon les résultats actuels. Vous pouvez lancer officiellement les phases finales à tout moment via le bouton ci-dessus.
+              {areAllQualifiersKnown
+                ? 'Tous les qualifiés pour la phase finale sont désormais validés. Vous pouvez officialiser et lancer le tableau final en cliquant sur le bouton ci-dessus.'
+                : `Tant que les sortants ne sont pas connus, le tableau de phase finale reste en attente. Les cases se rempliront automatiquement dès que les ${numQualifiers} qualifiés seront confirmés.`}
             </div>
           </div>
         </div>

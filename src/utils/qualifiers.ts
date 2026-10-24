@@ -27,6 +27,7 @@ export function getTournamentQualificationStatus(
       isFinalLaunched: false,
       isQualifAllDone: false,
       hasSureQualifiers: false,
+      areAllQualifiersKnown: false,
       sureQualifiers: [] as string[],
       ranking: [] as PlayerQualifStat[],
       numQualifiers: 4,
@@ -152,11 +153,15 @@ export function getTournamentQualificationStatus(
 
   const sureQualifiers = ranking.filter(p => p.isSure).map(p => p.id);
   const hasSureQualifiers = isFinalLaunched || isQualifAllDone || sureQualifiers.length > 0;
+  const areAllQualifiersKnown = tournament.format === 'direct_ko'
+    ? true
+    : Boolean(isFinalLaunched || isQualifAllDone || sureQualifiers.length >= numQualifiers);
 
   return {
     isFinalLaunched,
     isQualifAllDone,
     hasSureQualifiers,
+    areAllQualifiersKnown,
     sureQualifiers,
     ranking,
     numQualifiers,

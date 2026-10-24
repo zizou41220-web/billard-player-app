@@ -255,7 +255,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const areAllQualifiersKnown = Boolean(
     activeTournament &&
     !isFinalStageActive &&
-    (qualifStatus.isQualifAllDone || qualifStatus.sureQualifiers.length >= qualifStatus.numQualifiers)
+    qualifStatus.areAllQualifiersKnown
   );
   const showQualifAlertModal = areAllQualifiersKnown && dismissedQualifAlertTourId !== activeTournament?.id;
 
