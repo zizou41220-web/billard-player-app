@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import QRCode from 'react-qr-code';
 import {
@@ -176,6 +176,29 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   // Postpone Match Modal (Choose replacement from waiting queue)
   const [postponingMatchModal, setPostponingMatchModal] = useState<{ matchId: string; tableId: string } | null>(null);
 
+  // Measure live tournament tables deck container height dynamically
+  const [deckHeight, setDeckHeight] = useState<number>(0);
+  const deckRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!deckRef.current) return;
+    const updateSize = () => {
+      if (deckRef.current && deckRef.current.clientHeight > 0) {
+        setDeckHeight(deckRef.current.clientHeight);
+      }
+    };
+    updateSize();
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        if (entry.contentRect.height > 0) {
+          setDeckHeight(entry.contentRect.height);
+        }
+      }
+    });
+    ro.observe(deckRef.current);
+    return () => ro.disconnect();
+  }, [activeTab, dashboardSubTab]);
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -295,8 +318,35 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
     // Compact centered deck for live tournament dashboard
     if (showOnlyTournamentTables) {
+      const baseW = 240;
+      const baseH = 202; // BilliardTableVisual large base height
+
+      // Tables per row and estimated rows
+      const estimatedRows = tablesCount <= 2 ? 1 : (tablesCount <= 4 ? 2 : Math.ceil(tablesCount / 3));
+      const availableH = deckHeight > 0 ? deckHeight : 200;
+      const heightPadding = estimatedRows * 22;
+      const maxScaleFitHeight = (availableH - heightPadding) / (estimatedRows * baseH);
+
+      // Base target scales according to number of tournament tables
+      const getPreferredScale = (count: number) => {
+        if (count <= 1) return 0.85;
+        if (count === 2) return 0.78;
+        if (count === 3) return 0.70;
+        if (count === 4) return 0.65;
+        if (count <= 6) return 0.58;
+        return 0.52;
+      };
+
+      // Table scale adapts to both table count AND strictly fits within container height
+      const tableScale = Math.max(0.48, Math.min(getPreferredScale(tablesCount), maxScaleFitHeight));
+
+      const scaledW = Math.round(baseW * tableScale);
+      const scaledH = Math.round(baseH * tableScale);
+      const dynamicGap = tablesCount <= 1 ? '0rem' : tablesCount === 2 ? '2rem' : tablesCount <= 4 ? '1.2rem' : '0.8rem';
+
       return (
         <div
+          ref={deckRef}
           style={{
             flex: 1,
             width: '100%',
@@ -307,13 +357,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             border: '1px solid var(--border-color)',
             borderRadius: '16px',
             position: 'relative',
-            padding: '0.6rem 1rem',
+            padding: '0.4rem 0.8rem',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: tablesCount <= 2 ? '3.5rem' : '2rem',
+            alignContent: tablesCount <= 3 ? 'center' : 'start',
+            gap: dynamicGap,
             flexWrap: 'wrap',
-            overflow: 'hidden',
+            overflowY: 'auto',
+            overflowX: 'hidden',
             boxShadow: 'inset 0 0 35px rgba(0,0,0,0.85)'
           }}
         >
@@ -357,24 +409,41 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 <div
                   key={table.id}
                   style={{
+                    width: `${scaledW}px`,
+                    height: `${scaledH}px`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
                     cursor: 'pointer',
-                    transition: 'transform 0.2s ease',
-                    margin: '0.5rem 1rem',
-                    zIndex: isPlaying ? 10 : (isAssigned ? 5 : 1)
+                    zIndex: isPlaying ? 10 : (isAssigned ? 5 : 1),
+                    margin: tablesCount <= 2 ? '0.2rem 0.4rem' : '0.15rem 0.3rem'
                   }}
                   onClick={() => setSelectedTableForQR(table.id)}
                   title={`Cliquer pour voir le match de ${table.name || `Table ${table.number}`}`}
                 >
-                  <BilliardTableVisual
-                    number={table.number}
-                    name={table.name}
-                    status={isAssigned ? 'occupied' : 'free'}
-                    match={currentMatch}
-                    player1={p1}
-                    player2={p2}
-                    size="large"
-                    hasLiveStream={Boolean(table.liveStreamUrl || currentMatch?.liveStreamUrl)}
-                  />
+                  <div
+                    style={{
+                      width: `${baseW}px`,
+                      height: `${baseH}px`,
+                      transform: `scale(${tableScale})`,
+                      transformOrigin: 'center center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <BilliardTableVisual
+                      number={table.number}
+                      name={table.name}
+                      status={isAssigned ? 'occupied' : 'free'}
+                      match={currentMatch}
+                      player1={p1}
+                      player2={p2}
+                      size="large"
+                      hasLiveStream={Boolean(table.liveStreamUrl || currentMatch?.liveStreamUrl)}
+                    />
+                  </div>
                 </div>
               );
             })
@@ -827,7 +896,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
       )}
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, padding: '2.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flex: 1, padding: activeTab === 'dashboard' ? '1rem 1.8rem' : '2.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
         {/* ========================================================================= */}
         {/* 1. TOURNAMENT LAUNCHER TAB                                                */}
@@ -2514,16 +2583,24 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 </div>
 
                 {/* CENTER: Main Operations (Map + Matches) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: 0 }}>
-                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', position: 'relative', padding: '1.2rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexShrink: 0 }}>
-                      <h2 style={{ fontSize: '1.3rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', height: '100%', minHeight: 0 }}>
+                  <div className="glass-card" style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    padding: '1rem 1.2rem',
+                    flex: (activeTournament.settings?.tableIds.length || 0) <= 2 ? 1.25 : ((activeTournament.settings?.tableIds.length || 0) <= 4 ? 1.4 : 1.55),
+                    minHeight: 0,
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexShrink: 0, gap: '0.6rem' }}>
+                      <h2 style={{ fontSize: '1.2rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
                         <MonitorPlay size={20} style={{ color: 'var(--accent-primary)' }} /> Billards du Tournoi en Live
-                        <span style={{ fontSize: '0.8rem', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.3)' }}>
+                        <span style={{ fontSize: '0.78rem', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.3)' }}>
                           {activeTournament.settings?.tableIds.length || 0} billards
                         </span>
                       </h2>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         Cliquez sur une table pour afficher son QR code ou gérer le match
                       </span>
                     </div>
@@ -2533,7 +2610,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                   </div>
 
                   {/* Matchs à démarrer */}
-                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.2rem 1.4rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1rem 1.4rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexShrink: 0 }}>
                       <h2 style={{ fontSize: '1.25rem', color: '#fff', margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Matchs à démarrer
