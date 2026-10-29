@@ -66,13 +66,17 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const [clubSavedFeedback, setClubSavedFeedback] = useState(false);
   const [copiedClubUrl, setCopiedClubUrl] = useState(false);
 
-  const getClubShareUrl = () => {
+  const getAppBaseUrl = () => {
     if (typeof window === 'undefined') return '';
     if (window.location.hostname === 'localhost') {
-      return `${__LAN_URL__}?club=${currentClub.id}`;
+      return __LAN_URL__.replace(/\/+$/, '');
     }
-    const cleanBase = window.location.href.split('?')[0].replace(/\/+$/, '');
-    return `${cleanBase}/?club=${currentClub.id}`;
+    return window.location.href.split('?')[0].replace(/\/+$/, '');
+  };
+
+  const getClubShareUrl = () => {
+    if (typeof window === 'undefined') return '';
+    return `${getAppBaseUrl()}/?club=${currentClub.id}`;
   };
 
   // Tournament Setup State
@@ -3880,7 +3884,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     </span>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <a
-                        href={table.liveStreamUrl || match?.liveStreamUrl}
+                        href={(table.liveStreamUrl || match?.liveStreamUrl || '').replace(/\.github\.io\/\?overlay=/, '.github.io/billard-player-app/?overlay=')}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-neon"
@@ -3920,8 +3924,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       className="btn btn-neon"
                       style={{ width: '100%', fontSize: '0.84rem', padding: '0.65rem', justifyContent: 'center', fontWeight: 800 }}
                       onClick={() => {
-                        const origin = window.location.hostname === 'localhost' ? __LAN_URL__ : window.location.origin.replace(/\/+$/, '');
-                        const liveViewerUrl = `${origin}/?overlay=${table.id}&vdo=MCB_${currentClub.id}_${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
+                        const baseUrl = getAppBaseUrl();
+                        const liveViewerUrl = `${baseUrl}/?overlay=${table.id}&vdo=MCB_${currentClub.id}_${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
                         setTableLiveStream(table.id, liveViewerUrl);
                         if (match) setMatchLiveStream(match.id, liveViewerUrl);
                       }}
@@ -3977,8 +3981,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           className="btn btn-neon"
                           style={{ flex: 1, fontSize: '0.76rem', padding: '0.5rem', justifyContent: 'center', fontWeight: 800 }}
                           onClick={() => {
-                            const origin = window.location.hostname === 'localhost' ? __LAN_URL__ : window.location.origin.replace(/\/+$/, '');
-                            const liveViewerUrl = `${origin}/?overlay=${table.id}&vdo=MCB_${currentClub.id}_${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
+                            const baseUrl = getAppBaseUrl();
+                            const liveViewerUrl = `${baseUrl}/?overlay=${table.id}&vdo=MCB_${currentClub.id}_${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
                             setTableLiveStream(table.id, liveViewerUrl);
                             if (match) setMatchLiveStream(match.id, liveViewerUrl);
                           }}
@@ -4060,8 +4064,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           className="btn btn-outline"
                           style={{ flex: 1, fontSize: '0.76rem', padding: '0.45rem', justifyContent: 'center' }}
                           onClick={() => {
-                            const origin = window.location.hostname === 'localhost' ? __LAN_URL__ : window.location.origin.replace(/\/+$/, '');
-                            const overlayUrl = `${origin}/?overlay=${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
+                            const baseUrl = getAppBaseUrl();
+                            const overlayUrl = `${baseUrl}/?overlay=${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
                             navigator.clipboard.writeText(overlayUrl);
                             setCopiedOverlay(true);
                             setTimeout(() => setCopiedOverlay(false), 2500);

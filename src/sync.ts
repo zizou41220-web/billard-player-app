@@ -23,12 +23,17 @@ export const mapDBToPlayer = (d: any): Player => ({
   stats: d.stats || createDefaultPlayerStats()
 });
 
+const normalizeStreamUrl = (url: string | undefined): string | undefined => {
+  if (!url) return undefined;
+  return url.replace(/\.github\.io\/\?overlay=/, '.github.io/billard-player-app/?overlay=');
+};
+
 const getSavedTableStream = (clubId: string | undefined, tableId: string): string | undefined => {
   if (typeof window === 'undefined') return undefined;
   try {
     const cid = clubId || useStore.getState().currentClub.id;
     const saved = JSON.parse(localStorage.getItem(`mb_live_streams_${cid}`) || '{}');
-    return saved[tableId] || undefined;
+    return normalizeStreamUrl(saved[tableId] || undefined);
   } catch {
     return undefined;
   }
@@ -244,7 +249,7 @@ export const initSync = async () => {
   if (tourStreams) {
     Object.entries(tourStreams).forEach(([tId, url]) => {
       if (rawTables[tId] && url) {
-        rawTables[tId] = { ...rawTables[tId], liveStreamUrl: url };
+        rawTables[tId] = { ...rawTables[tId], liveStreamUrl: normalizeStreamUrl(url) };
       }
     });
   }
@@ -421,7 +426,7 @@ export const initSync = async () => {
                 Object.keys(updatedTables).forEach(tId => {
                   updatedTables[tId] = {
                     ...updatedTables[tId],
-                    liveStreamUrl: tourStreams[tId] || getSavedTableStream(state.currentClub.id, tId) || undefined
+                    liveStreamUrl: normalizeStreamUrl(tourStreams[tId]) || getSavedTableStream(state.currentClub.id, tId) || undefined
                   };
                 });
                 return {
