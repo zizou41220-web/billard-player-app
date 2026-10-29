@@ -1094,7 +1094,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (!match) return state;
 
       const tour = match.tournamentId ? state.tournaments[match.tournamentId] : undefined;
-      const rules = getMatchScoringRules(match, tour);
+      const rules = getMatchScoringRules(match, tour, state.players);
       const clamped = clampMatchScores(
         score1,
         score2,
@@ -1876,6 +1876,8 @@ export const useStore = create<AppState>((set, get) => ({
         const tourMatches = tournament.matches.map(id => newMatches[id]).filter(Boolean);
         const semi1 = tourMatches.find(m => (m.stage === 'semi' || m.id.includes('_semi_')) && (m.bracketPosition === 0 || m.id.includes('_semi_1_')));
         const semi2 = tourMatches.find(m => (m.stage === 'semi' || m.id.includes('_semi_')) && (m.bracketPosition === 1 || m.id.includes('_semi_2_')));
+        const finalMatch = tourMatches.find(m => m.stage === 'final' || m.id.includes('_final_'));
+        const thirdPlaceRound = finalMatch?.bracketRound ?? 2;
 
         let p1Id = '';
         let p2Id = '';
@@ -1909,7 +1911,7 @@ export const useStore = create<AppState>((set, get) => ({
           startTime: timestamp,
           tournamentId,
           stage: 'third_place',
-          bracketRound: 2,
+          bracketRound: thirdPlaceRound,
           bracketPosition: 1
         };
 
@@ -1932,7 +1934,7 @@ export const useStore = create<AppState>((set, get) => ({
           club_id: state.currentClub.id,
           tournament_id: tournamentId,
           stage: 'third_place',
-          bracket_round: 2,
+          bracket_round: thirdPlaceRound,
           bracket_position: 1,
           player1_id: p1Id || null,
           player2_id: p2Id || null,
@@ -2011,11 +2013,12 @@ export const useStore = create<AppState>((set, get) => ({
       tour.matches.forEach(mId => {
         const m = newMatches[mId];
         if (m && m.status === 'pending' && m.player1Id && m.player2Id) {
-          const matchStage = m.stage || (m.id.includes('_third_place_') ? 'third_place' : (m.id.includes('_final_') ? 'final' : undefined));
+          const isFinal = isFinalStageMatch(m);
+          const matchStage = m.stage || (m.id.includes('_third_place_') ? 'third_place' : (m.id.includes('_final_') ? 'final' : (isFinal ? 'quarter' : 'qualif')));
           const { isWinningSets: matchWinning, handicap: matchH } = getPhaseRules(mergedSettings, matchStage);
           const p1Level = state.players[m.player1Id]?.level;
           const p2Level = state.players[m.player2Id]?.level;
-          const targetSets = resolveDuelTargetSets(p1Level, p2Level, mergedSettings, true, matchStage);
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, mergedSettings, isFinal, matchStage);
           const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
           const { h1, h2 } = getMatchHandicap(p1Level, p2Level, matchH, maxH);
           newMatches[mId] = {

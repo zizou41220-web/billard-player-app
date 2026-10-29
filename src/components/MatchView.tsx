@@ -9,6 +9,7 @@ const MatchView: React.FC = () => {
   if (!activeMatchId) return null;
 
   const match = matches[activeMatchId];
+  if (!match) return null;
   const table = match.tableId ? tables[match.tableId] : null;
   const streamUrl = match.liveStreamUrl || table?.liveStreamUrl;
 

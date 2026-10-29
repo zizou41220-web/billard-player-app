@@ -3907,8 +3907,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         className="btn btn-neon"
                         style={{ flex: 1, fontSize: '0.82rem', padding: '0.6rem', justifyContent: 'center' }}
                         onClick={() => {
-                          const origin = window.location.hostname === 'localhost' ? 'https://192.168.1.15:5173' : window.location.origin;
-                          const overlayUrl = `${origin}?overlay=${table.id}&pos=${overlayPos}`;
+                          const origin = window.location.hostname === 'localhost' ? __LAN_URL__ : window.location.origin.replace(/\/+$/, '');
+                          const overlayUrl = `${origin}/?overlay=${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
                           navigator.clipboard.writeText(overlayUrl);
                           setCopiedOverlay(true);
                           setTimeout(() => setCopiedOverlay(false), 2500);
@@ -3917,7 +3917,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         {copiedOverlay ? '✓ URL copiée pour OBS !' : '📋 Copier URL Source Navigateur OBS'}
                       </button>
                       <a
-                        href={`?overlay=${table.id}&pos=${overlayPos}`}
+                        href={`?overlay=${table.id}&pos=${overlayPos}&club=${currentClub.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-outline"

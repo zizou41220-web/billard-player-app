@@ -5,6 +5,7 @@ import { computeAllPlayersStats, createDefaultPlayerStats } from './utils/player
 
 let isReceiving = false;
 let hasClubColumn = false;
+let channelsSubscribed = false;
 
 // Helpers to map camelCase <-> snake_case
 export const mapPlayerToDB = (p: Player) => {
@@ -112,8 +113,11 @@ export const mapDBToMatch = (d: any): Match => {
     tableId: d.status === 'finished' ? undefined : (d.table_id || undefined),
     player1Id: d.player1_id || '',
     player2Id: d.player2_id || '',
+    targetSets: d.target_sets || undefined,
     score1: d.score1 || 0,
     score2: d.score2 || 0,
+    handicapP1: d.handicap_p1 || undefined,
+    handicapP2: d.handicap_p2 || undefined,
     status: d.status,
     startTime: d.start_time,
     endTime: d.end_time || undefined,
@@ -305,6 +309,9 @@ export const initSync = async () => {
 
   isReceiving = false;
 
+  if (channelsSubscribed) return;
+  channelsSubscribed = true;
+
   // Setup Realtime Subscriptions
   const tablesToSync = ['tournoi2_players', 'tournoi2_tables', 'tournoi2_matches', 'tournoi2_tournaments'];
   
@@ -331,13 +338,17 @@ export const initSync = async () => {
             if (storeKey === 'tables') mappedData = mapDBToTable(data);
             if (storeKey === 'matches') {
               const existingM = state.matches[data.id];
+              const parsedM = mapDBToMatch(data);
               mappedData = {
                 ...existingM,
-                ...mapDBToMatch(data),
-                stage: mapDBToMatch(data).stage || existingM?.stage,
-                bracketRound: mapDBToMatch(data).bracketRound ?? existingM?.bracketRound,
-                bracketPosition: mapDBToMatch(data).bracketPosition ?? existingM?.bracketPosition,
-                nextMatchId: mapDBToMatch(data).nextMatchId || existingM?.nextMatchId
+                ...parsedM,
+                targetSets: parsedM.targetSets ?? existingM?.targetSets,
+                handicapP1: parsedM.handicapP1 ?? existingM?.handicapP1,
+                handicapP2: parsedM.handicapP2 ?? existingM?.handicapP2,
+                stage: parsedM.stage || existingM?.stage,
+                bracketRound: parsedM.bracketRound ?? existingM?.bracketRound,
+                bracketPosition: parsedM.bracketPosition ?? existingM?.bracketPosition,
+                nextMatchId: parsedM.nextMatchId || existingM?.nextMatchId
               };
 
               // If match is finished, immediately clear tableId, free table, and recompute player stats!
@@ -417,6 +428,11 @@ export const initSync = async () => {
 
 // Setup Diffing for outgoing changes
 useStore.subscribe(async (state, prevState) => {
+  if (state.currentClub.id !== prevState.currentClub.id) {
+    initSync();
+    return;
+  }
+
   if (isReceiving) return;
 
   // Diff Players

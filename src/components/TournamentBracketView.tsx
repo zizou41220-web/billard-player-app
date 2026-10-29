@@ -706,7 +706,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                           max={15}
                           value={modalGfAmateur}
                           onChange={(e) => setModalGfAmateur(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="input"
+                          className="input-field"
                           style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
                         />
                       </div>
@@ -718,7 +718,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                           max={15}
                           value={modalGfPrestige}
                           onChange={(e) => setModalGfPrestige(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="input"
+                          className="input-field"
                           style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
                         />
                       </div>
@@ -730,7 +730,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                           max={15}
                           value={modalGfMixed}
                           onChange={(e) => setModalGfMixed(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="input"
+                          className="input-field"
                           style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
                         />
                       </div>
@@ -741,7 +741,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                       <select
                         value={modalGfHandicap}
                         onChange={(e) => setModalGfHandicap(parseInt(e.target.value) || 0)}
-                        className="input"
+                        className="input-field"
                         style={{ width: '120px', padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
                       >
                         <option value={0}>Aucun (0)</option>
@@ -807,7 +807,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                             max={15}
                             value={modalTpAmateur}
                             onChange={(e) => setModalTpAmateur(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="input"
+                            className="input-field"
                             style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
                           />
                         </div>
@@ -819,7 +819,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                             max={15}
                             value={modalTpPrestige}
                             onChange={(e) => setModalTpPrestige(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="input"
+                            className="input-field"
                             style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
                           />
                         </div>
@@ -831,7 +831,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                             max={15}
                             value={modalTpMixed}
                             onChange={(e) => setModalTpMixed(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="input"
+                            className="input-field"
                             style={{ width: '100%', textAlign: 'center', padding: '0.3rem', fontSize: '0.85rem', fontWeight: 800, marginTop: '3px' }}
                           />
                         </div>
@@ -842,7 +842,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                         <select
                           value={modalTpHandicap}
                           onChange={(e) => setModalTpHandicap(parseInt(e.target.value) || 0)}
-                          className="input"
+                          className="input-field"
                           style={{ width: '120px', padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
                         >
                           <option value={0}>Aucun (0)</option>

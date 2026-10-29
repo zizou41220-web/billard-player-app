@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { Match, Table, Tournament } from '../types';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
+import { getMatchScoringRules } from '../utils/rules';
 
 interface StreamOverlayViewProps {
   tableParam: string;
@@ -33,11 +34,13 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const p2 = match ? players[match.player2Id] : undefined;
 
   const tournamentSettings = activeTournament?.settings;
-  const rulesText = tournamentSettings 
-    ? (tournamentSettings.qualifIsWinningSets 
-        ? `1er à ${tournamentSettings.qualifNbSets}` 
-        : `${tournamentSettings.qualifNbSets} manches`)
-    : '';
+  const rulesText = match
+    ? (getMatchScoringRules(match, activeTournament, players).formatLabel || '')
+    : (tournamentSettings
+        ? (tournamentSettings.qualifIsWinningSets
+            ? `1er à ${tournamentSettings.qualifNbSets}`
+            : `${tournamentSettings.qualifNbSets} manches`)
+        : '');
 
   return (
     <div style={{

@@ -19,10 +19,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
     return Object.values(players).filter(p => Boolean(p && p.id));
   }, [players]);
 
+  const matchesLevel = (p: Player) => {
+    if (filterLevel === 'all') return true;
+    if (filterLevel === 'Prestige') return p.level === 'Prestige' || p.level === 'Confirmé';
+    return p.level === filterLevel;
+  };
+
   const filteredAndSortedPlayers = useMemo(() => {
     return allPlayers
       .filter(p => {
-        if (filterLevel !== 'all' && p.level !== filterLevel) return false;
+        if (!matchesLevel(p)) return false;
         if (search.trim()) {
           return p.name.toLowerCase().includes(search.trim().toLowerCase());
         }
@@ -62,7 +68,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
   // Overall Top 3 for the 3D podium (unfiltered by search, but follows level filter)
   const podiumPlayers = useMemo(() => {
     return allPlayers
-      .filter(p => filterLevel === 'all' || p.level === filterLevel)
+      .filter(matchesLevel)
       .sort((a, b) => {
         const ptsA = a.stats.points ?? ((a.stats.wins * 3) + a.stats.matchesPlayed + ((a.stats.tournamentsWon || 0) * 10) + Math.max(0, a.stats.setDiff || 0));
         const ptsB = b.stats.points ?? ((b.stats.wins * 3) + b.stats.matchesPlayed + ((b.stats.tournamentsWon || 0) * 10) + Math.max(0, b.stats.setDiff || 0));
