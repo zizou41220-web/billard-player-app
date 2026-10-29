@@ -17,6 +17,9 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [camError, setCamError] = useState<string | null>(null);
+  const [fillScreen, setFillScreen] = useState<boolean>(true);
+  const [videoZoom, setVideoZoom] = useState<number>(1);
+  const [videoRotation, setVideoRotation] = useState<number>(0);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -120,20 +123,34 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
     }}>
       {/* 1. VDO.Ninja Wireless Camera Background (Smartphone or PC WebRTC) */}
       {vdoRoom && (
-        <iframe
-          src={`https://vdo.ninja/?view=${encodeURIComponent(vdoRoom)}&cleanoutput&autoplay&muted`}
-          allow="autoplay; camera; microphone; fullscreen; picture-in-picture"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            zIndex: 0,
-            background: '#050814'
-          }}
-          title="Flux Caméra Live"
-        />
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          zIndex: 0,
+          background: '#050814',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <iframe
+            src={`https://vdo.ninja/?view=${encodeURIComponent(vdoRoom)}&cleanoutput&autoplay&muted${fillScreen ? '&cover' : ''}`}
+            allow="autoplay; camera; microphone; fullscreen; picture-in-picture"
+            style={{
+              width: (videoRotation === 90 || videoRotation === 270) ? '100vh' : '100vw',
+              height: (videoRotation === 90 || videoRotation === 270) ? '100vw' : '100vh',
+              border: 'none',
+              transform: `rotate(${videoRotation}deg) scale(${videoZoom})`,
+              transformOrigin: 'center center',
+              transition: 'transform 0.25s ease',
+              background: '#050814',
+              flexShrink: 0
+            }}
+            title="Flux Caméra Live"
+          />
+        </div>
       )}
 
       {/* 2. Local Fixed USB Camera Background */}
@@ -149,7 +166,10 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
               inset: 0,
               width: '100%',
               height: '100%',
-              objectFit: 'cover',
+              objectFit: fillScreen ? 'cover' : 'contain',
+              transform: `rotate(${videoRotation}deg) scale(${videoZoom})`,
+              transformOrigin: 'center center',
+              transition: 'transform 0.25s ease',
               zIndex: 0,
               background: '#050814'
             }}
@@ -187,6 +207,9 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             width: '100%',
             height: '100%',
             border: 'none',
+            transform: `rotate(${videoRotation}deg) scale(${videoZoom})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.25s ease',
             zIndex: 0,
             background: '#050814'
           }}
@@ -194,7 +217,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
         />
       )}
 
-      {/* Floating Toolbar for Fixed Camera Selection & Scoreboard Position */}
+      {/* Floating Toolbar for Fixed Camera Selection, Zoom, Rotation & Fullscreen */}
       {hasVideoLayer && (
         <div style={{
           position: 'absolute',
@@ -204,14 +227,16 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
           zIndex: 20,
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
-          background: 'rgba(5, 8, 22, 0.8)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          flexWrap: 'wrap',
+          gap: '0.45rem',
+          background: 'rgba(5, 8, 22, 0.85)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.18)',
           padding: '6px 10px',
           borderRadius: '10px',
           fontSize: '0.75rem',
-          color: '#fff'
+          color: '#fff',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.6)'
         }}>
           {isLocalBroadcast && videoDevices.length > 0 && (
             <select
@@ -235,6 +260,61 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
               ))}
             </select>
           )}
+          <button
+            type="button"
+            onClick={() => setFillScreen(!fillScreen)}
+            style={{
+              background: fillScreen ? 'rgba(0, 255, 170, 0.2)' : 'rgba(255,255,255,0.1)',
+              color: fillScreen ? '#00ffaa' : '#fff',
+              border: fillScreen ? '1px solid rgba(0, 255, 170, 0.4)' : 'none',
+              borderRadius: '6px',
+              padding: '4px 8px',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              fontWeight: 700
+            }}
+            title="Étirer la vidéo pour remplir tout l'écran"
+          >
+            {fillScreen ? '↔ Plein cadre : OUI' : '↔ Plein cadre : NON'}
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '6px', padding: '2px 5px' }}>
+            <button
+              type="button"
+              onClick={() => setVideoZoom(z => Math.max(1, Math.round((z - 0.2) * 10) / 10))}
+              style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 900, padding: '2px 6px', fontSize: '0.8rem' }}
+              title="Dézoomer"
+            >
+              🔍-
+            </button>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, minWidth: '36px', textAlign: 'center', color: videoZoom > 1 ? '#00ffaa' : '#fff' }}>
+              {Math.round(videoZoom * 100)}%
+            </span>
+            <button
+              type="button"
+              onClick={() => setVideoZoom(z => Math.min(3, Math.round((z + 0.2) * 10) / 10))}
+              style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 900, padding: '2px 6px', fontSize: '0.8rem' }}
+              title="Zoomer"
+            >
+              🔍+
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVideoRotation(r => (r + 90) % 360)}
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '4px 8px',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              fontWeight: 700
+            }}
+            title="Pivoter l'image de 90° (utile si le téléphone est vertical)"
+          >
+            🔄 Pivoter ({videoRotation}°)
+          </button>
           <button
             type="button"
             onClick={() => setPosition(position === 'top' ? 'bottom' : 'top')}
@@ -261,17 +341,18 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
               }
             }}
             style={{
-              background: 'rgba(0, 255, 170, 0.2)',
-              color: '#00ffaa',
-              border: '1px solid rgba(0, 255, 170, 0.4)',
+              background: '#00ffaa',
+              color: '#000',
+              border: 'none',
               borderRadius: '6px',
-              padding: '4px 8px',
-              fontSize: '0.72rem',
+              padding: '5px 10px',
+              fontSize: '0.75rem',
               cursor: 'pointer',
-              fontWeight: 800
+              fontWeight: 900,
+              boxShadow: '0 0 12px rgba(0, 255, 170, 0.4)'
             }}
           >
-            ⛶ Plein écran
+            ⛶ PLEIN ÉCRAN
           </button>
         </div>
       )}
