@@ -23,6 +23,17 @@ export const mapDBToPlayer = (d: any): Player => ({
   stats: d.stats || createDefaultPlayerStats()
 });
 
+const getSavedTableStream = (clubId: string | undefined, tableId: string): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const cid = clubId || useStore.getState().currentClub.id;
+    const saved = JSON.parse(localStorage.getItem(`mb_live_streams_${cid}`) || '{}');
+    return saved[tableId] || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const mapTableToDB = (t: Table) => {
   const data: any = { id: t.id, number: t.number, name: t.name, status: t.status, current_match_id: t.currentMatchId || null, x: t.x || null, y: t.y || null };
   if (hasClubColumn) data.club_id = t.clubId || useStore.getState().currentClub.id;
@@ -38,7 +49,7 @@ const mapDBToTable = (d: any): Table => ({
   currentMatchId: d.current_match_id || undefined,
   x: d.x || undefined,
   y: d.y || undefined,
-  liveStreamUrl: d.live_stream_url || undefined
+  liveStreamUrl: d.live_stream_url || getSavedTableStream(d.club_id, d.id) || undefined
 });
 
 export const mapMatchToDB = (m: Match) => {
@@ -227,6 +238,17 @@ export const initSync = async () => {
     Object.assign(rawTournaments, useStore.getState().tournaments);
   }
 
+  // Restore any liveStreamUrls stored in the active tournament settings
+  const ongoingTour = Object.values(rawTournaments).slice().reverse().find(t => t.status === 'ongoing');
+  const tourStreams = (ongoingTour?.settings as any)?.tableLiveStreams as Record<string, string> | undefined;
+  if (tourStreams) {
+    Object.entries(tourStreams).forEach(([tId, url]) => {
+      if (rawTables[tId] && url) {
+        rawTables[tId] = { ...rawTables[tId], liveStreamUrl: url };
+      }
+    });
+  }
+
   // Calcul dynamique et complet des statistiques de tous les joueurs depuis les matchs
   const computedPlayers = computeAllPlayersStats(rawPlayers, rawMatches, rawTournaments);
 
@@ -335,7 +357,15 @@ export const initSync = async () => {
             }
             let mappedData: any;
             if (storeKey === 'players') mappedData = mapDBToPlayer(data);
-            if (storeKey === 'tables') mappedData = mapDBToTable(data);
+            if (storeKey === 'tables') {
+              const existingT = state.tables[data.id];
+              const parsedT = mapDBToTable(data);
+              mappedData = {
+                ...existingT,
+                ...parsedT,
+                liveStreamUrl: parsedT.liveStreamUrl ?? existingT?.liveStreamUrl
+              };
+            }
             if (storeKey === 'matches') {
               const existingM = state.matches[data.id];
               const parsedM = mapDBToMatch(data);
@@ -348,7 +378,8 @@ export const initSync = async () => {
                 stage: parsedM.stage || existingM?.stage,
                 bracketRound: parsedM.bracketRound ?? existingM?.bracketRound,
                 bracketPosition: parsedM.bracketPosition ?? existingM?.bracketPosition,
-                nextMatchId: parsedM.nextMatchId || existingM?.nextMatchId
+                nextMatchId: parsedM.nextMatchId || existingM?.nextMatchId,
+                liveStreamUrl: parsedM.liveStreamUrl ?? existingM?.liveStreamUrl
               };
 
               // If match is finished, immediately clear tableId, free table, and recompute player stats!
@@ -384,6 +415,23 @@ export const initSync = async () => {
                 ...parsedT,
                 finalStageLaunched: parsedT.finalStageLaunched || existingT?.finalStageLaunched
               };
+              const tourStreams = (parsedT.settings as any)?.tableLiveStreams as Record<string, string> | undefined;
+              if (tourStreams && parsedT.status === 'ongoing') {
+                const updatedTables = { ...state.tables };
+                Object.keys(updatedTables).forEach(tId => {
+                  updatedTables[tId] = {
+                    ...updatedTables[tId],
+                    liveStreamUrl: tourStreams[tId] || getSavedTableStream(state.currentClub.id, tId) || undefined
+                  };
+                });
+                return {
+                  tournaments: {
+                    ...state.tournaments,
+                    [mappedData.id]: mappedData
+                  },
+                  tables: updatedTables
+                };
+              }
             }
 
             if (storeKey === 'tables' && mappedData.status === 'occupied' && mappedData.currentMatchId) {

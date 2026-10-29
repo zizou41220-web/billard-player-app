@@ -2205,11 +2205,50 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => {
       const table = state.tables[tableId];
       if (!table) return state;
+
+      // Persist in localStorage so it never gets lost on reload or realtime echo
+      if (typeof window !== 'undefined') {
+        try {
+          const storageKey = `mb_live_streams_${state.currentClub.id}`;
+          const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          if (liveStreamUrl) {
+            existing[tableId] = liveStreamUrl;
+          } else {
+            delete existing[tableId];
+          }
+          localStorage.setItem(storageKey, JSON.stringify(existing));
+        } catch {}
+      }
+
+      // Also sync in active tournament settings JSONB so all smartphones receive the live link in real time
+      const newTournaments = { ...state.tournaments };
+      const activeTour = Object.values(newTournaments).slice().reverse().find(t => t.status === 'ongoing');
+      if (activeTour) {
+        const currentStreams = { ...((activeTour.settings as any)?.tableLiveStreams || {}) };
+        if (liveStreamUrl) {
+          currentStreams[tableId] = liveStreamUrl;
+        } else {
+          delete currentStreams[tableId];
+        }
+        const updatedSettings = {
+          ...(activeTour.settings || {}),
+          tableLiveStreams: currentStreams
+        } as any;
+        newTournaments[activeTour.id] = {
+          ...activeTour,
+          settings: updatedSettings
+        };
+        supabase.from('tournoi2_tournaments').update({
+          settings: updatedSettings
+        }).eq('id', activeTour.id).then();
+      }
+
       return {
         tables: {
           ...state.tables,
           [tableId]: { ...table, liveStreamUrl }
-        }
+        },
+        tournaments: newTournaments
       };
     });
   },

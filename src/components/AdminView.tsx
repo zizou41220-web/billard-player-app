@@ -3912,7 +3912,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     </div>
 
                     <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'inline-block' }}>
-                      <QRCode value={`https://vdo.ninja/?push=MCB_${currentClub.id}_${table.id}&webcam&autostart&rear`} size={125} />
+                      <QRCode value={`https://vdo.ninja/?push=MCB_${currentClub.id}_${table.id}&webcam&facingmode=environment`} size={125} />
                     </div>
 
                     <button
