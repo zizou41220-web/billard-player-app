@@ -11,11 +11,70 @@ interface StreamOverlayViewProps {
 const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => {
   const { tables, matches, players, tournaments, currentClub } = useStore();
   const [position, setPosition] = useState<'top' | 'bottom'>('top');
+  const [vdoRoom, setVdoRoom] = useState<string | null>(null);
+  const [isLocalBroadcast, setIsLocalBroadcast] = useState(false);
+  const [externalVideoUrl, setExternalVideoUrl] = useState<string | null>(null);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [camError, setCamError] = useState<string | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('pos') === 'bottom') setPosition('bottom');
+    if (params.get('vdo')) setVdoRoom(params.get('vdo'));
+    if (params.get('broadcast') === '1') setIsLocalBroadcast(true);
+    if (params.get('video')) setExternalVideoUrl(params.get('video'));
   }, []);
+
+  // Local USB / Fixed Camera handling when ?broadcast=1
+  useEffect(() => {
+    if (!isLocalBroadcast) return;
+    let activeStream: MediaStream | null = null;
+
+    const startCamera = async () => {
+      setCamError(null);
+      try {
+        const constraints: MediaStreamConstraints = {
+          video: selectedDeviceId
+            ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+            : { width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        activeStream = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cams = devices.filter(d => d.kind === 'videoinput');
+        setVideoDevices(cams);
+        if (!selectedDeviceId && cams.length > 0) {
+          const currentTrack = stream.getVideoTracks()[0];
+          const currentId = currentTrack?.getSettings()?.deviceId;
+          if (currentId) setSelectedDeviceId(currentId);
+        }
+      } catch (err: any) {
+        setCamError("Impossible d'accéder à la caméra USB. Vérifiez qu'elle est bien branchée et autorisée dans le navigateur.");
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [isLocalBroadcast, selectedDeviceId]);
+
+  const formatEmbedUrl = (url: string) => {
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/)([a-zA-Z0-9_-]+)/);
+    if (ytMatch) {
+      return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&mute=1`;
+    }
+    return url;
+  };
 
   // Find table by ID (e.g. 't1') or by number (e.g. '1') or by name
   const table: Table | undefined = Object.values(tables).find(t => 
@@ -42,11 +101,13 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             : `${tournamentSettings.qualifNbSets} manches`)
         : '');
 
+  const hasVideoLayer = Boolean(vdoRoom || isLocalBroadcast || externalVideoUrl);
+
   return (
     <div style={{
       width: '100vw',
       height: '100vh',
-      backgroundColor: 'transparent',
+      backgroundColor: hasVideoLayer ? '#000' : 'transparent',
       overflow: 'hidden',
       position: 'relative',
       display: 'flex',
@@ -57,10 +118,169 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       boxSizing: 'border-box',
       fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
     }}>
+      {/* 1. VDO.Ninja Wireless Camera Background (Smartphone or PC WebRTC) */}
+      {vdoRoom && (
+        <iframe
+          src={`https://vdo.ninja/?view=${encodeURIComponent(vdoRoom)}&cleanoutput&autoplay&muted`}
+          allow="autoplay; camera; microphone; fullscreen; picture-in-picture"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            zIndex: 0,
+            background: '#050814'
+          }}
+          title="Flux Caméra Live"
+        />
+      )}
+
+      {/* 2. Local Fixed USB Camera Background */}
+      {isLocalBroadcast && (
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              zIndex: 0,
+              background: '#050814'
+            }}
+          />
+          {camError && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'rgba(20, 8, 16, 0.9)',
+              border: '1px solid #ff4466',
+              color: '#fff',
+              padding: '1.2rem 1.8rem',
+              borderRadius: '12px',
+              zIndex: 5,
+              textAlign: 'center',
+              maxWidth: '480px'
+            }}>
+              <div style={{ fontWeight: 800, color: '#ff4466', marginBottom: '0.4rem', fontSize: '1rem' }}>⚠️ Caméra non détectée</div>
+              <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)' }}>{camError}</div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 3. External IP Camera / YouTube Embed Background */}
+      {externalVideoUrl && !vdoRoom && !isLocalBroadcast && (
+        <iframe
+          src={formatEmbedUrl(externalVideoUrl)}
+          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            zIndex: 0,
+            background: '#050814'
+          }}
+          title="Flux Vidéo Externe"
+        />
+      )}
+
+      {/* Floating Toolbar for Fixed Camera Selection & Scoreboard Position */}
+      {hasVideoLayer && (
+        <div style={{
+          position: 'absolute',
+          bottom: position === 'top' ? '16px' : 'auto',
+          top: position === 'bottom' ? '16px' : 'auto',
+          right: '16px',
+          zIndex: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: 'rgba(5, 8, 22, 0.8)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.15)',
+          padding: '6px 10px',
+          borderRadius: '10px',
+          fontSize: '0.75rem',
+          color: '#fff'
+        }}>
+          {isLocalBroadcast && videoDevices.length > 0 && (
+            <select
+              value={selectedDeviceId}
+              onChange={(e) => setSelectedDeviceId(e.target.value)}
+              style={{
+                background: '#0d1527',
+                color: '#fff',
+                border: '1px solid rgba(0,255,170,0.4)',
+                borderRadius: '6px',
+                padding: '3px 8px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              {videoDevices.map((d, idx) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  🎥 {d.label || `Caméra fixe #${idx + 1}`}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            onClick={() => setPosition(position === 'top' ? 'bottom' : 'top')}
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '4px 8px',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              fontWeight: 700
+            }}
+          >
+            Score : {position === 'top' ? '⬆ Haut' : '⬇ Bas'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen?.();
+              } else {
+                document.exitFullscreen?.();
+              }
+            }}
+            style={{
+              background: 'rgba(0, 255, 170, 0.2)',
+              color: '#00ffaa',
+              border: '1px solid rgba(0, 255, 170, 0.4)',
+              borderRadius: '6px',
+              padding: '4px 8px',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              fontWeight: 800
+            }}
+          >
+            ⛶ Plein écran
+          </button>
+        </div>
+      )}
       
       {/* Broadcast Scoreboard Graphic */}
       {table && match && p1 && p2 ? (
         <div style={{
+          position: 'relative',
+          zIndex: 10,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -318,6 +538,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       ) : (
         /* Standby / Waiting for Match State */
         <div style={{
+          position: 'relative',
+          zIndex: 10,
           background: 'rgba(5, 8, 22, 0.85)',
           backdropFilter: 'blur(12px)',
           border: '1px solid rgba(255, 255, 255, 0.15)',
