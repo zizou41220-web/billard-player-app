@@ -201,7 +201,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     });
     ro.observe(deckRef.current);
     return () => ro.disconnect();
-  }, [activeTab, dashboardSubTab]);
+  }, [activeTab, dashboardSubTab, activeTournament?.id, Object.keys(tables).length]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -322,31 +322,31 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
     // Compact centered deck for live tournament dashboard
     if (showOnlyTournamentTables) {
-      const baseW = 240;
-      const baseH = 202; // BilliardTableVisual large base height
+      const baseW = 248;
+      const baseH = 208; // BilliardTableVisual large base height
 
       // Tables per row and estimated rows
-      const estimatedRows = tablesCount <= 2 ? 1 : (tablesCount <= 4 ? 2 : Math.ceil(tablesCount / 3));
-      const availableH = deckHeight > 0 ? deckHeight : 200;
-      const heightPadding = estimatedRows * 22;
+      const estimatedRows = tablesCount <= 3 ? 1 : (tablesCount <= 6 ? 2 : Math.ceil(tablesCount / 3));
+      const availableH = deckHeight > 0 ? deckHeight : 300;
+      const heightPadding = estimatedRows * 16;
       const maxScaleFitHeight = (availableH - heightPadding) / (estimatedRows * baseH);
 
       // Base target scales according to number of tournament tables
       const getPreferredScale = (count: number) => {
-        if (count <= 1) return 0.85;
-        if (count === 2) return 0.78;
-        if (count === 3) return 0.70;
-        if (count === 4) return 0.65;
-        if (count <= 6) return 0.58;
-        return 0.52;
+        if (count <= 1) return 1.28;
+        if (count === 2) return 1.18;
+        if (count === 3) return 0.98;
+        if (count === 4) return 0.85;
+        if (count <= 6) return 0.74;
+        return 0.64;
       };
 
       // Table scale adapts to both table count AND strictly fits within container height
-      const tableScale = Math.max(0.48, Math.min(getPreferredScale(tablesCount), maxScaleFitHeight));
+      const tableScale = Math.max(0.55, Math.min(getPreferredScale(tablesCount), maxScaleFitHeight));
 
       const scaledW = Math.round(baseW * tableScale);
       const scaledH = Math.round(baseH * tableScale);
-      const dynamicGap = tablesCount <= 1 ? '0rem' : tablesCount === 2 ? '2rem' : tablesCount <= 4 ? '1.2rem' : '0.8rem';
+      const dynamicGap = tablesCount <= 1 ? '0rem' : tablesCount === 2 ? '2.8rem' : tablesCount <= 4 ? '1.5rem' : '1rem';
 
       return (
         <div

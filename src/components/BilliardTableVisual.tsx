@@ -348,14 +348,14 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
           flexDirection: 'column',
           alignItems: 'center',
           gap: isLarge ? '5px' : '2px',
-          background: isOccupied ? 'rgba(5, 8, 20, 0.94)' : 'rgba(10, 15, 25, 0.88)',
+          background: isOccupied ? 'rgba(5, 8, 20, 0.96)' : 'rgba(10, 15, 25, 0.9)',
           backdropFilter: 'blur(8px)',
-          border: isOccupied ? '1px solid rgba(0, 255, 170, 0.45)' : '1px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: isLarge ? '10px' : '7px',
-          padding: isLarge ? '4px 10px' : '2px 8px',
-          boxShadow: isOccupied ? '0 4px 16px rgba(0, 255, 170, 0.25)' : '0 2px 6px rgba(0,0,0,0.4)',
-          width: isLarge ? '240px' : undefined,
-          maxWidth: isLarge ? '240px' : '150px'
+          border: isOccupied ? '1.5px solid rgba(245, 158, 11, 0.55)' : '1px solid rgba(255, 255, 255, 0.15)',
+          borderRadius: isLarge ? '12px' : '7px',
+          padding: isLarge ? '6px 10px' : '2px 8px',
+          boxShadow: isOccupied ? '0 6px 20px rgba(0, 0, 0, 0.7)' : '0 2px 6px rgba(0,0,0,0.4)',
+          width: isLarge ? '248px' : undefined,
+          maxWidth: isLarge ? '248px' : '150px'
         }}
       >
         {/* Table Name + Live/Prêt Indicator */}
@@ -474,10 +474,10 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
               justifyContent: 'space-between',
               width: '100%',
               gap: isLarge ? '6px' : '4px',
-              fontSize: isLarge ? '0.82rem' : '0.66rem',
-              fontWeight: 700,
+              fontSize: isLarge ? '0.86rem' : '0.68rem',
+              fontWeight: 800,
               whiteSpace: 'nowrap',
-              borderTop: '1px solid rgba(255,255,255,0.08)',
+              borderTop: '1px solid rgba(255,255,255,0.1)',
               paddingTop: isLarge ? '5px' : '2px',
               marginTop: isLarge ? '2px' : '1px'
             }}
@@ -497,21 +497,24 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
             </span>
             <span
               style={{
-                color: 'var(--accent-primary)',
+                color: match.status === 'playing' ? '#000' : 'var(--accent-primary)',
                 fontWeight: 900,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '2px',
-                padding: isLarge ? '1px 6px' : '0',
-                background: isLarge && match.status === 'playing' ? 'rgba(0, 255, 170, 0.15)' : 'transparent',
-                borderRadius: '4px',
-                fontSize: isLarge ? (match.status === 'playing' ? '0.92rem' : '0.78rem') : 'inherit',
+                justifyContent: 'center',
+                gap: '3px',
+                padding: isLarge ? (match.status === 'playing' ? '2px 9px' : '1px 6px') : '0 4px',
+                background: match.status === 'playing' ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '6px',
+                fontSize: isLarge ? (match.status === 'playing' ? '1.12rem' : '0.82rem') : '0.74rem',
+                letterSpacing: match.status === 'playing' ? '0.5px' : '0',
+                boxShadow: match.status === 'playing' ? '0 0 12px rgba(245, 158, 11, 0.5)' : 'none',
                 flexShrink: 0
               }}
             >
-              {match.status === 'playing' ? `${match.score1}-${match.score2}` : 'VS'}
+              {match.status === 'playing' ? `${match.score1} - ${match.score2}` : 'VS'}
               {(Boolean(match.handicapP1) || Boolean(match.handicapP2)) && (
-                <span style={{ fontSize: isLarge ? '0.65rem' : '0.52rem', color: '#ffd700' }} title="Handicap actif">🎯</span>
+                <span style={{ fontSize: isLarge ? '0.68rem' : '0.52rem', color: match.status === 'playing' ? '#000' : '#ffd700' }} title="Handicap actif">🎯</span>
               )}
             </span>
             <span
