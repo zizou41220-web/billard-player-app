@@ -3469,9 +3469,12 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
         const match = (candidateMatch && candidateMatch.status !== 'finished') ? candidateMatch : null;
 
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedTableForQR(null)}>
-            <div className="glass-card" style={{ padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem', minWidth: '350px' }} onClick={e => e.stopPropagation()}>
-              <h2 style={{ fontSize: '2rem', margin: 0 }}>{table.name || `Table ${table.number}`}</h2>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setSelectedTableForQR(null)}>
+            <div className="glass-card" style={{ padding: '1.4rem 1.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', minWidth: '340px', maxWidth: '560px', width: '100%', maxHeight: '92vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <h2 style={{ fontSize: '1.5rem', margin: 0 }}>{table.name || `Table ${table.number}`}</h2>
+                <button className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.8rem' }} onClick={() => setSelectedTableForQR(null)}>✕ Fermer</button>
+              </div>
               {match?.stage && match.stage !== 'qualif' && (
                 <div style={{
                   display: 'inline-flex',
@@ -3884,17 +3887,17 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       fontSize: '0.78rem',
                       fontWeight: 800,
                       borderRadius: '8px',
-                      border: 'none',
+                      border: liveStreamTab === 'embed' ? 'none' : '1px solid rgba(255, 68, 68, 0.45)',
                       cursor: 'pointer',
-                      background: liveStreamTab === 'embed' ? 'var(--accent-primary)' : 'transparent',
-                      color: liveStreamTab === 'embed' ? '#000' : 'rgba(255,255,255,0.7)',
+                      background: liveStreamTab === 'embed' ? 'var(--accent-primary)' : 'rgba(255, 34, 68, 0.12)',
+                      color: liveStreamTab === 'embed' ? '#000' : '#ff8a96',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '0.35rem'
                     }}
                   >
-                    <Globe size={14} /> 3. YouTube / OBS
+                    <Globe size={14} /> ▶️ 3. YouTube / OBS
                   </button>
                 </div>
 

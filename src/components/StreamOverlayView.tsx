@@ -56,15 +56,18 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
 }) => {
   const defaultVdoRoom = `MCB_${currentClub.id}_${table.id}`;
   const tableExtVideo = extractExternalVideoFromStreamUrl(table.liveStreamUrl || match?.liveStreamUrl);
-  const [sourceMode, setSourceMode] = useState<string>(() => (tableExtVideo ? 'ext' : 'vdo'));
+  const [customYtUrl, setCustomYtUrl] = useState<string>(tableExtVideo);
+  const activeExtVideo = customYtUrl || tableExtVideo;
+  const [sourceMode, setSourceMode] = useState<string>(() => (activeExtVideo ? 'ext' : 'vdo'));
   const [tileZoom, setTileZoom] = useState<number>(1);
   const [tileRotation, setTileRotation] = useState<number>(0);
   const [fillTile, setFillTile] = useState<boolean>(true);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
-    if (tableExtVideo && sourceMode === 'vdo') {
-      setSourceMode('ext');
+    if (tableExtVideo) {
+      setCustomYtUrl(tableExtVideo);
+      if (sourceMode === 'vdo') setSourceMode('ext');
     }
   }, [tableExtVideo]);
 
@@ -107,9 +110,9 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
       boxSizing: 'border-box'
     }}>
       {/* Video Layer */}
-      {sourceMode === 'ext' && tableExtVideo ? (
+      {sourceMode === 'ext' && activeExtVideo ? (
         <iframe
-          src={formatEmbedVideoUrl(tableExtVideo)}
+          src={formatEmbedVideoUrl(activeExtVideo)}
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
           style={{
             position: 'absolute',
@@ -281,7 +284,7 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
           }}
           title="Choisir la caméra de ce billard"
         >
-          {tableExtVideo && <option value="ext">🌐 YouTube / Lien Externe</option>}
+          {activeExtVideo && <option value="ext">🌐 YouTube / Lien Externe</option>}
           <option value="vdo">📱 Sans-fil ({table.name || `T${table.number}`})</option>
           {videoDevices.map((d, idx) => (
             <option key={d.deviceId} value={`usb:${d.deviceId}`}>
@@ -289,6 +292,22 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={() => {
+            const url = window.prompt('Collez ici le lien YouTube (ex: https://www.youtube.com/watch?v=...) :', activeExtVideo || '');
+            if (url !== null) {
+              const trimmed = url.trim();
+              setCustomYtUrl(trimmed);
+              if (trimmed) setSourceMode('ext');
+              else setSourceMode('vdo');
+            }
+          }}
+          style={{ background: 'rgba(255, 34, 68, 0.25)', color: '#ff8a96', border: '1px solid rgba(255, 34, 68, 0.5)', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', fontWeight: 800, fontSize: '0.68rem' }}
+          title="Coller un lien vidéo YouTube pour ce billard"
+        >
+          ▶️ YouTube
+        </button>
         <button
           type="button"
           onClick={() => setFillTile(!fillTile)}
@@ -839,6 +858,35 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             }}
           >
             Score : {position === 'top' ? '⬆ Haut' : '⬇ Bas'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const url = window.prompt('Collez ici le lien YouTube (ex: https://www.youtube.com/watch?v=...) :', effectiveExternalVideo || '');
+              if (url !== null) {
+                const trimmed = url.trim();
+                if (trimmed) {
+                  setExternalVideoUrl(trimmed);
+                  setVdoRoom(null);
+                  setIsLocalBroadcast(false);
+                } else {
+                  setExternalVideoUrl(null);
+                }
+              }
+            }}
+            style={{
+              background: 'rgba(255, 34, 68, 0.25)',
+              color: '#ff8a96',
+              border: '1px solid rgba(255, 34, 68, 0.5)',
+              borderRadius: '6px',
+              padding: '4px 9px',
+              fontSize: '0.73rem',
+              cursor: 'pointer',
+              fontWeight: 800
+            }}
+            title="Coller un lien vidéo YouTube"
+          >
+            ▶️ Lien YouTube
           </button>
           <button
             type="button"
