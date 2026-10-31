@@ -25,6 +25,12 @@ export const mapDBToPlayer = (d: any): Player => ({
 
 const normalizeStreamUrl = (url: string | undefined): string | undefined => {
   if (!url) return undefined;
+  const qIdx = url.indexOf('?overlay=');
+  if (qIdx !== -1 && typeof window !== 'undefined') {
+    const cleanPath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/+$/, '');
+    const base = window.location.hostname === 'localhost' ? __LAN_URL__.replace(/\/+$/, '') : `${window.location.origin}${cleanPath}`;
+    return `${base}/${url.slice(qIdx)}`;
+  }
   return url.replace(/\.github\.io\/\?overlay=/, '.github.io/billard-player-app/?overlay=');
 };
 

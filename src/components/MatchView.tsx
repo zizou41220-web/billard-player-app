@@ -11,7 +11,17 @@ const MatchView: React.FC = () => {
   const match = matches[activeMatchId];
   if (!match) return null;
   const table = match.tableId ? tables[match.tableId] : null;
-  const streamUrl = match.liveStreamUrl || table?.liveStreamUrl;
+  const rawStreamUrl = match.liveStreamUrl || table?.liveStreamUrl;
+  const streamUrl = (() => {
+    if (!rawStreamUrl) return undefined;
+    const idx = rawStreamUrl.indexOf('?overlay=');
+    if (idx !== -1 && typeof window !== 'undefined') {
+      const cleanPath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/+$/, '');
+      const base = window.location.hostname === 'localhost' ? __LAN_URL__.replace(/\/+$/, '') : `${window.location.origin}${cleanPath}`;
+      return `${base}/${rawStreamUrl.slice(idx)}`;
+    }
+    return rawStreamUrl;
+  })();
 
   const p1 = match.player1Id;
   const p2 = match.player2Id;

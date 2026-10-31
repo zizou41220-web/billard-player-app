@@ -90,10 +90,29 @@ export const getClubCachedState = (clubId: string) => {
       const raw = localStorage.getItem(`mb_state_cache_${clubId}`);
       if (raw) {
         const parsed = JSON.parse(raw);
+        const cleanPath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/+$/, '');
+        const base = window.location.hostname === 'localhost' ? __LAN_URL__.replace(/\/+$/, '') : `${window.location.origin}${cleanPath}`;
+        const fixUrl = (u?: string) => {
+          if (!u) return undefined;
+          const idx = u.indexOf('?overlay=');
+          return idx !== -1 ? `${base}/${u.slice(idx)}` : u;
+        };
+        const tables = (parsed.tables || {}) as Record<string, Table>;
+        Object.keys(tables).forEach(k => {
+          if (tables[k]?.liveStreamUrl) {
+            tables[k] = { ...tables[k], liveStreamUrl: fixUrl(tables[k].liveStreamUrl) };
+          }
+        });
+        const matches = (parsed.matches || {}) as Record<string, Match>;
+        Object.keys(matches).forEach(k => {
+          if (matches[k]?.liveStreamUrl) {
+            matches[k] = { ...matches[k], liveStreamUrl: fixUrl(matches[k].liveStreamUrl) };
+          }
+        });
         return {
           players: (parsed.players || {}) as Record<string, Player>,
-          tables: (parsed.tables || {}) as Record<string, Table>,
-          matches: (parsed.matches || {}) as Record<string, Match>,
+          tables,
+          matches,
           tournaments: (parsed.tournaments || {}) as Record<string, Tournament>
         };
       }

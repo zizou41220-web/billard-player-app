@@ -71,7 +71,17 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     if (window.location.hostname === 'localhost') {
       return __LAN_URL__.replace(/\/+$/, '');
     }
-    return window.location.href.split('?')[0].replace(/\/+$/, '');
+    const cleanPath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/+$/, '');
+    return `${window.location.origin}${cleanPath}`;
+  };
+
+  const resolveStreamHref = (rawUrl?: string) => {
+    if (!rawUrl) return '';
+    const qIdx = rawUrl.indexOf('?overlay=');
+    if (qIdx !== -1) {
+      return `${getAppBaseUrl()}/${rawUrl.slice(qIdx)}`;
+    }
+    return rawUrl;
   };
 
   const getClubShareUrl = () => {
@@ -2609,7 +2619,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           Cliquez sur une table pour afficher son QR code ou gérer le match
                         </span>
                         <a
-                          href={`?overlay=all&club=${currentClub.id}`}
+                          href={`${getAppBaseUrl()}/?overlay=all&club=${currentClub.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-neon"
@@ -3906,7 +3916,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     </span>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <a
-                        href={(table.liveStreamUrl || match?.liveStreamUrl || '').replace(/\.github\.io\/\?overlay=/, '.github.io/billard-player-app/?overlay=')}
+                        href={resolveStreamHref(table.liveStreamUrl || match?.liveStreamUrl)}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-neon"
@@ -3915,7 +3925,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         <ExternalLink size={13} /> 👁️ Voir le Direct
                       </a>
                       <a
-                        href={`?overlay=all&club=${currentClub.id}`}
+                        href={`${getAppBaseUrl()}/?overlay=all&club=${currentClub.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-outline"
@@ -3979,7 +3989,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         Affiche directement la caméra fixe USB de cette table en plein écran avec le bandeau de score TV par-dessus (vous pourrez choisir quelle caméra USB utiliser en bas à droite de l'écran).
                       </p>
                       <a
-                        href={`?overlay=${table.id}&broadcast=1&pos=${overlayPos}&club=${currentClub.id}`}
+                        href={`${getAppBaseUrl()}/?overlay=${table.id}&broadcast=1&pos=${overlayPos}&club=${currentClub.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-neon"
@@ -4106,7 +4116,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           {copiedOverlay ? '✓ URL OBS copiée !' : '📋 Copier URL Overlay OBS'}
                         </button>
                         <a
-                          href={`?overlay=${table.id}&pos=${overlayPos}&club=${currentClub.id}`}
+                          href={`${getAppBaseUrl()}/?overlay=${table.id}&pos=${overlayPos}&club=${currentClub.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-outline"
@@ -4821,4 +4831,29 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => 
+                  onClick={() => setShowEditRulesModal(false)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-neon"
+                  style={{ color: '#000', fontWeight: 800 }}
+                  onClick={() => {
+                    updateTournamentSettings(activeTournament.id, editTourSettings);
+                    setShowEditRulesModal(false);
+                  }}
+                >
+                  ✓ Appliquer les règles
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+    </div>
+  );
+};
+
+export default AdminView;
