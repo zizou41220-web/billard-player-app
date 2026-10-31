@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
-import { Match, Table, Tournament } from '../types';
+import { Club, Match, Player, Table, Tournament } from '../types';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMatchScoringRules } from '../utils/rules';
 
@@ -8,8 +8,288 @@ interface StreamOverlayViewProps {
   tableParam: string;
 }
 
+interface MultiTableTileProps {
+  table: Table;
+  match?: Match;
+  p1?: Player;
+  p2?: Player;
+  activeTournament: Tournament | null;
+  players: Record<string, Player>;
+  currentClub: Club;
+  videoDevices: MediaDeviceInfo[];
+  onFocusTable: (tableId: string) => void;
+}
+
+const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
+  table,
+  match,
+  p1,
+  p2,
+  activeTournament,
+  players,
+  currentClub,
+  videoDevices,
+  onFocusTable
+}) => {
+  const defaultVdoRoom = `MCB_${currentClub.id}_${table.id}`;
+  const [sourceMode, setSourceMode] = useState<string>('vdo');
+  const [tileZoom, setTileZoom] = useState<number>(1);
+  const [tileRotation, setTileRotation] = useState<number>(0);
+  const [fillTile, setFillTile] = useState<boolean>(true);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (!sourceMode.startsWith('usb:')) return;
+    const deviceId = sourceMode.replace('usb:', '');
+    let activeStream: MediaStream | null = null;
+
+    navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    }).then(stream => {
+      activeStream = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    }).catch(() => {});
+
+    return () => {
+      if (activeStream) activeStream.getTracks().forEach(t => t.stop());
+    };
+  }, [sourceMode]);
+
+  const rulesText = match
+    ? (getMatchScoringRules(match, activeTournament, players).formatLabel || '')
+    : '';
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      height: '100%',
+      backgroundColor: '#050814',
+      overflow: 'hidden',
+      border: '1px solid rgba(255, 255, 255, 0.14)',
+      borderRadius: '12px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+      padding: '0.8rem',
+      boxSizing: 'border-box'
+    }}>
+      {/* Video Layer */}
+      {sourceMode === 'vdo' ? (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          zIndex: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <iframe
+            src={`https://vdo.ninja/?view=${encodeURIComponent(defaultVdoRoom)}&cleanoutput&autoplay&muted${fillTile ? '&cover' : ''}`}
+            allow="autoplay; camera; microphone; fullscreen; picture-in-picture"
+            style={{
+              width: (tileRotation === 90 || tileRotation === 270) ? '100%' : '100%',
+              height: (tileRotation === 90 || tileRotation === 270) ? '100%' : '100%',
+              border: 'none',
+              transform: `rotate(${tileRotation}deg) scale(${tileZoom})`,
+              transformOrigin: 'center center',
+              transition: 'transform 0.2s ease'
+            }}
+            title={`Caméra ${table.name || table.number}`}
+          />
+        </div>
+      ) : (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: fillTile ? 'cover' : 'contain',
+            transform: `rotate(${tileRotation}deg) scale(${tileZoom})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.2s ease',
+            zIndex: 0
+          }}
+        />
+      )}
+
+      {/* Compact Scoreboard Overlay */}
+      <div style={{
+        position: 'relative',
+        zIndex: 10,
+        width: '96%',
+        maxWidth: '640px',
+        background: 'rgba(8, 12, 26, 0.9)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.18)',
+        borderTop: '2px solid var(--accent-primary, #F59E0B)',
+        borderRadius: '12px',
+        padding: '0.45rem 0.9rem',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.75)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.35rem'
+      }}>
+        {/* Header row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', fontWeight: 800 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ background: '#ff2244', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fff' }} />
+              LIVE
+            </span>
+            <span style={{ color: 'var(--accent-primary, #F59E0B)', fontWeight: 900, fontSize: '0.82rem' }}>
+              {table.name || `BILLARD ${table.number}`}
+            </span>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>
+            {rulesText || activeTournament?.name || currentClub.name}
+          </span>
+        </div>
+
+        {/* Players & Score row */}
+        {match && p1 && p2 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+              <img
+                src={p1.avatarUrl || `https://i.pravatar.cc/150?u=${p1.id}`}
+                alt={p1.name}
+                style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B', flexShrink: 0 }}
+              />
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p1.name}
+              </span>
+            </div>
+
+            <div style={{
+              background: 'var(--accent-primary, #F59E0B)',
+              color: '#000',
+              fontWeight: 900,
+              fontSize: '1.25rem',
+              padding: '2px 12px',
+              borderRadius: '8px',
+              letterSpacing: '1px',
+              boxShadow: '0 0 14px rgba(245, 158, 11, 0.45)'
+            }}>
+              {match.score1} - {match.score2}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', overflow: 'hidden' }}>
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                {p2.name}
+              </span>
+              <img
+                src={p2.avatarUrl || `https://i.pravatar.cc/150?u=${p2.id}`}
+                alt={p2.name}
+                style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B', flexShrink: 0 }}
+              />
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.78rem', textAlign: 'center', padding: '2px 0' }}>
+            En attente du prochain match sur ce billard...
+          </div>
+        )}
+      </div>
+
+      {/* Tile bottom-right mini toolbar */}
+      <div style={{
+        position: 'absolute',
+        bottom: '10px',
+        right: '10px',
+        zIndex: 15,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        background: 'rgba(5, 8, 22, 0.82)',
+        backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        padding: '4px 8px',
+        borderRadius: '8px',
+        fontSize: '0.68rem',
+        color: '#fff'
+      }}>
+        <select
+          value={sourceMode}
+          onChange={(e) => setSourceMode(e.target.value)}
+          style={{
+            background: '#0d1527',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: '5px',
+            padding: '2px 5px',
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            maxWidth: '140px'
+          }}
+          title="Choisir la caméra de ce billard"
+        >
+          <option value="vdo">📱 Sans-fil ({table.name || `T${table.number}`})</option>
+          {videoDevices.map((d, idx) => (
+            <option key={d.deviceId} value={`usb:${d.deviceId}`}>
+              🎥 {d.label || `Caméra USB #${idx + 1}`}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => setFillTile(!fillTile)}
+          style={{ background: fillTile ? 'rgba(0,255,170,0.2)' : 'rgba(255,255,255,0.1)', color: fillTile ? '#00ffaa' : '#fff', border: 'none', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.68rem' }}
+          title="Plein cadre"
+        >
+          ↔
+        </button>
+        <button
+          type="button"
+          onClick={() => setTileZoom(z => Math.max(1, Math.round((z - 0.2) * 10) / 10))}
+          style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', fontWeight: 800, fontSize: '0.68rem' }}
+        >
+          🔍-
+        </button>
+        <span style={{ fontWeight: 800, minWidth: '28px', textAlign: 'center' }}>{Math.round(tileZoom * 100)}%</span>
+        <button
+          type="button"
+          onClick={() => setTileZoom(z => Math.min(3, Math.round((z + 0.2) * 10) / 10))}
+          style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', fontWeight: 800, fontSize: '0.68rem' }}
+        >
+          🔍+
+        </button>
+        <button
+          type="button"
+          onClick={() => setTileRotation(r => (r + 90) % 360)}
+          style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.68rem' }}
+          title="Pivoter de 90°"
+        >
+          🔄 {tileRotation}°
+        </button>
+        <button
+          type="button"
+          onClick={() => onFocusTable(table.id)}
+          style={{ background: 'var(--accent-primary, #F59E0B)', color: '#000', border: 'none', borderRadius: '4px', padding: '2px 7px', cursor: 'pointer', fontWeight: 900, fontSize: '0.68rem' }}
+          title="Afficher uniquement ce billard en grand"
+        >
+          ⤢ Seul
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => {
   const { tables, matches, players, tournaments, currentClub } = useStore();
+  const [activeTableParam, setActiveTableParam] = useState<string>(tableParam);
+  const [onlyLiveTables, setOnlyLiveTables] = useState<boolean>(false);
+  const [twoTablesStacked, setTwoTablesStacked] = useState<boolean>(false);
   const [position, setPosition] = useState<'top' | 'bottom'>('top');
   const [vdoRoom, setVdoRoom] = useState<string | null>(null);
   const [isLocalBroadcast, setIsLocalBroadcast] = useState(false);
@@ -28,6 +308,12 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
     if (params.get('vdo')) setVdoRoom(params.get('vdo'));
     if (params.get('broadcast') === '1') setIsLocalBroadcast(true);
     if (params.get('video')) setExternalVideoUrl(params.get('video'));
+
+    if (navigator.mediaDevices?.enumerateDevices) {
+      navigator.mediaDevices.enumerateDevices().then(devices => {
+        setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
+      }).catch(() => {});
+    }
   }, []);
 
   // Local USB / Fixed Camera handling when ?broadcast=1
@@ -79,16 +365,192 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
     return url;
   };
 
-  // Find table by ID (e.g. 't1') or by number (e.g. '1') or by name
-  const table: Table | undefined = Object.values(tables).find(t => 
-    t.id === tableParam || 
-    t.number.toString() === tableParam || 
-    t.name?.toLowerCase().includes(tableParam.toLowerCase())
-  );
-
   // Find active tournament
   const allTournaments = Object.values(tournaments);
   const activeTournament: Tournament | null = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
+
+  // MULTI-TABLE MOSAIC VIEW (?overlay=all or toggled via button)
+  if (activeTableParam === 'all') {
+    const allSortedTables = Object.values(tables).sort((a, b) => a.number - b.number);
+    const tourTables = activeTournament?.settings?.tableIds?.length
+      ? allSortedTables.filter(t => activeTournament.settings?.tableIds.includes(t.id))
+      : allSortedTables;
+
+    const displayedTables = onlyLiveTables
+      ? tourTables.filter(t => {
+          const m = t.currentMatchId ? matches[t.currentMatchId] : undefined;
+          return Boolean(t.liveStreamUrl || m?.liveStreamUrl || t.status === 'occupied');
+        })
+      : tourTables;
+
+    const finalTables = displayedTables.length > 0 ? displayedTables : tourTables;
+    const count = finalTables.length;
+
+    const gridCols = count <= 1
+      ? '1fr'
+      : count === 2
+        ? (twoTablesStacked ? '1fr' : '1fr 1fr')
+        : count <= 4
+          ? '1fr 1fr'
+          : 'repeat(3, 1fr)';
+
+    const gridRows = count <= 1
+      ? '1fr'
+      : count === 2
+        ? (twoTablesStacked ? '1fr 1fr' : '1fr')
+        : '1fr 1fr';
+
+    return (
+      <div style={{
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: '#02040a',
+        overflow: 'hidden',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '0.6rem',
+        gap: '0.6rem',
+        boxSizing: 'border-box',
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
+      }}>
+        {/* Top Bar for Multi-Billards TV Wall */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'rgba(10, 15, 30, 0.92)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '10px',
+          padding: '0.45rem 1rem',
+          color: '#fff',
+          flexShrink: 0,
+          flexWrap: 'wrap',
+          gap: '0.6rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <div style={{ background: '#fff', padding: '2px 6px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center' }}>
+              <img
+                src={getClubLogoUrl(currentClub.logoUrl)}
+                alt={currentClub.name}
+                style={{ height: '24px', objectFit: 'contain' }}
+                onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
+              />
+            </div>
+            <span style={{ fontWeight: 900, fontSize: '0.95rem', color: 'var(--accent-primary, #F59E0B)' }}>
+              📺 MUR VIDÉO MULTI-BILLARDS • {currentClub.name}
+            </span>
+            {activeTournament && (
+              <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                🏆 {activeTournament.name}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setOnlyLiveTables(!onlyLiveTables)}
+              style={{
+                background: onlyLiveTables ? 'rgba(255, 34, 68, 0.25)' : 'rgba(255,255,255,0.1)',
+                color: onlyLiveTables ? '#ff8a96' : '#fff',
+                border: onlyLiveTables ? '1px solid #ff2244' : 'none',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                fontWeight: 800
+              }}
+            >
+              {onlyLiveTables ? '🔴 Tables actives uniquement' : `🎱 Tous les billards (${tourTables.length})`}
+            </button>
+            {count === 2 && (
+              <button
+                type="button"
+                onClick={() => setTwoTablesStacked(!twoTablesStacked)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '0.74rem',
+                  cursor: 'pointer',
+                  fontWeight: 700
+                }}
+              >
+                {twoTablesStacked ? '◫ Disposition : Côte à côte' : '⊟ Disposition : Haut / Bas'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (!document.fullscreenElement) {
+                  document.documentElement.requestFullscreen?.();
+                } else {
+                  document.exitFullscreen?.();
+                }
+              }}
+              style={{
+                background: '#00ffaa',
+                color: '#000',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '5px 12px',
+                fontSize: '0.76rem',
+                cursor: 'pointer',
+                fontWeight: 900
+              }}
+            >
+              ⛶ PLEIN ÉCRAN
+            </button>
+          </div>
+        </div>
+
+        {/* Multi-Table Video Grid */}
+        <div style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'grid',
+          gridTemplateColumns: gridCols,
+          gridTemplateRows: gridRows,
+          gap: '0.6rem',
+          width: '100%',
+          height: '100%'
+        }}>
+          {finalTables.map(t => {
+            const m = t.currentMatchId ? matches[t.currentMatchId] : undefined;
+            const player1 = m ? players[m.player1Id] : undefined;
+            const player2 = m ? players[m.player2Id] : undefined;
+            return (
+              <MultiTableVideoTile
+                key={t.id}
+                table={t}
+                match={m}
+                p1={player1}
+                p2={player2}
+                activeTournament={activeTournament}
+                players={players}
+                currentClub={currentClub}
+                videoDevices={videoDevices}
+                onFocusTable={(tId) => {
+                  setActiveTableParam(tId);
+                  setVdoRoom(`MCB_${currentClub.id}_${tId}`);
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Find table by ID (e.g. 't1') or by number (e.g. '1') or by name
+  const table: Table | undefined = Object.values(tables).find(t => 
+    t.id === activeTableParam || 
+    t.number.toString() === activeTableParam || 
+    t.name?.toLowerCase().includes(activeTableParam.toLowerCase())
+  );
 
   // Find the match running on this table
   const match: Match | undefined = table?.currentMatchId ? matches[table.currentMatchId] : undefined;
@@ -330,6 +792,23 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             }}
           >
             Score : {position === 'top' ? '⬆ Haut' : '⬇ Bas'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTableParam('all')}
+            style={{
+              background: 'rgba(245, 158, 11, 0.22)',
+              color: '#F59E0B',
+              border: '1px solid rgba(245, 158, 11, 0.5)',
+              borderRadius: '6px',
+              padding: '4px 9px',
+              fontSize: '0.73rem',
+              cursor: 'pointer',
+              fontWeight: 800
+            }}
+            title="Afficher les vidéos de tous les billards sur le même écran"
+          >
+            ⊞ Multi-Billards
           </button>
           <button
             type="button"

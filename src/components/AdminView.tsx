@@ -2604,9 +2604,31 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           {activeTournament.settings?.tableIds.length || 0} billards
                         </span>
                       </h2>
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        Cliquez sur une table pour afficher son QR code ou gérer le match
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          Cliquez sur une table pour afficher son QR code ou gérer le match
+                        </span>
+                        <a
+                          href={`?overlay=all&club=${currentClub.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-neon"
+                          style={{
+                            fontSize: '0.74rem',
+                            padding: '4px 10px',
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            whiteSpace: 'nowrap',
+                            fontWeight: 800,
+                            flexShrink: 0
+                          }}
+                          title="Afficher les vidéos en direct de tous les billards sur un seul écran"
+                        >
+                          <Tv size={14} /> 📺 Multi-Live Vidéo
+                        </a>
+                      </div>
                     </div>
                     <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                       {renderMap(false, undefined, true)}
@@ -3892,6 +3914,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       >
                         <ExternalLink size={13} /> 👁️ Voir le Direct
                       </a>
+                      <a
+                        href={`?overlay=all&club=${currentClub.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-outline"
+                        style={{ fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', borderColor: 'rgba(245, 158, 11, 0.45)' }}
+                        title="Ouvrir le mur vidéo avec tous les billards sur le même écran"
+                      >
+                        <Tv size={13} /> ⊞ Multi-Billards
+                      </a>
                       <button
                         type="button"
                         className="btn btn-outline"
@@ -4789,29 +4821,4 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => setShowEditRulesModal(false)}
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-neon"
-                  style={{ color: '#000', fontWeight: 800 }}
-                  onClick={() => {
-                    updateTournamentSettings(activeTournament.id, editTourSettings);
-                    setShowEditRulesModal(false);
-                  }}
-                >
-                  ✓ Appliquer les règles
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-    </div>
-  );
-};
-
-export default AdminView;
+                  onClick={() => 
