@@ -4047,8 +4047,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       <input
                         type="url"
                         className="input-field"
-                        placeholder="https://www.youtube.com/watch?v=... ou http://camera-ip..."
-                        defaultValue={table.liveStreamUrl || match?.liveStreamUrl || ''}
+                        placeholder="https://www.youtube.com/watch?v=... ou https://youtube.com/live/..."
+                        defaultValue={(() => {
+                          const raw = table.liveStreamUrl || match?.liveStreamUrl || '';
+                          const qIdx = raw.indexOf('?');
+                          if (qIdx !== -1 && raw.includes('overlay=')) {
+                            const v = new URLSearchParams(raw.slice(qIdx)).get('video');
+                            return v || '';
+                          }
+                          return raw;
+                        })()}
                         id={`stream-input-${table.id}`}
                         style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}
                       />
@@ -4059,8 +4067,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         onClick={() => {
                           const input = document.getElementById(`stream-input-${table.id}`) as HTMLInputElement;
                           const trimmed = input?.value.trim() || '';
-                          setTableLiveStream(table.id, trimmed || undefined);
-                          if (match) setMatchLiveStream(match.id, trimmed || undefined);
+                          if (!trimmed) {
+                            setTableLiveStream(table.id, undefined);
+                            if (match) setMatchLiveStream(match.id, undefined);
+                            return;
+                          }
+                          const wrappedUrl = trimmed.includes('?overlay=')
+                            ? trimmed
+                            : `${getAppBaseUrl()}/?overlay=${table.id}&video=${encodeURIComponent(trimmed)}&pos=${overlayPos}&club=${currentClub.id}`;
+                          setTableLiveStream(table.id, wrappedUrl);
+                          if (match) setMatchLiveStream(match.id, wrappedUrl);
                         }}
                       >
                         Enregistrer

@@ -20,6 +20,29 @@ interface MultiTableTileProps {
   onFocusTable: (tableId: string) => void;
 }
 
+const formatEmbedVideoUrl = (url: string) => {
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
+  if (ytMatch) {
+    return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&mute=1&playsinline=1&rel=0`;
+  }
+  return url;
+};
+
+const extractExternalVideoFromStreamUrl = (streamUrl?: string): string => {
+  if (!streamUrl) return '';
+  try {
+    const qIdx = streamUrl.indexOf('?');
+    if (qIdx !== -1 && streamUrl.includes('overlay=')) {
+      const params = new URLSearchParams(streamUrl.slice(qIdx));
+      return params.get('video') || '';
+    }
+  } catch {}
+  if (!streamUrl.includes('overlay=')) {
+    return streamUrl;
+  }
+  return '';
+};
+
 const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
   table,
   match,
@@ -32,11 +55,18 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
   onFocusTable
 }) => {
   const defaultVdoRoom = `MCB_${currentClub.id}_${table.id}`;
-  const [sourceMode, setSourceMode] = useState<string>('vdo');
+  const tableExtVideo = extractExternalVideoFromStreamUrl(table.liveStreamUrl || match?.liveStreamUrl);
+  const [sourceMode, setSourceMode] = useState<string>(() => (tableExtVideo ? 'ext' : 'vdo'));
   const [tileZoom, setTileZoom] = useState<number>(1);
   const [tileRotation, setTileRotation] = useState<number>(0);
   const [fillTile, setFillTile] = useState<boolean>(true);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (tableExtVideo && sourceMode === 'vdo') {
+      setSourceMode('ext');
+    }
+  }, [tableExtVideo]);
 
   useEffect(() => {
     if (!sourceMode.startsWith('usb:')) return;
@@ -77,7 +107,24 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
       boxSizing: 'border-box'
     }}>
       {/* Video Layer */}
-      {sourceMode === 'vdo' ? (
+      {sourceMode === 'ext' && tableExtVideo ? (
+        <iframe
+          src={formatEmbedVideoUrl(tableExtVideo)}
+          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            transform: `rotate(${tileRotation}deg) scale(${tileZoom})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.2s ease',
+            zIndex: 0
+          }}
+          title={`YouTube ${table.name || table.number}`}
+        />
+      ) : sourceMode === 'vdo' ? (
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -234,6 +281,7 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
           }}
           title="Choisir la caméra de ce billard"
         >
+          {tableExtVideo && <option value="ext">🌐 YouTube / Lien Externe</option>}
           <option value="vdo">📱 Sans-fil ({table.name || `T${table.number}`})</option>
           {videoDevices.map((d, idx) => (
             <option key={d.deviceId} value={`usb:${d.deviceId}`}>
@@ -356,14 +404,6 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       }
     };
   }, [isLocalBroadcast, selectedDeviceId]);
-
-  const formatEmbedUrl = (url: string) => {
-    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/)([a-zA-Z0-9_-]+)/);
-    if (ytMatch) {
-      return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&mute=1`;
-    }
-    return url;
-  };
 
   // Find active tournament
   const allTournaments = Object.values(tournaments);
@@ -534,8 +574,14 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 currentClub={currentClub}
                 videoDevices={videoDevices}
                 onFocusTable={(tId) => {
+                  const extVid = extractExternalVideoFromStreamUrl(t.liveStreamUrl || m?.liveStreamUrl);
                   setActiveTableParam(tId);
-                  setVdoRoom(`MCB_${currentClub.id}_${tId}`);
+                  if (extVid) {
+                    setExternalVideoUrl(extVid);
+                    setVdoRoom(null);
+                  } else {
+                    setVdoRoom(`MCB_${currentClub.id}_${tId}`);
+                  }
                 }}
               />
             );
@@ -566,7 +612,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             : `${tournamentSettings.qualifNbSets} manches`)
         : '');
 
-  const hasVideoLayer = Boolean(vdoRoom || isLocalBroadcast || externalVideoUrl);
+  const effectiveExternalVideo = externalVideoUrl || extractExternalVideoFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl);
+  const hasVideoLayer = Boolean(vdoRoom || isLocalBroadcast || effectiveExternalVideo);
 
   return (
     <div style={{
@@ -659,9 +706,9 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       )}
 
       {/* 3. External IP Camera / YouTube Embed Background */}
-      {externalVideoUrl && !vdoRoom && !isLocalBroadcast && (
+      {effectiveExternalVideo && !vdoRoom && !isLocalBroadcast && (
         <iframe
-          src={formatEmbedUrl(externalVideoUrl)}
+          src={formatEmbedVideoUrl(effectiveExternalVideo)}
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
           style={{
             position: 'absolute',
