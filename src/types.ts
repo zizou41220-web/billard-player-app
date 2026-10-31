@@ -23,6 +23,8 @@ export type PlayerStats = {
   bestFriendId?: string; // Player they play the most with
   bestFriendMatches?: number;
   recentForm?: ('W' | 'L')[];
+  clubName?: string;
+  clubLogoUrl?: string;
 };
 
 export type Player = {
@@ -31,6 +33,8 @@ export type Player = {
   name: string;
   level: PlayerLevel;
   avatarUrl?: string;
+  clubName?: string;
+  clubLogoUrl?: string;
   stats: PlayerStats;
 };
 

@@ -9,7 +9,12 @@ let channelsSubscribed = false;
 
 // Helpers to map camelCase <-> snake_case
 export const mapPlayerToDB = (p: Player) => {
-  const data: any = { id: p.id, name: p.name, level: p.level, avatar_url: p.avatarUrl, stats: p.stats };
+  const statsPayload = {
+    ...(p.stats || {}),
+    ...(p.clubName !== undefined ? { clubName: p.clubName } : {}),
+    ...(p.clubLogoUrl !== undefined ? { clubLogoUrl: p.clubLogoUrl } : {})
+  };
+  const data: any = { id: p.id, name: p.name, level: p.level, avatar_url: p.avatarUrl, stats: statsPayload };
   if (hasClubColumn) data.club_id = p.clubId || useStore.getState().currentClub.id;
   return data;
 };
@@ -20,6 +25,8 @@ export const mapDBToPlayer = (d: any): Player => ({
   name: d.name,
   level: d.level,
   avatarUrl: d.avatar_url,
+  clubName: d.stats?.clubName || undefined,
+  clubLogoUrl: d.stats?.clubLogoUrl || undefined,
   stats: d.stats || createDefaultPlayerStats()
 });
 

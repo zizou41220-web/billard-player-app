@@ -224,8 +224,16 @@ export function computeAllPlayersStats(
     s.bestFriendId = bestFriendId;
     s.bestFriendMatches = bestFriendMatches > 0 ? bestFriendMatches : undefined;
 
+    const pObj = players[pId];
+    const resolvedClubName = pObj?.clubName || pObj?.stats?.clubName;
+    const resolvedClubLogo = pObj?.clubLogoUrl || pObj?.stats?.clubLogoUrl;
+    if (resolvedClubName) s.clubName = resolvedClubName;
+    if (resolvedClubLogo) s.clubLogoUrl = resolvedClubLogo;
+
     result[pId] = {
-      ...players[pId],
+      ...pObj,
+      ...(resolvedClubName ? { clubName: resolvedClubName } : {}),
+      ...(resolvedClubLogo ? { clubLogoUrl: resolvedClubLogo } : {}),
       stats: s
     };
   });

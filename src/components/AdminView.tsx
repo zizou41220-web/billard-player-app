@@ -28,6 +28,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
     assignMatchToTable, updateFinishedMatchScore, startTournamentMatch,
+    startCustomLiveMatch,
     launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream,
     updateTournamentSettings, recomputePlayerStats
   } = useStore();
@@ -36,7 +37,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
   const isTournamentActive = Boolean(activeTournament);
 
-  const [activeTab, setActiveTab] = useState<'launcher' | 'dashboard' | 'admin' | 'leaderboard'>(() => {
+  const [activeTab, setActiveTab] = useState<'launcher' | 'dashboard' | 'live_studio' | 'admin' | 'leaderboard'>(() => {
     return isTournamentActive ? 'dashboard' : 'launcher';
   });
   const hasAutoSwitchedToDashboard = React.useRef(false);
@@ -175,12 +176,76 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerLevel, setNewPlayerLevel] = useState<any>('Amateur');
   const [newPlayerPhoto, setNewPlayerPhoto] = useState<string | null>(null);
+  const [newPlayerClubName, setNewPlayerClubName] = useState('');
+  const [newPlayerClubLogo, setNewPlayerClubLogo] = useState<string | null>(null);
 
   // Edit Player State
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [editPlayerName, setEditPlayerName] = useState('');
   const [editPlayerLevel, setEditPlayerLevel] = useState<any>('Amateur');
   const [editPlayerPhoto, setEditPlayerPhoto] = useState<string | null>(null);
+  const [editPlayerClubName, setEditPlayerClubName] = useState('');
+  const [editPlayerClubLogo, setEditPlayerClubLogo] = useState<string | null>(null);
+
+  // Standalone Live Studio State ('live_studio' tab)
+  const [liveStudioTableId, setLiveStudioTableId] = useState<string>(() => Object.keys(tables)[0] || 't1');
+  const [liveStudioTargetSets, setLiveStudioTargetSets] = useState<number>(3);
+  const [liveStudioHandicapP1, setLiveStudioHandicapP1] = useState<number>(0);
+  const [liveStudioHandicapP2, setLiveStudioHandicapP2] = useState<number>(0);
+
+  const [liveP1Mode, setLiveP1Mode] = useState<'existing' | 'new'>('existing');
+  const [liveP1ExistingId, setLiveP1ExistingId] = useState<string>('');
+  const [liveP1Name, setLiveP1Name] = useState<string>('');
+  const [liveP1Level, setLiveP1Level] = useState<'Amateur' | 'Prestige'>('Amateur');
+  const [liveP1Photo, setLiveP1Photo] = useState<string>('');
+  const [liveP1ClubName, setLiveP1ClubName] = useState<string>('');
+  const [liveP1ClubLogo, setLiveP1ClubLogo] = useState<string>('');
+  const [liveP1EditExistingDetails, setLiveP1EditExistingDetails] = useState<boolean>(false);
+
+  const [liveP2Mode, setLiveP2Mode] = useState<'existing' | 'new'>('existing');
+  const [liveP2ExistingId, setLiveP2ExistingId] = useState<string>('');
+  const [liveP2Name, setLiveP2Name] = useState<string>('');
+  const [liveP2Level, setLiveP2Level] = useState<'Amateur' | 'Prestige'>('Amateur');
+  const [liveP2Photo, setLiveP2Photo] = useState<string>('');
+  const [liveP2ClubName, setLiveP2ClubName] = useState<string>('');
+  const [liveP2ClubLogo, setLiveP2ClubLogo] = useState<string>('');
+  const [liveP2EditExistingDetails, setLiveP2EditExistingDetails] = useState<boolean>(false);
+
+  const readImageFile = (file: File, setter: (dataUrl: string) => void) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const src = ev.target?.result as string;
+      if (!src) return;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 256;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          setter(canvas.toDataURL('image/png', 0.85));
+        } else {
+          setter(src);
+        }
+      };
+      img.onerror = () => setter(src);
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Finished Match Score Correction State (Admin Mode)
   const [editingFinishedMatchId, setEditingFinishedMatchId] = useState<string | null>(null);
@@ -665,6 +730,23 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
               <MonitorPlay size={18} />
             )}
             Vue d'ensemble
+          </button>
+
+          <button
+            className={`btn ${activeTab === 'live_studio' ? 'btn-neon' : 'btn-outline'}`}
+            onClick={() => setActiveTab('live_studio')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontWeight: 800,
+              borderColor: activeTab === 'live_studio' ? undefined : 'rgba(255, 34, 68, 0.5)',
+              background: activeTab === 'live_studio' ? undefined : 'rgba(255, 34, 68, 0.12)',
+              color: activeTab === 'live_studio' ? undefined : '#ff8a96'
+            }}
+            title="Lancer un match en direct (hors tournoi ou amical) avec choix/création des joueurs, photo, club, logo et régie vidéo"
+          >
+            <Radio size={18} style={{ color: activeTab === 'live_studio' ? '#000' : '#ff2244' }} /> 🎥 Match Live
           </button>
 
           <button
@@ -3105,22 +3187,38 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
                         {editingPlayerId === p.id ? (
                           // Edit Mode
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                            <input type="text" className="input-field" value={editPlayerName} onChange={e => setEditPlayerName(e.target.value)} />
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                            <input type="text" className="input-field" placeholder="Nom du joueur" value={editPlayerName} onChange={e => setEditPlayerName(e.target.value)} />
                             <select className="input-field" value={editPlayerLevel === 'Confirmé' ? 'Prestige' : editPlayerLevel} onChange={e => setEditPlayerLevel(e.target.value)} style={{ appearance: 'none', background: 'rgba(255,255,255,0.05)', color: '#fff' }}>
                               <option value="Amateur" style={{ color: '#000' }}>Amateur</option>
                               <option value="Prestige" style={{ color: '#000' }}>👑 Prestige</option>
                             </select>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Photo du joueur :</div>
                             <input type="file" accept="image/*" onChange={e => {
                               const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => setEditPlayerPhoto(reader.result as string);
-                                reader.readAsDataURL(file);
-                              }
-                            }} style={{ fontSize: '0.8rem' }} />
-                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                              <button className="btn" style={{ background: 'var(--accent-primary)', color: '#000' }} onClick={() => { updatePlayer(p.id, editPlayerName, editPlayerLevel, editPlayerPhoto || undefined); setEditingPlayerId(null); }}>Sauvegarder</button>
+                              if (file) readImageFile(file, (url) => setEditPlayerPhoto(url));
+                            }} style={{ fontSize: '0.78rem' }} />
+                            <input
+                              type="text"
+                              className="input-field"
+                              placeholder="Club (optionnel)"
+                              value={editPlayerClubName}
+                              onChange={e => setEditPlayerClubName(e.target.value)}
+                              style={{ fontSize: '0.82rem', padding: '0.45rem 0.7rem' }}
+                            />
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Logo du club (optionnel) :</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <input type="file" accept="image/*" onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) readImageFile(file, (url) => setEditPlayerClubLogo(url));
+                              }} style={{ fontSize: '0.76rem', flex: 1 }} />
+                              {editPlayerClubLogo && <img src={editPlayerClubLogo} alt="Logo" style={{ width: '26px', height: '26px', borderRadius: '4px', objectFit: 'contain', background: '#fff', padding: '1px' }} />}
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+                              <button className="btn" style={{ background: 'var(--accent-primary)', color: '#000' }} onClick={() => {
+                                updatePlayer(p.id, editPlayerName, editPlayerLevel, editPlayerPhoto || undefined, editPlayerClubName.trim(), editPlayerClubLogo || '');
+                                setEditingPlayerId(null);
+                              }}>Sauvegarder</button>
                               <button className="btn btn-outline" onClick={() => setEditingPlayerId(null)}>Annuler</button>
                             </div>
                           </div>
@@ -3129,7 +3227,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           <>
                             <img src={p.avatarUrl} alt={p.name} style={{ width: '70px', height: '70px', borderRadius: '50%', border: `3px solid ${(p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : 'var(--border-color)'}`, objectFit: 'cover' }} />
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '1.15rem', fontWeight: 700 }}>{p.name}</div>
+                              <div style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <span>{p.name}</span>
+                                {(p.clubLogoUrl || p.clubName) && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--accent-primary)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '6px' }}>
+                                    {p.clubLogoUrl && <img src={p.clubLogoUrl} alt="" style={{ width: '14px', height: '14px', borderRadius: '3px', objectFit: 'contain', background: '#fff' }} />}
+                                    {p.clubName}
+                                  </span>
+                                )}
+                              </div>
                               <div style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -3232,6 +3338,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   setEditPlayerName(p.name);
                                   setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
                                   setEditPlayerPhoto(null);
+                                  setEditPlayerClubName(p.clubName || p.stats?.clubName || '');
+                                  setEditPlayerClubLogo(p.clubLogoUrl || p.stats?.clubLogoUrl || null);
                                 }} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '0.9rem', width: '28px', height: '28px', borderRadius: '4px' }}>✎</button>
                                 <button onClick={() => {
                                   if (window.confirm(`Supprimer ${p.name} ?`)) deletePlayer(p.id);
@@ -3286,14 +3394,47 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           {newPlayerPhoto && <img src={newPlayerPhoto} alt="Aperçu" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />}
                         </div>
                       </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Club (optionnel)</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder={`Ex: ${currentClub.name}`}
+                          value={newPlayerClubName}
+                          onChange={e => setNewPlayerClubName(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Logo du Club (optionnel)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) readImageFile(f, (url) => setNewPlayerClubLogo(url));
+                            }}
+                            style={{ fontSize: '0.8rem', flex: 1 }}
+                          />
+                          {newPlayerClubLogo && <img src={newPlayerClubLogo} alt="Aperçu logo" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '2px' }} />}
+                        </div>
+                      </div>
                       <button
                         className="btn btn-neon"
                         style={{ marginTop: '1rem', justifyContent: 'center' }}
                         onClick={() => {
                           if (!newPlayerName.trim()) return alert('Veuillez entrer un nom.');
-                          addPlayer(newPlayerName.trim(), newPlayerLevel, newPlayerPhoto || undefined);
+                          addPlayer(
+                            newPlayerName.trim(),
+                            newPlayerLevel,
+                            newPlayerPhoto || undefined,
+                            newPlayerClubName.trim() || undefined,
+                            newPlayerClubLogo || undefined
+                          );
                           setNewPlayerName('');
                           setNewPlayerPhoto(null);
+                          setNewPlayerClubName('');
+                          setNewPlayerClubLogo(null);
                         }}
                       >
                         Ajouter au club
@@ -3452,6 +3593,1119 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             <LeaderboardView compact={false} />
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* 5. STANDALONE LIVE MATCH STUDIO TAB ('live_studio')                       */}
+        {/* ========================================================================= */}
+        {activeTab === 'live_studio' && (() => {
+          const tableList = Object.values(tables);
+          const effectiveTableId = (liveStudioTableId && tables[liveStudioTableId]) ? liveStudioTableId : (tableList[0]?.id || '');
+          const studioTable = effectiveTableId ? tables[effectiveTableId] : null;
+          let studioMatch = studioTable?.currentMatchId ? matches[studioTable.currentMatchId] : null;
+          if (!studioMatch || studioMatch.status === 'finished') {
+            studioMatch = Object.values(matches).find(m => m.tableId === effectiveTableId && m.status !== 'finished') || null;
+          }
+          const sortedPlayers = Object.values(players).slice().sort((a, b) => a.name.localeCompare(b.name));
+          const selectedP1Obj = liveP1ExistingId ? players[liveP1ExistingId] : null;
+          const selectedP2Obj = liveP2ExistingId ? players[liveP2ExistingId] : null;
+
+          const renderPlayerSelectorCard = (
+            slotLabel: string,
+            accentColor: string,
+            mode: 'existing' | 'new',
+            setMode: (m: 'existing' | 'new') => void,
+            existingId: string,
+            setExistingId: (id: string) => void,
+            existingObj: typeof selectedP1Obj,
+            editExistingDetails: boolean,
+            setEditExistingDetails: (v: boolean) => void,
+            nameVal: string,
+            setNameVal: (v: string) => void,
+            levelVal: 'Amateur' | 'Prestige',
+            setLevelVal: (v: 'Amateur' | 'Prestige') => void,
+            photoVal: string,
+            setPhotoVal: (v: string) => void,
+            clubNameVal: string,
+            setClubNameVal: (v: string) => void,
+            clubLogoVal: string,
+            setClubLogoVal: (v: string) => void
+          ) => (
+            <div style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${accentColor}`,
+              borderRadius: '14px',
+              padding: '1.1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.8rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 900, fontSize: '1rem', color: '#fff', letterSpacing: '0.5px' }}>
+                  {slotLabel}
+                </span>
+                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.35)', padding: '3px', borderRadius: '8px', gap: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setMode('existing')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: mode === 'existing' ? 'var(--accent-primary)' : 'transparent',
+                      color: mode === 'existing' ? '#000' : 'rgba(255,255,255,0.75)'
+                    }}
+                  >
+                    👤 Joueur existant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('new')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: mode === 'new' ? 'var(--accent-primary)' : 'transparent',
+                      color: mode === 'new' ? '#000' : 'rgba(255,255,255,0.75)'
+                    }}
+                  >
+                    ➕ Créer un joueur
+                  </button>
+                </div>
+              </div>
+
+              {mode === 'existing' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                  <select
+                    className="input-field"
+                    value={existingId}
+                    onChange={e => {
+                      const id = e.target.value;
+                      setExistingId(id);
+                      const p = players[id];
+                      if (p) {
+                        setPhotoVal(p.avatarUrl || '');
+                        setClubNameVal(p.clubName || p.stats?.clubName || '');
+                        setClubLogoVal(p.clubLogoUrl || p.stats?.clubLogoUrl || '');
+                      }
+                    }}
+                    style={{ background: '#050c1a', color: '#fff', fontWeight: 700 }}
+                  >
+                    <option value="" style={{ color: '#000' }}>-- Choisir un joueur du club --</option>
+                    {sortedPlayers.map(p => (
+                      <option key={p.id} value={p.id} style={{ color: '#000' }}>
+                        {p.name} ({(p.level === 'Prestige' || p.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}{p.clubName ? ` • ${p.clubName}` : ''})
+                      </option>
+                    ))}
+                  </select>
+
+                  {existingObj && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.8rem',
+                      background: 'rgba(0,0,0,0.28)',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(255,255,255,0.08)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <img
+                          src={photoVal || existingObj.avatarUrl}
+                          alt={existingObj.name}
+                          style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-primary)' }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff' }}>{existingObj.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {(clubLogoVal || existingObj.clubLogoUrl) && (
+                              <img
+                                src={clubLogoVal || existingObj.clubLogoUrl}
+                                alt="Club"
+                                style={{ width: '18px', height: '18px', borderRadius: '4px', objectFit: 'contain', background: '#fff', padding: '1px' }}
+                              />
+                            )}
+                            <span>{clubNameVal || existingObj.clubName || currentClub.name}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ fontSize: '0.72rem', padding: '4px 8px' }}
+                        onClick={() => setEditExistingDetails(!editExistingDetails)}
+                      >
+                        {editExistingDetails ? 'Masquer options' : '✎ Photo / Club / Logo'}
+                      </button>
+                    </div>
+                  )}
+
+                  {existingObj && editExistingDetails && (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.6rem',
+                      background: 'rgba(255,255,255,0.03)',
+                      padding: '0.75rem',
+                      borderRadius: '10px',
+                      border: '1px dashed rgba(0,255,170,0.3)'
+                    }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                          Changer la photo du joueur (optionnel)
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ fontSize: '0.76rem' }}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) readImageFile(f, setPhotoVal);
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                          Club du joueur (optionnel — affiché sur le Live TV)
+                        </label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder={`Ex: ${currentClub.name}, BC Tours...`}
+                          value={clubNameVal}
+                          onChange={e => setClubNameVal(e.target.value)}
+                          style={{ fontSize: '0.82rem', padding: '0.45rem 0.7rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                          Logo du club (optionnel)
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ fontSize: '0.75rem', flex: 1 }}
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) readImageFile(f, setClubLogoVal);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.7rem', padding: '3px 8px' }}
+                            onClick={() => {
+                              setClubNameVal( clubNameVal || currentClub.name );
+                              setClubLogoVal(getClubLogoUrl(currentClub.logoUrl));
+                            }}
+                          >
+                            Logo {currentClub.name}
+                          </button>
+                          {clubLogoVal && (
+                            <img src={clubLogoVal} alt="Logo club" style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '2px' }} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Create New Player Mode */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: '0.5rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Nom & Prénom *</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Ex: Ronnie O'Sullivan"
+                        value={nameVal}
+                        onChange={e => setNameVal(e.target.value)}
+                        style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Niveau</label>
+                      <select
+                        className="input-field"
+                        value={levelVal}
+                        onChange={e => setLevelVal(e.target.value as 'Amateur' | 'Prestige')}
+                        style={{ fontSize: '0.85rem', padding: '0.5rem', background: '#050c1a', color: '#fff' }}
+                      >
+                        <option value="Amateur" style={{ color: '#000' }}>Amateur</option>
+                        <option value="Prestige" style={{ color: '#000' }}>👑 Prestige</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', alignItems: 'center' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Photo du joueur (optionnel)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ fontSize: '0.74rem', width: '100%' }}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) readImageFile(f, setPhotoVal);
+                          }}
+                        />
+                        {photoVal && (
+                          <img src={photoVal} alt="Aperçu joueur" style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-primary)', flexShrink: 0 }} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Nom du Club (optionnel)</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder={`Ex: ${currentClub.name}`}
+                        value={clubNameVal}
+                        onChange={e => setClubNameVal(e.target.value)}
+                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.7rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Logo du Club (optionnel)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ fontSize: '0.74rem', flex: 1 }}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (f) readImageFile(f, setClubLogoVal);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ fontSize: '0.72rem', padding: '4px 8px' }}
+                        onClick={() => {
+                          if (!clubNameVal) setClubNameVal(currentClub.name);
+                          setClubLogoVal(getClubLogoUrl(currentClub.logoUrl));
+                        }}
+                      >
+                        Utiliser logo {currentClub.name}
+                      </button>
+                      {clubLogoVal && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <img src={clubLogoVal} alt="Aperçu logo club" style={{ width: '30px', height: '30px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '2px' }} />
+                          <button
+                            type="button"
+                            onClick={() => setClubLogoVal('')}
+                            style={{ background: 'none', border: 'none', color: '#ff6b81', cursor: 'pointer', fontSize: '0.8rem' }}
+                            title="Retirer le logo"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+
+          return (
+            <div style={{
+              maxWidth: '1320px',
+              width: '100%',
+              margin: '0 auto',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+              gap: '1.8rem',
+              alignItems: 'start',
+              paddingBottom: '2rem',
+              overflowY: 'auto'
+            }}>
+              {/* LEFT COLUMN: CONFIGURE & LAUNCH LIVE MATCH */}
+              <div className="glass-card" style={{ padding: '1.6rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <Radio size={24} style={{ color: '#ff2244' }} />
+                    <div>
+                      <h2 style={{ fontSize: '1.35rem', margin: 0 }}>Studio Match Live</h2>
+                      <p style={{ margin: '0.15rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        Lancez un match en direct avec joueurs existants ou nouveaux (photo + club + logo)
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href={`${getAppBaseUrl()}/?overlay=all&club=${currentClub.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-outline"
+                    style={{ fontSize: '0.78rem', padding: '0.45rem 0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-primary)', borderColor: 'rgba(245, 158, 11, 0.45)' }}
+                  >
+                    <Tv size={15} /> ⊞ Mur Multi-Billards
+                  </a>
+                </div>
+
+                {/* Table & Match Format Selection */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1.3fr 1fr 0.8fr 0.8fr',
+                  gap: '0.7rem',
+                  background: 'rgba(0,0,0,0.25)',
+                  padding: '0.9rem',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255,255,255,0.08)'
+                }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 800, marginBottom: '0.25rem' }}>
+                      🎱 Billard du Match
+                    </label>
+                    <select
+                      className="input-field"
+                      value={effectiveTableId}
+                      onChange={e => setLiveStudioTableId(e.target.value)}
+                      style={{ background: '#050c1a', color: '#fff', fontWeight: 800, padding: '0.5rem' }}
+                    >
+                      {tableList.map(t => {
+                        const occ = t.status === 'occupied';
+                        return (
+                          <option key={t.id} value={t.id} style={{ color: '#000' }}>
+                            {t.name} {occ ? '🔴 (En cours)' : '🟢 (Libre)'}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.25rem' }}>
+                      🏆 Manches gagnantes
+                    </label>
+                    <input
+                      type="number"
+                      className="input-field"
+                      min={1}
+                      max={35}
+                      value={liveStudioTargetSets}
+                      onChange={e => setLiveStudioTargetSets(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      style={{ padding: '0.5rem', fontWeight: 800, textAlign: 'center' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.25rem' }}>
+                      Handicap J1
+                    </label>
+                    <input
+                      type="number"
+                      className="input-field"
+                      min={0}
+                      max={15}
+                      value={liveStudioHandicapP1}
+                      onChange={e => setLiveStudioHandicapP1(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      style={{ padding: '0.5rem', textAlign: 'center' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.25rem' }}>
+                      Handicap J2
+                    </label>
+                    <input
+                      type="number"
+                      className="input-field"
+                      min={0}
+                      max={15}
+                      value={liveStudioHandicapP2}
+                      onChange={e => setLiveStudioHandicapP2(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      style={{ padding: '0.5rem', textAlign: 'center' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Player 1 Card */}
+                {renderPlayerSelectorCard(
+                  '🟦 JOUEUR 1 (Gauche)',
+                  'rgba(59, 130, 246, 0.45)',
+                  liveP1Mode,
+                  setLiveP1Mode,
+                  liveP1ExistingId,
+                  setLiveP1ExistingId,
+                  selectedP1Obj,
+                  liveP1EditExistingDetails,
+                  setLiveP1EditExistingDetails,
+                  liveP1Name,
+                  setLiveP1Name,
+                  liveP1Level,
+                  setLiveP1Level,
+                  liveP1Photo,
+                  setLiveP1Photo,
+                  liveP1ClubName,
+                  setLiveP1ClubName,
+                  liveP1ClubLogo,
+                  setLiveP1ClubLogo
+                )}
+
+                {/* Player 2 Card */}
+                {renderPlayerSelectorCard(
+                  '🟨 JOUEUR 2 (Droite)',
+                  'rgba(245, 158, 11, 0.45)',
+                  liveP2Mode,
+                  setLiveP2Mode,
+                  liveP2ExistingId,
+                  setLiveP2ExistingId,
+                  selectedP2Obj,
+                  liveP2EditExistingDetails,
+                  setLiveP2EditExistingDetails,
+                  liveP2Name,
+                  setLiveP2Name,
+                  liveP2Level,
+                  setLiveP2Level,
+                  liveP2Photo,
+                  setLiveP2Photo,
+                  liveP2ClubName,
+                  setLiveP2ClubName,
+                  liveP2ClubLogo,
+                  setLiveP2ClubLogo
+                )}
+
+                <button
+                  type="button"
+                  className="btn btn-neon"
+                  style={{ width: '100%', padding: '0.95rem', fontSize: '1.02rem', fontWeight: 900, justifyContent: 'center', color: '#000' }}
+                  onClick={() => {
+                    if (!effectiveTableId) {
+                      alert('Veuillez sélectionner un billard.');
+                      return;
+                    }
+
+                    // Resolve Player 1
+                    let finalP1Id = '';
+                    if (liveP1Mode === 'existing') {
+                      if (!liveP1ExistingId || !players[liveP1ExistingId]) {
+                        alert('Veuillez choisir le Joueur 1 dans la liste ou cliquer sur "➕ Créer un joueur".');
+                        return;
+                      }
+                      finalP1Id = liveP1ExistingId;
+                      const p1 = players[finalP1Id];
+                      if (liveP1EditExistingDetails) {
+                        updatePlayer(
+                          finalP1Id,
+                          p1.name,
+                          p1.level,
+                          liveP1Photo || p1.avatarUrl,
+                          liveP1ClubName.trim(),
+                          liveP1ClubLogo
+                        );
+                      }
+                    } else {
+                      if (!liveP1Name.trim()) {
+                        alert('Veuillez saisir le nom du Joueur 1.');
+                        return;
+                      }
+                      finalP1Id = addPlayer(
+                        liveP1Name.trim(),
+                        liveP1Level,
+                        liveP1Photo || undefined,
+                        liveP1ClubName.trim() || undefined,
+                        liveP1ClubLogo || undefined
+                      );
+                      setLiveP1ExistingId(finalP1Id);
+                      setLiveP1Mode('existing');
+                    }
+
+                    // Resolve Player 2
+                    let finalP2Id = '';
+                    if (liveP2Mode === 'existing') {
+                      if (!liveP2ExistingId || !players[liveP2ExistingId]) {
+                        alert('Veuillez choisir le Joueur 2 dans la liste ou cliquer sur "➕ Créer un joueur".');
+                        return;
+                      }
+                      finalP2Id = liveP2ExistingId;
+                      const p2 = players[finalP2Id];
+                      if (liveP2EditExistingDetails) {
+                        updatePlayer(
+                          finalP2Id,
+                          p2.name,
+                          p2.level,
+                          liveP2Photo || p2.avatarUrl,
+                          liveP2ClubName.trim(),
+                          liveP2ClubLogo
+                        );
+                      }
+                    } else {
+                      if (!liveP2Name.trim()) {
+                        alert('Veuillez saisir le nom du Joueur 2.');
+                        return;
+                      }
+                      finalP2Id = addPlayer(
+                        liveP2Name.trim(),
+                        liveP2Level,
+                        liveP2Photo || undefined,
+                        liveP2ClubName.trim() || undefined,
+                        liveP2ClubLogo || undefined
+                      );
+                      setLiveP2ExistingId(finalP2Id);
+                      setLiveP2Mode('existing');
+                    }
+
+                    if (finalP1Id === finalP2Id) {
+                      alert('Veuillez sélectionner deux joueurs différents.');
+                      return;
+                    }
+
+                    if (studioMatch && studioMatch.status === 'playing') {
+                      const ok = window.confirm(`Un match est déjà en cours sur ${studioTable?.name}. Voulez-vous le remplacer par ce nouveau Match Live ?`);
+                      if (!ok) return;
+                    }
+
+                    startCustomLiveMatch({
+                      tableId: effectiveTableId,
+                      player1Id: finalP1Id,
+                      player2Id: finalP2Id,
+                      targetSets: liveStudioTargetSets,
+                      handicapP1: liveStudioHandicapP1,
+                      handicapP2: liveStudioHandicapP2
+                    });
+                  }}
+                >
+                  <Play size={20} /> 🚀 Lancer le Match Live sur {studioTable?.name || 'ce billard'}
+                </button>
+              </div>
+
+              {/* RIGHT COLUMN: ACTIVE MATCH SCORE CONTROL & FULL STREAMING HUB */}
+              <div className="glass-card" style={{ padding: '1.6rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {studioTable ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--accent-primary)' }}>
+                          🎱 {studioTable.name} — Score & Diffusion
+                        </h3>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {studioMatch ? 'Match en direct actif sur cette table' : 'Aucun match en cours sur cette table (lancez-en un à gauche)'}
+                        </span>
+                      </div>
+                      {studioMatch && (
+                        <span style={{ background: 'rgba(0, 255, 170, 0.15)', color: '#00ffaa', border: '1px solid rgba(0,255,170,0.4)', padding: '4px 10px', borderRadius: '999px', fontSize: '0.76rem', fontWeight: 800 }}>
+                          Premier à {studioMatch.targetSets || liveStudioTargetSets} manches
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Score Control if a match is active on studioTable */}
+                    {studioMatch ? (() => {
+                      const mp1 = players[studioMatch.player1Id];
+                      const mp2 = players[studioMatch.player2Id];
+                      const target = studioMatch.targetSets || liveStudioTargetSets || 3;
+                      const h1 = studioMatch.handicapP1 ?? 0;
+                      const h2 = studioMatch.handicapP2 ?? 0;
+
+                      return (
+                        <div style={{
+                          background: 'rgba(0,0,0,0.32)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '14px',
+                          padding: '1.1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '1rem'
+                        }}>
+                          {/* Player 1 Score Row */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1rem', borderRadius: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                              {mp1?.avatarUrl && (
+                                <img src={mp1.avatarUrl} alt={mp1.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
+                              )}
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {mp1?.name || 'Joueur 1'}
+                                </div>
+                                {(mp1?.clubName || mp1?.clubLogoUrl) && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: 'var(--accent-primary)', marginTop: '2px' }}>
+                                    {mp1.clubLogoUrl && (
+                                      <img src={mp1.clubLogoUrl} alt="Club" style={{ width: '16px', height: '16px', borderRadius: '3px', objectFit: 'contain', background: '#fff', padding: '1px' }} />
+                                    )}
+                                    <span>{mp1.clubName}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                disabled={studioMatch.score1 <= h1}
+                                onClick={() => updateMatchScore(studioMatch!.id, Math.max(h1, studioMatch!.score1 - 1), studioMatch!.score2)}
+                                style={{ width: '38px', height: '38px', padding: 0, justifyContent: 'center' }}
+                              >
+                                <Minus size={18} />
+                              </button>
+                              <span style={{ fontSize: '1.8rem', fontWeight: 900, minWidth: '2.2rem', textAlign: 'center', color: 'var(--accent-primary)' }}>
+                                {studioMatch.score1}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-neon"
+                                onClick={() => updateMatchScore(studioMatch!.id, studioMatch!.score1 + 1, studioMatch!.score2)}
+                                style={{ width: '38px', height: '38px', padding: 0, justifyContent: 'center', color: '#000' }}
+                              >
+                                <Plus size={18} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Player 2 Score Row */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1rem', borderRadius: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                              {mp2?.avatarUrl && (
+                                <img src={mp2.avatarUrl} alt={mp2.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #f59e0b' }} />
+                              )}
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {mp2?.name || 'Joueur 2'}
+                                </div>
+                                {(mp2?.clubName || mp2?.clubLogoUrl) && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: 'var(--accent-primary)', marginTop: '2px' }}>
+                                    {mp2.clubLogoUrl && (
+                                      <img src={mp2.clubLogoUrl} alt="Club" style={{ width: '16px', height: '16px', borderRadius: '3px', objectFit: 'contain', background: '#fff', padding: '1px' }} />
+                                    )}
+                                    <span>{mp2.clubName}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                disabled={studioMatch.score2 <= h2}
+                                onClick={() => updateMatchScore(studioMatch!.id, studioMatch!.score1, Math.max(h2, studioMatch!.score2 - 1))}
+                                style={{ width: '38px', height: '38px', padding: 0, justifyContent: 'center' }}
+                              >
+                                <Minus size={18} />
+                              </button>
+                              <span style={{ fontSize: '1.8rem', fontWeight: 900, minWidth: '2.2rem', textAlign: 'center', color: 'var(--accent-primary)' }}>
+                                {studioMatch.score2}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-neon"
+                                onClick={() => updateMatchScore(studioMatch!.id, studioMatch!.score1, studioMatch!.score2 + 1)}
+                                style={{ width: '38px', height: '38px', padding: 0, justifyContent: 'center', color: '#000' }}
+                              >
+                                <Plus size={18} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* QR Code for Smartphone Scoring + Match Finish/Free buttons */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div style={{ background: '#fff', padding: '6px', borderRadius: '8px', display: 'inline-flex' }}>
+                                <QRCode
+                                  value={JSON.stringify({
+                                    tournamentId: studioMatch.tournamentId || '',
+                                    matchId: studioMatch.id,
+                                    tableId: studioTable.id,
+                                    clubId: currentClub.id
+                                  })}
+                                  size={64}
+                                />
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '210px', lineHeight: '1.35' }}>
+                                <b style={{ color: '#fff' }}>QR Code Télécommande :</b><br />
+                                Les joueurs peuvent flasher ce QR code pour scorer depuis leur téléphone.
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="btn btn-neon"
+                                style={{ fontSize: '0.8rem', padding: '0.5rem 0.9rem', color: '#000', fontWeight: 800 }}
+                                onClick={() => {
+                                  if (studioMatch!.score1 < target && studioMatch!.score2 < target) {
+                                    if (!window.confirm(`Score actuel : ${studioMatch!.score1} - ${studioMatch!.score2}. Terminer et valider ce match maintenant ?`)) return;
+                                  }
+                                  finishMatch(studioMatch!.id);
+                                }}
+                              >
+                                <CheckCircle2 size={16} /> Terminer le match
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                style={{ fontSize: '0.8rem', padding: '0.5rem 0.8rem', color: '#ff6b81', borderColor: 'rgba(255,107,129,0.4)' }}
+                                onClick={() => {
+                                  if (window.confirm('Libérer ce billard ?')) {
+                                    freeTable(studioTable.id);
+                                  }
+                                }}
+                              >
+                                <XCircle size={15} /> Libérer
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })() : null}
+
+                    {/* FULL LIVE & STREAMING HUB (Same options as table modal) */}
+                    <div style={{
+                      background: 'rgba(5, 12, 28, 0.92)',
+                      border: '1px solid rgba(0, 255, 170, 0.35)',
+                      borderRadius: '16px',
+                      padding: '1.2rem',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.9rem',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.6)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 900, color: 'var(--accent-primary)', fontSize: '1.05rem' }}>
+                          <Radio size={20} style={{ color: '#ff2244', animation: 'pulse 1.5s infinite' }} /> Régie Live & Streaming ({studioTable.name})
+                        </div>
+                        {Boolean(studioTable.liveStreamUrl || studioMatch?.liveStreamUrl) ? (
+                          <span style={{ fontSize: '0.72rem', background: '#ff2244', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fff' }} />
+                            STREAM CONNECTÉ
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px' }}>
+                            En attente de diffusion
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Sub-tabs for Streaming Modes */}
+                      <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(255,255,255,0.05)', padding: '3px', borderRadius: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setLiveStreamTab('phone')}
+                          style={{
+                            flex: 1,
+                            padding: '0.45rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            borderRadius: '8px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: liveStreamTab === 'phone' ? 'var(--accent-primary)' : 'transparent',
+                            color: liveStreamTab === 'phone' ? '#000' : 'rgba(255,255,255,0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <Smartphone size={14} /> 1. Smartphone
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLiveStreamTab('obs')}
+                          style={{
+                            flex: 1,
+                            padding: '0.45rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            borderRadius: '8px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: liveStreamTab === 'obs' ? 'var(--accent-primary)' : 'transparent',
+                            color: liveStreamTab === 'obs' ? '#000' : 'rgba(255,255,255,0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <Tv size={14} /> 2. Caméra Fixe Club
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLiveStreamTab('embed')}
+                          style={{
+                            flex: 1,
+                            padding: '0.45rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            borderRadius: '8px',
+                            border: liveStreamTab === 'embed' ? 'none' : '1px solid rgba(255, 68, 68, 0.45)',
+                            cursor: 'pointer',
+                            background: liveStreamTab === 'embed' ? 'var(--accent-primary)' : 'rgba(255, 34, 68, 0.12)',
+                            color: liveStreamTab === 'embed' ? '#000' : '#ff8a96',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <Globe size={14} /> ▶️ 3. YouTube / OBS
+                        </button>
+                      </div>
+
+                      {/* Active Stream Banner */}
+                      {Boolean(studioTable.liveStreamUrl || studioMatch?.liveStreamUrl) && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
+                          background: 'rgba(255, 34, 68, 0.14)',
+                          border: '1px solid rgba(255, 34, 68, 0.45)',
+                          padding: '0.55rem 0.8rem',
+                          borderRadius: '10px',
+                          flexWrap: 'wrap'
+                        }}>
+                          <span style={{ fontSize: '0.78rem', color: '#ff8a96', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            🔴 Direct actif sur {studioTable.name}
+                          </span>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <a
+                              href={resolveStreamHref(studioTable.liveStreamUrl || studioMatch?.liveStreamUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-neon"
+                              style={{ fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <ExternalLink size={13} /> 👁️ Voir le Direct
+                            </a>
+                            <a
+                              href={`${getAppBaseUrl()}/?overlay=all&club=${currentClub.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-outline"
+                              style={{ fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', borderColor: 'rgba(245, 158, 11, 0.45)' }}
+                            >
+                              <Tv size={13} /> ⊞ Multi-Billards
+                            </a>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              style={{ fontSize: '0.74rem', padding: '4px 10px', color: '#ff6b81', borderColor: 'rgba(255,107,129,0.4)' }}
+                              onClick={() => {
+                                setTableLiveStream(studioTable.id, undefined);
+                                if (studioMatch) setMatchLiveStream(studioMatch.id, undefined);
+                              }}
+                            >
+                              ⏹ Couper
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TAB 1: SMARTPHONE WIRELESS CAMERA */}
+                      {liveStreamTab === 'phone' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center', textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.45', textAlign: 'left', width: '100%', background: 'rgba(255,255,255,0.03)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div><b style={{ color: 'var(--accent-primary)' }}>Étape 1 :</b> Posez un smartphone face au billard et flashez ce QR Code (caméra sans fil instantanée).</div>
+                            <div style={{ marginTop: '4px' }}><b style={{ color: 'var(--accent-primary)' }}>Étape 2 :</b> Cliquez sur le bouton ci-dessous pour diffuser la vidéo + le score en direct !</div>
+                          </div>
+
+                          <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'inline-block' }}>
+                            <QRCode value={`https://vdo.ninja/?push=MCB_${currentClub.id}_${studioTable.id}&webcam&facingmode=environment`} size={125} />
+                          </div>
+
+                          <button
+                            type="button"
+                            className="btn btn-neon"
+                            style={{ width: '100%', fontSize: '0.84rem', padding: '0.65rem', justifyContent: 'center', fontWeight: 800 }}
+                            onClick={() => {
+                              const baseUrl = getAppBaseUrl();
+                              const liveViewerUrl = `${baseUrl}/?overlay=${studioTable.id}&vdo=MCB_${currentClub.id}_${studioTable.id}&pos=${overlayPos}&club=${currentClub.id}`;
+                              setTableLiveStream(studioTable.id, liveViewerUrl);
+                              if (studioMatch) setMatchLiveStream(studioMatch.id, liveViewerUrl);
+                            }}
+                          >
+                            🔴 Activer le Direct Smartphone (Vidéo + Score TV)
+                          </button>
+                        </div>
+                      )}
+
+                      {/* TAB 2: CLUB FIXED CAMERA (USB / NETWORK) */}
+                      {liveStreamTab === 'obs' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.7rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(0,255,170,0.25)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--accent-primary)' }}>
+                              📺 Mode A — Afficher sur la TV du club (Caméra USB branchée à ce PC)
+                            </div>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.35' }}>
+                              Affiche directement la caméra fixe USB de cette table en plein écran avec le bandeau de score TV (photos + logos des clubs) par-dessus.
+                            </p>
+                            <a
+                              href={`${getAppBaseUrl()}/?overlay=${studioTable.id}&broadcast=1&pos=${overlayPos}&club=${currentClub.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-neon"
+                              style={{ fontSize: '0.8rem', padding: '0.55rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontWeight: 800 }}
+                            >
+                              <ExternalLink size={14} /> 🎥 Ouvrir Caméra Fixe USB + Score TV
+                            </a>
+                          </div>
+
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.7rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#fff' }}>
+                              📡 Mode B — Diffuser la Caméra Fixe sur les téléphones des joueurs
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <a
+                                href={`https://vdo.ninja/?push=MCB_${currentClub.id}_${studioTable.id}&webcam&autostart`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn btn-outline"
+                                style={{ flex: 1, fontSize: '0.76rem', padding: '0.5rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                              >
+                                <ExternalLink size={13} /> 1. Lancer la caméra du PC
+                              </a>
+                              <button
+                                type="button"
+                                className="btn btn-neon"
+                                style={{ flex: 1, fontSize: '0.76rem', padding: '0.5rem', justifyContent: 'center', fontWeight: 800 }}
+                                onClick={() => {
+                                  const baseUrl = getAppBaseUrl();
+                                  const liveViewerUrl = `${baseUrl}/?overlay=${studioTable.id}&vdo=MCB_${currentClub.id}_${studioTable.id}&pos=${overlayPos}&club=${currentClub.id}`;
+                                  setTableLiveStream(studioTable.id, liveViewerUrl);
+                                  if (studioMatch) setMatchLiveStream(studioMatch.id, liveViewerUrl);
+                                }}
+                              >
+                                🔴 2. Activer le Direct
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TAB 3: PUBLIC LIVE LINK (YouTube / Twitch / IP Cam) & OBS OVERLAY */}
+                      {liveStreamTab === 'embed' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                          <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                            Collez un lien <b>YouTube Live, Twitch, Facebook</b> ou l'adresse web d'une <b>Caméra IP</b> :
+                          </p>
+
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <input
+                              type="url"
+                              className="input-field"
+                              placeholder="https://www.youtube.com/watch?v=... ou https://youtube.com/live/..."
+                              defaultValue={(() => {
+                                const raw = studioTable.liveStreamUrl || studioMatch?.liveStreamUrl || '';
+                                const qIdx = raw.indexOf('?');
+                                if (qIdx !== -1 && raw.includes('overlay=')) {
+                                  const v = new URLSearchParams(raw.slice(qIdx)).get('video');
+                                  return v || '';
+                                }
+                                return raw;
+                              })()}
+                              id={`studio-stream-input-${studioTable.id}`}
+                              style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-neon"
+                              style={{ fontSize: '0.78rem', padding: '0.5rem 0.9rem', whiteSpace: 'nowrap' }}
+                              onClick={() => {
+                                const input = document.getElementById(`studio-stream-input-${studioTable.id}`) as HTMLInputElement;
+                                const trimmed = input?.value.trim() || '';
+                                if (!trimmed) {
+                                  setTableLiveStream(studioTable.id, undefined);
+                                  if (studioMatch) setMatchLiveStream(studioMatch.id, undefined);
+                                  return;
+                                }
+                                const wrappedUrl = trimmed.includes('?overlay=')
+                                  ? trimmed
+                                  : `${getAppBaseUrl()}/?overlay=${studioTable.id}&video=${encodeURIComponent(trimmed)}&pos=${overlayPos}&club=${currentClub.id}`;
+                                setTableLiveStream(studioTable.id, wrappedUrl);
+                                if (studioMatch) setMatchLiveStream(studioMatch.id, wrappedUrl);
+                              }}
+                            >
+                              Enregistrer
+                            </button>
+                          </div>
+
+                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              <span>Bandeau de score seul (pour OBS Studio) :</span>
+                              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    padding: '2px 7px',
+                                    background: overlayPos === 'top' ? 'rgba(0, 255, 170, 0.2)' : 'transparent',
+                                    borderColor: overlayPos === 'top' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)'
+                                  }}
+                                  onClick={() => setOverlayPos('top')}
+                                >
+                                  ⬆ Haut
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    padding: '2px 7px',
+                                    background: overlayPos === 'bottom' ? 'rgba(0, 255, 170, 0.2)' : 'transparent',
+                                    borderColor: overlayPos === 'bottom' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)'
+                                  }}
+                                  onClick={() => setOverlayPos('bottom')}
+                                >
+                                  ⬇ Bas
+                                </button>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                style={{ flex: 1, fontSize: '0.76rem', padding: '0.45rem', justifyContent: 'center' }}
+                                onClick={() => {
+                                  const baseUrl = getAppBaseUrl();
+                                  const overlayUrl = `${baseUrl}/?overlay=${studioTable.id}&pos=${overlayPos}&club=${currentClub.id}`;
+                                  navigator.clipboard.writeText(overlayUrl);
+                                  setCopiedOverlay(true);
+                                  setTimeout(() => setCopiedOverlay(false), 2500);
+                                }}
+                              >
+                                {copiedOverlay ? '✓ URL OBS copiée !' : '📋 Copier URL Overlay OBS'}
+                              </button>
+                              <a
+                                href={`${getAppBaseUrl()}/?overlay=${studioTable.id}&pos=${overlayPos}&club=${currentClub.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn btn-outline"
+                                style={{ fontSize: '0.76rem', padding: '0.45rem 0.75rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <ExternalLink size={13} /> Tester Score
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ color: 'var(--text-muted)' }}>Aucun billard configuré dans le club.</div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
       </main>
 

@@ -26,9 +26,17 @@ interface AppState {
 
   // Actions
   setClub: (club: Partial<Club>) => void;
-  addPlayer: (name: string, level: PlayerLevel, photoUrl?: string) => void;
-  updatePlayer: (id: string, name: string, level: PlayerLevel, photoUrl?: string) => void;
+  addPlayer: (name: string, level: PlayerLevel, photoUrl?: string, clubName?: string, clubLogoUrl?: string) => string;
+  updatePlayer: (id: string, name: string, level: PlayerLevel, photoUrl?: string, clubName?: string, clubLogoUrl?: string) => void;
   deletePlayer: (id: string) => void;
+  startCustomLiveMatch: (options: {
+    tableId: string;
+    player1Id: string;
+    player2Id: string;
+    targetSets: number;
+    handicapP1?: number;
+    handicapP2?: number;
+  }) => string;
   createTournament: (name: string, format: TournamentFormat, settings: TournamentSettings, participants: string[]) => void;
   startTournamentMatch: (matchId: string, asCurrentUser?: boolean) => void;
   updateScore: (playerId: string, delta: number) => void;
@@ -690,8 +698,11 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  addPlayer: (name, level, photoUrl) => {
-    const id = `p_${Date.now()}`;
+  addPlayer: (name, level, photoUrl, clubName, clubLogoUrl) => {
+    const id = `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const defaultStats = createDefaultPlayerStats();
+    if (clubName) defaultStats.clubName = clubName;
+    if (clubLogoUrl) defaultStats.clubLogoUrl = clubLogoUrl;
     set((state) => ({
       players: {
         ...state.players,
@@ -701,16 +712,26 @@ export const useStore = create<AppState>((set, get) => ({
           name,
           level,
           avatarUrl: photoUrl || `https://i.pravatar.cc/150?u=${id}`,
-          stats: createDefaultPlayerStats()
+          ...(clubName ? { clubName } : {}),
+          ...(clubLogoUrl ? { clubLogoUrl } : {}),
+          stats: defaultStats
         }
       }
     }));
+    return id;
   },
 
-  updatePlayer: (id, name, level, photoUrl) => {
+  updatePlayer: (id, name, level, photoUrl, clubName, clubLogoUrl) => {
     set((state) => {
       const player = state.players[id];
       if (!player) return state;
+      const nextClubName = clubName !== undefined ? (clubName || undefined) : player.clubName;
+      const nextClubLogo = clubLogoUrl !== undefined ? (clubLogoUrl || undefined) : player.clubLogoUrl;
+      const nextStats = {
+        ...player.stats,
+        clubName: nextClubName,
+        clubLogoUrl: nextClubLogo
+      };
       return {
         players: {
           ...state.players,
@@ -718,11 +739,64 @@ export const useStore = create<AppState>((set, get) => ({
             ...player,
             name,
             level,
-            avatarUrl: photoUrl || player.avatarUrl
+            avatarUrl: photoUrl || player.avatarUrl,
+            clubName: nextClubName,
+            clubLogoUrl: nextClubLogo,
+            stats: nextStats
           }
         }
       };
     });
+  },
+
+  startCustomLiveMatch: ({ tableId, player1Id, player2Id, targetSets, handicapP1 = 0, handicapP2 = 0 }) => {
+    const matchId = `m_live_${Date.now()}`;
+    set((state) => {
+      const table = state.tables[tableId];
+      if (!table) return state;
+
+      const updatedMatches = { ...state.matches };
+      // Detach any non-finished match currently assigned to this table
+      Object.values(updatedMatches).forEach(m => {
+        if (m.tableId === tableId && m.status !== 'finished') {
+          updatedMatches[m.id] = {
+            ...m,
+            tableId: undefined,
+            status: m.status === 'playing' ? 'finished' : m.status
+          };
+        }
+      });
+
+      const newMatch: Match = {
+        id: matchId,
+        clubId: state.currentClub.id,
+        tableId,
+        player1Id,
+        player2Id,
+        targetSets: Math.max(1, targetSets),
+        score1: Math.max(0, handicapP1),
+        score2: Math.max(0, handicapP2),
+        handicapP1: handicapP1 > 0 ? handicapP1 : undefined,
+        handicapP2: handicapP2 > 0 ? handicapP2 : undefined,
+        status: 'playing',
+        startTime: Date.now(),
+        liveStreamUrl: table.liveStreamUrl
+      };
+      updatedMatches[matchId] = newMatch;
+
+      return {
+        matches: updatedMatches,
+        tables: {
+          ...state.tables,
+          [tableId]: {
+            ...table,
+            status: 'occupied',
+            currentMatchId: matchId
+          }
+        }
+      };
+    });
+    return matchId;
   },
 
   deletePlayer: (id) => {

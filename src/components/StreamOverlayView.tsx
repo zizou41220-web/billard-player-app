@@ -215,9 +215,19 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
                 alt={p1.name}
                 style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B', flexShrink: 0 }}
               />
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p1.name}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p1.name}
+                </span>
+                {(p1.clubName || p1.stats?.clubName || p1.clubLogoUrl || p1.stats?.clubLogoUrl) && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.66rem', color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
+                    {(p1.clubLogoUrl || p1.stats?.clubLogoUrl) && (
+                      <img src={p1.clubLogoUrl || p1.stats?.clubLogoUrl} alt="" style={{ width: '13px', height: '13px', objectFit: 'contain', borderRadius: '2px', background: '#fff', padding: '1px' }} />
+                    )}
+                    {p1.clubName || p1.stats?.clubName}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div style={{
@@ -234,9 +244,19 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', overflow: 'hidden' }}>
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                {p2.name}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', overflow: 'hidden' }}>
+                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                  {p2.name}
+                </span>
+                {(p2.clubName || p2.stats?.clubName || p2.clubLogoUrl || p2.stats?.clubLogoUrl) && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.66rem', color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
+                    {p2.clubName || p2.stats?.clubName}
+                    {(p2.clubLogoUrl || p2.stats?.clubLogoUrl) && (
+                      <img src={p2.clubLogoUrl || p2.stats?.clubLogoUrl} alt="" style={{ width: '13px', height: '13px', objectFit: 'contain', borderRadius: '2px', background: '#fff', padding: '1px' }} />
+                    )}
+                  </span>
+                )}
+              </div>
               <img
                 src={p2.avatarUrl || `https://i.pravatar.cc/150?u=${p2.id}`}
                 alt={p2.name}
@@ -1058,7 +1078,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 }}>
                   {p1.name}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.45rem', marginTop: '2px' }}>
                   <span style={{
                     color: (p1.level === 'Prestige' || p1.level === 'Confirmé') ? '#ffd700' : 'rgba(255,255,255,0.6)',
                     fontSize: '0.8rem',
@@ -1066,6 +1086,29 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                   }}>
                     {(p1.level === 'Prestige' || p1.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
                   </span>
+                  {(p1.clubName || p1.stats?.clubName || p1.clubLogoUrl || p1.stats?.clubLogoUrl) && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      padding: '1px 7px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      color: '#fff',
+                      fontWeight: 700
+                    }}>
+                      {(p1.clubLogoUrl || p1.stats?.clubLogoUrl) && (
+                        <img
+                          src={p1.clubLogoUrl || p1.stats?.clubLogoUrl}
+                          alt=""
+                          style={{ width: '16px', height: '16px', objectFit: 'contain', borderRadius: '3px', background: '#fff', padding: '1px' }}
+                        />
+                      )}
+                      {p1.clubName || p1.stats?.clubName}
+                    </span>
+                  )}
                   {Boolean(match.handicapP1 && match.handicapP1 > 0) && (
                     <span style={{ fontSize: '0.7rem', background: 'rgba(0, 255, 170, 0.25)', color: '#00ffaa', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
                       +{match.handicapP1} Handicap
@@ -1140,10 +1183,33 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 }}>
                   {p2.name}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '0.45rem', marginTop: '2px' }}>
                   {Boolean(match.handicapP2 && match.handicapP2 > 0) && (
                     <span style={{ fontSize: '0.7rem', background: 'rgba(0, 255, 170, 0.25)', color: '#00ffaa', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
                       +{match.handicapP2} Handicap
+                    </span>
+                  )}
+                  {(p2.clubName || p2.stats?.clubName || p2.clubLogoUrl || p2.stats?.clubLogoUrl) && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      padding: '1px 7px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      color: '#fff',
+                      fontWeight: 700
+                    }}>
+                      {p2.clubName || p2.stats?.clubName}
+                      {(p2.clubLogoUrl || p2.stats?.clubLogoUrl) && (
+                        <img
+                          src={p2.clubLogoUrl || p2.stats?.clubLogoUrl}
+                          alt=""
+                          style={{ width: '16px', height: '16px', objectFit: 'contain', borderRadius: '3px', background: '#fff', padding: '1px' }}
+                        />
+                      )}
                     </span>
                   )}
                   <span style={{
