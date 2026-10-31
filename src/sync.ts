@@ -136,13 +136,22 @@ export const mapDBToMatch = (d: any): Match => {
     }
   }
 
+  let parsedTargetSets = d.target_sets || undefined;
+  if (!parsedTargetSets && typeof d.id === 'string' && d.id.startsWith('m_live_')) {
+    const parts = d.id.split('_');
+    const maybeSets = parseInt(parts[2], 10);
+    if (!isNaN(maybeSets) && maybeSets > 0 && maybeSets < 100) {
+      parsedTargetSets = maybeSets;
+    }
+  }
+
   return {
     id: d.id,
     clubId: d.club_id || undefined,
     tableId: d.status === 'finished' ? undefined : (d.table_id || undefined),
     player1Id: d.player1_id || '',
     player2Id: d.player2_id || '',
-    targetSets: d.target_sets || undefined,
+    targetSets: parsedTargetSets,
     score1: d.score1 || 0,
     score2: d.score2 || 0,
     handicapP1: d.handicap_p1 || undefined,
@@ -156,7 +165,7 @@ export const mapDBToMatch = (d: any): Match => {
     bracketRound,
     bracketPosition,
     nextMatchId,
-    liveStreamUrl: d.live_stream_url || undefined
+    liveStreamUrl: d.live_stream_url || (d.table_id ? getSavedTableStream(d.club_id, d.table_id) : undefined) || undefined
   };
 };
 

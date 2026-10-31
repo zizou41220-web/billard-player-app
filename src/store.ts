@@ -30,7 +30,7 @@ interface AppState {
   updatePlayer: (id: string, name: string, level: PlayerLevel, photoUrl?: string, clubName?: string, clubLogoUrl?: string) => void;
   deletePlayer: (id: string) => void;
   startCustomLiveMatch: (options: {
-    tableId: string;
+    tableId?: string;
     player1Id: string;
     player2Id: string;
     targetSets: number;
@@ -749,14 +749,22 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  startCustomLiveMatch: ({ tableId, player1Id, player2Id, targetSets, handicapP1 = 0, handicapP2 = 0 }) => {
-    const matchId = `m_live_${Date.now()}`;
+  startCustomLiveMatch: ({ tableId = 'live', player1Id, player2Id, targetSets, handicapP1 = 0, handicapP2 = 0 }) => {
+    const cleanTarget = Math.max(1, targetSets);
+    const matchId = `m_live_${cleanTarget}_${Date.now()}`;
     set((state) => {
       const table = state.tables[tableId];
-      if (!table) return state;
+      let savedStream: string | undefined = table?.liveStreamUrl;
+      if (!savedStream && typeof window !== 'undefined') {
+        try {
+          const storageKey = `mb_live_streams_${state.currentClub.id}`;
+          const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          savedStream = existing[tableId];
+        } catch {}
+      }
 
       const updatedMatches = { ...state.matches };
-      // Detach any non-finished match currently assigned to this table
+      // Detach any non-finished match currently assigned to this live channel / table
       Object.values(updatedMatches).forEach(m => {
         if (m.tableId === tableId && m.status !== 'finished') {
           updatedMatches[m.id] = {
@@ -773,16 +781,22 @@ export const useStore = create<AppState>((set, get) => ({
         tableId,
         player1Id,
         player2Id,
-        targetSets: Math.max(1, targetSets),
+        targetSets: cleanTarget,
         score1: Math.max(0, handicapP1),
         score2: Math.max(0, handicapP2),
         handicapP1: handicapP1 > 0 ? handicapP1 : undefined,
         handicapP2: handicapP2 > 0 ? handicapP2 : undefined,
         status: 'playing',
         startTime: Date.now(),
-        liveStreamUrl: table.liveStreamUrl
+        liveStreamUrl: savedStream
       };
       updatedMatches[matchId] = newMatch;
+
+      if (!table) {
+        return {
+          matches: updatedMatches
+        };
+      }
 
       return {
         matches: updatedMatches,
@@ -1028,30 +1042,32 @@ export const useStore = create<AppState>((set, get) => ({
         club_id: match.clubId || state.currentClub.id
       }).then();
 
-      supabase.from('tournoi2_tables').upsert({
-        id: effectiveTableId,
-        number: state.tables[effectiveTableId]?.number,
-        name: state.tables[effectiveTableId]?.name,
-        status: 'occupied',
-        current_match_id: matchId,
-        x: state.tables[effectiveTableId]?.x || null,
-        y: state.tables[effectiveTableId]?.y || null,
-        club_id: state.tables[effectiveTableId]?.clubId || state.currentClub.id
-      }).then();
+      if (state.tables[effectiveTableId]) {
+        supabase.from('tournoi2_tables').upsert({
+          id: effectiveTableId,
+          number: state.tables[effectiveTableId]?.number,
+          name: state.tables[effectiveTableId]?.name,
+          status: 'occupied',
+          current_match_id: matchId,
+          x: state.tables[effectiveTableId]?.x || null,
+          y: state.tables[effectiveTableId]?.y || null,
+          club_id: state.tables[effectiveTableId]?.clubId || state.currentClub.id
+        }).then();
+      }
       
       return {
         matches: { 
           ...state.matches, 
           [matchId]: { ...match, tableId: effectiveTableId, status: 'playing', startTime } 
         },
-        tables: {
+        tables: state.tables[effectiveTableId] ? {
           ...state.tables,
           [effectiveTableId]: {
             ...state.tables[effectiveTableId],
             status: 'occupied',
             currentMatchId: matchId
           }
-        },
+        } : state.tables,
         ...(asCurrentUser ? { activeMatchId: matchId } : {})
       };
     });
@@ -2317,7 +2333,6 @@ export const useStore = create<AppState>((set, get) => ({
   setTableLiveStream: (tableId, liveStreamUrl) => {
     set((state) => {
       const table = state.tables[tableId];
-      if (!table) return state;
 
       // Persist in localStorage so it never gets lost on reload or realtime echo
       if (typeof window !== 'undefined') {
@@ -2354,6 +2369,12 @@ export const useStore = create<AppState>((set, get) => ({
         supabase.from('tournoi2_tournaments').update({
           settings: updatedSettings
         }).eq('id', activeTour.id).then();
+      }
+
+      if (!table) {
+        return {
+          tournaments: newTournaments
+        };
       }
 
       return {

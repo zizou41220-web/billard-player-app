@@ -118,9 +118,11 @@ const MatchView: React.FC = () => {
             </a>
           )}
         </div>
-        <div style={{ background: 'var(--bg-surface)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700 }}>
-          {table?.name || (table?.number ? `Table ${table.number}` : 'Billard')}
-        </div>
+        {table && match.tournamentId && (
+          <div style={{ background: 'var(--bg-surface)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700 }}>
+            {table.name || (table.number ? `Table ${table.number}` : 'Billard')}
+          </div>
+        )}
       </div>
 
       {/* Player 2 Zone (Top half) */}
@@ -129,14 +131,16 @@ const MatchView: React.FC = () => {
           <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '1.05rem' }}>
             {players[p2]?.name}
           </span>
-          {(players[p2]?.level === 'Prestige' || players[p2]?.level === 'Confirmé') ? (
-            <span style={{ fontSize: '0.68rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)' }}>
-              👑 Prestige
-            </span>
-          ) : (
-            <span style={{ fontSize: '0.68rem', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
-              Amateur
-            </span>
+          {Boolean(match.tournamentId) && (
+            (players[p2]?.level === 'Prestige' || players[p2]?.level === 'Confirmé') ? (
+              <span style={{ fontSize: '0.68rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)' }}>
+                👑 Prestige
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.68rem', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                Amateur
+              </span>
+            )
           )}
           {Boolean(match.handicapP2 && match.handicapP2 > 0) && (
             <span style={{ fontSize: '0.68rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid var(--accent-primary)' }}>
@@ -171,14 +175,16 @@ const MatchView: React.FC = () => {
           <span style={{ color: 'var(--accent-primary)', fontWeight: 800, fontSize: '1.15rem' }}>
             {players[p1]?.name}
           </span>
-          {(players[p1]?.level === 'Prestige' || players[p1]?.level === 'Confirmé') ? (
-            <span style={{ fontSize: '0.68rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)' }}>
-              👑 Prestige
-            </span>
-          ) : (
-            <span style={{ fontSize: '0.68rem', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
-              Amateur
-            </span>
+          {Boolean(match.tournamentId) && (
+            (players[p1]?.level === 'Prestige' || players[p1]?.level === 'Confirmé') ? (
+              <span style={{ fontSize: '0.68rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)' }}>
+                👑 Prestige
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.68rem', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                Amateur
+              </span>
+            )
           )}
           {Boolean(match.handicapP1 && match.handicapP1 > 0) && (
             <span style={{ fontSize: '0.68rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid var(--accent-primary)' }}>

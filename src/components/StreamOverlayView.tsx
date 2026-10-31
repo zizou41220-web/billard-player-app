@@ -631,14 +631,21 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   }
 
   // Find table by ID (e.g. 't1') or by number (e.g. '1') or by name
-  const table: Table | undefined = Object.values(tables).find(t => 
-    t.id === activeTableParam || 
-    t.number.toString() === activeTableParam || 
-    t.name?.toLowerCase().includes(activeTableParam.toLowerCase())
-  );
+  const table: Table | undefined = activeTableParam === 'live'
+    ? undefined
+    : Object.values(tables).find(t => 
+        t.id === activeTableParam || 
+        t.number.toString() === activeTableParam || 
+        t.name?.toLowerCase().includes(activeTableParam.toLowerCase())
+      );
 
-  // Find the match running on this table
-  const match: Match | undefined = table?.currentMatchId ? matches[table.currentMatchId] : undefined;
+  // Find the match running on this table or standalone live channel
+  const match: Match | undefined = activeTableParam === 'live'
+    ? Object.values(matches).find(m => m.tableId === 'live' && m.status !== 'finished')
+    : (table?.currentMatchId
+        ? matches[table.currentMatchId]
+        : Object.values(matches).find(m => m.tableId === table?.id && m.status !== 'finished'));
+  const isStandaloneLive = activeTableParam === 'live' || Boolean(match && !match.tournamentId);
   const p1 = match ? players[match.player1Id] : undefined;
   const p2 = match ? players[match.player2Id] : undefined;
 
@@ -952,7 +959,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       )}
       
       {/* Broadcast Scoreboard Graphic */}
-      {table && match && p1 && p2 ? (
+      {(table || isStandaloneLive) && match && p1 && p2 ? (
         <div style={{
           position: 'relative',
           zIndex: 10,
@@ -1014,13 +1021,15 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
                 LIVE
               </span>
-              <span style={{ color: 'var(--accent-primary, #00ffcc)', fontWeight: 800 }}>
-                {table.name || `BILLARD ${table.number}`}
-              </span>
+              {!isStandaloneLive && table && (
+                <span style={{ color: 'var(--accent-primary, #00ffcc)', fontWeight: 800 }}>
+                  {table.name || `BILLARD ${table.number}`}
+                </span>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
-              {activeTournament && <span>{activeTournament.name}</span>}
+              {!isStandaloneLive && activeTournament && <span>{activeTournament.name}</span>}
               {rulesText && (
                 <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px', color: '#fff' }}>
                   {rulesText}
@@ -1061,8 +1070,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                   height: '54px',
                   borderRadius: '50%',
                   objectFit: 'cover',
-                  border: `2px solid ${(p1.level === 'Prestige' || p1.level === 'Confirmé') ? '#ffd700' : '#00ffcc'}`,
-                  boxShadow: (p1.level === 'Prestige' || p1.level === 'Confirmé') ? '0 0 16px rgba(255, 215, 0, 0.4)' : '0 0 12px rgba(0,0,0,0.5)',
+                  border: `2px solid ${(!isStandaloneLive && (p1.level === 'Prestige' || p1.level === 'Confirmé')) ? '#ffd700' : '#00ffcc'}`,
+                  boxShadow: (!isStandaloneLive && (p1.level === 'Prestige' || p1.level === 'Confirmé')) ? '0 0 16px rgba(255, 215, 0, 0.4)' : '0 0 12px rgba(0,0,0,0.5)',
                   flexShrink: 0
                 }}
               />
@@ -1079,13 +1088,15 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                   {p1.name}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.45rem', marginTop: '2px' }}>
-                  <span style={{
-                    color: (p1.level === 'Prestige' || p1.level === 'Confirmé') ? '#ffd700' : 'rgba(255,255,255,0.6)',
-                    fontSize: '0.8rem',
-                    fontWeight: 700
-                  }}>
-                    {(p1.level === 'Prestige' || p1.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
-                  </span>
+                  {!isStandaloneLive && (
+                    <span style={{
+                      color: (p1.level === 'Prestige' || p1.level === 'Confirmé') ? '#ffd700' : 'rgba(255,255,255,0.6)',
+                      fontSize: '0.8rem',
+                      fontWeight: 700
+                    }}>
+                      {(p1.level === 'Prestige' || p1.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
+                    </span>
+                  )}
                   {(p1.clubName || p1.stats?.clubName || p1.clubLogoUrl || p1.stats?.clubLogoUrl) && (
                     <span style={{
                       display: 'inline-flex',
@@ -1212,13 +1223,15 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                       )}
                     </span>
                   )}
-                  <span style={{
-                    color: (p2.level === 'Prestige' || p2.level === 'Confirmé') ? '#ffd700' : 'rgba(255,255,255,0.6)',
-                    fontSize: '0.8rem',
-                    fontWeight: 700
-                  }}>
-                    {(p2.level === 'Prestige' || p2.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
-                  </span>
+                  {!isStandaloneLive && (
+                    <span style={{
+                      color: (p2.level === 'Prestige' || p2.level === 'Confirmé') ? '#ffd700' : 'rgba(255,255,255,0.6)',
+                      fontSize: '0.8rem',
+                      fontWeight: 700
+                    }}>
+                      {(p2.level === 'Prestige' || p2.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
+                    </span>
+                  )}
                 </div>
               </div>
               <img 
@@ -1229,8 +1242,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                   height: '54px',
                   borderRadius: '50%',
                   objectFit: 'cover',
-                  border: `2px solid ${(p2.level === 'Prestige' || p2.level === 'Confirmé') ? '#ffd700' : '#00ffcc'}`,
-                  boxShadow: (p2.level === 'Prestige' || p2.level === 'Confirmé') ? '0 0 16px rgba(255, 215, 0, 0.4)' : '0 0 12px rgba(0,0,0,0.5)',
+                  border: `2px solid ${(!isStandaloneLive && (p2.level === 'Prestige' || p2.level === 'Confirmé')) ? '#ffd700' : '#00ffcc'}`,
+                  boxShadow: (!isStandaloneLive && (p2.level === 'Prestige' || p2.level === 'Confirmé')) ? '0 0 16px rgba(255, 215, 0, 0.4)' : '0 0 12px rgba(0,0,0,0.5)',
                   flexShrink: 0
                 }}
               />
@@ -1291,7 +1304,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
           </div>
           <div>
             <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--accent-primary, #00ffcc)' }}>
-              {table ? (table.name || `Billard ${table.number}`) : `Table ${tableParam}`}
+              {isStandaloneLive ? 'Match Live' : (table ? (table.name || `Billard ${table.number}`) : `Table ${tableParam}`)}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>
               {currentClub.name} • En attente du prochain match...
