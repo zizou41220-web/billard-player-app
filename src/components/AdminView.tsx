@@ -4421,14 +4421,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-neon"
-                          style={{ fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
                         >
                           <ExternalLink size={13} /> 👁️ Voir le Direct
                         </a>
                         <button
                           type="button"
                           className="btn btn-outline"
-                          style={{ fontSize: '0.74rem', padding: '4px 10px', color: '#ff6b81', borderColor: 'rgba(255,107,129,0.4)' }}
+                          style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', color: '#ff6b81', borderColor: 'rgba(255,107,129,0.4)', whiteSpace: 'nowrap' }}
                           onClick={() => updateStudioStream(undefined)}
                         >
                           ⏹ Couper
@@ -4495,14 +4495,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             target="_blank"
                             rel="noreferrer"
                             className="btn btn-outline"
-                            style={{ flex: 1, fontSize: '0.76rem', padding: '0.5rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                            style={{ flex: 1, width: 'auto', fontSize: '0.76rem', padding: '0.5rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}
                           >
                             <ExternalLink size={13} /> 1. Lancer la caméra du PC
                           </a>
                           <button
                             type="button"
                             className="btn btn-neon"
-                            style={{ flex: 1, fontSize: '0.76rem', padding: '0.5rem', justifyContent: 'center', fontWeight: 800 }}
+                            style={{ flex: 1, width: 'auto', fontSize: '0.76rem', padding: '0.5rem', justifyContent: 'center', fontWeight: 800, whiteSpace: 'nowrap' }}
                             onClick={() => {
                               const baseUrl = getAppBaseUrl();
                               const liveViewerUrl = `${baseUrl}/?overlay=${studioChannelId}&vdo=MCB_${currentClub.id}_${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`;
@@ -4519,15 +4519,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                   {/* TAB 3: PUBLIC LIVE LINK (YouTube / Twitch / IP Cam) & OBS OVERLAY */}
                   {liveStreamTab === 'embed' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                      <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
                         Collez un lien <b>YouTube Live, Twitch, Facebook</b> ou l'adresse web d'une <b>Caméra IP</b> :
                       </p>
 
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <input
                           type="url"
                           className="input-field"
-                          placeholder="https://www.youtube.com/watch?v=... ou https://youtube.com/live/..."
+                          placeholder="👉 Collez ici : https://www.youtube.com/watch?v=... ou https://youtube.com/live/..."
                           defaultValue={(() => {
                             const raw = activeStudioStreamUrl || '';
                             const qIdx = raw.indexOf('?');
@@ -4538,12 +4538,21 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             return raw;
                           })()}
                           id="studio-stream-input-live"
-                          style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}
+                          style={{
+                            width: '100%',
+                            fontSize: '0.85rem',
+                            padding: '0.65rem 0.9rem',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: '2px solid rgba(245, 158, 11, 0.6)',
+                            color: '#fff',
+                            borderRadius: '10px',
+                            userSelect: 'text'
+                          }}
                         />
                         <button
                           type="button"
                           className="btn btn-neon"
-                          style={{ fontSize: '0.78rem', padding: '0.5rem 0.9rem', whiteSpace: 'nowrap' }}
+                          style={{ width: '100%', fontSize: '0.85rem', padding: '0.6rem 1rem', fontWeight: 800 }}
                           onClick={() => {
                             const input = document.getElementById('studio-stream-input-live') as HTMLInputElement;
                             const trimmed = input?.value.trim() || '';
@@ -4557,22 +4566,24 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             updateStudioStream(wrappedUrl);
                           }}
                         >
-                          Enregistrer
+                          🔴 Enregistrer & Activer le Lien Vidéo
                         </button>
                       </div>
 
                       <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           <span>Bandeau de score seul (pour OBS Studio) :</span>
-                          <div style={{ display: 'flex', gap: '0.3rem' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
                             <button
                               type="button"
                               className="btn btn-outline"
                               style={{
-                                fontSize: '0.68rem',
-                                padding: '2px 7px',
+                                width: 'auto',
+                                fontSize: '0.72rem',
+                                padding: '3px 10px',
+                                whiteSpace: 'nowrap',
                                 background: overlayPos === 'top' ? 'rgba(0, 255, 170, 0.2)' : 'transparent',
-                                borderColor: overlayPos === 'top' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)'
+                                borderColor: overlayPos === 'top' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.15)'
                               }}
                               onClick={() => setOverlayPos('top')}
                             >
@@ -4582,10 +4593,12 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               type="button"
                               className="btn btn-outline"
                               style={{
-                                fontSize: '0.68rem',
-                                padding: '2px 7px',
+                                width: 'auto',
+                                fontSize: '0.72rem',
+                                padding: '3px 10px',
+                                whiteSpace: 'nowrap',
                                 background: overlayPos === 'bottom' ? 'rgba(0, 255, 170, 0.2)' : 'transparent',
-                                borderColor: overlayPos === 'bottom' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)'
+                                borderColor: overlayPos === 'bottom' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.15)'
                               }}
                               onClick={() => setOverlayPos('bottom')}
                             >
@@ -4598,7 +4611,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           <button
                             type="button"
                             className="btn btn-outline"
-                            style={{ flex: 1, fontSize: '0.76rem', padding: '0.45rem', justifyContent: 'center' }}
+                            style={{ flex: 1, width: 'auto', fontSize: '0.78rem', padding: '0.5rem 0.8rem', justifyContent: 'center', whiteSpace: 'nowrap' }}
                             onClick={() => {
                               const baseUrl = getAppBaseUrl();
                               const overlayUrl = `${baseUrl}/?overlay=${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`;
@@ -4614,7 +4627,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             target="_blank"
                             rel="noreferrer"
                             className="btn btn-outline"
-                            style={{ fontSize: '0.76rem', padding: '0.45rem 0.75rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            style={{ width: 'auto', fontSize: '0.78rem', padding: '0.5rem 0.9rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}
                           >
                             <ExternalLink size={13} /> Tester Score
                           </a>
@@ -5098,7 +5111,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-neon"
-                        style={{ fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
                       >
                         <ExternalLink size={13} /> 👁️ Voir le Direct
                       </a>
@@ -5107,7 +5120,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-outline"
-                        style={{ fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', borderColor: 'rgba(245, 158, 11, 0.45)' }}
+                        style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', borderColor: 'rgba(245, 158, 11, 0.45)', whiteSpace: 'nowrap' }}
                         title="Ouvrir le mur vidéo avec tous les billards sur le même écran"
                       >
                         <Tv size={13} /> ⊞ Multi-Billards
@@ -5115,7 +5128,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       <button
                         type="button"
                         className="btn btn-outline"
-                        style={{ fontSize: '0.74rem', padding: '4px 10px', color: '#ff6b81', borderColor: 'rgba(255,107,129,0.4)' }}
+                        style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', color: '#ff6b81', borderColor: 'rgba(255,107,129,0.4)', whiteSpace: 'nowrap' }}
                         onClick={() => {
                           setTableLiveStream(table.id, undefined);
                           if (match) setMatchLiveStream(match.id, undefined);
@@ -5192,14 +5205,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-outline"
-                          style={{ flex: 1, fontSize: '0.76rem', padding: '0.5rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                          style={{ flex: 1, width: 'auto', fontSize: '0.76rem', padding: '0.5rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}
                         >
                           <ExternalLink size={13} /> 1. Lancer la caméra du PC
                         </a>
                         <button
                           type="button"
                           className="btn btn-neon"
-                          style={{ flex: 1, fontSize: '0.76rem', padding: '0.5rem', justifyContent: 'center', fontWeight: 800 }}
+                          style={{ flex: 1, width: 'auto', fontSize: '0.76rem', padding: '0.5rem', justifyContent: 'center', fontWeight: 800, whiteSpace: 'nowrap' }}
                           onClick={() => {
                             const baseUrl = getAppBaseUrl();
                             const liveViewerUrl = `${baseUrl}/?overlay=${table.id}&vdo=MCB_${currentClub.id}_${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
@@ -5217,15 +5230,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 {/* TAB 3: PUBLIC LIVE LINK (YouTube / Twitch / IP Cam) & OBS OVERLAY */}
                 {liveStreamTab === 'embed' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                    <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
                       Collez un lien <b>YouTube Live, Twitch, Facebook</b> ou l'adresse web d'une <b>Caméra IP</b> :
                     </p>
 
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       <input
                         type="url"
                         className="input-field"
-                        placeholder="https://www.youtube.com/watch?v=... ou https://youtube.com/live/..."
+                        placeholder="👉 Collez ici : https://www.youtube.com/watch?v=... ou https://youtube.com/live/..."
                         defaultValue={(() => {
                           const raw = table.liveStreamUrl || match?.liveStreamUrl || '';
                           const qIdx = raw.indexOf('?');
@@ -5236,12 +5249,21 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           return raw;
                         })()}
                         id={`stream-input-${table.id}`}
-                        style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}
+                        style={{
+                          width: '100%',
+                          fontSize: '0.85rem',
+                          padding: '0.65rem 0.9rem',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          border: '2px solid rgba(245, 158, 11, 0.6)',
+                          color: '#fff',
+                          borderRadius: '10px',
+                          userSelect: 'text'
+                        }}
                       />
                       <button
                         type="button"
                         className="btn btn-neon"
-                        style={{ fontSize: '0.78rem', padding: '0.5rem 0.9rem', whiteSpace: 'nowrap' }}
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '0.6rem 1rem', fontWeight: 800 }}
                         onClick={() => {
                           const input = document.getElementById(`stream-input-${table.id}`) as HTMLInputElement;
                           const trimmed = input?.value.trim() || '';
@@ -5257,22 +5279,24 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           if (match) setMatchLiveStream(match.id, wrappedUrl);
                         }}
                       >
-                        Enregistrer
+                        🔴 Enregistrer & Activer le Lien Vidéo
                       </button>
                     </div>
 
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         <span>Bandeau de score seul (pour OBS Studio) :</span>
-                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
                           <button
                             type="button"
                             className="btn btn-outline"
                             style={{
-                              fontSize: '0.68rem',
-                              padding: '2px 7px',
+                              width: 'auto',
+                              fontSize: '0.72rem',
+                              padding: '3px 10px',
+                              whiteSpace: 'nowrap',
                               background: overlayPos === 'top' ? 'rgba(0, 255, 170, 0.2)' : 'transparent',
-                              borderColor: overlayPos === 'top' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)'
+                              borderColor: overlayPos === 'top' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.15)'
                             }}
                             onClick={() => setOverlayPos('top')}
                           >
@@ -5282,10 +5306,12 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             type="button"
                             className="btn btn-outline"
                             style={{
-                              fontSize: '0.68rem',
-                              padding: '2px 7px',
+                              width: 'auto',
+                              fontSize: '0.72rem',
+                              padding: '3px 10px',
+                              whiteSpace: 'nowrap',
                               background: overlayPos === 'bottom' ? 'rgba(0, 255, 170, 0.2)' : 'transparent',
-                              borderColor: overlayPos === 'bottom' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)'
+                              borderColor: overlayPos === 'bottom' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.15)'
                             }}
                             onClick={() => setOverlayPos('bottom')}
                           >
@@ -5298,7 +5324,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         <button
                           type="button"
                           className="btn btn-outline"
-                          style={{ flex: 1, fontSize: '0.76rem', padding: '0.45rem', justifyContent: 'center' }}
+                          style={{ flex: 1, width: 'auto', fontSize: '0.78rem', padding: '0.5rem 0.8rem', justifyContent: 'center', whiteSpace: 'nowrap' }}
                           onClick={() => {
                             const baseUrl = getAppBaseUrl();
                             const overlayUrl = `${baseUrl}/?overlay=${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
@@ -5314,7 +5340,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-outline"
-                          style={{ fontSize: '0.76rem', padding: '0.45rem 0.8rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                          style={{ width: 'auto', fontSize: '0.78rem', padding: '0.5rem 0.9rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}
                         >
                           <ExternalLink size={13} /> Tester Score
                         </a>
