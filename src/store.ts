@@ -84,22 +84,28 @@ const getInitialClub = (): Club => {
   };
 };
 
-const MOCK_PLAYERS: Record<string, Player> = {
-  'p1': { id: 'p1', clubId: 'bc41', name: 'Sébastien T.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p1', stats: { ...createDefaultPlayerStats(), matchesPlayed: 142, wins: 89, losses: 53, winRate: 62.6, setsWon: 290, setsLost: 210, setDiff: 80, tournamentsPlayed: 12, tournamentsWon: 3, points: 489, nemesisId: 'p3', bestFriendId: 'p2' } },
-  'p2': { id: 'p2', clubId: 'bc41', name: 'Alexandre D.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p2', stats: { ...createDefaultPlayerStats(), matchesPlayed: 98, wins: 45, losses: 53, winRate: 45.9, setsWon: 180, setsLost: 195, setDiff: -15, tournamentsPlayed: 8, tournamentsWon: 1, points: 243 } },
-  'p3': { id: 'p3', clubId: 'bc41', name: 'Maxime R.', level: 'Prestige', avatarUrl: 'https://i.pravatar.cc/150?u=p3', stats: { ...createDefaultPlayerStats(), matchesPlayed: 210, wins: 156, losses: 54, winRate: 74.2, setsWon: 450, setsLost: 240, setDiff: 210, tournamentsPlayed: 18, tournamentsWon: 6, points: 948 } },
-  'p4': { id: 'p4', clubId: 'bc41', name: 'Sophie L.', level: 'Amateur', avatarUrl: 'https://i.pravatar.cc/150?u=p4', stats: { ...createDefaultPlayerStats(), matchesPlayed: 56, wins: 30, losses: 26, winRate: 53.5, setsWon: 110, setsLost: 102, setDiff: 8, tournamentsPlayed: 5, tournamentsWon: 0, points: 154 } },
+export const getClubCachedState = (clubId: string) => {
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(`mb_state_cache_${clubId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          players: (parsed.players || {}) as Record<string, Player>,
+          tables: (parsed.tables || {}) as Record<string, Table>,
+          matches: (parsed.matches || {}) as Record<string, Match>,
+          tournaments: (parsed.tournaments || {}) as Record<string, Tournament>
+        };
+      }
+    } catch {}
+  }
+  return {
+    players: {} as Record<string, Player>,
+    tables: {} as Record<string, Table>,
+    matches: {} as Record<string, Match>,
+    tournaments: {} as Record<string, Tournament>
+  };
 };
-
-const MOCK_TABLES: Record<string, Table> = {
-  't1': { id: 't1', clubId: 'bc41', number: 1, name: 'Billard 1', status: 'free', x: 20, y: 20 },
-  't2': { id: 't2', clubId: 'bc41', number: 2, name: 'Billard 2', status: 'free', x: 50, y: 20 },
-  't3': { id: 't3', clubId: 'bc41', number: 3, name: 'Billard 3', status: 'free', x: 80, y: 20 },
-};
-
-const MOCK_MATCHES: Record<string, Match> = {};
-
-const MOCK_TOURNAMENTS: Record<string, Tournament> = {};
 
 export const healAndAdvanceBracketMatches = (
   matches: Record<string, Match>,
@@ -623,18 +629,22 @@ export const dispatchTournamentMatches = (
   return { tables: newTables, matches: newMatches };
 };
 
+const initialClub = getInitialClub();
+const initialCache = getClubCachedState(initialClub.id);
+
 export const useStore = create<AppState>((set, get) => ({
-  currentClub: getInitialClub(),
+  currentClub: initialClub,
   currentUser: 'p1',
-  players: MOCK_PLAYERS,
-  tables: MOCK_TABLES,
-  matches: MOCK_MATCHES,
-  tournaments: MOCK_TOURNAMENTS,
+  players: initialCache.players,
+  tables: initialCache.tables,
+  matches: initialCache.matches,
+  tournaments: initialCache.tournaments,
   activeMatchId: null,
 
   setClub: (updated) => {
     set((state) => {
       const nextClub = { ...state.currentClub, ...updated };
+      const clubChanged = nextClub.id !== state.currentClub.id;
       if (typeof window !== 'undefined') {
         localStorage.setItem('mb_current_club_id', nextClub.id);
         localStorage.setItem(`mb_club_name_${nextClub.id}`, nextClub.name);
@@ -646,6 +656,16 @@ export const useStore = create<AppState>((set, get) => ({
           url.searchParams.set('club', nextClub.id);
           window.history.replaceState({}, '', url.toString());
         }
+      }
+      if (clubChanged) {
+        const nextCache = getClubCachedState(nextClub.id);
+        return {
+          currentClub: nextClub,
+          players: nextCache.players,
+          tables: nextCache.tables,
+          matches: nextCache.matches,
+          tournaments: nextCache.tournaments
+        };
       }
       return { currentClub: nextClub };
     });

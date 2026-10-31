@@ -183,6 +183,41 @@ const mapDBToTournament = (d: any): Tournament => {
   };
 };
 
+const saveClubStateCache = (state: {
+  currentClub: { id: string };
+  players: Record<string, Player>;
+  tables: Record<string, Table>;
+  matches: Record<string, Match>;
+  tournaments: Record<string, Tournament>;
+}) => {
+  if (typeof window === 'undefined') return;
+  const clubId = state.currentClub.id;
+  try {
+    localStorage.setItem(`mb_state_cache_${clubId}`, JSON.stringify({
+      players: state.players,
+      tables: state.tables,
+      matches: state.matches,
+      tournaments: state.tournaments
+    }));
+  } catch {
+    try {
+      const lightPlayers: Record<string, Player> = {};
+      Object.values(state.players).forEach(p => {
+        lightPlayers[p.id] = {
+          ...p,
+          avatarUrl: p.avatarUrl?.startsWith('data:') ? undefined : p.avatarUrl
+        };
+      });
+      localStorage.setItem(`mb_state_cache_${clubId}`, JSON.stringify({
+        players: lightPlayers,
+        tables: state.tables,
+        matches: state.matches,
+        tournaments: state.tournaments
+      }));
+    } catch {}
+  }
+};
+
 // Initial fetch
 export const initSync = async () => {
   isReceiving = true;
@@ -216,28 +251,28 @@ export const initSync = async () => {
   ]);
 
   const rawPlayers: Record<string, Player> = {};
-  if (playersRes.data && playersRes.data.length > 0) {
+  if (!playersRes.error && playersRes.data) {
     playersRes.data.forEach(d => rawPlayers[d.id] = mapDBToPlayer(d));
   } else {
     Object.assign(rawPlayers, useStore.getState().players);
   }
 
   const rawTables: Record<string, Table> = {};
-  if (tablesRes.data && tablesRes.data.length > 0) {
+  if (!tablesRes.error && tablesRes.data) {
     tablesRes.data.forEach(d => rawTables[d.id] = mapDBToTable(d));
   } else {
     Object.assign(rawTables, useStore.getState().tables);
   }
 
   const rawMatches: Record<string, Match> = {};
-  if (matchesRes.data && matchesRes.data.length > 0) {
+  if (!matchesRes.error && matchesRes.data) {
     matchesRes.data.forEach(d => rawMatches[d.id] = mapDBToMatch(d));
   } else {
     Object.assign(rawMatches, useStore.getState().matches);
   }
 
   const rawTournaments: Record<string, Tournament> = {};
-  if (tournamentsRes.data && tournamentsRes.data.length > 0) {
+  if (!tournamentsRes.error && tournamentsRes.data) {
     tournamentsRes.data.forEach(d => rawTournaments[d.id] = mapDBToTournament(d));
   } else {
     Object.assign(rawTournaments, useStore.getState().tournaments);
@@ -333,6 +368,7 @@ export const initSync = async () => {
 
   // Auto-dispatch any ready tournament matches to available free tables
   useStore.getState().autoDispatchMatches();
+  saveClubStateCache(useStore.getState());
 
   isReceiving = false;
 
@@ -484,6 +520,15 @@ useStore.subscribe(async (state, prevState) => {
   if (state.currentClub.id !== prevState.currentClub.id) {
     initSync();
     return;
+  }
+
+  if (
+    state.players !== prevState.players ||
+    state.tables !== prevState.tables ||
+    state.matches !== prevState.matches ||
+    state.tournaments !== prevState.tournaments
+  ) {
+    saveClubStateCache(state);
   }
 
   if (isReceiving) return;
