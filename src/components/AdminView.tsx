@@ -6,7 +6,7 @@ import {
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
-  Radio, Tv, Smartphone, Globe, ExternalLink
+  Radio, Tv, Smartphone, Globe, ExternalLink, Trash2
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
@@ -2288,6 +2288,40 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               {p.stats.matchesPlayed} matchs • {p.stats.winRate}% vict. ({p.stats.wins}V - {p.stats.losses ?? (p.stats.matchesPlayed - p.stats.wins)}D)
                             </div>
                           </div>
+                          <button
+                            type="button"
+                            title={`Supprimer définitivement ${p.name} du club`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
+                                deletePlayer(p.id);
+                                setSelectedPlayers(prev => prev.filter(id => id !== p.id));
+                              }
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'rgba(255, 68, 68, 0.45)',
+                              cursor: 'pointer',
+                              padding: '6px',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              transition: 'all 0.15s'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.color = '#ff4444';
+                              e.currentTarget.style.background = 'rgba(255, 68, 68, 0.12)';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.color = 'rgba(255, 68, 68, 0.45)';
+                              e.currentTarget.style.background = 'transparent';
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -3157,13 +3191,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
             {/* Sub-menu 2: Joueurs */}
             {adminSubTab === 'players' && (
-              <div style={{ display: 'grid', gridTemplateColumns: isAdminUnlocked ? '1fr 360px' : '1fr', gap: '2.5rem', height: '100%', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 340px)', gap: '2rem', height: '100%', maxWidth: '1280px', width: '100%', margin: '0 auto' }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
                       <h2 style={{ fontSize: '1.8rem', margin: '0 0 0.3rem 0' }}>Pédigré des Joueurs ({Object.keys(players).length})</h2>
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        {isAdminUnlocked ? "Mode Édition: Modifiez les fiches joueurs ou ajoutez de nouveaux membres." : "Mode Lecture: Statistiques complètes calculées depuis l'historique des matchs."}
+                        Gérez les membres du club : modifiez les fiches, ajoutez de nouveaux joueurs ou supprimez les profils inutilisés.
                       </span>
                     </div>
                     <button
@@ -3221,12 +3255,24 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               }} style={{ fontSize: '0.76rem', flex: 1 }} />
                               {editPlayerClubLogo && <img src={editPlayerClubLogo} alt="Logo" style={{ width: '26px', height: '26px', borderRadius: '4px', objectFit: 'contain', background: '#fff', padding: '1px' }} />}
                             </div>
-                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
-                              <button className="btn" style={{ background: 'var(--accent-primary)', color: '#000' }} onClick={() => {
+                            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                              <button className="btn" style={{ background: 'var(--accent-primary)', color: '#000', flex: 1, padding: '0.5rem', fontSize: '0.8rem' }} onClick={() => {
                                 updatePlayer(p.id, editPlayerName, editPlayerLevel, editPlayerPhoto || undefined, editPlayerClubName.trim(), editPlayerClubLogo || '');
                                 setEditingPlayerId(null);
                               }}>Sauvegarder</button>
-                              <button className="btn btn-outline" onClick={() => setEditingPlayerId(null)}>Annuler</button>
+                              <button className="btn btn-outline" style={{ flex: 1, padding: '0.5rem', fontSize: '0.8rem' }} onClick={() => setEditingPlayerId(null)}>Annuler</button>
+                              <button
+                                className="btn btn-outline"
+                                style={{ width: '100%', borderColor: 'rgba(255, 68, 68, 0.4)', color: '#ff6b81', padding: '0.45rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                                onClick={() => {
+                                  if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
+                                    deletePlayer(p.id);
+                                    setEditingPlayerId(null);
+                                  }
+                                }}
+                              >
+                                <Trash2 size={13} /> Supprimer ce joueur
+                              </button>
                             </div>
                           </div>
                         ) : (
@@ -3338,21 +3384,33 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 )}
                               </div>
                             </div>
-                            {isAdminUnlocked && (
-                              <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '0.4rem' }}>
-                                <button onClick={() => {
+                            <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '0.4rem' }}>
+                              <button
+                                title={`Modifier ${p.name}`}
+                                onClick={() => {
                                   setEditingPlayerId(p.id);
                                   setEditPlayerName(p.name);
                                   setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
                                   setEditPlayerPhoto(null);
                                   setEditPlayerClubName(p.clubName || p.stats?.clubName || '');
                                   setEditPlayerClubLogo(p.clubLogoUrl || p.stats?.clubLogoUrl || null);
-                                }} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '0.9rem', width: '28px', height: '28px', borderRadius: '4px' }}>✎</button>
-                                <button onClick={() => {
-                                  if (window.confirm(`Supprimer ${p.name} ?`)) deletePlayer(p.id);
-                                }} style={{ background: 'rgba(255,0,0,0.2)', border: 'none', color: '#ff4444', cursor: 'pointer', fontSize: '0.9rem', width: '28px', height: '28px', borderRadius: '4px' }}>✕</button>
-                              </div>
-                            )}
+                                }}
+                                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                title={`Supprimer définitivement ${p.name}`}
+                                onClick={() => {
+                                  if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
+                                    deletePlayer(p.id);
+                                  }
+                                }}
+                                style={{ background: 'rgba(255,68,68,0.15)', border: '1px solid rgba(255,68,68,0.35)', color: '#ff6b81', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </>
                         )}
                       </div>
@@ -3360,9 +3418,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                   </div>
                 </div>
 
-                {/* Add Player Sidebar if unlocked */}
-                {isAdminUnlocked && (
-                  <div className="glass-card" style={{ padding: '2rem', height: 'fit-content' }}>
+                {/* Add Player Sidebar */}
+                <div className="glass-card" style={{ padding: '2rem', height: 'fit-content' }}>
                     <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Users size={18} /> Nouveau Joueur
                     </h3>
@@ -3448,7 +3505,6 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       </button>
                     </div>
                   </div>
-                )}
               </div>
             )}
 
@@ -3821,6 +3877,22 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             <img src={clubLogoVal} alt="Logo club" style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '2px' }} />
                           )}
                         </div>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ borderColor: 'rgba(255,68,68,0.4)', color: '#ff6b81', padding: '0.45rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}
+                          onClick={() => {
+                            if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${existingObj.name}" du club ?`)) {
+                              deletePlayer(existingObj.id);
+                              setExistingId('');
+                            }
+                          }}
+                        >
+                          <Trash2 size={13} /> Supprimer ce joueur du club
+                        </button>
                       </div>
                     </div>
                   )}

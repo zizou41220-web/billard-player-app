@@ -834,6 +834,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deletePlayer: (id) => {
+    supabase.from('tournoi2_players').delete().eq('id', id).then();
     set((state) => {
       const newPlayers = { ...state.players };
       delete newPlayers[id];
