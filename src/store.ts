@@ -63,6 +63,7 @@ interface AppState {
 }
 
 import { defaultClubLogo, getClubLogoUrl } from './utils/logo';
+import { generateFigurineSvg, isCustomPlayerPhoto } from './utils/avatar';
 
 const getInitialClub = (): Club => {
   if (typeof window !== 'undefined') {
@@ -117,8 +118,21 @@ export const getClubCachedState = (clubId: string) => {
             matches[k] = { ...matches[k], liveStreamUrl: fixUrl(matches[k].liveStreamUrl) };
           }
         });
+        const rawPlayers = (parsed.players || {}) as Record<string, Player>;
+        const players: Record<string, Player> = {};
+        Object.keys(rawPlayers).forEach(k => {
+          const p = rawPlayers[k];
+          if (!p) return;
+          const isPravatar = p.avatarUrl?.includes('pravatar.cc');
+          players[k] = {
+            ...p,
+            avatarUrl: (!isPravatar && isCustomPlayerPhoto(p.avatarUrl))
+              ? p.avatarUrl
+              : generateFigurineSvg(p.id, p.name)
+          };
+        });
         return {
-          players: (parsed.players || {}) as Record<string, Player>,
+          players,
           tables,
           matches,
           tournaments: (parsed.tournaments || {}) as Record<string, Tournament>
@@ -703,6 +717,7 @@ export const useStore = create<AppState>((set, get) => ({
     const defaultStats = createDefaultPlayerStats();
     if (clubName) defaultStats.clubName = clubName;
     if (clubLogoUrl) defaultStats.clubLogoUrl = clubLogoUrl;
+    const finalAvatar = photoUrl || generateFigurineSvg(id, name);
     set((state) => ({
       players: {
         ...state.players,
@@ -711,7 +726,7 @@ export const useStore = create<AppState>((set, get) => ({
           clubId: state.currentClub.id,
           name,
           level,
-          avatarUrl: photoUrl || `https://i.pravatar.cc/150?u=${id}`,
+          avatarUrl: finalAvatar,
           ...(clubName ? { clubName } : {}),
           ...(clubLogoUrl ? { clubLogoUrl } : {}),
           stats: defaultStats
@@ -732,6 +747,11 @@ export const useStore = create<AppState>((set, get) => ({
         clubName: nextClubName,
         clubLogoUrl: nextClubLogo
       };
+      const isExistingPravatar = player.avatarUrl?.includes('pravatar.cc');
+      const finalAvatar = photoUrl
+        || ((!isExistingPravatar && isCustomPlayerPhoto(player.avatarUrl))
+          ? player.avatarUrl
+          : generateFigurineSvg(id, name));
       return {
         players: {
           ...state.players,
@@ -739,7 +759,7 @@ export const useStore = create<AppState>((set, get) => ({
             ...player,
             name,
             level,
-            avatarUrl: photoUrl || player.avatarUrl,
+            avatarUrl: finalAvatar,
             clubName: nextClubName,
             clubLogoUrl: nextClubLogo,
             stats: nextStats

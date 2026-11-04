@@ -2,6 +2,7 @@ import React from 'react';
 import { useStore } from '../store';
 import { Trophy, Crosshair, Swords } from 'lucide-react';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
+import { getPlayerAvatar } from '../utils/avatar';
 
 const ProfileView: React.FC = () => {
   const { currentUser, players, currentClub } = useStore();
@@ -12,32 +13,19 @@ const ProfileView: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-        {me.avatarUrl ? (
-          <img
-            src={me.avatarUrl}
-            alt={me.name}
-            style={{
-              width: '100px',
-              height: '100px',
-              borderRadius: '50%',
-              margin: '0 auto 1rem',
-              objectFit: 'cover',
-              border: `3px solid ${(me.level === 'Prestige' || me.level === 'Confirmé') ? '#ffd700' : 'var(--accent-primary)'}`,
-              boxShadow: '0 0 20px rgba(0, 255, 170, 0.2)'
-            }}
-          />
-        ) : (
-          <div style={{ 
-            width: '100px', height: '100px', 
-            borderRadius: '50%', 
-            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+        <img
+          src={getPlayerAvatar(me)}
+          alt={me.name}
+          style={{
+            width: '100px',
+            height: '100px',
+            borderRadius: '50%',
             margin: '0 auto 1rem',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '2.5rem', fontWeight: 'bold', color: '#000'
-          }}>
-            {me.name.charAt(0)}
-          </div>
-        )}
+            objectFit: 'cover',
+            border: `3px solid ${(me.level === 'Prestige' || me.level === 'Confirmé') ? '#ffd700' : 'var(--accent-primary)'}`,
+            boxShadow: '0 0 20px rgba(0, 255, 170, 0.2)'
+          }}
+        />
         <h2>{me.name}</h2>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
           <span style={{

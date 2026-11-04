@@ -9,6 +9,7 @@ import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { getBracketSize, getBracketRounds, isFinalStageMatch, generateSeedingPairs } from '../utils/bracket';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMatchScoringRules, resolveDuelTargetSets, getPhaseRules } from '../utils/rules';
+import { getPlayerAvatar } from '../utils/avatar';
 
 interface BracketViewProps {
   onSelectTableForQR?: (tableId: string) => void;
@@ -1204,8 +1205,8 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                           opacity: (m.status === 'finished' && !isP1Winner) ? 0.45 : 1
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: 0 }}>
-                            {p1?.avatarUrl ? (
-                              <img src={p1.avatarUrl} alt={p1.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                            {p1 ? (
+                              <img src={getPlayerAvatar(p1)} alt={p1.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
                             ) : (
                               <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>
                                 <Users size={14} />
@@ -1261,8 +1262,8 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                               <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>
                                 💤
                               </div>
-                            ) : p2?.avatarUrl ? (
-                              <img src={p2.avatarUrl} alt={p2.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : p2 ? (
+                              <img src={getPlayerAvatar(p2)} alt={p2.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
                             ) : (
                               <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>
                                 <Users size={14} />
@@ -1475,7 +1476,7 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                 </div>
 
                 <img
-                  src={playerObj?.avatarUrl}
+                  src={getPlayerAvatar(playerObj)}
                   alt={p.name}
                   style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover' }}
                 />

@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { useStore } from './store';
 import { Match, Player, Table, Tournament } from './types';
 import { computeAllPlayersStats, createDefaultPlayerStats } from './utils/playerStats';
+import { generateFigurineSvg, isCustomPlayerPhoto } from './utils/avatar';
 
 let isReceiving = false;
 let hasClubColumn = false;
@@ -14,21 +15,28 @@ export const mapPlayerToDB = (p: Player) => {
     ...(p.clubName !== undefined ? { clubName: p.clubName } : {}),
     ...(p.clubLogoUrl !== undefined ? { clubLogoUrl: p.clubLogoUrl } : {})
   };
-  const data: any = { id: p.id, name: p.name, level: p.level, avatar_url: p.avatarUrl, stats: statsPayload };
+  const safeAvatar = p.avatarUrl && !p.avatarUrl.includes('pravatar.cc') ? p.avatarUrl : generateFigurineSvg(p.id, p.name);
+  const data: any = { id: p.id, name: p.name, level: p.level, avatar_url: safeAvatar, stats: statsPayload };
   if (hasClubColumn) data.club_id = p.clubId || useStore.getState().currentClub.id;
   return data;
 };
 
-export const mapDBToPlayer = (d: any): Player => ({
-  id: d.id,
-  clubId: d.club_id || undefined,
-  name: d.name,
-  level: d.level,
-  avatarUrl: d.avatar_url,
-  clubName: d.stats?.clubName || undefined,
-  clubLogoUrl: d.stats?.clubLogoUrl || undefined,
-  stats: d.stats || createDefaultPlayerStats()
-});
+export const mapDBToPlayer = (d: any): Player => {
+  const rawAvatar = d.avatar_url;
+  const avatarUrl = (rawAvatar && isCustomPlayerPhoto(rawAvatar) && !rawAvatar.includes('pravatar.cc'))
+    ? rawAvatar
+    : generateFigurineSvg(d.id, d.name);
+  return {
+    id: d.id,
+    clubId: d.club_id || undefined,
+    name: d.name,
+    level: d.level,
+    avatarUrl,
+    clubName: d.stats?.clubName || undefined,
+    clubLogoUrl: d.stats?.clubLogoUrl || undefined,
+    stats: d.stats || createDefaultPlayerStats()
+  };
+};
 
 const normalizeStreamUrl = (url: string | undefined): string | undefined => {
   if (!url) return undefined;

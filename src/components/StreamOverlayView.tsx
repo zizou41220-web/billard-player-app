@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { Club, Match, Player, Table, Tournament } from '../types';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMatchScoringRules } from '../utils/rules';
+import { getPlayerAvatar } from '../utils/avatar';
 
 interface StreamOverlayViewProps {
   tableParam: string;
@@ -211,7 +212,7 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
               <img
-                src={p1.avatarUrl || `https://i.pravatar.cc/150?u=${p1.id}`}
+                src={getPlayerAvatar(p1)}
                 alt={p1.name}
                 style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B', flexShrink: 0 }}
               />
@@ -258,7 +259,7 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
                 )}
               </div>
               <img
-                src={p2.avatarUrl || `https://i.pravatar.cc/150?u=${p2.id}`}
+                src={getPlayerAvatar(p2)}
                 alt={p2.name}
                 style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B', flexShrink: 0 }}
               />
@@ -1063,7 +1064,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
               borderRight: '1px solid rgba(255,255,255,0.08)'
             }}>
               <img 
-                src={p1.avatarUrl || `https://i.pravatar.cc/150?u=${p1.id}`} 
+                src={getPlayerAvatar(p1)} 
                 alt={p1.name} 
                 style={{
                   width: '54px',
@@ -1235,7 +1236,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 </div>
               </div>
               <img 
-                src={p2.avatarUrl || `https://i.pravatar.cc/150?u=${p2.id}`} 
+                src={getPlayerAvatar(p2)} 
                 alt={p2.name} 
                 style={{
                   width: '54px',

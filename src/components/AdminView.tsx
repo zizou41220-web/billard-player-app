@@ -16,6 +16,7 @@ import { APP_VERSION } from '../version';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules } from '../utils/rules';
 import { isFinalStageMatch } from '../utils/bracket';
+import { getPlayerAvatar, isCustomPlayerPhoto } from '../utils/avatar';
 
 interface AdminViewProps {
   onOpenKiosk?: () => void;
@@ -1169,7 +1170,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         const isPrestige = p.level === 'Prestige' || p.level === 'Confirmé';
                         return (
                           <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.04)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <img src={p.avatarUrl} alt={p.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                            <img src={getPlayerAvatar(p)} alt={p.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
                             <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{p.name}</span>
                             <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: isPrestige ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.08)', color: isPrestige ? '#ffd700' : 'var(--text-muted)', fontWeight: isPrestige ? 800 : 600 }}>
                               {isPrestige ? '👑 Prestige' : 'Amateur'}
@@ -2269,7 +2270,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selectedPlayers.includes(p.id) ? 'var(--accent-primary)' : 'transparent', flexShrink: 0 }}>
                             {selectedPlayers.includes(p.id) && <div style={{ width: '10px', height: '10px', background: '#000' }} />}
                           </div>
-                          <img src={p.avatarUrl} alt={p.name} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                          <img src={getPlayerAvatar(p)} alt={p.name} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                           <div style={{ flex: 1, overflow: 'hidden' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <span style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{p.name}</span>
@@ -3231,7 +3232,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         ) : (
                           // View Mode
                           <>
-                            <img src={p.avatarUrl} alt={p.name} style={{ width: '70px', height: '70px', borderRadius: '50%', border: `3px solid ${(p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : 'var(--border-color)'}`, objectFit: 'cover' }} />
+                            <img src={getPlayerAvatar(p)} alt={p.name} style={{ width: '70px', height: '70px', borderRadius: '50%', border: `3px solid ${(p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : 'var(--border-color)'}`, objectFit: 'cover' }} />
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                 <span>{p.name}</span>
@@ -3697,7 +3698,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       setExistingId(id);
                       const p = players[id];
                       if (p) {
-                        setPhotoVal(p.avatarUrl || '');
+                        setPhotoVal(isCustomPlayerPhoto(p.avatarUrl) && !p.avatarUrl?.includes('pravatar.cc') ? (p.avatarUrl || '') : '');
                         setClubNameVal(p.clubName || p.stats?.clubName || '');
                         setClubLogoVal(p.clubLogoUrl || p.stats?.clubLogoUrl || '');
                       }
@@ -3725,7 +3726,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <img
-                          src={photoVal || existingObj.avatarUrl}
+                          src={photoVal || getPlayerAvatar(existingObj)}
                           alt={existingObj.name}
                           style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-primary)' }}
                         />
@@ -4176,8 +4177,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       {/* Player 1 Score Row */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1rem', borderRadius: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-                          {mp1?.avatarUrl && (
-                            <img src={mp1.avatarUrl} alt={mp1.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
+                          {mp1 && (
+                            <img src={getPlayerAvatar(mp1)} alt={mp1.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
                           )}
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -4221,8 +4222,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       {/* Player 2 Score Row */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1rem', borderRadius: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-                          {mp2?.avatarUrl && (
-                            <img src={mp2.avatarUrl} alt={mp2.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #f59e0b' }} />
+                          {mp2 && (
+                            <img src={getPlayerAvatar(mp2)} alt={mp2.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #f59e0b' }} />
                           )}
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

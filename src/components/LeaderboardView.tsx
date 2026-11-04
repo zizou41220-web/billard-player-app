@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { Trophy, Medal, Award, Crown, Target, Search, Flame, User } from 'lucide-react';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { Player } from '../types';
+import { getPlayerAvatar } from '../utils/avatar';
 
 interface LeaderboardViewProps {
   compact?: boolean;
@@ -206,36 +207,18 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
                 maxWidth: '160px'
               }}>
                 <div style={{ position: 'relative', marginBottom: '0.6rem' }}>
-                  {p2.avatarUrl ? (
-                    <img
-                      src={p2.avatarUrl}
-                      alt={p2.name}
-                      style={{
-                        width: compact ? '52px' : '72px',
-                        height: compact ? '52px' : '72px',
-                        borderRadius: '50%',
-                        border: '3px solid #cbd5e1',
-                        objectFit: 'cover',
-                        boxShadow: '0 0 20px rgba(203, 213, 225, 0.4)'
-                      }}
-                    />
-                  ) : (
-                    <div style={{
+                  <img
+                    src={getPlayerAvatar(p2)}
+                    alt={p2.name}
+                    style={{
                       width: compact ? '52px' : '72px',
                       height: compact ? '52px' : '72px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #94a3b8, #cbd5e1)',
-                      color: '#000',
-                      fontWeight: 900,
-                      fontSize: compact ? '1.4rem' : '1.8rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '3px solid #cbd5e1'
-                    }}>
-                      {p2.name.charAt(0)}
-                    </div>
-                  )}
+                      border: '3px solid #cbd5e1',
+                      objectFit: 'cover',
+                      boxShadow: '0 0 20px rgba(203, 213, 225, 0.4)'
+                    }}
+                  />
                   <div style={{
                     position: 'absolute',
                     bottom: '-6px',
@@ -306,37 +289,18 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
                   }}>
                     <Crown size={compact ? 24 : 30} color="#ffd700" fill="#ffd700" style={{ filter: 'drop-shadow(0 2px 6px rgba(255, 215, 0, 0.7))' }} />
                   </div>
-                  {p1.avatarUrl ? (
-                    <img
-                      src={p1.avatarUrl}
-                      alt={p1.name}
-                      style={{
-                        width: compact ? '68px' : '92px',
-                        height: compact ? '68px' : '92px',
-                        borderRadius: '50%',
-                        border: '4px solid #ffd700',
-                        objectFit: 'cover',
-                        boxShadow: '0 0 30px rgba(255, 215, 0, 0.5)'
-                      }}
-                    />
-                  ) : (
-                    <div style={{
+                  <img
+                    src={getPlayerAvatar(p1)}
+                    alt={p1.name}
+                    style={{
                       width: compact ? '68px' : '92px',
                       height: compact ? '68px' : '92px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #eab308, #ffd700)',
-                      color: '#000',
-                      fontWeight: 900,
-                      fontSize: compact ? '1.8rem' : '2.4rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
                       border: '4px solid #ffd700',
+                      objectFit: 'cover',
                       boxShadow: '0 0 30px rgba(255, 215, 0, 0.5)'
-                    }}>
-                      {p1.name.charAt(0)}
-                    </div>
-                  )}
+                    }}
+                  />
                   <div style={{
                     position: 'absolute',
                     bottom: '-8px',
@@ -397,36 +361,18 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
                 maxWidth: '160px'
               }}>
                 <div style={{ position: 'relative', marginBottom: '0.6rem' }}>
-                  {p3.avatarUrl ? (
-                    <img
-                      src={p3.avatarUrl}
-                      alt={p3.name}
-                      style={{
-                        width: compact ? '52px' : '72px',
-                        height: compact ? '52px' : '72px',
-                        borderRadius: '50%',
-                        border: '3px solid #b45309',
-                        objectFit: 'cover',
-                        boxShadow: '0 0 20px rgba(180, 83, 9, 0.4)'
-                      }}
-                    />
-                  ) : (
-                    <div style={{
+                  <img
+                    src={getPlayerAvatar(p3)}
+                    alt={p3.name}
+                    style={{
                       width: compact ? '52px' : '72px',
                       height: compact ? '52px' : '72px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #78350f, #b45309)',
-                      color: '#fff',
-                      fontWeight: 900,
-                      fontSize: compact ? '1.4rem' : '1.8rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '3px solid #b45309'
-                    }}>
-                      {p3.name.charAt(0)}
-                    </div>
-                  )}
+                      border: '3px solid #b45309',
+                      objectFit: 'cover',
+                      boxShadow: '0 0 20px rgba(180, 83, 9, 0.4)'
+                    }}
+                  />
                   <div style={{
                     position: 'absolute',
                     bottom: '-6px',
@@ -687,34 +633,17 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
                     {/* Player Info */}
                     <td style={{ padding: '0.8rem 1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                        {player.avatarUrl ? (
-                          <img
-                            src={player.avatarUrl}
-                            alt={player.name}
-                            style={{
-                              width: '38px',
-                              height: '38px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              border: `2px solid ${isPrestige ? '#ffd700' : 'var(--accent-primary)'}`
-                            }}
-                          />
-                        ) : (
-                          <div style={{
+                        <img
+                          src={getPlayerAvatar(player)}
+                          alt={player.name}
+                          style={{
                             width: '38px',
                             height: '38px',
                             borderRadius: '50%',
-                            background: isPrestige ? 'linear-gradient(135deg, #ffd700, #b45309)' : 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                            color: '#000',
-                            fontWeight: 800,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1rem'
-                          }}>
-                            {player.name.charAt(0)}
-                          </div>
-                        )}
+                            objectFit: 'cover',
+                            border: `2px solid ${isPrestige ? '#ffd700' : 'var(--accent-primary)'}`
+                          }}
+                        />
                         <div>
                           <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff' }}>
                             {player.name}

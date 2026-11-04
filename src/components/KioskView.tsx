@@ -9,6 +9,7 @@ import { APP_VERSION } from '../version';
 import LeaderboardView from './LeaderboardView';
 import TournamentBracketView from './TournamentBracketView';
 import { getMatchScoringRules } from '../utils/rules';
+import { getPlayerAvatar } from '../utils/avatar';
 
 interface KioskViewProps {
   onExit?: () => void;
@@ -530,38 +531,19 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: 'auto 0' }}>
                       {/* Player 1 */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, textAlign: 'center' }}>
-                        {p1.avatarUrl ? (
-                          <img
-                            src={p1.avatarUrl}
-                            alt={p1.name}
-                            style={{
-                              width: '68px',
-                              height: '68px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              border: `3px solid ${(p1.level === 'Prestige' || p1.level === 'Confirmé') ? '#ffd700' : 'var(--accent-primary)'}`,
-                              boxShadow: '0 0 15px rgba(0, 255, 170, 0.25)',
-                              marginBottom: '0.5rem'
-                            }}
-                          />
-                        ) : (
-                          <div style={{
+                        <img
+                          src={getPlayerAvatar(p1)}
+                          alt={p1.name}
+                          style={{
                             width: '68px',
                             height: '68px',
                             borderRadius: '50%',
-                            background: (p1.level === 'Prestige' || p1.level === 'Confirmé') ? 'linear-gradient(135deg, #ffd700, #b45309)' : 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                            color: '#000',
-                            fontWeight: 900,
-                            fontSize: '1.8rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            objectFit: 'cover',
                             border: `3px solid ${(p1.level === 'Prestige' || p1.level === 'Confirmé') ? '#ffd700' : 'var(--accent-primary)'}`,
+                            boxShadow: '0 0 15px rgba(0, 255, 170, 0.25)',
                             marginBottom: '0.5rem'
-                          }}>
-                            {p1.name.charAt(0)}
-                          </div>
-                        )}
+                          }}
+                        />
                         <span style={{ fontWeight: 900, fontSize: '1.05rem', color: '#fff' }}>
                           {p1.name}
                         </span>
@@ -626,38 +608,19 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
 
                       {/* Player 2 */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, textAlign: 'center' }}>
-                        {p2.avatarUrl ? (
-                          <img
-                            src={p2.avatarUrl}
-                            alt={p2.name}
-                            style={{
-                              width: '68px',
-                              height: '68px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              border: `3px solid ${(p2.level === 'Prestige' || p2.level === 'Confirmé') ? '#ffd700' : 'var(--accent-primary)'}`,
-                              boxShadow: '0 0 15px rgba(0, 255, 170, 0.25)',
-                              marginBottom: '0.5rem'
-                            }}
-                          />
-                        ) : (
-                          <div style={{
+                        <img
+                          src={getPlayerAvatar(p2)}
+                          alt={p2.name}
+                          style={{
                             width: '68px',
                             height: '68px',
                             borderRadius: '50%',
-                            background: (p2.level === 'Prestige' || p2.level === 'Confirmé') ? 'linear-gradient(135deg, #ffd700, #b45309)' : 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                            color: '#000',
-                            fontWeight: 900,
-                            fontSize: '1.8rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            objectFit: 'cover',
                             border: `3px solid ${(p2.level === 'Prestige' || p2.level === 'Confirmé') ? '#ffd700' : 'var(--accent-primary)'}`,
+                            boxShadow: '0 0 15px rgba(0, 255, 170, 0.25)',
                             marginBottom: '0.5rem'
-                          }}>
-                            {p2.name.charAt(0)}
-                          </div>
-                        )}
+                          }}
+                        />
                         <span style={{ fontWeight: 900, fontSize: '1.05rem', color: '#fff' }}>
                           {p2.name}
                         </span>
