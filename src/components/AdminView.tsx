@@ -4731,28 +4731,58 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setSelectedTableForQR(null)}>
-            <div className="glass-card" style={{ padding: '1.4rem 1.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', minWidth: '340px', maxWidth: '560px', width: '100%', maxHeight: '92vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <h2 style={{ fontSize: '1.5rem', margin: 0 }}>{table.name || `Table ${table.number}`}</h2>
-                <button className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.8rem' }} onClick={() => setSelectedTableForQR(null)}>✕ Fermer</button>
-              </div>
-              {match?.stage && match.stage !== 'qualif' && (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: 'rgba(255, 215, 0, 0.2)',
-                  color: '#ffd700',
-                  padding: '4px 14px',
-                  borderRadius: '20px',
-                  fontWeight: 900,
-                  fontSize: '0.85rem',
-                  border: '1px solid rgba(255, 215, 0, 0.4)',
-                  marginTop: '-1rem'
-                }}>
-                  {match.stage === 'final' ? '🏆 GRANDE FINALE' : match.stage === 'semi' ? '⚔️ DEMI-FINALE' : '🎯 1/4 DE FINALE'}
+            <div
+              className="glass-card"
+              style={{
+                padding: '1.5rem 1.8rem',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1.1rem',
+                minWidth: '320px',
+                maxWidth: '660px',
+                width: '95vw',
+                maxHeight: '92vh',
+                overflowY: 'auto',
+                border: '1.5px solid rgba(0, 255, 170, 0.4)',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.75)',
+                borderRadius: '20px'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.8rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
+                  <h2 style={{ fontSize: '1.45rem', margin: 0, fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>
+                    🎱 {table.name || `Table ${table.number}`}
+                  </h2>
+                  {match?.stage && match.stage !== 'qualif' && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: 'rgba(255, 215, 0, 0.18)',
+                      color: '#ffd700',
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.75rem',
+                      border: '1px solid rgba(255, 215, 0, 0.35)',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {match.stage === 'final' ? '🏆 GRANDE FINALE' : match.stage === 'semi' ? '⚔️ DEMI-FINALE' : '🎯 1/4 DE FINALE'}
+                    </span>
+                  )}
                 </div>
-              )}
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ width: 'auto', padding: '5px 12px', fontSize: '0.82rem', borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)', flexShrink: 0 }}
+                  onClick={() => setSelectedTableForQR(null)}
+                >
+                  ✕ Fermer
+                </button>
+              </div>
 
               {justScannedMatchId && match && match.id === justScannedMatchId ? (
                 /* 1. Just scanned success feedback */
@@ -4786,6 +4816,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     const matchTour = match.tournamentId ? tournaments[match.tournamentId] : activeTournament;
                     const scoringRules = getMatchScoringRules(match, matchTour, players);
                     const { maxSets, isWinningSets, minScore1, minScore2, formatLabel } = scoringRules;
+                    const p1 = players[match.player1Id];
+                    const p2 = players[match.player2Id];
 
                     const isMatchFinished = isWinningSets
                       ? (match.score1 >= maxSets || match.score2 >= maxSets)
@@ -4808,115 +4840,241 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       : (isMatchFinished ? (match.score1 > match.score2 ? match.player1Id : (match.score2 > match.score1 ? match.player2Id : undefined)) : undefined);
 
                     return (
-                      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem', width: '100%' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
-                          <div style={{
+                      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.1rem', width: '100%' }}>
+                        {/* Status Pills */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap', width: '100%' }}>
+                          <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: '6px',
-                            background: 'rgba(0, 255, 170, 0.15)', color: 'var(--accent-primary)',
-                            padding: '6px 16px', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem',
-                            border: '1px solid rgba(0, 255, 170, 0.3)'
+                            background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)',
+                            padding: '4px 12px', borderRadius: '16px', fontWeight: 800, fontSize: '0.78rem',
+                            border: '1px solid rgba(0, 255, 170, 0.25)'
                           }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 1.5s infinite' }} />
+                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 1.5s infinite' }} />
                             MATCH EN DIRECT
-                          </div>
-                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.2rem' }}>
-                            <span style={{ fontSize: '0.78rem', background: 'rgba(255,255,255,0.06)', color: 'var(--accent-secondary)', padding: '2px 10px', borderRadius: '12px', border: '1px solid var(--border-color)', fontWeight: 700 }}>
-                              Format : {formatLabel}
+                          </span>
+                          <span style={{ fontSize: '0.76rem', background: 'rgba(255,255,255,0.05)', color: 'var(--card-text-muted)', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', fontWeight: 600 }}>
+                            Format : {formatLabel}
+                          </span>
+                          {(Boolean(match.handicapP1) || Boolean(match.handicapP2)) && (
+                            <span style={{ fontSize: '0.76rem', background: 'rgba(255, 215, 0, 0.15)', color: '#ffd700', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.3)', fontWeight: 700 }}>
+                              Handicap : +{match.handicapP1 || match.handicapP2} pour {players[match.handicapP1 ? match.player1Id : match.player2Id]?.name}
                             </span>
-                            {(Boolean(match.handicapP1) || Boolean(match.handicapP2)) && (
-                              <span style={{ fontSize: '0.78rem', background: 'rgba(255, 215, 0, 0.15)', color: '#ffd700', padding: '2px 10px', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.3)', fontWeight: 700 }}>
-                                Handicap : +{match.handicapP1 || match.handicapP2} pour {players[match.handicapP1 ? match.player1Id : match.player2Id]?.name}
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
 
                         {/* Players & Scores with interactive adjustments */}
                         <div style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-                          width: '100%', background: 'rgba(255, 255, 255, 0.03)',
-                          padding: '1.2rem 1rem', borderRadius: '16px', border: '1px solid var(--border-color)'
+                          display: 'grid',
+                          gridTemplateColumns: '1fr auto 1fr',
+                          alignItems: 'center',
+                          gap: '0.8rem',
+                          width: '100%'
                         }}>
-                          {/* Player 1 */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                              {players[match.player1Id]?.name}
+                          {/* Player 1 Card */}
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            background: 'rgba(0, 0, 0, 0.35)',
+                            border: `1.5px solid ${match.score1 > match.score2 ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.1)'}`,
+                            borderRadius: '16px',
+                            padding: '1rem 0.6rem',
+                            gap: '0.5rem',
+                            boxShadow: match.score1 > match.score2 ? '0 0 20px rgba(0, 255, 170, 0.15)' : 'none',
+                            transition: 'all 0.2s',
+                            minWidth: 0
+                          }}>
+                            <img
+                              src={getPlayerAvatar(p1)}
+                              alt={p1?.name}
+                              style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '50%',
+                                objectFit: 'cover',
+                                border: `2px solid ${(p1?.level === 'Prestige' || p1?.level === 'Confirmé') ? '#ffd700' : 'var(--accent-primary)'}`,
+                                boxShadow: '0 0 12px rgba(0, 0, 0, 0.4)'
+                              }}
+                            />
+                            <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
+                              <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {p1?.name || 'Joueur 1'}
+                              </div>
+                              {(p1?.clubName || p1?.stats?.clubName) && (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {(p1.clubLogoUrl || p1.stats?.clubLogoUrl) && (
+                                    <img src={p1.clubLogoUrl || p1.stats?.clubLogoUrl} alt="" style={{ width: '12px', height: '12px', borderRadius: '2px', objectFit: 'contain', background: '#fff', padding: '1px' }} />
+                                  )}
+                                  <span>{p1.clubName || p1.stats?.clubName}</span>
+                                </div>
+                              )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+                            {/* Score Controls */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
                               <button
+                                type="button"
                                 className="btn-surface"
                                 disabled={!canP1Decrement}
                                 style={{
-                                  width: '34px', height: '34px', borderRadius: '50%', padding: 0,
-                                  opacity: canP1Decrement ? 1 : 0.3, cursor: canP1Decrement ? 'pointer' : 'not-allowed'
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  opacity: canP1Decrement ? 1 : 0.25,
+                                  cursor: canP1Decrement ? 'pointer' : 'not-allowed',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.05)'
                                 }}
                                 title={!canP1Decrement ? (minScore1 > 0 ? "Score minimum (Handicap actif)" : "Score minimum (0)") : "Retirer une manche"}
                                 onClick={() => canP1Decrement && updateMatchScore(match.id, match.score1 - 1, match.score2)}
                               >
-                                <Minus size={16} />
+                                <Minus size={18} />
                               </button>
-                              <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
+
+                              <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center', color: 'var(--accent-primary)', textShadow: '0 0 15px rgba(0, 255, 170, 0.3)' }}>
                                 {match.score1}
                               </span>
+
                               <button
+                                type="button"
                                 className="btn-surface"
                                 disabled={!canP1Increment}
                                 style={{
-                                  width: '34px', height: '34px', borderRadius: '50%', padding: 0,
-                                  opacity: canP1Increment ? 1 : 0.3, cursor: canP1Increment ? 'pointer' : 'not-allowed'
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  opacity: canP1Increment ? 1 : 0.25,
+                                  cursor: canP1Increment ? 'pointer' : 'not-allowed',
+                                  border: '1px solid rgba(0, 255, 170, 0.4)',
+                                  background: canP1Increment ? 'rgba(0, 255, 170, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+                                  color: canP1Increment ? 'var(--accent-primary)' : '#fff'
                                 }}
-                                title={!canP1Increment ? (isMatchFinished ? "Match terminé (score max atteint)" : "Score max atteint") : "Ajouter une manche"}
+                                title={!canP1Increment ? (isMatchFinished ? "Match terminé" : "Score max atteint") : "Ajouter une manche"}
                                 onClick={() => canP1Increment && updateMatchScore(match.id, match.score1 + 1, match.score2)}
                               >
-                                <Plus size={16} />
+                                <Plus size={18} />
                               </button>
                             </div>
+
                             {minScore1 > 0 && (
-                              <span style={{ fontSize: '0.68rem', color: '#ffd700', fontWeight: 700 }}>
-                                (dont +{minScore1} handicap)
+                              <span style={{ fontSize: '0.7rem', color: '#ffd700', fontWeight: 800, background: 'rgba(255, 215, 0, 0.12)', padding: '2px 8px', borderRadius: '10px' }}>
+                                dont +{minScore1} handicap
                               </span>
                             )}
                           </div>
 
-                          <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-muted)' }}>VS</div>
+                          {/* VS Divider */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ width: '1px', height: '24px', background: 'rgba(255, 255, 255, 0.15)' }} />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '1px' }}>VS</span>
+                            <div style={{ width: '1px', height: '24px', background: 'rgba(255, 255, 255, 0.15)' }} />
+                          </div>
 
-                          {/* Player 2 */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>
-                              {players[match.player2Id]?.name}
+                          {/* Player 2 Card */}
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            background: 'rgba(0, 0, 0, 0.35)',
+                            border: `1.5px solid ${match.score2 > match.score1 ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.1)'}`,
+                            borderRadius: '16px',
+                            padding: '1rem 0.6rem',
+                            gap: '0.5rem',
+                            boxShadow: match.score2 > match.score1 ? '0 0 20px rgba(0, 255, 170, 0.15)' : 'none',
+                            transition: 'all 0.2s',
+                            minWidth: 0
+                          }}>
+                            <img
+                              src={getPlayerAvatar(p2)}
+                              alt={p2?.name}
+                              style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '50%',
+                                objectFit: 'cover',
+                                border: `2px solid ${(p2?.level === 'Prestige' || p2?.level === 'Confirmé') ? '#ffd700' : 'var(--accent-primary)'}`,
+                                boxShadow: '0 0 12px rgba(0, 0, 0, 0.4)'
+                              }}
+                            />
+                            <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
+                              <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {p2?.name || 'Joueur 2'}
+                              </div>
+                              {(p2?.clubName || p2?.stats?.clubName) && (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {(p2.clubLogoUrl || p2.stats?.clubLogoUrl) && (
+                                    <img src={p2.clubLogoUrl || p2.stats?.clubLogoUrl} alt="" style={{ width: '12px', height: '12px', borderRadius: '2px', objectFit: 'contain', background: '#fff', padding: '1px' }} />
+                                  )}
+                                  <span>{p2.clubName || p2.stats?.clubName}</span>
+                                </div>
+                              )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+                            {/* Score Controls */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
                               <button
+                                type="button"
                                 className="btn-surface"
                                 disabled={!canP2Decrement}
                                 style={{
-                                  width: '34px', height: '34px', borderRadius: '50%', padding: 0,
-                                  opacity: canP2Decrement ? 1 : 0.3, cursor: canP2Decrement ? 'pointer' : 'not-allowed'
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  opacity: canP2Decrement ? 1 : 0.25,
+                                  cursor: canP2Decrement ? 'pointer' : 'not-allowed',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  background: 'rgba(255, 255, 255, 0.05)'
                                 }}
                                 title={!canP2Decrement ? (minScore2 > 0 ? "Score minimum (Handicap actif)" : "Score minimum (0)") : "Retirer une manche"}
                                 onClick={() => canP2Decrement && updateMatchScore(match.id, match.score1, match.score2 - 1)}
                               >
-                                <Minus size={16} />
+                                <Minus size={18} />
                               </button>
-                              <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
+
+                              <span style={{ fontSize: '2.5rem', fontWeight: 900, minWidth: '40px', textAlign: 'center', color: '#fff', textShadow: '0 0 15px rgba(255, 255, 255, 0.2)' }}>
                                 {match.score2}
                               </span>
+
                               <button
+                                type="button"
                                 className="btn-surface"
                                 disabled={!canP2Increment}
                                 style={{
-                                  width: '34px', height: '34px', borderRadius: '50%', padding: 0,
-                                  opacity: canP2Increment ? 1 : 0.3, cursor: canP2Increment ? 'pointer' : 'not-allowed'
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  opacity: canP2Increment ? 1 : 0.25,
+                                  cursor: canP2Increment ? 'pointer' : 'not-allowed',
+                                  border: '1px solid rgba(0, 255, 170, 0.4)',
+                                  background: canP2Increment ? 'rgba(0, 255, 170, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+                                  color: canP2Increment ? 'var(--accent-primary)' : '#fff'
                                 }}
-                                title={!canP2Increment ? (isMatchFinished ? "Match terminé (score max atteint)" : "Score max atteint") : "Ajouter une manche"}
+                                title={!canP2Increment ? (isMatchFinished ? "Match terminé" : "Score max atteint") : "Ajouter une manche"}
                                 onClick={() => canP2Increment && updateMatchScore(match.id, match.score1, match.score2 + 1)}
                               >
-                                <Plus size={16} />
+                                <Plus size={18} />
                               </button>
                             </div>
+
                             {minScore2 > 0 && (
-                              <span style={{ fontSize: '0.68rem', color: '#ffd700', fontWeight: 700 }}>
-                                (dont +{minScore2} handicap)
+                              <span style={{ fontSize: '0.7rem', color: '#ffd700', fontWeight: 800, background: 'rgba(255, 215, 0, 0.12)', padding: '2px 8px', borderRadius: '10px' }}>
+                                dont +{minScore2} handicap
                               </span>
                             )}
                           </div>
