@@ -2302,8 +2302,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           </div>
                           <img src={getPlayerAvatar(p)} alt={p.name} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                           <div style={{ flex: 1, overflow: 'hidden' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                               <span style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{p.name}</span>
+                              {(p.clubName || p.stats?.clubName) && (
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.25)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  {(p.clubLogoUrl || p.stats?.clubLogoUrl) && (
+                                    <img src={p.clubLogoUrl || p.stats?.clubLogoUrl} alt="" style={{ width: '12px', height: '12px', objectFit: 'contain', background: '#fff', borderRadius: '2px' }} />
+                                  )}
+                                  {p.clubName || p.stats?.clubName}
+                                </span>
+                              )}
                               {(p.level === 'Prestige' || p.level === 'Confirmé') ? (
                                 <span style={{ fontSize: '0.65rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)', flexShrink: 0 }}>
                                   👑 Prestige
@@ -2318,40 +2326,78 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               {p.stats.matchesPlayed} matchs • {p.stats.winRate}% vict. ({p.stats.wins}V - {p.stats.losses ?? (p.stats.matchesPlayed - p.stats.wins)}D)
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            title={`Supprimer définitivement ${p.name} du club`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
-                                deletePlayer(p.id);
-                                setSelectedPlayers(prev => prev.filter(id => id !== p.id));
-                              }
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'rgba(255, 68, 68, 0.45)',
-                              cursor: 'pointer',
-                              padding: '6px',
-                              borderRadius: '6px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              transition: 'all 0.15s'
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.color = '#ff4444';
-                              e.currentTarget.style.background = 'rgba(255, 68, 68, 0.12)';
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.color = 'rgba(255, 68, 68, 0.45)';
-                              e.currentTarget.style.background = 'transparent';
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              title={`Modifier la fiche et le club de ${p.name}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveTab('admin');
+                                setAdminSubTab('players');
+                                setEditingPlayerId(p.id);
+                                setEditPlayerName(p.name);
+                                setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
+                                setEditPlayerPhoto(null);
+                                setEditPlayerClubName(p.clubName || p.stats?.clubName || '');
+                                setEditPlayerClubLogo(p.clubLogoUrl || p.stats?.clubLogoUrl || null);
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'rgba(255, 255, 255, 0.45)',
+                                cursor: 'pointer',
+                                padding: '6px',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.color = 'var(--accent-primary)';
+                                e.currentTarget.style.background = 'rgba(0, 255, 170, 0.12)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.45)';
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              title={`Supprimer définitivement ${p.name} du club`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
+                                  deletePlayer(p.id);
+                                  setSelectedPlayers(prev => prev.filter(id => id !== p.id));
+                                }
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'rgba(255, 68, 68, 0.45)',
+                                cursor: 'pointer',
+                                padding: '6px',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.color = '#ff4444';
+                                e.currentTarget.style.background = 'rgba(255, 68, 68, 0.12)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.color = 'rgba(255, 68, 68, 0.45)';
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -3312,10 +3358,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                 <span>{p.name}</span>
-                                {(p.clubLogoUrl || p.clubName) && (
+                                {(p.clubLogoUrl || p.stats?.clubLogoUrl || p.clubName || p.stats?.clubName) && (
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--accent-primary)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '6px' }}>
-                                    {p.clubLogoUrl && <img src={p.clubLogoUrl} alt="" style={{ width: '14px', height: '14px', borderRadius: '3px', objectFit: 'contain', background: '#fff' }} />}
-                                    {p.clubName}
+                                    {(p.clubLogoUrl || p.stats?.clubLogoUrl) && <img src={p.clubLogoUrl || p.stats?.clubLogoUrl} alt="" style={{ width: '14px', height: '14px', borderRadius: '3px', objectFit: 'contain', background: '#fff' }} />}
+                                    {p.clubName || p.stats?.clubName}
                                   </span>
                                 )}
                               </div>
@@ -3845,29 +3891,27 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '0.6rem',
+                      gap: '0.65rem',
                       background: 'rgba(255,255,255,0.03)',
-                      padding: '0.75rem',
+                      padding: '0.85rem',
                       borderRadius: '10px',
-                      border: '1px dashed rgba(0,255,170,0.3)'
+                      border: '1.5px dashed rgba(0,255,170,0.4)'
                     }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-                          Changer la photo du joueur (optionnel)
+                          Nom du joueur
                         </label>
                         <input
-                          type="file"
-                          accept="image/*"
-                          style={{ fontSize: '0.76rem' }}
-                          onChange={e => {
-                            const f = e.target.files?.[0];
-                            if (f) readImageFile(f, setPhotoVal);
-                          }}
+                          type="text"
+                          className="input-field"
+                          value={nameVal || existingObj.name}
+                          onChange={e => setNameVal(e.target.value)}
+                          style={{ fontSize: '0.82rem', padding: '0.45rem 0.7rem' }}
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-                          Club du joueur (optionnel — affiché sur le Live TV)
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 800, marginBottom: '0.25rem' }}>
+                          Club du joueur (affiché sur le Live TV & Tournois)
                         </label>
                         <input
                           type="text"
@@ -3908,8 +3952,55 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           )}
                         </div>
                       </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                          Photo du joueur (optionnel)
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ fontSize: '0.76rem' }}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) readImageFile(f, setPhotoVal);
+                          }}
+                        />
+                      </div>
 
-                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
+                      {/* Immediate Save Button */}
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-neon"
+                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.82rem', fontWeight: 800, justifyContent: 'center' }}
+                          onClick={() => {
+                            const finalName = (nameVal || existingObj.name).trim();
+                            const finalClub = clubNameVal.trim();
+                            updatePlayer(
+                              existingObj.id,
+                              finalName,
+                              existingObj.level,
+                              photoVal || existingObj.avatarUrl,
+                              finalClub,
+                              clubLogoVal || existingObj.clubLogoUrl
+                            );
+                            alert(`✓ Fiche mise à jour avec succès !\nJoueur : ${finalName}\nClub : ${finalClub || 'Aucun'}`);
+                            setEditExistingDetails(false);
+                          }}
+                        >
+                          <Check size={15} /> Enregistrer le Club & Profil
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ padding: '0.55rem 0.9rem', fontSize: '0.82rem' }}
+                          onClick={() => setEditExistingDetails(false)}
+                        >
+                          Fermer
+                        </button>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.4rem' }}>
                         <button
                           type="button"
                           className="btn btn-outline"
@@ -3962,7 +4053,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Nom du Club (optionnel)</label>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 800, marginBottom: '0.2rem' }}>Nom du Club (optionnel)</label>
                       <input
                         type="text"
                         className="input-field"
@@ -4012,6 +4103,30 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       )}
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-neon"
+                    style={{ width: '100%', padding: '0.6rem', fontSize: '0.85rem', fontWeight: 800, justifyContent: 'center', marginTop: '0.4rem', color: '#000' }}
+                    onClick={() => {
+                      if (!nameVal.trim()) {
+                        alert('Veuillez saisir le nom du joueur.');
+                        return;
+                      }
+                      const newId = addPlayer(
+                        nameVal.trim(),
+                        'Amateur',
+                        photoVal || undefined,
+                        clubNameVal.trim() || undefined,
+                        clubLogoVal || undefined
+                      );
+                      setExistingId(newId);
+                      setMode('existing');
+                      alert(`✓ Joueur "${nameVal.trim()}" créé avec succès et associé au club "${clubNameVal.trim() || currentClub.name}" !`);
+                    }}
+                  >
+                    <Check size={16} /> Enregistrer et ajouter ce joueur
+                  </button>
                 </div>
               )}
             </div>

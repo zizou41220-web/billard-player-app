@@ -12,8 +12,8 @@ let channelsSubscribed = false;
 export const mapPlayerToDB = (p: Player) => {
   const statsPayload = {
     ...(p.stats || {}),
-    ...(p.clubName !== undefined ? { clubName: p.clubName } : {}),
-    ...(p.clubLogoUrl !== undefined ? { clubLogoUrl: p.clubLogoUrl } : {})
+    clubName: p.clubName !== undefined ? p.clubName : p.stats?.clubName,
+    clubLogoUrl: p.clubLogoUrl !== undefined ? p.clubLogoUrl : p.stats?.clubLogoUrl
   };
   const safeAvatar = p.avatarUrl && !p.avatarUrl.includes('pravatar.cc') ? p.avatarUrl : generateFigurineSvg(p.id, p.name);
   const data: any = { id: p.id, name: p.name, level: p.level, avatar_url: safeAvatar, stats: statsPayload };
@@ -32,8 +32,8 @@ export const mapDBToPlayer = (d: any): Player => {
     name: d.name,
     level: d.level,
     avatarUrl,
-    clubName: d.stats?.clubName || undefined,
-    clubLogoUrl: d.stats?.clubLogoUrl || undefined,
+    clubName: d.stats?.clubName || d.club_name || undefined,
+    clubLogoUrl: d.stats?.clubLogoUrl || d.club_logo_url || undefined,
     stats: d.stats || createDefaultPlayerStats()
   };
 };
