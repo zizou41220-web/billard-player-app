@@ -78,13 +78,15 @@ export type Match = {
   bracketRound?: number;
   bracketPosition?: number;
   nextMatchId?: string;
+  loserMatchId?: string;
+  bracketType?: 'winner' | 'loser' | 'grand_final';
   targetSets?: number; // Nombre de manches spécifiques allouées à ce duel
   handicapP1?: number;
   handicapP2?: number;
   liveStreamUrl?: string;
 };
 
-export type TournamentFormat = 'cartesien' | 'robin' | 'double_ko' | 'direct_ko';
+export type TournamentFormat = 'cartesien' | 'robin' | 'double_ko' | 'double_ko_bracket' | 'direct_ko';
 
 export type TournamentSettings = {
   tableIds: string[]; // IDs des billards physiquement alloués au tournoi

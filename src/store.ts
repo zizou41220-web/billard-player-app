@@ -3,6 +3,7 @@ import { Club, Player, PlayerLevel, Table, Match, Tournament, TournamentFormat, 
 import { getMatchHandicap } from './utils/handicap';
 import { getTournamentQualificationStatus } from './utils/qualifiers';
 import { buildBracketMatches, isFinalStageMatch } from './utils/bracket';
+import { buildDoubleKOBracketMatches } from './utils/doubleBracket';
 import {
   getMatchScoringRules,
   clampMatchScores,
@@ -890,7 +891,8 @@ export const useStore = create<AppState>((set, get) => ({
       : cleanFinalHandicap;
     const cleanThirdPlaceH = Math.min(rawThirdPlaceH, maxAllowedThirdPlaceHandicap);
 
-    const cleanQualifNbQualifiers = (format !== 'direct_ko' && participants.length >= 3)
+    const isDirectTreeFormat = format === 'direct_ko' || format === 'double_ko_bracket';
+    const cleanQualifNbQualifiers = (!isDirectTreeFormat && participants.length >= 3)
       ? Math.max(2, Math.min(participants.length - 1, settings?.qualifNbQualifiers || 2))
       : (settings?.qualifNbQualifiers || 2);
 
@@ -926,7 +928,21 @@ export const useStore = create<AppState>((set, get) => ({
       thirdPlaceHandicapAmateurSets: cleanThirdPlaceH
     };
 
-    if (format === 'direct_ko') {
+    if (format === 'double_ko_bracket') {
+      // Arbre Double KO officiel (Winner Bracket + Loser Bracket + Grande Finale)
+      const { newMatches: dkoMatches, newMatchIds } = buildDoubleKOBracketMatches({
+        tournamentId: tourId,
+        clubId: get().currentClub.id,
+        participants,
+        finalNbSets: cleanSettings.finalNbSets,
+        finalIsWinningSets: cleanSettings.finalIsWinningSets,
+        handicapAmateurSets: cleanFinalHandicap,
+        players: get().players,
+        tournamentSettings: cleanSettings
+      });
+      Object.assign(newMatches, dkoMatches);
+      matchIds.push(...newMatchIds);
+    } else if (format === 'direct_ko') {
       // Arbre à élimination directe immédiat (de 2 à 128 joueurs)
       const { newMatches: bracketMatches, newMatchIds } = buildBracketMatches({
         tournamentId: tourId,
@@ -994,10 +1010,10 @@ export const useStore = create<AppState>((set, get) => ({
         participants,
         settings: {
           ...cleanSettings,
-          finalStageLaunched: format === 'direct_ko' ? true : undefined
+          finalStageLaunched: (format === 'direct_ko' || format === 'double_ko_bracket') ? true : undefined
         },
         matches: matchIds,
-        finalStageLaunched: format === 'direct_ko' ? true : undefined
+        finalStageLaunched: (format === 'direct_ko' || format === 'double_ko_bracket') ? true : undefined
       };
 
       // 2. Detach ANY old match from any table and finish any lingering playing match
@@ -1385,6 +1401,44 @@ export const useStore = create<AppState>((set, get) => ({
         }
       }
 
+      // Progression du perdant vers le Losers Bracket (Double KO)
+      if (match.loserMatchId && newMatches[match.loserMatchId]) {
+        const loserId = (newWinnerId === match.player1Id) ? match.player2Id : match.player1Id;
+        let loserM = newMatches[match.loserMatchId];
+        if (match.bracketPosition !== undefined && match.bracketType === 'winner' && match.stage !== 'semi') {
+          if (match.bracketPosition % 2 === 0) {
+            loserM = { ...loserM, player1Id: loserId || '' };
+          } else {
+            loserM = { ...loserM, player2Id: loserId || '' };
+          }
+        } else {
+          if (!loserM.player1Id || loserM.player1Id === loserId) {
+            loserM = { ...loserM, player1Id: loserId || '' };
+          } else if (!loserM.player2Id || loserM.player2Id === loserId) {
+            loserM = { ...loserM, player2Id: loserId || '' };
+          }
+        }
+
+        if (loserM.player1Id && loserM.player2Id && loserM.status === 'pending') {
+          const tour = match.tournamentId ? state.tournaments[match.tournamentId] : null;
+          const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour?.settings, loserM.stage);
+          const p1Level = state.players[loserM.player1Id]?.level;
+          const p2Level = state.players[loserM.player2Id]?.level;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true, loserM.stage);
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
+          loserM = {
+            ...loserM,
+            targetSets,
+            score1: h1,
+            score2: h2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+        }
+        newMatches[match.loserMatchId] = loserM;
+      }
+
       const { tables: dispatchedTables, matches: dispatchedMatches } = dispatchTournamentMatches(
         state.tables,
         newMatches,
@@ -1604,6 +1658,44 @@ export const useStore = create<AppState>((set, get) => ({
           }
           newMatches[thirdPlaceMatch.id] = tpM;
         }
+      }
+
+      // Progression du perdant vers le Losers Bracket (Double KO)
+      if (match.loserMatchId && newMatches[match.loserMatchId]) {
+        const loserId = (winnerId === match.player1Id) ? match.player2Id : match.player1Id;
+        let loserM = newMatches[match.loserMatchId];
+        if (match.bracketPosition !== undefined && match.bracketType === 'winner' && match.stage !== 'semi') {
+          if (match.bracketPosition % 2 === 0) {
+            loserM = { ...loserM, player1Id: loserId || '' };
+          } else {
+            loserM = { ...loserM, player2Id: loserId || '' };
+          }
+        } else {
+          if (!loserM.player1Id || loserM.player1Id === loserId) {
+            loserM = { ...loserM, player1Id: loserId || '' };
+          } else if (!loserM.player2Id || loserM.player2Id === loserId) {
+            loserM = { ...loserM, player2Id: loserId || '' };
+          }
+        }
+
+        if (loserM.player1Id && loserM.player2Id && loserM.status === 'pending') {
+          const tour = match.tournamentId ? state.tournaments[match.tournamentId] : null;
+          const { isWinningSets: matchWinning, handicap: finalH } = getPhaseRules(tour?.settings, loserM.stage);
+          const p1Level = state.players[loserM.player1Id]?.level;
+          const p2Level = state.players[loserM.player2Id]?.level;
+          const targetSets = resolveDuelTargetSets(p1Level, p2Level, tour?.settings, true, loserM.stage);
+          const maxH = matchWinning ? Math.max(0, targetSets - 1) : undefined;
+          const { h1, h2 } = getMatchHandicap(p1Level, p2Level, finalH, maxH);
+          loserM = {
+            ...loserM,
+            targetSets,
+            score1: h1,
+            score2: h2,
+            handicapP1: h1 > 0 ? h1 : undefined,
+            handicapP2: h2 > 0 ? h2 : undefined
+          };
+        }
+        newMatches[match.loserMatchId] = loserM;
       }
 
       const newTables = { ...state.tables };

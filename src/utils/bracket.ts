@@ -85,9 +85,11 @@ export function getBracketRounds(bracketSize: number): BracketRoundDef[] {
  * Vérifie si un match fait partie de la phase finale / tableau éliminatoire.
  */
 export function isFinalStageMatch(m: Match): boolean {
+  if (m.bracketType) return true;
   if (m.stage && m.stage !== 'qualif') return true;
   if (!m.id) return false;
   return (
+    m.id.includes('_dko_') ||
     m.id.includes('_final_') ||
     m.id.includes('_third_place_') ||
     m.id.includes('_semi_') ||

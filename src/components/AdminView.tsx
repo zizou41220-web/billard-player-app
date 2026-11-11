@@ -136,12 +136,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const maxAllowedGrandFinalHandicap = getMaxAllowedFinalHandicap(grandFinalNbSetsMixed, grandFinalIsWinningSets);
   const maxAllowedThirdPlaceHandicap = getMaxAllowedFinalHandicap(thirdPlaceNbSetsMixed, thirdPlaceIsWinningSets);
 
-  const maxAllowedQualifiers = newTourFormat !== 'direct_ko' && selectedPlayers.length >= 3
+  const isPoolFormat = newTourFormat !== 'direct_ko' && newTourFormat !== 'double_ko_bracket';
+  const maxAllowedQualifiers = isPoolFormat && selectedPlayers.length >= 3
     ? selectedPlayers.length - 1
-    : (newTourFormat !== 'direct_ko' && selectedPlayers.length === 2 ? 2 : 128);
+    : (isPoolFormat && selectedPlayers.length === 2 ? 2 : 128);
 
   React.useEffect(() => {
-    if (newTourFormat !== 'direct_ko' && selectedPlayers.length >= 3) {
+    if (isPoolFormat && selectedPlayers.length >= 3) {
       const maxSortants = selectedPlayers.length - 1;
       if (qualifNbQualifiers > maxSortants) {
         setQualifNbQualifiers(Math.max(2, maxSortants));
@@ -1022,7 +1023,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)', boxShadow: '0 0 8px var(--accent-primary)' }} />
                           TOURNOI EN COURS
                         </span>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Format : <b style={{ color: '#fff' }}>{activeTournament.format === 'cartesien' ? 'Cartésien' : activeTournament.format === 'robin' ? 'Poules Robin' : 'Double KO'}</b></span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                          Format : <b style={{ color: '#fff' }}>
+                            {activeTournament.format === 'cartesien' ? 'Cartésien' :
+                             activeTournament.format === 'robin' ? 'Poules Robin' :
+                             activeTournament.format === 'double_ko_bracket' ? 'Double KO (Arbre Gagnants / Repêchage)' :
+                             activeTournament.format === 'direct_ko' ? 'Tableau Direct (KO)' :
+                             'Double KO (Poules & Rattrapage)'}
+                          </b>
+                        </span>
                       </div>
                       <h2 style={{ fontSize: '2.4rem', margin: 0, fontWeight: 900, color: '#fff' }}>
                         {activeTournament.name}
@@ -1394,12 +1403,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     {/* Format Selector */}
                     <div>
                       <label style={{ display: 'block', marginBottom: '0.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>Format de compétition</label>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
                         {[
                           { id: 'direct_ko', label: 'Tableau Direct (KO)', badge: 'Arbre immédiat' },
+                          { id: 'double_ko_bracket', label: 'Double KO (Arbre)', badge: 'Gagnants / Repêchage' },
+                          { id: 'double_ko', label: 'Double KO (Poules)', badge: 'Poules & Rattrapage' },
                           { id: 'cartesien', label: 'Cartésien', badge: 'Poules' },
-                          { id: 'robin', label: 'Poules Robin', badge: 'Championnat' },
-                          { id: 'double_ko', label: 'Double KO', badge: 'Rattrapage' }
+                          { id: 'robin', label: 'Poules Robin', badge: 'Championnat' }
                         ].map(fmt => (
                           <div
                             key={fmt.id}
@@ -1414,7 +1424,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : '#fff' }}>{fmt.label}</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : '#fff' }}>{fmt.label}</div>
                             <div style={{ fontSize: '0.72rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : 'var(--text-muted)', marginTop: '0.2rem' }}>{fmt.badge}</div>
                           </div>
                         ))}
@@ -1431,8 +1441,28 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       </div>
                     )}
 
+                    {/* Notice si Double KO Arbre (Winners & Losers Bracket) */}
+                    {newTourFormat === 'double_ko_bracket' && (
+                      <div style={{ padding: '1.2rem', background: 'rgba(0, 255, 204, 0.08)', borderRadius: '12px', border: '1px solid rgba(0, 255, 204, 0.25)', display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                        <Trophy size={28} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                        <div style={{ fontSize: '0.85rem', color: '#fff', lineHeight: '1.4' }}>
+                          <strong>Format Double KO Officiel (Double Élimination) :</strong> Arbre complet avec <em>Tableau des Vainqueurs</em> (Winners) et <em>Tableau de Repêchage</em> (Losers). Les joueurs débutent tous dans le tableau principal. Dès leur 1ère défaite, ils basculent dans le tableau de repêchage ; seule une 2ème défaite les élimine définitivement. La Grande Finale réunit le vainqueur du tableau principal et le vainqueur du repêchage !
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notice si Double KO Poules & Rattrapage */}
+                    {newTourFormat === 'double_ko' && (
+                      <div style={{ padding: '1.2rem', background: 'rgba(255, 215, 0, 0.08)', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.25)', display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                        <Trophy size={28} style={{ color: '#ffd700', flexShrink: 0 }} />
+                        <div style={{ fontSize: '0.85rem', color: '#fff', lineHeight: '1.4' }}>
+                          <strong>Format Double KO (Poules & Rattrapage) :</strong> Phase préliminaire où tous les joueurs disputent plusieurs duels sans élimination directe immédiate. Les points et les sets déterminent le classement, puis les meilleurs qualifiés accèdent au tableau final éliminatoire.
+                        </div>
+                      </div>
+                    )}
+
                     {/* Qualif Rules (uniquement pour les formats avec poules) */}
-                    {newTourFormat !== 'direct_ko' && (
+                    {isPoolFormat && (
                       <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
                         <h3 style={{ fontSize: '1.2rem', marginBottom: '1.2rem', color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           Phase de Qualification
@@ -2160,16 +2190,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         if (selectedPlayers.length < 2) return alert('Veuillez sélectionner au moins 2 joueurs inscrits.');
                         if (selectedTables.length === 0) return alert('Veuillez sélectionner au moins 1 billard.');
 
-                        if (newTourFormat !== 'direct_ko') {
+                        if (newTourFormat !== 'direct_ko' && newTourFormat !== 'double_ko_bracket') {
                           if (selectedPlayers.length < 3) {
-                            return alert(`Pour un format avec phase de qualification (poules / cartésien), il faut au moins 3 joueurs inscrits (au moins 1 joueur éliminé et 2 finalistes). Avec ${selectedPlayers.length} participant(s), veuillez sélectionner le format "Élimination Directe".`);
+                            return alert(`Pour un format avec phase de qualification (poules / cartésien), il faut au moins 3 joueurs inscrits (au moins 1 joueur éliminé et 2 finalistes). Avec ${selectedPlayers.length} participant(s), veuillez sélectionner le format "Tableau Direct (KO)" ou "Double KO (Arbre)".`);
                           }
                           if (qualifNbQualifiers >= selectedPlayers.length) {
                             return alert(`Configuration impossible : avec ${selectedPlayers.length} joueurs inscrits, le nombre de qualifiés (${qualifNbQualifiers}) doit être d'au maximum ${selectedPlayers.length - 1} personnes afin qu'il y ait au moins un éliminé en qualification.`);
                           }
                         }
 
-                        if (newTourFormat !== 'direct_ko' && qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
+                        if (newTourFormat !== 'direct_ko' && newTourFormat !== 'double_ko_bracket' && qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
                           return alert(`Configuration qualification impossible : avec l'affiche mixte (${qualifNbSetsMixed} manche(s)), le handicap poules doit être de +${maxAllowedQualifHandicap} manche(s) maximum.`);
                         }
                         if (finalHandicapAmateurSets > maxAllowedFinalHandicap) {
@@ -3420,91 +3450,91 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
                 {/* Add Player Sidebar */}
                 <div className="glass-card" style={{ padding: '2rem', height: 'fit-content' }}>
-                    <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Users size={18} /> Nouveau Joueur
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nom & Prénom</label>
-                        <input
-                          type="text"
-                          className="input-field"
-                          placeholder="Ex: John Doe"
-                          value={newPlayerName}
-                          onChange={e => setNewPlayerName(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Niveau</label>
-                        <select
-                          className="input-field"
-                          value={newPlayerLevel === 'Confirmé' ? 'Prestige' : newPlayerLevel}
-                          onChange={e => setNewPlayerLevel(e.target.value)}
-                          style={{ appearance: 'none', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                        >
-                          <option value="Amateur" style={{ color: '#000' }}>Amateur</option>
-                          <option value="Prestige" style={{ color: '#000' }}>👑 Prestige</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Photo (depuis l'ordinateur)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handlePhotoUpload}
-                            style={{ fontSize: '0.8rem' }}
-                          />
-                          {newPlayerPhoto && <img src={newPlayerPhoto} alt="Aperçu" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />}
-                        </div>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Club (optionnel)</label>
-                        <input
-                          type="text"
-                          className="input-field"
-                          placeholder={`Ex: ${currentClub.name}`}
-                          value={newPlayerClubName}
-                          onChange={e => setNewPlayerClubName(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Logo du Club (optionnel)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={e => {
-                              const f = e.target.files?.[0];
-                              if (f) readImageFile(f, (url) => setNewPlayerClubLogo(url));
-                            }}
-                            style={{ fontSize: '0.8rem', flex: 1 }}
-                          />
-                          {newPlayerClubLogo && <img src={newPlayerClubLogo} alt="Aperçu logo" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '2px' }} />}
-                        </div>
-                      </div>
-                      <button
-                        className="btn btn-neon"
-                        style={{ marginTop: '1rem', justifyContent: 'center' }}
-                        onClick={() => {
-                          if (!newPlayerName.trim()) return alert('Veuillez entrer un nom.');
-                          addPlayer(
-                            newPlayerName.trim(),
-                            newPlayerLevel,
-                            newPlayerPhoto || undefined,
-                            newPlayerClubName.trim() || undefined,
-                            newPlayerClubLogo || undefined
-                          );
-                          setNewPlayerName('');
-                          setNewPlayerPhoto(null);
-                          setNewPlayerClubName('');
-                          setNewPlayerClubLogo(null);
-                        }}
-                      >
-                        Ajouter au club
-                      </button>
+                  <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Users size={18} /> Nouveau Joueur
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nom & Prénom</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Ex: John Doe"
+                        value={newPlayerName}
+                        onChange={e => setNewPlayerName(e.target.value)}
+                      />
                     </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Niveau</label>
+                      <select
+                        className="input-field"
+                        value={newPlayerLevel === 'Confirmé' ? 'Prestige' : newPlayerLevel}
+                        onChange={e => setNewPlayerLevel(e.target.value)}
+                        style={{ appearance: 'none', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                      >
+                        <option value="Amateur" style={{ color: '#000' }}>Amateur</option>
+                        <option value="Prestige" style={{ color: '#000' }}>👑 Prestige</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Photo (depuis l'ordinateur)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          style={{ fontSize: '0.8rem' }}
+                        />
+                        {newPlayerPhoto && <img src={newPlayerPhoto} alt="Aperçu" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Club (optionnel)</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder={`Ex: ${currentClub.name}`}
+                        value={newPlayerClubName}
+                        onChange={e => setNewPlayerClubName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Logo du Club (optionnel)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) readImageFile(f, (url) => setNewPlayerClubLogo(url));
+                          }}
+                          style={{ fontSize: '0.8rem', flex: 1 }}
+                        />
+                        {newPlayerClubLogo && <img src={newPlayerClubLogo} alt="Aperçu logo" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '2px' }} />}
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-neon"
+                      style={{ marginTop: '1rem', justifyContent: 'center' }}
+                      onClick={() => {
+                        if (!newPlayerName.trim()) return alert('Veuillez entrer un nom.');
+                        addPlayer(
+                          newPlayerName.trim(),
+                          newPlayerLevel,
+                          newPlayerPhoto || undefined,
+                          newPlayerClubName.trim() || undefined,
+                          newPlayerClubLogo || undefined
+                        );
+                        setNewPlayerName('');
+                        setNewPlayerPhoto(null);
+                        setNewPlayerClubName('');
+                        setNewPlayerClubLogo(null);
+                      }}
+                    >
+                      Ajouter au club
+                    </button>
                   </div>
+                </div>
               </div>
             )}
 

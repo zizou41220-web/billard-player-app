@@ -132,7 +132,88 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
 
   let rounds: { title: string; stage: MatchStage; matches: DisplayMatch[] }[] = [];
 
-  if (isFinalLaunched) {
+  if (activeTournament.format === 'double_ko_bracket') {
+    // Collecte des matchs de l'arbre Double KO officiel
+    const dkoMatches = finalMatches.length > 0 ? finalMatches : allTourMatches;
+    const wbMatches = dkoMatches.filter(m => m.bracketType === 'winner' || m.id.includes('_wb_'));
+    const lbMatches = dkoMatches.filter(m => m.bracketType === 'loser' || m.id.includes('_lb_'));
+    const gfMatches = dkoMatches.filter(m => m.bracketType === 'grand_final' || m.id.includes('_gf_'));
+
+    const toDisplayMatch = (m: Match, defaultTitle: string): DisplayMatch => {
+      const isBye = (!m.player2Id || m.player2Id === 'BYE') && m.status === 'finished';
+      return {
+        id: m.id,
+        stage: m.stage || 'final',
+        title: defaultTitle,
+        round: m.bracketRound ?? 1,
+        position: m.bracketPosition ?? 0,
+        player1Id: m.player1Id,
+        player2Id: isBye ? undefined : m.player2Id,
+        player2Label: isBye ? '⚡ BLANC (Exempt)' : undefined,
+        score1: m.score1,
+        score2: m.score2,
+        status: m.status,
+        winnerId: m.winnerId,
+        tableId: m.tableId,
+        realMatch: m,
+        handicapP1: m.handicapP1,
+        handicapP2: m.handicapP2
+      };
+    };
+
+    // 1. Tours du Tableau Principal (Winners)
+    const wbRoundsMap = new Map<number, Match[]>();
+    wbMatches.forEach(m => {
+      const r = m.bracketRound ?? 1;
+      const arr = wbRoundsMap.get(r) || [];
+      arr.push(m);
+      wbRoundsMap.set(r, arr);
+    });
+
+    const maxWbRound = Math.max(1, ...Array.from(wbRoundsMap.keys()));
+    Array.from(wbRoundsMap.keys()).sort((a, b) => a - b).forEach(r => {
+      const list = (wbRoundsMap.get(r) || []).sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+      const title = r === maxWbRound
+        ? '⭐ Finale Gagnants (WB)'
+        : (r === maxWbRound - 1 ? '⭐ 1/2 Finales Gagnants' : `⭐ Gagnants (Tour ${r})`);
+      rounds.push({
+        title,
+        stage: list[0]?.stage || 'semi',
+        matches: list.map((m, idx) => toDisplayMatch(m, `${title} #${idx + 1}`))
+      });
+    });
+
+    // 2. Tours du Tableau de Repêchage (Losers)
+    const lbRoundsMap = new Map<number, Match[]>();
+    lbMatches.forEach(m => {
+      const r = m.bracketRound ?? 1;
+      const arr = lbRoundsMap.get(r) || [];
+      arr.push(m);
+      lbRoundsMap.set(r, arr);
+    });
+
+    const maxLbRound = Math.max(1, ...Array.from(lbRoundsMap.keys()));
+    Array.from(lbRoundsMap.keys()).sort((a, b) => a - b).forEach(r => {
+      const list = (lbRoundsMap.get(r) || []).sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+      const title = r === maxLbRound
+        ? '🛡️ Finale Repêchage (LB)'
+        : (r === maxLbRound - 1 ? '🛡️ 1/2 Finale Repêchage' : `🛡️ Repêchage (Tour ${r})`);
+      rounds.push({
+        title,
+        stage: list[0]?.stage || 'third_place',
+        matches: list.map((m, idx) => toDisplayMatch(m, `${title} #${idx + 1}`))
+      });
+    });
+
+    // 3. Grande Finale
+    if (gfMatches.length > 0) {
+      rounds.push({
+        title: '👑 Grande Finale',
+        stage: 'final',
+        matches: gfMatches.map(m => toDisplayMatch(m, '👑 Grande Finale'))
+      });
+    }
+  } else if (isFinalLaunched) {
     // 1. Collecte depuis les vrais matchs en base
     bracketRoundDefs.forEach((roundDef, rIdx) => {
       const isLastRound = rIdx === totalRoundsCount - 1;
@@ -412,19 +493,23 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
                     ? 'var(--accent-primary)'
                     : (areAllQualifiersKnown ? 'var(--accent-secondary)' : 'var(--text-muted)')
                 }} />
-                {isFinalLaunched
-                  ? 'PHASES FINALES OFFICIELLES'
-                  : (areAllQualifiersKnown
-                    ? `QUALIFIÉS CONNUS (${numQualifiers}/${numQualifiers})`
-                    : `EN ATTENTE DES SORTANTS (${sureQualifiers.length}/${numQualifiers} assurés)`)}
+                {activeTournament.format === 'double_ko_bracket'
+                  ? 'DOUBLE KO EN DIRECT'
+                  : isFinalLaunched
+                    ? 'PHASES FINALES OFFICIELLES'
+                    : (areAllQualifiersKnown
+                      ? `QUALIFIÉS CONNUS (${numQualifiers}/${numQualifiers})`
+                      : `EN ATTENTE DES SORTANTS (${sureQualifiers.length}/${numQualifiers} assurés)`)}
               </span>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                {activeTournament.settings?.seedByMerit ? 'Tirage au Mérite (1er vs dernier)' : 'Tirage Classique'}
+                {activeTournament.format === 'double_ko_bracket' ? 'Winner Bracket & Loser Bracket' : (activeTournament.settings?.seedByMerit ? 'Tirage au Mérite (1er vs dernier)' : 'Tirage Classique')}
               </span>
             </div>
 
             <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0 }}>
-              {currentClub.name} • Phases Finales • {numQualifiers} Qualifiés
+              {activeTournament.format === 'double_ko_bracket'
+                ? `${currentClub.name} • Arbre Double KO (Gagnants & Repêchage)`
+                : `${currentClub.name} • Phases Finales • ${numQualifiers} Qualifiés`}
             </h2>
           </div>
         </div>
@@ -1437,10 +1522,14 @@ export const TournamentBracketView: React.FC<BracketViewProps> = ({ onSelectTabl
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Users size={18} color="var(--accent-primary)" />
-            {isFinalLaunched ? 'Joueurs Qualifiés pour le Tableau Final' : 'Classement Actuel & Qualifiés Provisoires'}
+            {activeTournament.format === 'double_ko_bracket' || activeTournament.format === 'direct_ko'
+              ? 'Participants au Tableau'
+              : (isFinalLaunched ? 'Joueurs Qualifiés pour le Tableau Final' : 'Classement Actuel & Qualifiés Provisoires')}
           </h3>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Les {numQualifiers} premiers avancent en phases finales
+            {activeTournament.format === 'double_ko_bracket' || activeTournament.format === 'direct_ko'
+              ? `${activeTournament.participants.length} participants inscrits`
+              : `Les ${numQualifiers} premiers avancent en phases finales`}
           </span>
         </div>
 
