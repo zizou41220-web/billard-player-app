@@ -967,19 +967,29 @@ export const useStore = create<AppState>((set, get) => ({
 
       if (isMultiPool) {
         const poolLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-        const poolsDistribution: Record<string, string[]> = {};
-        for (let p = 0; p < nbPoules; p++) {
-          const pName = `Poule ${poolLetters[p] || (p + 1)}`;
-          poolsDistribution[pName] = [];
-        }
+        let poolsDistribution: Record<string, string[]> = {};
 
-        // Répartition aléatoire et équilibrée
-        const shuffled = [...participants].sort(() => 0.5 - Math.random());
-        shuffled.forEach((pId, idx) => {
-          const pIdx = idx % nbPoules;
-          const pName = `Poule ${poolLetters[pIdx] || (pIdx + 1)}`;
-          poolsDistribution[pName].push(pId);
-        });
+        // Vérifier si une répartition manuelle valide a été fournie par l'utilisateur
+        const hasValidCustom = cleanSettings.poolsDistribution &&
+          Object.keys(cleanSettings.poolsDistribution).length === nbPoules &&
+          participants.every(pId => Object.values(cleanSettings.poolsDistribution!).some(list => list.includes(pId)));
+
+        if (hasValidCustom) {
+          poolsDistribution = cleanSettings.poolsDistribution!;
+        } else {
+          for (let p = 0; p < nbPoules; p++) {
+            const pName = `Poule ${poolLetters[p] || (p + 1)}`;
+            poolsDistribution[pName] = [];
+          }
+
+          // Répartition aléatoire et équilibrée
+          const shuffled = [...participants].sort(() => 0.5 - Math.random());
+          shuffled.forEach((pId, idx) => {
+            const pIdx = idx % nbPoules;
+            const pName = `Poule ${poolLetters[pIdx] || (pIdx + 1)}`;
+            poolsDistribution[pName].push(pId);
+          });
+        }
 
         cleanSettings.poolsDistribution = poolsDistribution;
         cleanSettings.qualifNbPoules = nbPoules;

@@ -6,7 +6,7 @@ import {
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
-  Radio, Tv, Smartphone, Globe, ExternalLink, Trash2
+  Radio, Tv, Smartphone, Globe, ExternalLink, Trash2, Shuffle
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
@@ -102,6 +102,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const [qualifIsWinningSets, setQualifIsWinningSets] = useState(true);
   const [qualifNbQualifiers, setQualifNbQualifiers] = useState(2);
   const [qualifNbPoules, setQualifNbPoules] = useState(1);
+  const [customPoolsDistribution, setCustomPoolsDistribution] = useState<Record<string, string[]>>({});
   const [activePoolRankingTab, setActivePoolRankingTab] = useState<string>('all');
 
   const [finalNbSetsAmateur, setFinalNbSetsAmateur] = useState(3);
@@ -160,6 +161,71 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
       }
     }
   }, [selectedPlayers.length, qualifNbPoules]);
+
+  // Synchronisation de la répartition personnalisée des poules
+  React.useEffect(() => {
+    if (qualifNbPoules <= 1 || selectedPlayers.length === 0) {
+      setCustomPoolsDistribution({});
+      return;
+    }
+    const poolLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const currentPoolNames = Array.from({ length: qualifNbPoules }).map((_, i) => `Poule ${poolLetters[i] || (i + 1)}`);
+
+    setCustomPoolsDistribution(prev => {
+      const nextDist: Record<string, string[]> = {};
+      currentPoolNames.forEach(pName => { nextDist[pName] = []; });
+
+      const alreadyAssigned = new Set<string>();
+      currentPoolNames.forEach(pName => {
+        const existing = (prev[pName] || []).filter(pId => selectedPlayers.includes(pId));
+        nextDist[pName] = existing;
+        existing.forEach(pId => alreadyAssigned.add(pId));
+      });
+
+      selectedPlayers.forEach(pId => {
+        if (!alreadyAssigned.has(pId)) {
+          let minPool = currentPoolNames[0];
+          let minCount = nextDist[minPool].length;
+          currentPoolNames.forEach(pName => {
+            if (nextDist[pName].length < minCount) {
+              minCount = nextDist[pName].length;
+              minPool = pName;
+            }
+          });
+          nextDist[minPool].push(pId);
+          alreadyAssigned.add(pId);
+        }
+      });
+
+      return nextDist;
+    });
+  }, [selectedPlayers, qualifNbPoules]);
+
+  const movePlayerToPool = (playerId: string, targetPool: string) => {
+    setCustomPoolsDistribution(prev => {
+      const next: Record<string, string[]> = {};
+      Object.keys(prev).forEach(pName => {
+        next[pName] = (prev[pName] || []).filter(id => id !== playerId);
+      });
+      if (!next[targetPool]) next[targetPool] = [];
+      next[targetPool] = [...next[targetPool], playerId];
+      return next;
+    });
+  };
+
+  const shufflePoolsDistribution = () => {
+    const poolLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const currentPoolNames = Array.from({ length: qualifNbPoules }).map((_, i) => `Poule ${poolLetters[i] || (i + 1)}`);
+    const nextDist: Record<string, string[]> = {};
+    currentPoolNames.forEach(pName => { nextDist[pName] = []; });
+
+    const shuffled = [...selectedPlayers].sort(() => 0.5 - Math.random());
+    shuffled.forEach((pId, idx) => {
+      const pName = currentPoolNames[idx % qualifNbPoules];
+      nextDist[pName].push(pId);
+    });
+    setCustomPoolsDistribution(nextDist);
+  };
 
   React.useEffect(() => {
     if (qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
@@ -1536,7 +1602,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 ) : (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                                     <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                                      ✓ Les {selectedPlayers.length} participants seront répartis équitablement dans {qualifNbPoules} poules distinctes ({Array.from({ length: qualifNbPoules }).map((_, i) => `Poule ${String.fromCharCode(65 + i)}`).join(', ')}).
+                                      ✓ Les {selectedPlayers.length} participants sont répartis dans {qualifNbPoules} poules distinctes ({Array.from({ length: qualifNbPoules }).map((_, i) => `Poule ${String.fromCharCode(65 + i)}`).join(', ')}).
                                     </span>
                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>
                                       Chaque joueur affronte uniquement les adversaires de sa propre poule.
@@ -1547,6 +1613,142 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   </div>
                                 )}
                               </div>
+
+                              {/* Attribution personnalisée des joueurs dans chaque poule */}
+                              {qualifNbPoules > 1 && Object.keys(customPoolsDistribution).length > 0 && (
+                                <div style={{ marginTop: '0.8rem', background: 'rgba(0,0,0,0.25)', padding: '0.9rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>👥 Composition & Choix des Poules</span>
+                                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                        (cliquez sur les lettres pour changer de poule)
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={shufflePoolsDistribution}
+                                      className="btn btn-outline"
+                                      style={{ fontSize: '0.74rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                      title="Mélanger aléatoirement les joueurs dans les poules"
+                                    >
+                                      <Shuffle size={13} /> Tirage au sort
+                                    </button>
+                                  </div>
+
+                                  <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: `repeat(auto-fit, minmax(${qualifNbPoules <= 2 ? '220px' : '180px'}, 1fr))`,
+                                    gap: '0.7rem'
+                                  }}>
+                                    {Object.entries(customPoolsDistribution).map(([pName, pPlayerIds]) => {
+                                      const isWarn = pPlayerIds.length < 2;
+                                      return (
+                                        <div
+                                          key={pName}
+                                          style={{
+                                            background: 'rgba(255,255,255,0.02)',
+                                            border: isWarn ? '1px solid rgba(255, 70, 70, 0.4)' : '1px solid rgba(0, 255, 204, 0.2)',
+                                            borderRadius: '10px',
+                                            padding: '0.7rem',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '0.5rem'
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0.4rem' }}>
+                                            <span style={{ fontWeight: 800, color: 'var(--accent-primary)', fontSize: '0.88rem' }}>
+                                              🎱 {pName}
+                                            </span>
+                                            <span style={{
+                                              fontSize: '0.72rem',
+                                              fontWeight: 700,
+                                              padding: '1px 6px',
+                                              borderRadius: '6px',
+                                              background: isWarn ? 'rgba(255, 70, 70, 0.2)' : 'rgba(0, 255, 204, 0.15)',
+                                              color: isWarn ? '#ff6b6b' : 'var(--accent-primary)'
+                                            }}>
+                                              {pPlayerIds.length} joueur{pPlayerIds.length > 1 ? 's' : ''}
+                                            </span>
+                                          </div>
+
+                                          {pPlayerIds.length === 0 ? (
+                                            <div style={{ padding: '0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', fontStyle: 'italic' }}>
+                                              Vide (déplacez-y un joueur)
+                                            </div>
+                                          ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                                              {pPlayerIds.map(pId => {
+                                                const player = players[pId];
+                                                const pNameTargetList = Object.keys(customPoolsDistribution);
+                                                return (
+                                                  <div
+                                                    key={pId}
+                                                    style={{
+                                                      background: 'rgba(255,255,255,0.03)',
+                                                      border: '1px solid rgba(255,255,255,0.06)',
+                                                      borderRadius: '7px',
+                                                      padding: '0.35rem 0.5rem',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'space-between',
+                                                      gap: '0.4rem'
+                                                    }}
+                                                  >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0, overflow: 'hidden' }}>
+                                                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {player?.name || 'Joueur'}
+                                                      </span>
+                                                      {player?.level && (
+                                                        <span style={{ fontSize: '0.62rem', color: player.level === 'prestige' ? '#ffd700' : 'var(--accent-secondary)', textTransform: 'capitalize' }}>
+                                                          ({player.level})
+                                                        </span>
+                                                      )}
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+                                                      {pNameTargetList.map(targetPName => {
+                                                        const isCurrent = targetPName === pName;
+                                                        const shortLetter = targetPName.replace('Poule ', '');
+                                                        return (
+                                                          <button
+                                                            key={targetPName}
+                                                            type="button"
+                                                            disabled={isCurrent}
+                                                            onClick={() => movePlayerToPool(pId, targetPName)}
+                                                            style={{
+                                                              width: '22px',
+                                                              height: '22px',
+                                                              borderRadius: '5px',
+                                                              fontSize: '0.68rem',
+                                                              fontWeight: 800,
+                                                              border: isCurrent ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                                                              background: isCurrent ? 'var(--accent-primary)' : 'rgba(255,255,255,0.04)',
+                                                              color: isCurrent ? '#000' : 'var(--text-muted)',
+                                                              cursor: isCurrent ? 'default' : 'pointer',
+                                                              display: 'flex',
+                                                              alignItems: 'center',
+                                                              justifyContent: 'center',
+                                                              padding: 0,
+                                                              transition: 'all 0.15s'
+                                                            }}
+                                                            title={isCurrent ? `Actuellement dans ${pName}` : `Déplacer vers ${targetPName}`}
+                                                          >
+                                                            {shortLetter}
+                                                          </button>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -2281,6 +2483,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           }
                         }
 
+                        if (isPoolFormat && qualifNbPoules > 1 && (newTourFormat === 'cartesien' || newTourFormat === 'robin')) {
+                          const hasEmptyPool = Object.values(customPoolsDistribution).some(list => list.length < 2);
+                          if (hasEmptyPool) {
+                            return alert(`Chaque poule doit comporter au moins 2 joueurs. Veuillez rééquilibrer les participants entre les poules.`);
+                          }
+                        }
+
                         if (newTourFormat !== 'direct_ko' && newTourFormat !== 'double_ko_bracket' && qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
                           return alert(`Configuration qualification impossible : avec l'affiche mixte (${qualifNbSetsMixed} manche(s)), le handicap poules doit être de +${maxAllowedQualifHandicap} manche(s) maximum.`);
                         }
@@ -2298,6 +2507,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           tableIds: selectedTables,
                           qualifNbSets: qualifNbSetsMixed, qualifIsWinningSets, qualifNbQualifiers,
                           qualifNbPoules: (newTourFormat === 'cartesien' || newTourFormat === 'robin') ? qualifNbPoules : 1,
+                          poolsDistribution: (newTourFormat === 'cartesien' || newTourFormat === 'robin') && qualifNbPoules > 1 ? customPoolsDistribution : undefined,
                           qualifNbSetsAmateur, qualifNbSetsPrestige, qualifNbSetsMixed,
                           finalNbSets: finalNbSetsMixed, finalIsWinningSets, seedByMerit,
                           finalNbSetsAmateur, finalNbSetsPrestige, finalNbSetsMixed,
