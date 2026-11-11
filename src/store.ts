@@ -907,6 +907,8 @@ export const useStore = create<AppState>((set, get) => ({
       finalNbSetsPrestige: settings?.finalNbSetsPrestige || settings?.finalNbSets || 3,
       finalNbSetsMixed: finalNbSetsMixed,
       qualifNbQualifiers: cleanQualifNbQualifiers,
+      qualifNbPoules: settings?.qualifNbPoules ? Math.max(1, settings.qualifNbPoules) : 1,
+      poolsDistribution: settings?.poolsDistribution,
       qualifHandicapAmateurSets: cleanQualifHandicap,
       finalHandicapAmateurSets: cleanFinalHandicap,
       handicapAmateurSets: cleanFinalHandicap,
@@ -959,38 +961,96 @@ export const useStore = create<AppState>((set, get) => ({
       matchIds.push(...newMatchIds);
     } else {
       // Qualifications en Poule / Round Robin
-      const shuffled = [...participants].sort(() => 0.5 - Math.random());
+      const nbPoules = Math.max(1, cleanSettings.qualifNbPoules || 1);
+      const isMultiPool = (format === 'cartesien' || format === 'robin') && nbPoules > 1;
       const playersState = get().players;
 
-      for (let i = 0; i < shuffled.length; i++) {
-        for (let j = i + 1; j < shuffled.length; j++) {
-          const matchId = `m_${Date.now()}_${i}_${j}`;
-          const p1 = playersState[shuffled[i]];
-          const p2 = playersState[shuffled[j]];
-          const targetSets = resolveDuelTargetSets(p1?.level, p2?.level, cleanSettings, false);
-          const maxQualifHandicap = (cleanSettings.qualifIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
-          const { h1, h2 } = getMatchHandicap(p1?.level, p2?.level, cleanQualifHandicap, maxQualifHandicap);
-
-          newMatches[matchId] = {
-            id: matchId,
-            clubId: get().currentClub.id,
-            player1Id: shuffled[i],
-            player2Id: shuffled[j],
-            targetSets,
-            score1: h1,
-            score2: h2,
-            handicapP1: h1 > 0 ? h1 : undefined,
-            handicapP2: h2 > 0 ? h2 : undefined,
-            status: 'pending',
-            startTime: Date.now(),
-            tournamentId: tourId,
-            stage: 'qualif'
-          };
-          matchIds.push(matchId);
+      if (isMultiPool) {
+        const poolLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+        const poolsDistribution: Record<string, string[]> = {};
+        for (let p = 0; p < nbPoules; p++) {
+          const pName = `Poule ${poolLetters[p] || (p + 1)}`;
+          poolsDistribution[pName] = [];
         }
+
+        // Répartition aléatoire et équilibrée
+        const shuffled = [...participants].sort(() => 0.5 - Math.random());
+        shuffled.forEach((pId, idx) => {
+          const pIdx = idx % nbPoules;
+          const pName = `Poule ${poolLetters[pIdx] || (pIdx + 1)}`;
+          poolsDistribution[pName].push(pId);
+        });
+
+        cleanSettings.poolsDistribution = poolsDistribution;
+        cleanSettings.qualifNbPoules = nbPoules;
+
+        // Génération des matchs par poule
+        Object.entries(poolsDistribution).forEach(([pName, pList], pIdx) => {
+          for (let i = 0; i < pList.length; i++) {
+            for (let j = i + 1; j < pList.length; j++) {
+              const matchId = `m_${Date.now()}_p${pIdx}_${i}_${j}`;
+              const p1 = playersState[pList[i]];
+              const p2 = playersState[pList[j]];
+              const targetSets = resolveDuelTargetSets(p1?.level, p2?.level, cleanSettings, false);
+              const maxQualifHandicap = (cleanSettings.qualifIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+              const { h1, h2 } = getMatchHandicap(p1?.level, p2?.level, cleanQualifHandicap, maxQualifHandicap);
+
+              newMatches[matchId] = {
+                id: matchId,
+                clubId: get().currentClub.id,
+                player1Id: pList[i],
+                player2Id: pList[j],
+                targetSets,
+                score1: h1,
+                score2: h2,
+                handicapP1: h1 > 0 ? h1 : undefined,
+                handicapP2: h2 > 0 ? h2 : undefined,
+                status: 'pending',
+                startTime: Date.now(),
+                tournamentId: tourId,
+                stage: 'qualif',
+                poolName: pName,
+                poolIndex: pIdx
+              };
+              matchIds.push(matchId);
+            }
+          }
+        });
+        matchIds.sort(() => 0.5 - Math.random());
+      } else {
+        cleanSettings.qualifNbPoules = 1;
+        const shuffled = [...participants].sort(() => 0.5 - Math.random());
+
+        for (let i = 0; i < shuffled.length; i++) {
+          for (let j = i + 1; j < shuffled.length; j++) {
+            const matchId = `m_${Date.now()}_${i}_${j}`;
+            const p1 = playersState[shuffled[i]];
+            const p2 = playersState[shuffled[j]];
+            const targetSets = resolveDuelTargetSets(p1?.level, p2?.level, cleanSettings, false);
+            const maxQualifHandicap = (cleanSettings.qualifIsWinningSets ?? true) ? Math.max(0, targetSets - 1) : undefined;
+            const { h1, h2 } = getMatchHandicap(p1?.level, p2?.level, cleanQualifHandicap, maxQualifHandicap);
+
+            newMatches[matchId] = {
+              id: matchId,
+              clubId: get().currentClub.id,
+              player1Id: shuffled[i],
+              player2Id: shuffled[j],
+              targetSets,
+              score1: h1,
+              score2: h2,
+              handicapP1: h1 > 0 ? h1 : undefined,
+              handicapP2: h2 > 0 ? h2 : undefined,
+              status: 'pending',
+              startTime: Date.now(),
+              tournamentId: tourId,
+              stage: 'qualif'
+            };
+            matchIds.push(matchId);
+          }
+        }
+        // Shuffle the matches so the initial queue isn't completely sequential for one player
+        matchIds.sort(() => 0.5 - Math.random());
       }
-      // Shuffle the matches so the initial queue isn't completely sequential for one player
-      matchIds.sort(() => 0.5 - Math.random());
     }
 
     set((state) => {

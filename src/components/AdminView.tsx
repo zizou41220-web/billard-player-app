@@ -101,6 +101,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const [qualifNbSetsMixed, setQualifNbSetsMixed] = useState(1);
   const [qualifIsWinningSets, setQualifIsWinningSets] = useState(true);
   const [qualifNbQualifiers, setQualifNbQualifiers] = useState(2);
+  const [qualifNbPoules, setQualifNbPoules] = useState(1);
+  const [activePoolRankingTab, setActivePoolRankingTab] = useState<string>('all');
 
   const [finalNbSetsAmateur, setFinalNbSetsAmateur] = useState(3);
   const [finalNbSetsPrestige, setFinalNbSetsPrestige] = useState(3);
@@ -149,6 +151,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
       }
     }
   }, [selectedPlayers.length, newTourFormat, qualifNbQualifiers]);
+
+  React.useEffect(() => {
+    if (selectedPlayers.length > 0) {
+      const maxPoules = Math.max(1, Math.floor(selectedPlayers.length / 2));
+      if (qualifNbPoules > maxPoules) {
+        setQualifNbPoules(maxPoules);
+      }
+    }
+  }, [selectedPlayers.length, qualifNbPoules]);
 
   React.useEffect(() => {
     if (qualifHandicapAmateurSets > maxAllowedQualifHandicap) {
@@ -1025,8 +1036,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         </span>
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                           Format : <b style={{ color: '#fff' }}>
-                            {activeTournament.format === 'cartesien' ? 'Cartésien' :
-                             activeTournament.format === 'robin' ? 'Poules Robin' :
+                            {activeTournament.format === 'cartesien' ? `Cartésien${activeTournament.settings?.qualifNbPoules && activeTournament.settings.qualifNbPoules > 1 ? ` (${activeTournament.settings.qualifNbPoules} poules)` : ''}` :
+                             activeTournament.format === 'robin' ? `Poules Robin${activeTournament.settings?.qualifNbPoules && activeTournament.settings.qualifNbPoules > 1 ? ` (${activeTournament.settings.qualifNbPoules} poules)` : ''}` :
                              activeTournament.format === 'double_ko_bracket' ? 'Double KO (Arbre Gagnants / Repêchage)' :
                              activeTournament.format === 'direct_ko' ? 'Tableau Direct (KO)' :
                              'Double KO (Poules & Rattrapage)'}
@@ -1468,6 +1479,77 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           Phase de Qualification
                         </h3>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                          {/* Option Nombre de poules (Cartésien & Poules Robin) */}
+                          {(newTourFormat === 'cartesien' || newTourFormat === 'robin') && (
+                            <div style={{
+                              gridColumn: '1 / -1',
+                              background: 'rgba(0, 255, 204, 0.05)',
+                              padding: '1.1rem',
+                              borderRadius: '12px',
+                              border: '1px solid rgba(0, 255, 204, 0.25)',
+                              marginBottom: '0.2rem'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <label style={{ color: 'var(--accent-primary)', fontSize: '0.95rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  🎱 Répartition en Poules ({qualifNbPoules} poule{qualifNbPoules > 1 ? 's' : ''})
+                                </label>
+                                <span style={{ fontSize: '0.75rem', background: 'rgba(0, 255, 204, 0.15)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 204, 0.3)' }}>
+                                  {selectedPlayers.length} inscrit{selectedPlayers.length > 1 ? 's' : ''}
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map(nb => {
+                                  const minRequired = nb * 2;
+                                  const isDis = selectedPlayers.length > 0 && selectedPlayers.length < minRequired;
+                                  return (
+                                    <button
+                                      key={nb}
+                                      type="button"
+                                      disabled={isDis}
+                                      onClick={() => !isDis && setQualifNbPoules(nb)}
+                                      style={{
+                                        padding: '0.45rem 0.9rem',
+                                        borderRadius: '8px',
+                                        border: qualifNbPoules === nb ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                                        background: qualifNbPoules === nb ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.04)',
+                                        color: qualifNbPoules === nb ? 'var(--accent-primary)' : (isDis ? 'rgba(255,255,255,0.25)' : '#fff'),
+                                        cursor: isDis ? 'not-allowed' : 'pointer',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 800,
+                                        opacity: isDis ? 0.35 : 1,
+                                        transition: 'all 0.15s'
+                                      }}
+                                      title={isDis ? `Impossible avec ${selectedPlayers.length} inscrits : il faut au moins ${minRequired} joueurs (minimum 2 joueurs par poule)` : undefined}
+                                    >
+                                      {nb === 1 ? '1 Poule unique' : `${nb} Poules`}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              <div style={{ fontSize: '0.8rem', color: '#fff', lineHeight: '1.4' }}>
+                                {qualifNbPoules === 1 ? (
+                                  <span style={{ color: 'var(--text-muted)' }}>
+                                    Poule unique : tous les {selectedPlayers.length} participants disputent leurs matchs ensemble dans le même classement.
+                                  </span>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                    <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                                      ✓ Les {selectedPlayers.length} participants seront répartis équitablement dans {qualifNbPoules} poules distinctes ({Array.from({ length: qualifNbPoules }).map((_, i) => `Poule ${String.fromCharCode(65 + i)}`).join(', ')}).
+                                    </span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>
+                                      Chaque joueur affronte uniquement les adversaires de sa propre poule.
+                                      {qualifNbQualifiers >= qualifNbPoules && (
+                                        <> Les <strong>{Math.ceil(qualifNbQualifiers / qualifNbPoules)} premiers</strong> de chaque poule seront qualifiés et croisés dans le tableau final éliminatoire.</>
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
                           <div style={{ gridColumn: '1 / -1' }}>
                             <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Type de match</label>
                             <select className="input-field" value={qualifIsWinningSets ? 'winning' : 'fixed'} onChange={e => setQualifIsWinningSets(e.target.value === 'winning')} style={{ appearance: 'none', background: '#050816', color: '#fff' }}>
@@ -2215,6 +2297,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         createTournament(newTourName.trim(), newTourFormat, {
                           tableIds: selectedTables,
                           qualifNbSets: qualifNbSetsMixed, qualifIsWinningSets, qualifNbQualifiers,
+                          qualifNbPoules: (newTourFormat === 'cartesien' || newTourFormat === 'robin') ? qualifNbPoules : 1,
                           qualifNbSetsAmateur, qualifNbSetsPrestige, qualifNbSetsMixed,
                           finalNbSets: finalNbSetsMixed, finalIsWinningSets, seedByMerit,
                           finalNbSetsAmateur, finalNbSetsPrestige, finalNbSetsMixed,
@@ -2727,7 +2810,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                                  {match.poolName && (
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 700, background: 'rgba(0, 255, 204, 0.12)', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(0, 255, 204, 0.25)' }}>
+                                      {match.poolName}
+                                    </span>
+                                  )}
+                                </div>
                                 {match.stage && (
                                   <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                     {match.stage}
@@ -2872,7 +2962,22 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               </div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                                  <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
+                                    {match.poolName && (
+                                      <span style={{
+                                        background: 'rgba(0, 255, 204, 0.15)',
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        padding: '1px 6px',
+                                        borderRadius: '4px',
+                                        border: '1px solid rgba(0, 255, 204, 0.3)'
+                                      }}>
+                                        {match.poolName}
+                                      </span>
+                                    )}
+                                  </div>
                                   {match.stage && match.stage !== 'qualif' && (
                                     <span style={{
                                       background: 'rgba(255, 215, 0, 0.2)',
@@ -2966,52 +3071,154 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: 0 }}>
                   {/* Ranking */}
                   <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.2rem 1.4rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                    <h2 style={{ fontSize: '1.2rem', color: 'var(--accent-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Trophy size={18} /> Classement Actuel
-                    </h2>
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                        <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', backdropFilter: 'blur(10px)', zIndex: 1 }}>
-                          <tr style={{ color: 'var(--card-text-muted)', borderBottom: '2px solid var(--border-color)' }}>
-                            <th style={{ padding: '0.5rem' }}>#</th>
-                            <th style={{ padding: '0.5rem' }}>Joueur</th>
-                            <th style={{ padding: '0.5rem', textAlign: 'center' }}>V</th>
-                            <th style={{ padding: '0.5rem', textAlign: 'center' }}>+/-</th>
-                            <th style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ranking.map((p, i) => {
-                            const isSure = qualifStatus.sureQualifiers.includes(p.id);
-                            const isQualifyingZone = i < qualifStatus.numQualifiers;
-                            const isCutoff = i === qualifStatus.numQualifiers - 1 && i < ranking.length - 1;
-                            return (
-                              <tr
-                                key={p.id}
-                                style={{
-                                  borderBottom: isCutoff ? '2px dashed rgba(0, 255, 170, 0.4)' : '1px solid var(--border-color)',
-                                  background: isQualifyingZone ? 'rgba(0, 255, 170, 0.05)' : 'transparent'
-                                }}
-                              >
-                                <td style={{ padding: '0.5rem', fontWeight: 800, color: isQualifyingZone ? 'var(--accent-primary)' : 'inherit' }}>{i + 1}</td>
-                                <td style={{ padding: '0.5rem', fontWeight: 600 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span>{p.name}</span>
-                                    {isSure && (
-                                      <span style={{ fontSize: '0.65rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(0, 255, 170, 0.3)' }} title="Mathématiquement qualifié">
-                                        Qualifié
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }}>{p.won}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <h2 style={{ fontSize: '1.2rem', color: 'var(--accent-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Trophy size={18} /> Classement Actuel
+                      </h2>
+                      {qualifStatus.isMultiPool && qualifStatus.rankingsByPool && qualifStatus.poolNames && qualifStatus.poolNames.length > 1 && (
+                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => setActivePoolRankingTab('all')}
+                            style={{
+                              padding: '2px 7px',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              border: activePoolRankingTab === 'all' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                              background: activePoolRankingTab === 'all' ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
+                              color: activePoolRankingTab === 'all' ? 'var(--accent-primary)' : '#fff',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Toutes
+                          </button>
+                          {qualifStatus.poolNames.map(pName => (
+                            <button
+                              key={pName}
+                              type="button"
+                              onClick={() => setActivePoolRankingTab(pName)}
+                              style={{
+                                padding: '2px 7px',
+                                borderRadius: '6px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                border: activePoolRankingTab === pName ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                                background: activePoolRankingTab === pName ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
+                                color: activePoolRankingTab === pName ? 'var(--accent-primary)' : '#fff',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {pName}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {qualifStatus.isMultiPool && qualifStatus.rankingsByPool && qualifStatus.poolNames && qualifStatus.poolNames.length > 1 ? (
+                        (activePoolRankingTab === 'all' ? qualifStatus.poolNames : [activePoolRankingTab]).map(pName => {
+                          const poolRank = qualifStatus.rankingsByPool[pName] || [];
+                          const qualPerPool = Math.max(1, Math.round(qualifStatus.numQualifiers / qualifStatus.poolNames.length));
+
+                          return (
+                            <div key={pName} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '0.8rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                                <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  🎱 {pName}
+                                </span>
+                                <span style={{ fontSize: '0.72rem', background: 'rgba(0, 255, 204, 0.12)', color: 'var(--accent-primary)', padding: '2px 7px', borderRadius: '8px', fontWeight: 700 }}>
+                                  Top {qualPerPool} qualifié{qualPerPool > 1 ? 's' : ''}
+                                </span>
+                              </div>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                                <thead>
+                                  <tr style={{ color: 'var(--card-text-muted)', borderBottom: '1px solid var(--border-color)' }}>
+                                    <th style={{ padding: '0.4rem' }}>#</th>
+                                    <th style={{ padding: '0.4rem' }}>Joueur</th>
+                                    <th style={{ padding: '0.4rem', textAlign: 'center' }}>V</th>
+                                    <th style={{ padding: '0.4rem', textAlign: 'center' }}>+/-</th>
+                                    <th style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {poolRank.map((p, i) => {
+                                    const isQualifyingZone = i < qualPerPool;
+                                    const isCutoff = i === qualPerPool - 1 && i < poolRank.length - 1;
+                                    return (
+                                      <tr
+                                        key={p.id}
+                                        style={{
+                                          borderBottom: isCutoff ? '2px dashed rgba(0, 255, 170, 0.4)' : '1px solid var(--border-color)',
+                                          background: isQualifyingZone ? 'rgba(0, 255, 170, 0.05)' : 'transparent'
+                                        }}
+                                      >
+                                        <td style={{ padding: '0.4rem', fontWeight: 800, color: isQualifyingZone ? 'var(--accent-primary)' : 'inherit' }}>{i + 1}</td>
+                                        <td style={{ padding: '0.4rem', fontWeight: 600 }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span>{p.name}</span>
+                                            {p.isSure && (
+                                              <span style={{ fontSize: '0.62rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(0, 255, 170, 0.3)' }} title="Mathématiquement qualifié">
+                                                Qualifié
+                                              </span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--accent-primary)' }}>{p.won}</td>
+                                        <td style={{ padding: '0.4rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
+                                        <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', backdropFilter: 'blur(10px)', zIndex: 1 }}>
+                            <tr style={{ color: 'var(--card-text-muted)', borderBottom: '2px solid var(--border-color)' }}>
+                              <th style={{ padding: '0.5rem' }}>#</th>
+                              <th style={{ padding: '0.5rem' }}>Joueur</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center' }}>V</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center' }}>+/-</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ranking.map((p, i) => {
+                              const isSure = qualifStatus.sureQualifiers.includes(p.id);
+                              const isQualifyingZone = i < qualifStatus.numQualifiers;
+                              const isCutoff = i === qualifStatus.numQualifiers - 1 && i < ranking.length - 1;
+                              return (
+                                <tr
+                                  key={p.id}
+                                  style={{
+                                    borderBottom: isCutoff ? '2px dashed rgba(0, 255, 170, 0.4)' : '1px solid var(--border-color)',
+                                    background: isQualifyingZone ? 'rgba(0, 255, 170, 0.05)' : 'transparent'
+                                  }}
+                                >
+                                  <td style={{ padding: '0.5rem', fontWeight: 800, color: isQualifyingZone ? 'var(--accent-primary)' : 'inherit' }}>{i + 1}</td>
+                                  <td style={{ padding: '0.5rem', fontWeight: 600 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>{p.name}</span>
+                                      {isSure && (
+                                        <span style={{ fontSize: '0.65rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(0, 255, 170, 0.3)' }} title="Mathématiquement qualifié">
+                                          Qualifié
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }}>{p.won}</td>
+                                  <td style={{ padding: '0.5rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
+                                  <td style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
 
                     <button

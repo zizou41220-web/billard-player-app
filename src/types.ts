@@ -83,6 +83,8 @@ export type Match = {
   targetSets?: number; // Nombre de manches spécifiques allouées à ce duel
   handicapP1?: number;
   handicapP2?: number;
+  poolName?: string; // Ex: 'Poule A', 'Poule B'
+  poolIndex?: number; // Ex: 0, 1
   liveStreamUrl?: string;
 };
 
@@ -96,6 +98,8 @@ export type TournamentSettings = {
   qualifNbSetsMixed?: number; // Manches Amateur vs Prestige en qualif
   qualifIsWinningSets: boolean; // true = "première à X", false = "jouer X manches fixes"
   qualifNbQualifiers: number; // sortants par poule / qualifiés
+  qualifNbPoules?: number; // Nombre de poules (ex: 1, 2, 3, 4...). Par défaut 1
+  poolsDistribution?: Record<string, string[]>; // { 'Poule A': [p1, p2...], 'Poule B': [...] }
   qualifHandicapAmateurSets?: number; // 0 = aucun, 1 = +1 manche d'avance pour Amateur vs Prestige en qualif
   finalNbSets: number;
   finalNbSetsAmateur?: number; // Manches Amateur vs Amateur en phase finale
