@@ -1699,7 +1699,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                                         {player?.name || 'Joueur'}
                                                       </span>
                                                       {player?.level && (
-                                                        <span style={{ fontSize: '0.62rem', color: player.level === 'prestige' ? '#ffd700' : 'var(--accent-secondary)', textTransform: 'capitalize' }}>
+                                                        <span style={{ fontSize: '0.62rem', color: (player.level === 'Prestige' || player.level === 'Confirmé') ? '#ffd700' : 'var(--accent-secondary)', textTransform: 'capitalize' }}>
                                                           ({player.level})
                                                         </span>
                                                       )}
