@@ -3410,8 +3410,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   <tr style={{ color: 'var(--card-text-muted)', borderBottom: '1px solid var(--border-color)' }}>
                                     <th style={{ padding: '0.4rem' }}>#</th>
                                     <th style={{ padding: '0.4rem' }}>Joueur</th>
-                                    <th style={{ padding: '0.4rem', textAlign: 'center' }}>V</th>
-                                    <th style={{ padding: '0.4rem', textAlign: 'center' }}>+/-</th>
+                                    <th style={{ padding: '0.4rem', textAlign: 'center' }} title="Matchs Joués">J</th>
+                                    <th style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--accent-primary)' }} title="Matchs Gagnés">G</th>
+                                    <th style={{ padding: '0.4rem', textAlign: 'center', color: '#ff6b6b' }} title="Matchs Perdus">P</th>
+                                    <th style={{ padding: '0.4rem', textAlign: 'center' }} title="Différence de manches">+/-</th>
                                     <th style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
                                   </tr>
                                 </thead>
@@ -3438,7 +3440,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                             )}
                                           </div>
                                         </td>
-                                        <td style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--accent-primary)' }}>{p.won}</td>
+                                        <td style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--text-muted)' }}>{p.played}</td>
+                                        <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: 700, color: 'var(--accent-primary)' }}>{p.won}</td>
+                                        <td style={{ padding: '0.4rem', textAlign: 'center', color: p.lost > 0 ? '#ff6b6b' : 'var(--text-muted)' }}>{p.lost}</td>
                                         <td style={{ padding: '0.4rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
                                         <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
                                       </tr>
@@ -3455,8 +3459,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             <tr style={{ color: 'var(--card-text-muted)', borderBottom: '2px solid var(--border-color)' }}>
                               <th style={{ padding: '0.5rem' }}>#</th>
                               <th style={{ padding: '0.5rem' }}>Joueur</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'center' }}>V</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'center' }}>+/-</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center' }} title="Matchs Joués">J</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }} title="Matchs Gagnés">G</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center', color: '#ff6b6b' }} title="Matchs Perdus">P</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center' }} title="Différence de manches">+/-</th>
                               <th style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
                             </tr>
                           </thead>
@@ -3484,7 +3490,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       )}
                                     </div>
                                   </td>
-                                  <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }}>{p.won}</td>
+                                  <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>{p.played}</td>
+                                  <td style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 700, color: 'var(--accent-primary)' }}>{p.won}</td>
+                                  <td style={{ padding: '0.5rem', textAlign: 'center', color: p.lost > 0 ? '#ff6b6b' : 'var(--text-muted)' }}>{p.lost}</td>
                                   <td style={{ padding: '0.5rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
                                   <td style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
                                 </tr>
