@@ -28,7 +28,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     createTournament, addPlayer, updatePlayer, deletePlayer,
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
-    assignMatchToTable, launchMatchOnTable, updateFinishedMatchScore, startTournamentMatch,
+    launchMatchOnTable, updateFinishedMatchScore, startTournamentMatch,
     startCustomLiveMatch,
     launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream,
     updateTournamentSettings, recomputePlayerStats
@@ -419,6 +419,72 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const unplayedQualifMatches = (isFinalStageActive && activeTournament)
     ? allTourMatches.filter(m => !isFinalStageMatch(m) && m.status !== 'finished')
     : [];
+
+  // Table mapping for all occupied tables
+  const tableByCurrentMatchId: Record<string, string> = {};
+  Object.values(tables).forEach(t => {
+    if (t.status === 'occupied' && t.currentMatchId) {
+      tableByCurrentMatchId[t.currentMatchId] = t.id;
+    }
+  });
+
+  const getEffectiveTableId = (match: any): string | undefined => {
+    return match?.tableId || tableByCurrentMatchId[match?.id];
+  };
+
+  // Safe, strictly deduplicated matchesToPlay: 1 match max per table, no player on 2 tables at once
+  const { matchesToPlay, matchesWaiting } = (() => {
+    const tableAssigned = new Map<string, any>();
+    const busyPlayerSet = new Set<string>();
+
+    // 1. Live playing matches get top priority
+    pendingTourMatches.filter(m => m.status === 'playing').forEach(m => {
+      const tId = getEffectiveTableId(m);
+      if (tId && !tableAssigned.has(tId)) {
+        tableAssigned.set(tId, m);
+        if (m.player1Id) busyPlayerSet.add(m.player1Id);
+        if (m.player2Id) busyPlayerSet.add(m.player2Id);
+      }
+    });
+
+    // 2. Pending matches with a table assigned
+    pendingTourMatches.filter(m => m.status === 'pending' && Boolean(getEffectiveTableId(m))).forEach(m => {
+      const tId = getEffectiveTableId(m)!;
+      if (!tableAssigned.has(tId)) {
+        const p1Conflict = m.player1Id && busyPlayerSet.has(m.player1Id);
+        const p2Conflict = m.player2Id && busyPlayerSet.has(m.player2Id);
+        if (!p1Conflict && !p2Conflict) {
+          tableAssigned.set(tId, m);
+          if (m.player1Id) busyPlayerSet.add(m.player1Id);
+          if (m.player2Id) busyPlayerSet.add(m.player2Id);
+        }
+      }
+    });
+
+    const toPlay = Array.from(tableAssigned.values());
+    const toPlayIds = new Set(toPlay.map(m => m.id));
+    const waiting = pendingTourMatches.filter(m => !toPlayIds.has(m.id));
+
+    return { matchesToPlay: toPlay, matchesWaiting: waiting };
+  })();
+
+  // Helper to check if any player in a match is already busy on an assigned table
+  const getBusyPlayerInfo = (m: any) => {
+    for (const activeM of matchesToPlay) {
+      if (activeM.id === m.id) continue;
+      const tId = getEffectiveTableId(activeM);
+      const tObj = tId ? tables[tId] : null;
+      const tName = tObj?.name || (tId ? `T.${tObj?.number || tId}` : 'un billard');
+
+      if (m.player1Id && (activeM.player1Id === m.player1Id || activeM.player2Id === m.player1Id)) {
+        return { busy: true, playerName: players[m.player1Id]?.name || 'Joueur 1', tableName: tName };
+      }
+      if (m.player2Id && (activeM.player1Id === m.player2Id || activeM.player2Id === m.player2Id)) {
+        return { busy: true, playerName: players[m.player2Id]?.name || 'Joueur 2', tableName: tName };
+      }
+    }
+    return { busy: false, playerName: '', tableName: '' };
+  };
 
   const hasInvertedSemi = Boolean(isFinalStageActive && qualifStatus.ranking.length >= 2 && (() => {
     const tourMatches = activeTournament ? activeTournament.matches.map(id => matches[id]).filter(Boolean) : [];
@@ -2792,72 +2858,6 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
           const finishedMatches = allTourMatches.filter(m => m.status === 'finished').reverse();
 
-          // Table mapping for all occupied tables
-          const tableByCurrentMatchId: Record<string, string> = {};
-          Object.values(tables).forEach(t => {
-            if (t.status === 'occupied' && t.currentMatchId) {
-              tableByCurrentMatchId[t.currentMatchId] = t.id;
-            }
-          });
-
-          const getEffectiveTableId = (match: any): string | undefined => {
-            return match.tableId || tableByCurrentMatchId[match.id];
-          };
-
-          // Safe, strictly deduplicated matchesToPlay: 1 match max per table, no player on 2 tables at once
-          const { matchesToPlay, matchesWaiting } = (() => {
-            const tableAssigned = new Map<string, any>();
-            const busyPlayerSet = new Set<string>();
-
-            // 1. Live playing matches get top priority
-            pendingTourMatches.filter(m => m.status === 'playing').forEach(m => {
-              const tId = getEffectiveTableId(m);
-              if (tId && !tableAssigned.has(tId)) {
-                tableAssigned.set(tId, m);
-                if (m.player1Id) busyPlayerSet.add(m.player1Id);
-                if (m.player2Id) busyPlayerSet.add(m.player2Id);
-              }
-            });
-
-            // 2. Pending matches with a table assigned
-            pendingTourMatches.filter(m => m.status === 'pending' && Boolean(getEffectiveTableId(m))).forEach(m => {
-              const tId = getEffectiveTableId(m)!;
-              if (!tableAssigned.has(tId)) {
-                const p1Conflict = m.player1Id && busyPlayerSet.has(m.player1Id);
-                const p2Conflict = m.player2Id && busyPlayerSet.has(m.player2Id);
-                if (!p1Conflict && !p2Conflict) {
-                  tableAssigned.set(tId, m);
-                  if (m.player1Id) busyPlayerSet.add(m.player1Id);
-                  if (m.player2Id) busyPlayerSet.add(m.player2Id);
-                }
-              }
-            });
-
-            const toPlay = Array.from(tableAssigned.values());
-            const toPlayIds = new Set(toPlay.map(m => m.id));
-            const waiting = pendingTourMatches.filter(m => !toPlayIds.has(m.id));
-
-            return { matchesToPlay: toPlay, matchesWaiting: waiting };
-          })();
-
-          // Helper to check if any player in a match is already busy on an assigned table
-          const getBusyPlayerInfo = (m: any) => {
-            for (const activeM of matchesToPlay) {
-              if (activeM.id === m.id) continue;
-              const tId = getEffectiveTableId(activeM);
-              const tObj = tId ? tables[tId] : null;
-              const tName = tObj?.name || (tId ? `T.${tObj?.number || tId}` : 'un billard');
-
-              if (m.player1Id && (activeM.player1Id === m.player1Id || activeM.player2Id === m.player1Id)) {
-                return { busy: true, playerName: players[m.player1Id]?.name || 'Joueur 1', tableName: tName };
-              }
-              if (m.player2Id && (activeM.player1Id === m.player2Id || activeM.player2Id === m.player2Id)) {
-                return { busy: true, playerName: players[m.player2Id]?.name || 'Joueur 2', tableName: tName };
-              }
-            }
-            return { busy: false, playerName: '', tableName: '' };
-          };
-
           if (dashboardSubTab === 'bracket') {
             return (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflowY: 'auto' }}>
@@ -3099,7 +3099,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                         <button
                                           key={tId}
                                           className={isFree ? "btn btn-neon" : "btn btn-outline"}
-                                          disabled={busyInfo.busy || isPlaying}
+                                          disabled={Boolean(busyInfo.busy || isPlaying)}
                                           style={{
                                             fontSize: '0.65rem',
                                             padding: '2px 7px',
@@ -5886,7 +5886,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '0.2rem' }}>
-                        {matchesWaiting.map((wm, idx) => {
+                        {matchesWaiting.map((wm: any, idx: number) => {
                           const busy = getBusyPlayerInfo(wm);
                           const p1 = players[wm.player1Id];
                           const p2 = players[wm.player2Id];
@@ -5942,7 +5942,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 <button
                                   type="button"
                                   className="btn btn-neon"
-                                  disabled={busy.busy}
+                                  disabled={Boolean(busy.busy)}
                                   style={{
                                     fontSize: '0.75rem',
                                     padding: '0.35rem 0.8rem',
