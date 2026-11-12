@@ -2962,7 +2962,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr 340px', gap: '1.5rem', flex: 1, minHeight: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 270px) 1fr minmax(460px, 490px)', gap: '1.2rem', flex: 1, minHeight: 0 }}>
 
                 {/* LEFT: Meta & QR + FILE D'ATTENTE */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: 0 }}>
@@ -3215,108 +3215,132 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         Aucun match prêt à jouer.
                       </div>
                     ) : (
-                      <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '0.9rem', alignContent: 'start', paddingRight: '0.3rem' }}>
-                        {matchesToPlay.map(match => {
-                          const effTableId = getEffectiveTableId(match);
-                          const tableObj = effTableId ? tables[effTableId] : null;
-                          const tableName = tableObj?.name || (effTableId ? `Table ${tableObj?.number || effTableId}` : 'Table');
+                      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingRight: '0.3rem' }}>
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          justifyContent: 'center',
+                          gap: '0.9rem',
+                          width: '100%',
+                          maxWidth: (matchesToPlay.length <= 2) ? '700px' : '960px'
+                        }}>
+                          {matchesToPlay.map(match => {
+                            const effTableId = getEffectiveTableId(match);
+                            const tableObj = effTableId ? tables[effTableId] : null;
+                            const tableName = tableObj?.name || (effTableId ? `Table ${tableObj?.number || effTableId}` : 'Table');
 
-                          return (
-                            <div key={match.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                              <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '8px', opacity: match.status === 'playing' ? 0.3 : 1 }}>
-                                <QRCode value={JSON.stringify({ tournamentId: match.tournamentId || activeTournament.id, matchId: match.id, tableId: effTableId || match.tableId || '', clubId: currentClub.id })} size={80} />
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
-                                    {match.poolName && (
+                            return (
+                              <div
+                                key={match.id}
+                                style={{
+                                  flex: '1 1 290px',
+                                  maxWidth: (matchesToPlay.length <= 2) ? '335px' : '360px',
+                                  minWidth: '260px',
+                                  background: 'rgba(255,255,255,0.02)',
+                                  border: '1px solid var(--border-color)',
+                                  borderRadius: '12px',
+                                  padding: '0.9rem 1rem',
+                                  display: 'flex',
+                                  gap: '0.9rem',
+                                  alignItems: 'center',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '8px', opacity: match.status === 'playing' ? 0.3 : 1 }}>
+                                  <QRCode value={JSON.stringify({ tournamentId: match.tournamentId || activeTournament.id, matchId: match.id, tableId: effTableId || match.tableId || '', clubId: currentClub.id })} size={80} />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
+                                      {match.poolName && (
+                                        <span style={{
+                                          background: 'rgba(0, 255, 204, 0.15)',
+                                          color: 'var(--accent-primary)',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 800,
+                                          padding: '1px 6px',
+                                          borderRadius: '4px',
+                                          border: '1px solid rgba(0, 255, 204, 0.3)'
+                                        }}>
+                                          {match.poolName}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {match.stage && match.stage !== 'qualif' && (
                                       <span style={{
-                                        background: 'rgba(0, 255, 204, 0.15)',
-                                        color: 'var(--accent-primary)',
+                                        background: 'rgba(255, 215, 0, 0.2)',
+                                        color: '#ffd700',
                                         fontSize: '0.68rem',
                                         fontWeight: 800,
                                         padding: '1px 6px',
                                         borderRadius: '4px',
-                                        border: '1px solid rgba(0, 255, 204, 0.3)'
+                                        border: '1px solid rgba(255, 215, 0, 0.4)'
                                       }}>
-                                        {match.poolName}
+                                        {match.stage === 'final' ? '🏆 Finale' : match.stage === 'semi' ? '⚔️ 1/2 Finale' : '🎯 1/4 Finale'}
                                       </span>
                                     )}
                                   </div>
-                                  {match.stage && match.stage !== 'qualif' && (
-                                    <span style={{
-                                      background: 'rgba(255, 215, 0, 0.2)',
-                                      color: '#ffd700',
-                                      fontSize: '0.68rem',
-                                      fontWeight: 800,
-                                      padding: '1px 6px',
-                                      borderRadius: '4px',
-                                      border: '1px solid rgba(255, 215, 0, 0.4)'
-                                    }}>
-                                      {match.stage === 'final' ? '🏆 Finale' : match.stage === 'semi' ? '⚔️ 1/2 Finale' : '🎯 1/4 Finale'}
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player1Id]?.name}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
-                                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player2Id]?.name}</div>
-                                {match.status === 'playing' ? (
-                                  <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                                    <div style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
-                                    {effTableId && (
+                                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player1Id]?.name}</div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
+                                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player2Id]?.name}</div>
+                                  {match.status === 'playing' ? (
+                                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                                      <div style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
+                                      {effTableId && (
+                                        <button
+                                          className="btn btn-outline"
+                                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem', width: '100%', justifyContent: 'center' }}
+                                          onClick={() => setSelectedTableForQR(effTableId)}
+                                        >
+                                          Modifier le score
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+                                      <button
+                                        className="btn btn-neon"
+                                        style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#000', fontWeight: 800 }}
+                                        onClick={() => {
+                                          startTournamentMatch(match.id, false);
+                                          if (effTableId) setSelectedTableForQR(effTableId);
+                                        }}
+                                      >
+                                        <Play size={12} /> Démarrer
+                                      </button>
                                       <button
                                         className="btn btn-outline"
-                                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem', width: '100%', justifyContent: 'center' }}
-                                        onClick={() => setSelectedTableForQR(effTableId)}
+                                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: 'var(--accent-primary)', borderColor: 'rgba(0, 255, 170, 0.35)' }}
+                                        title="Marquer le score directement si ce match a été joué sans utiliser l'application"
+                                        onClick={() => openDirectScoreModal(match)}
                                       >
-                                        Modifier le score
+                                        <Edit2 size={12} /> Score
                                       </button>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
-                                    <button
-                                      className="btn btn-neon"
-                                      style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#000', fontWeight: 800 }}
-                                      onClick={() => {
-                                        startTournamentMatch(match.id, false);
-                                        if (effTableId) setSelectedTableForQR(effTableId);
-                                      }}
-                                    >
-                                      <Play size={12} /> Démarrer
-                                    </button>
-                                    <button
-                                      className="btn btn-outline"
-                                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: 'var(--accent-primary)', borderColor: 'rgba(0, 255, 170, 0.35)' }}
-                                      title="Marquer le score directement si ce match a été joué sans utiliser l'application"
-                                      onClick={() => openDirectScoreModal(match)}
-                                    >
-                                      <Edit2 size={12} /> Score
-                                    </button>
-                                    <button
-                                      className="btn btn-outline"
-                                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                                      onClick={() => {
-                                        if (effTableId && matchesWaiting.length > 0) {
-                                          setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
-                                        } else {
-                                          postponeMatch(match.id);
-                                        }
-                                      }}
-                                    >
-                                      <ArrowUpDown size={12} /> Repousser
-                                    </button>
-                                  </div>
-                                )}
+                                      <button
+                                        className="btn btn-outline"
+                                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                                        onClick={() => {
+                                          if (effTableId && matchesWaiting.length > 0) {
+                                            setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
+                                          } else {
+                                            postponeMatch(match.id);
+                                          }
+                                        }}
+                                      >
+                                        <ArrowUpDown size={12} /> Repousser
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
 
                         {/* Matchs de qualification non joués (clôturés lors du passage en phase finale) */}
                         {unplayedQualifMatches.length > 0 && (
-                          <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem', padding: '0.8rem 1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ width: '100%', maxWidth: '700px', marginTop: '0.8rem', padding: '0.8rem 1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700 }}>
                                 Matchs de poule restants (non disputés pour passage en phase finale)
