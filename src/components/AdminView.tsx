@@ -5391,6 +5391,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           </ul>
                         </div>
 
+                        <div style={{ fontSize: '0.73rem', color: '#ffb3ba', lineHeight: '1.4', background: 'rgba(255, 0, 51, 0.08)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255, 0, 51, 0.25)' }}>
+                          ⚠️ <b>Important sur YouTube :</b> Tous les formats de liens sont acceptés (<code>youtube.com/watch?v=...</code>, <code>youtu.be/...</code>, <code>youtube.com/live/...</code>). Dans YouTube Studio &gt; Paramètres du flux, veillez à ce que <b>« Autoriser l'intégration »</b> soit activé.
+                        </div>
+
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <button
                             type="button"
@@ -6569,6 +6573,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           <li><b>Sur PC avec OBS :</b> Dans OBS &gt; Paramètres &gt; Stream &gt; YouTube, et ajoutez une source Navigateur avec l'URL ci-dessous.</li>
                           <li><b>Sur Smartphone avec Prism :</b> Dans l'application Prism Live Studio, liez votre compte YouTube et ajoutez l'URL ci-dessous comme Widget Web.</li>
                         </ul>
+                      </div>
+
+                      <div style={{ fontSize: '0.73rem', color: '#ffb3ba', lineHeight: '1.4', background: 'rgba(255, 0, 51, 0.08)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255, 0, 51, 0.25)' }}>
+                        ⚠️ <b>Important sur YouTube :</b> Tous les formats de liens sont acceptés (<code>youtube.com/watch?v=...</code>, <code>youtu.be/...</code>, <code>youtube.com/live/...</code>). Dans YouTube Studio &gt; Paramètres du flux, veillez à ce que <b>« Autoriser l'intégration »</b> soit activé.
                       </div>
 
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

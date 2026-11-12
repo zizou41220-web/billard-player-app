@@ -9,6 +9,8 @@ interface StreamOverlayViewProps {
   tableParam: string;
 }
 
+import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl } from '../utils/video';
+
 interface MultiTableTileProps {
   table: Table;
   match?: Match;
@@ -21,31 +23,7 @@ interface MultiTableTileProps {
   onFocusTable: (tableId: string) => void;
 }
 
-const formatEmbedVideoUrl = (url: string) => {
-  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
-  if (ytMatch) {
-    return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&mute=1&playsinline=1&rel=0`;
-  }
-  if (url.includes('facebook.com') || url.includes('fb.watch')) {
-    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&autoplay=1&mute=1&show_text=0`;
-  }
-  return url;
-};
 
-const extractExternalVideoFromStreamUrl = (streamUrl?: string): string => {
-  if (!streamUrl) return '';
-  try {
-    const qIdx = streamUrl.indexOf('?');
-    if (qIdx !== -1 && streamUrl.includes('overlay=')) {
-      const params = new URLSearchParams(streamUrl.slice(qIdx));
-      return params.get('video') || '';
-    }
-  } catch {}
-  if (!streamUrl.includes('overlay=')) {
-    return streamUrl;
-  }
-  return '';
-};
 
 const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
   table,
@@ -117,7 +95,9 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
       {sourceMode === 'ext' && activeExtVideo ? (
         <iframe
           src={formatEmbedVideoUrl(activeExtVideo)}
-          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
           style={{
             position: 'absolute',
             inset: 0,
@@ -759,7 +739,9 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       {effectiveExternalVideo && !vdoRoom && !isLocalBroadcast && (
         <iframe
           src={formatEmbedVideoUrl(effectiveExternalVideo)}
-          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
           style={{
             position: 'absolute',
             inset: 0,

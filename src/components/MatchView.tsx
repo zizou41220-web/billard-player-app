@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../store';
 import { Flag, Minus, Plus, Radio } from 'lucide-react';
 import { getMatchScoringRules } from '../utils/rules';
+import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl } from '../utils/video';
 
 const MatchView: React.FC = () => {
   const { players, matches, activeMatchId, updateScore, finishMatch, tables, tournaments } = useStore();
@@ -12,6 +13,11 @@ const MatchView: React.FC = () => {
   if (!match) return null;
   const table = match.tableId ? tables[match.tableId] : null;
   const rawStreamUrl = match.liveStreamUrl || table?.liveStreamUrl;
+  const extVideo = extractExternalVideoFromStreamUrl(rawStreamUrl);
+  const vdoRoom = extractVdoRoomFromStreamUrl(rawStreamUrl);
+  const hasLiveVideo = Boolean(extVideo || vdoRoom);
+  const [showVideo, setShowVideo] = useState(true);
+
   const streamUrl = (() => {
     if (!rawStreamUrl) return undefined;
     const idx = rawStreamUrl.indexOf('?overlay=');
@@ -124,6 +130,106 @@ const MatchView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Live Video Player on Match View */}
+      {hasLiveVideo && (
+        <div style={{
+          width: '100%',
+          background: '#050814',
+          borderBottom: '2px solid rgba(0, 255, 170, 0.3)',
+          display: 'flex',
+          flexDirection: 'column',
+          flexShrink: 0
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.45rem 1rem',
+            background: 'rgba(255, 255, 255, 0.04)',
+            fontSize: '0.74rem'
+          }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#ff4466', fontWeight: 800 }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ff4466', animation: 'pulse 1.5s infinite' }} />
+              DIRECT VIDÉO
+            </span>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowVideo(v => !v)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: 'rgba(255,255,255,0.85)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '0.7rem',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                {showVideo ? 'Masquer vidéo 🔼' : 'Afficher vidéo 🔽'}
+              </button>
+              {streamUrl && (
+                <a
+                  href={streamUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    color: 'var(--accent-primary)',
+                    textDecoration: 'none',
+                    fontSize: '0.7rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    fontWeight: 700
+                  }}
+                  title="Ouvrir le direct plein écran avec bandeau TV"
+                >
+                  ⤢ Plein écran
+                </a>
+              )}
+            </div>
+          </div>
+
+          {showVideo && (
+            <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000', overflow: 'hidden' }}>
+              {extVideo ? (
+                <iframe
+                  src={formatEmbedVideoUrl(extVideo)}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 'none'
+                  }}
+                  title="Direct Vidéo du Match"
+                />
+              ) : vdoRoom ? (
+                <iframe
+                  src={`https://vdo.ninja/?view=${encodeURIComponent(vdoRoom)}&cleanoutput&autoplay&muted`}
+                  allow="autoplay; camera; microphone; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 'none'
+                  }}
+                  title="Direct Vidéo Smartphone"
+                />
+              ) : null}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Player 2 Zone (Top half) */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', minHeight: '200px' }}>
