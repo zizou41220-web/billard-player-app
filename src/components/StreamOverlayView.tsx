@@ -26,6 +26,9 @@ const formatEmbedVideoUrl = (url: string) => {
   if (ytMatch) {
     return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&mute=1&playsinline=1&rel=0`;
   }
+  if (url.includes('facebook.com') || url.includes('fb.watch')) {
+    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&autoplay=1&mute=1&show_text=0`;
+  }
   return url;
 };
 
