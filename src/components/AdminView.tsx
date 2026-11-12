@@ -2968,132 +2968,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 270px) 1fr minmax(460px, 490px)', gap: '1.2rem', flex: 1, minHeight: 0 }}>
 
-                {/* LEFT: QR BILLARDS + FILE D'ATTENTE PLEINE HAUTEUR */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', minHeight: 0 }}>
-                  {/* QR Codes des Billards en Salle */}
-                  <div
-                    className="glass-card"
-                    style={{
-                      padding: '0.8rem 1rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.6rem',
-                      flexShrink: 0
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '1rem' }}>🎱</span>
-                        <h3 style={{ fontSize: '0.95rem', color: '#fff', margin: 0, fontWeight: 700 }}>
-                          QR Billards
-                        </h3>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{
-                            fontSize: '0.7rem',
-                            padding: '2px 8px',
-                            height: '24px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            color: 'var(--accent-primary)',
-                            borderColor: 'rgba(0, 255, 170, 0.35)',
-                            background: 'rgba(0, 255, 170, 0.08)'
-                          }}
-                          onClick={() => setShowJoinQRModal(true)}
-                          title="Afficher le QR code d'accès au tournoi pour les joueurs / spectateurs"
-                        >
-                          <Smartphone size={12} /> QR Inscription
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{ fontSize: '0.7rem', padding: '2px 7px', height: '24px', display: 'flex', alignItems: 'center', gap: '3px' }}
-                          onClick={() => setActiveTab('launcher')}
-                          title="Gérer dans le Lanceur"
-                        >
-                          <Rocket size={12} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Ligne des QR Codes des billards */}
-                    {(() => {
-                      const tourTableIds = (activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0)
-                        ? activeTournament.settings.tableIds
-                        : Object.keys(tables);
-                      const tourTables = tourTableIds.map(id => tables[id]).filter(Boolean);
-
-                      return (
-                        <div style={{
-                          display: 'flex',
-                          gap: '0.7rem',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          overflowX: 'auto',
-                          padding: '0.2rem 0'
-                        }}>
-                          {tourTables.map(t => {
-                            const tMatch = (t.currentMatchId && matches[t.currentMatchId])
-                              ? matches[t.currentMatchId]
-                              : Object.values(matches).find(m => m.tableId === t.id && m.status !== 'finished');
-                            const isPlaying = tMatch && tMatch.status === 'playing';
-                            const isPending = tMatch && tMatch.status === 'pending';
-                            const qrData = JSON.stringify({
-                              tournamentId: activeTournament.id,
-                              tableId: t.id,
-                              matchId: tMatch?.id || '',
-                              clubId: currentClub.id
-                            });
-
-                            return (
-                              <div
-                                key={t.id}
-                                onClick={() => setSelectedTableForQR(t.id)}
-                                style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  background: 'rgba(0,0,0,0.25)',
-                                  padding: '6px 8px',
-                                  borderRadius: '8px',
-                                  border: '1px solid var(--border-color)',
-                                  cursor: 'pointer',
-                                  transition: 'transform 0.15s, border-color 0.15s'
-                                }}
-                                title={`Cliquez pour agrandir le QR Code du Billard ${t.number || t.name}`}
-                              >
-                                <div style={{ background: '#fff', padding: '4px', borderRadius: '6px', display: 'flex' }}>
-                                  <QRCode value={qrData} size={68} />
-                                </div>
-                                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
-                                  {t.name || `Table ${t.number}`}
-                                </div>
-                                <span style={{
-                                  fontSize: '0.62rem',
-                                  fontWeight: 700,
-                                  padding: '1px 5px',
-                                  borderRadius: '4px',
-                                  background: isPlaying ? 'rgba(0, 255, 170, 0.15)' : (isPending ? 'rgba(255, 183, 3, 0.15)' : 'rgba(255, 255, 255, 0.08)'),
-                                  color: isPlaying ? 'var(--accent-primary)' : (isPending ? '#ffb703' : 'var(--text-muted)'),
-                                  border: isPlaying ? '1px solid rgba(0, 255, 170, 0.3)' : (isPending ? '1px solid rgba(255, 183, 3, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)')
-                                }}>
-                                  {isPlaying ? '🟢 En jeu' : (isPending ? '🟡 Prêt' : '⚪ Libre')}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* File d'attente (Prend toute la hauteur restante) */}
-                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                {/* LEFT: FILE D'ATTENTE PLEINE HAUTEUR (100%) */}
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                  {/* File d'attente (Prend toute la hauteur de la colonne) */}
+                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
                     {(() => {
                       const filteredWaitingMatches = matchesWaiting.filter(m => {
                         if (!playerSearchQuery.trim()) return true;
@@ -3109,9 +2987,30 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             <h3 style={{ fontSize: '1rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
                               <Users size={16} style={{ color: 'var(--accent-secondary)' }} /> File d'attente
                             </h3>
-                            <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.15)', color: 'var(--accent-secondary)', padding: '2px 7px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.3)' }}>
-                              {filteredWaitingMatches.length}{playerSearchQuery.trim() ? ` / ${matchesWaiting.length}` : ''} {matchesWaiting.length > 1 ? 'matchs' : 'match'}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '2px 8px',
+                                  height: '24px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  color: 'var(--accent-primary)',
+                                  borderColor: 'rgba(0, 255, 170, 0.35)',
+                                  background: 'rgba(0, 255, 170, 0.08)'
+                                }}
+                                onClick={() => setShowJoinQRModal(true)}
+                                title="Afficher le QR code d'accès au tournoi pour les joueurs / spectateurs"
+                              >
+                                <Smartphone size={12} /> QR Inscription
+                              </button>
+                              <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.15)', color: 'var(--accent-secondary)', padding: '2px 7px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.3)' }}>
+                                {filteredWaitingMatches.length}{playerSearchQuery.trim() ? ` / ${matchesWaiting.length}` : ''} {matchesWaiting.length > 1 ? 'matchs' : 'match'}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Barre de recherche des joueurs */}
