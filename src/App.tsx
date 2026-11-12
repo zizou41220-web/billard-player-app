@@ -17,10 +17,14 @@ function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const overlayTableParam = urlParams.get('overlay') || urlParams.get('stream');
   const kioskParam = urlParams.get('kiosk') || urlParams.get('tv');
+  const matchParam = urlParams.get('match');
+  const tableParam = urlParams.get('table');
+  const clubParam = urlParams.get('club');
 
   const isDesktop = window.innerWidth > 768;
   const [appMode, setAppMode] = useState<'player' | 'admin' | 'kiosk'>(() => {
     if (kioskParam) return 'kiosk';
+    if (matchParam || tableParam) return 'player';
     return isDesktop ? 'admin' : 'player';
   });
   const [activeTab, setActiveTab] = useState<Tab>('scan');
@@ -28,6 +32,50 @@ function App() {
 
   useEffect(() => {
     initSync();
+
+    if (clubParam) {
+      useStore.getState().setClub({ id: clubParam });
+    }
+
+    if (matchParam || tableParam) {
+      setAppMode('player');
+
+      const openMatchFromUrl = async () => {
+        let match = matchParam ? useStore.getState().matches[matchParam] : null;
+        if (!match && tableParam) {
+          const tObj = useStore.getState().tables[tableParam];
+          if (tObj?.currentMatchId) match = useStore.getState().matches[tObj.currentMatchId];
+          if (!match) {
+            match = Object.values(useStore.getState().matches).find(m => m.tableId === tableParam && m.status !== 'finished') || null;
+          }
+        }
+
+        if (!match) {
+          try {
+            await initSync();
+            if (matchParam) match = useStore.getState().matches[matchParam];
+            if (!match && tableParam) {
+              const tObj = useStore.getState().tables[tableParam];
+              if (tObj?.currentMatchId) match = useStore.getState().matches[tObj.currentMatchId];
+              if (!match) {
+                match = Object.values(useStore.getState().matches).find(m => m.tableId === tableParam && m.status !== 'finished') || null;
+              }
+            }
+          } catch (e) {
+            console.warn("Erreur chargement match URL:", e);
+          }
+        }
+
+        if (match) {
+          if (match.status === 'pending') {
+            useStore.getState().startTournamentMatch(match.id, true);
+          }
+          useStore.setState({ activeMatchId: match.id });
+        }
+      };
+
+      openMatchFromUrl();
+    }
   }, []);
 
   // Dedicated Overlay Mode for OBS / Prism Live Studio / Facebook / YouTube streams

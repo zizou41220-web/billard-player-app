@@ -17,26 +17,40 @@ const ScanView: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      let data: any;
-      try {
-        data = JSON.parse(rawData);
-      } catch {
-        if (rawData.startsWith('http://') || rawData.startsWith('https://')) {
-          alert("Ce QR Code est un lien web, pas un QR Code de match à lancer.");
+      let matchId = '';
+      let tableId = '';
+      let clubId = '';
+
+      if (rawData.startsWith('http://') || rawData.startsWith('https://')) {
+        try {
+          const parsedUrl = new URL(rawData);
+          matchId = parsedUrl.searchParams.get('match') || '';
+          tableId = parsedUrl.searchParams.get('table') || '';
+          clubId = parsedUrl.searchParams.get('club') || '';
+        } catch {
+          const mMatch = rawData.match(/[?&]match=([^&]+)/);
+          const tMatch = rawData.match(/[?&]table=([^&]+)/);
+          const cMatch = rawData.match(/[?&]club=([^&]+)/);
+          if (mMatch) matchId = decodeURIComponent(mMatch[1]);
+          if (tMatch) tableId = decodeURIComponent(tMatch[1]);
+          if (cMatch) clubId = decodeURIComponent(cMatch[1]);
+        }
+      } else {
+        try {
+          const data = JSON.parse(rawData);
+          matchId = data.matchId || '';
+          tableId = data.tableId || '';
+          clubId = data.clubId || '';
+        } catch {
+          alert("QR Code non reconnu : format invalide.");
           setIsProcessing(false);
           return;
         }
-        alert("QR Code invalide (format non reconnu).");
-        setIsProcessing(false);
-        return;
       }
 
-      if (data.clubId && data.clubId !== currentClub.id) {
-        setClub({ id: data.clubId });
+      if (clubId && clubId !== currentClub.id) {
+        setClub({ id: clubId });
       }
-
-      const matchId = data.matchId;
-      const tableId = data.tableId;
 
       if (!matchId && !tableId) {
         alert("QR Code non reconnu : aucun match ou billard trouvé.");
@@ -167,7 +181,8 @@ const ScanView: React.FC = () => {
       }
 
       // Start match and enter live scoring
-      startTournamentMatch(match.id);
+      startTournamentMatch(match.id, true);
+      useStore.setState({ activeMatchId: match.id });
       setIsProcessing(false);
     } catch (e) {
       console.error("Erreur scan:", e);

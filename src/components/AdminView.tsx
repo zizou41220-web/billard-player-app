@@ -93,6 +93,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     return `${getAppBaseUrl()}/?club=${currentClub.id}`;
   };
 
+  const getMatchShareUrl = (matchId: string, tableId?: string, tourId?: string) => {
+    if (typeof window === 'undefined') return '';
+    let url = `${getAppBaseUrl()}/?club=${currentClub.id}&match=${encodeURIComponent(matchId)}`;
+    if (tableId) url += `&table=${encodeURIComponent(tableId)}`;
+    if (tourId) url += `&tour=${encodeURIComponent(tourId)}`;
+    return url;
+  };
+
   // Tournament Setup State
   const [newTourName, setNewTourName] = useState('');
   const [newTourFormat, setNewTourFormat] = useState<any>('cartesien');
@@ -3281,7 +3289,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 }}
                               >
                                 <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '8px', opacity: match.status === 'playing' ? 0.3 : 1 }}>
-                                  <QRCode value={JSON.stringify({ tournamentId: match.tournamentId || activeTournament.id, matchId: match.id, tableId: effTableId || match.tableId || '', clubId: currentClub.id })} size={80} />
+                                  <QRCode value={getMatchShareUrl(match.id, effTableId || match.tableId, match.tournamentId || activeTournament.id)} size={80} />
                                 </div>
                                 <div style={{ flex: 1 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
@@ -5033,12 +5041,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                           <div style={{ background: '#fff', padding: '6px', borderRadius: '8px', display: 'inline-flex' }}>
                             <QRCode
-                              value={JSON.stringify({
-                                tournamentId: '',
-                                matchId: studioMatch.id,
-                                tableId: studioChannelId,
-                                clubId: currentClub.id
-                              })}
+                              value={getMatchShareUrl(studioMatch.id, studioChannelId)}
                               size={64}
                             />
                           </div>
@@ -5857,9 +5860,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     </div>
 
                     <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <QRCode value={JSON.stringify({ tournamentId: match.tournamentId || activeTournament?.id || '', matchId: match.id, tableId: table.id || match.tableId || '', clubId: currentClub.id })} size={200} />
-                      <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#666', wordBreak: 'break-all', textAlign: 'center', userSelect: 'all', cursor: 'copy' }} title="Copier ce texte pour la simulation">
-                        {JSON.stringify({ tournamentId: match.tournamentId || activeTournament?.id || '', matchId: match.id, tableId: table.id || match.tableId || '', clubId: currentClub.id })}
+                      <QRCode value={getMatchShareUrl(match.id, table.id || match.tableId, match.tournamentId || activeTournament?.id)} size={200} />
+                      <div style={{ marginTop: '0.8rem', fontSize: '0.72rem', color: '#666', wordBreak: 'break-all', textAlign: 'center', userSelect: 'all', cursor: 'copy' }} title="Lien direct vers le match">
+                        {getMatchShareUrl(match.id, table.id || match.tableId, match.tournamentId || activeTournament?.id)}
                       </div>
                     </div>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, textAlign: 'center' }}>
