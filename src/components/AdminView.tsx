@@ -6,7 +6,7 @@ import {
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
-  Radio, Tv, Smartphone, Globe, ExternalLink, Trash2, Shuffle,
+  Radio, Tv, Smartphone, ExternalLink, Trash2, Shuffle,
   Search, X, Facebook, Youtube
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
