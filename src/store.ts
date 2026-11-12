@@ -1554,10 +1554,18 @@ export const useStore = create<AppState>((set, get) => ({
           const assignedTableId = m.tableId || Object.values(newTables).find(t => t.currentMatchId === m.id)?.id;
           if (assignedTableId && assignedTableId !== tableId) {
             if (m.player1Id === playerId || m.player2Id === playerId) {
-              const busyTable = newTables[assignedTableId];
-              const tName = busyTable?.name || `Table ${busyTable?.number || assignedTableId}`;
-              const pName = state.players[playerId]?.name || 'Ce joueur';
-              return `${pName} est déjà assigné sur ${tName}`;
+              if (m.status === 'playing') {
+                const busyTable = newTables[assignedTableId];
+                const tName = busyTable?.name || `Table ${busyTable?.number || assignedTableId}`;
+                const pName = state.players[playerId]?.name || 'Ce joueur';
+                return `${pName} joue actuellement sur ${tName}`;
+              } else {
+                // Si l'ancien match était seulement en attente sur une autre table, le désassigner pour libérer le joueur
+                newMatches[m.id] = { ...m, tableId: undefined };
+                if (newTables[assignedTableId]?.currentMatchId === m.id) {
+                  newTables[assignedTableId] = { ...newTables[assignedTableId], status: 'free', currentMatchId: undefined };
+                }
+              }
             }
           }
         }

@@ -6,7 +6,8 @@ import {
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
-  Radio, Tv, Smartphone, Globe, ExternalLink, Trash2, Shuffle
+  Radio, Tv, Smartphone, Globe, ExternalLink, Trash2, Shuffle,
+  Search, X
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
@@ -59,6 +60,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const [liveStreamTab, setLiveStreamTab] = useState<'obs' | 'phone' | 'embed'>('phone');
   const [overlayPos, setOverlayPos] = useState<'top' | 'bottom'>('top');
   const [dismissedQualifAlertTourId, setDismissedQualifAlertTourId] = useState<string | null>(null);
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
+  const [showJoinQRModal, setShowJoinQRModal] = useState(false);
   const matchStatusAtOpenRef = React.useRef<string | null>(null);
 
   // Club Configuration State
@@ -468,10 +471,11 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     return { matchesToPlay: toPlay, matchesWaiting: waiting };
   })();
 
-  // Helper to check if any player in a match is already busy on an assigned table
+  // Helper to check if any player in a match is already busy on an assigned table (only if ACTUALLY playing)
   const getBusyPlayerInfo = (m: any) => {
     for (const activeM of matchesToPlay) {
       if (activeM.id === m.id) continue;
+      if (activeM.status !== 'playing') continue;
       const tId = getEffectiveTableId(activeM);
       const tObj = tId ? tables[tId] : null;
       const tName = tObj?.name || (tId ? `T.${tObj?.number || tId}` : 'un billard');
@@ -2964,190 +2968,343 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 270px) 1fr minmax(460px, 490px)', gap: '1.2rem', flex: 1, minHeight: 0 }}>
 
-                {/* LEFT: Meta & QR + FILE D'ATTENTE */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: 0 }}>
-                  {/* QR Code pour rejoindre l'appli */}
+                {/* LEFT: QR BILLARDS + FILE D'ATTENTE PLEINE HAUTEUR */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', minHeight: 0 }}>
+                  {/* QR Codes des Billards en Salle */}
                   <div
                     className="glass-card"
                     style={{
-                      padding: '1.2rem',
+                      padding: '0.8rem 1rem',
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      textAlign: 'center',
-                      flex: 1,
-                      minHeight: 0,
-                      overflow: 'hidden'
+                      gap: '0.6rem',
+                      flexShrink: 0
                     }}
                   >
-                    <div>
-                      <h2 style={{ fontSize: '1.15rem', color: 'var(--accent-primary)', marginBottom: '0.2rem', fontWeight: 800 }}>{activeTournament.name}</h2>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--card-text-muted)', margin: 0 }}>Scannez pour rejoindre l'application</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '1rem' }}>🎱</span>
+                        <h3 style={{ fontSize: '0.95rem', color: '#fff', margin: 0, fontWeight: 700 }}>
+                          QR Billards
+                        </h3>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '2px 8px',
+                            height: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            color: 'var(--accent-primary)',
+                            borderColor: 'rgba(0, 255, 170, 0.35)',
+                            background: 'rgba(0, 255, 170, 0.08)'
+                          }}
+                          onClick={() => setShowJoinQRModal(true)}
+                          title="Afficher le QR code d'accès au tournoi pour les joueurs / spectateurs"
+                        >
+                          <Smartphone size={12} /> QR Inscription
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.7rem', padding: '2px 7px', height: '24px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                          onClick={() => setActiveTab('launcher')}
+                          title="Gérer dans le Lanceur"
+                        >
+                          <Rocket size={12} />
+                        </button>
+                      </div>
                     </div>
 
-                    <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 'auto 0' }}>
-                      <QRCode value={getClubShareUrl()} size={125} />
-                    </div>
+                    {/* Ligne des QR Codes des billards */}
+                    {(() => {
+                      const tourTableIds = (activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0)
+                        ? activeTournament.settings.tableIds
+                        : Object.keys(tables);
+                      const tourTables = tourTableIds.map(id => tables[id]).filter(Boolean);
 
-                    <button
-                      className="btn btn-outline"
-                      style={{ width: '100%', fontSize: '0.78rem', padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                      onClick={() => setActiveTab('launcher')}
-                    >
-                      <Rocket size={14} /> Gérer dans le Lanceur
-                    </button>
+                      return (
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.7rem',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          overflowX: 'auto',
+                          padding: '0.2rem 0'
+                        }}>
+                          {tourTables.map(t => {
+                            const tMatch = (t.currentMatchId && matches[t.currentMatchId])
+                              ? matches[t.currentMatchId]
+                              : Object.values(matches).find(m => m.tableId === t.id && m.status !== 'finished');
+                            const isPlaying = tMatch && tMatch.status === 'playing';
+                            const isPending = tMatch && tMatch.status === 'pending';
+                            const qrData = JSON.stringify({
+                              tournamentId: activeTournament.id,
+                              tableId: t.id,
+                              matchId: tMatch?.id || '',
+                              clubId: currentClub.id
+                            });
+
+                            return (
+                              <div
+                                key={t.id}
+                                onClick={() => setSelectedTableForQR(t.id)}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: 'rgba(0,0,0,0.25)',
+                                  padding: '6px 8px',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--border-color)',
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.15s, border-color 0.15s'
+                                }}
+                                title={`Cliquez pour agrandir le QR Code du Billard ${t.number || t.name}`}
+                              >
+                                <div style={{ background: '#fff', padding: '4px', borderRadius: '6px', display: 'flex' }}>
+                                  <QRCode value={qrData} size={68} />
+                                </div>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
+                                  {t.name || `Table ${t.number}`}
+                                </div>
+                                <span style={{
+                                  fontSize: '0.62rem',
+                                  fontWeight: 700,
+                                  padding: '1px 5px',
+                                  borderRadius: '4px',
+                                  background: isPlaying ? 'rgba(0, 255, 170, 0.15)' : (isPending ? 'rgba(255, 183, 3, 0.15)' : 'rgba(255, 255, 255, 0.08)'),
+                                  color: isPlaying ? 'var(--accent-primary)' : (isPending ? '#ffb703' : 'var(--text-muted)'),
+                                  border: isPlaying ? '1px solid rgba(0, 255, 170, 0.3)' : (isPending ? '1px solid rgba(255, 183, 3, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)')
+                                }}>
+                                  {isPlaying ? '🟢 En jeu' : (isPending ? '🟡 Prêt' : '⚪ Libre')}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  {/* File d'attente (directement sous le QR code) */}
+                  {/* File d'attente (Prend toute la hauteur restante) */}
                   <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-                      <h3 style={{ fontSize: '1rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
-                        <Users size={16} style={{ color: 'var(--accent-secondary)' }} /> File d'attente
-                      </h3>
-                      <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.15)', color: 'var(--accent-secondary)', padding: '2px 7px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.3)' }}>
-                        {matchesWaiting.length} {matchesWaiting.length > 1 ? 'matchs' : 'match'}
-                      </span>
-                    </div>
+                    {(() => {
+                      const filteredWaitingMatches = matchesWaiting.filter(m => {
+                        if (!playerSearchQuery.trim()) return true;
+                        const q = playerSearchQuery.toLowerCase();
+                        const p1 = (players[m.player1Id]?.name || '').toLowerCase();
+                        const p2 = (players[m.player2Id]?.name || '').toLowerCase();
+                        return p1.includes(q) || p2.includes(q);
+                      });
 
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingRight: '0.2rem' }}>
-                      {matchesWaiting.length === 0 ? (
-                        <div style={{ color: 'var(--card-text-muted)', fontSize: '0.8rem', textAlign: 'center', marginTop: '1.5rem' }}>
-                          Aucun match en attente.
-                        </div>
-                      ) : (
-                        matchesWaiting.map((match, idx) => {
-                          const busyInfo = getBusyPlayerInfo(match);
+                      return (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexShrink: 0 }}>
+                            <h3 style={{ fontSize: '1rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
+                              <Users size={16} style={{ color: 'var(--accent-secondary)' }} /> File d'attente
+                            </h3>
+                            <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.15)', color: 'var(--accent-secondary)', padding: '2px 7px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.3)' }}>
+                              {filteredWaitingMatches.length}{playerSearchQuery.trim() ? ` / ${matchesWaiting.length}` : ''} {matchesWaiting.length > 1 ? 'matchs' : 'match'}
+                            </span>
+                          </div>
 
-                          return (
-                            <div
-                              key={match.id}
+                          {/* Barre de recherche des joueurs */}
+                          <div style={{ position: 'relative', marginBottom: '0.7rem', flexShrink: 0 }}>
+                            <Search size={14} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                            <input
+                              type="text"
+                              placeholder="Rechercher un joueur..."
+                              value={playerSearchQuery}
+                              onChange={(e) => setPlayerSearchQuery(e.target.value)}
                               style={{
-                                background: 'rgba(255,255,255,0.03)',
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: '8px',
-                                padding: '0.6rem 0.8rem',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.3rem'
+                                width: '100%',
+                                padding: '0.42rem 1.8rem 0.42rem 1.9rem',
+                                borderRadius: '7px',
+                                border: '1px solid var(--border-color)',
+                                background: 'rgba(0,0,0,0.3)',
+                                color: '#fff',
+                                fontSize: '0.78rem',
+                                boxSizing: 'border-box'
                               }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
-                                  {match.poolName && (
-                                    <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 700, background: 'rgba(0, 255, 204, 0.12)', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(0, 255, 204, 0.25)' }}>
-                                      {match.poolName}
-                                    </span>
-                                  )}
-                                </div>
-                                {match.stage && (
-                                  <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                    {match.stage}
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                                <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player1Id]?.name || 'Attente...'}</span>
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '0 4px' }}>VS</span>
-                                <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player2Id]?.name || 'Attente...'}</span>
-                              </div>
+                            />
+                            {playerSearchQuery && (
+                              <button
+                                onClick={() => setPlayerSearchQuery('')}
+                                style={{
+                                  position: 'absolute',
+                                  right: '7px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-muted)',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                title="Effacer la recherche"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
 
-                              {/* Warning badge if player is busy on another table */}
-                              {busyInfo.busy && (
-                                <div style={{ fontSize: '0.65rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255, 183, 3, 0.3)', marginTop: '0.1rem' }}>
-                                  ⚠️ {busyInfo.playerName} déjà sur {busyInfo.tableName}
-                                </div>
-                              )}
+                          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingRight: '0.2rem' }}>
+                            {matchesWaiting.length === 0 ? (
+                              <div style={{ color: 'var(--card-text-muted)', fontSize: '0.8rem', textAlign: 'center', marginTop: '1.5rem' }}>
+                                Aucun match en attente.
+                              </div>
+                            ) : filteredWaitingMatches.length === 0 ? (
+                              <div style={{ color: 'var(--card-text-muted)', fontSize: '0.8rem', textAlign: 'center', marginTop: '1.5rem' }}>
+                                Aucun match trouvé pour "{playerSearchQuery}".
+                              </div>
+                            ) : (
+                              filteredWaitingMatches.map((match, idx) => {
+                                const busyInfo = getBusyPlayerInfo(match);
 
-                              {/* Actions : Lancer sur un billard disponible ou Marquer le score directement */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Lancer sur un billard :</span>
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline"
+                                return (
+                                  <div
+                                    key={match.id}
                                     style={{
-                                      fontSize: '0.65rem',
-                                      padding: '2px 7px',
-                                      height: '20px',
+                                      background: 'rgba(255,255,255,0.03)',
+                                      border: '1px solid rgba(255,255,255,0.08)',
+                                      borderRadius: '8px',
+                                      padding: '0.6rem 0.8rem',
                                       display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      color: 'var(--accent-primary)',
-                                      borderColor: 'rgba(0, 255, 170, 0.35)',
-                                      background: 'rgba(0, 255, 170, 0.08)'
+                                      flexDirection: 'column',
+                                      gap: '0.3rem'
                                     }}
-                                    onClick={() => openDirectScoreModal(match)}
-                                    title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
                                   >
-                                    <Edit2 size={10} /> 📝 Saisir score
-                                  </button>
-                                </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                                        {match.poolName && (
+                                          <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 700, background: 'rgba(0, 255, 204, 0.12)', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(0, 255, 204, 0.25)' }}>
+                                            {match.poolName}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {match.stage && (
+                                        <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                          {match.stage}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                                      <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player1Id]?.name || 'Attente...'}</span>
+                                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '0 4px' }}>VS</span>
+                                      <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player2Id]?.name || 'Attente...'}</span>
+                                    </div>
 
-                                {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
-                                  <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                                    {activeTournament.settings.tableIds.map(tId => {
-                                      const tObj = tables[tId];
-                                      const label = tObj ? `T.${tObj.number}` : tId;
-                                      const curM = tObj?.currentMatchId ? matches[tObj.currentMatchId] : null;
-                                      const isPlaying = curM && curM.status === 'playing';
-                                      const isPending = curM && curM.status === 'pending';
-                                      const isFree = !curM || tObj?.status === 'free';
+                                    {/* Warning badge if player is busy on another table (ACTUALLY PLAYING) */}
+                                    {busyInfo.busy && (
+                                      <div style={{ fontSize: '0.65rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255, 183, 3, 0.3)', marginTop: '0.1rem' }}>
+                                        ⚠️ {busyInfo.playerName} joue actuellement sur {busyInfo.tableName}
+                                      </div>
+                                    )}
 
-                                      return (
+                                    {/* Actions : Lancer sur un billard disponible ou Marquer le score directement */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Lancer sur un billard :</span>
                                         <button
-                                          key={tId}
-                                          className={isFree ? "btn btn-neon" : "btn btn-outline"}
-                                          disabled={Boolean(busyInfo.busy || isPlaying)}
+                                          type="button"
+                                          className="btn btn-outline"
                                           style={{
                                             fontSize: '0.65rem',
                                             padding: '2px 7px',
-                                            height: '22px',
-                                            fontWeight: isFree ? 800 : 600,
-                                            color: isPlaying ? 'rgba(255,255,255,0.25)' : (isFree ? '#000' : 'var(--text-muted)'),
-                                            background: isPlaying ? 'rgba(255,255,255,0.03)' : (isFree ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)'),
-                                            borderColor: isPlaying ? 'rgba(255,255,255,0.08)' : (isFree ? 'var(--accent-primary)' : 'rgba(255,255,255,0.15)'),
-                                            opacity: (busyInfo.busy || isPlaying) ? 0.4 : 1,
-                                            cursor: (busyInfo.busy || isPlaying) ? 'not-allowed' : 'pointer'
+                                            height: '20px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            color: 'var(--accent-primary)',
+                                            borderColor: 'rgba(0, 255, 170, 0.35)',
+                                            background: 'rgba(0, 255, 170, 0.08)'
                                           }}
-                                          title={
-                                            busyInfo.busy ? `Impossible : ${busyInfo.playerName} est déjà sur ${busyInfo.tableName}` :
-                                            isPlaying ? `Occupé : match en cours sur ${tObj?.name || label}` :
-                                            isPending ? `Table ${label} a un match en attente. Cliquez pour remplacer et lancer immédiatement ce match.` :
-                                            `Lancer immédiatement ce match sur ${tObj?.name || label}`
-                                          }
-                                          onClick={() => {
-                                            if (busyInfo.busy) {
-                                              return alert(`Impossible : ${busyInfo.playerName} est déjà sur ${busyInfo.tableName}`);
-                                            }
-                                            if (isPlaying) {
-                                              return alert(`Un match est déjà en cours de jeu sur ${tObj?.name || label}.`);
-                                            }
-                                            if (isPending) {
-                                              const confirmReplace = window.confirm(
-                                                `Le billard ${tObj?.name || label} a déjà un match programmé.\n\nVoulez-vous remplacer ce match et lancer immédiatement celui-ci ?`
-                                              );
-                                              if (!confirmReplace) return;
-                                            }
-                                            const res = launchMatchOnTable(match.id, tId);
-                                            if (!res.success && res.reason) {
-                                              alert(res.reason);
-                                            }
-                                          }}
+                                          onClick={() => openDirectScoreModal(match)}
+                                          title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
                                         >
-                                          🚀 {label} {isFree ? '(Libre)' : ''}
+                                          <Edit2 size={10} /> 📝 Saisir score
                                         </button>
-                                      );
-                                    })}
+                                      </div>
+
+                                      {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
+                                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                          {activeTournament.settings.tableIds.map(tId => {
+                                            const tObj = tables[tId];
+                                            const label = tObj ? `T.${tObj.number}` : tId;
+                                            const curM = (tObj?.currentMatchId && matches[tObj.currentMatchId])
+                                              ? matches[tObj.currentMatchId]
+                                              : Object.values(matches).find(m => m.tableId === tId && m.status !== 'finished') || null;
+                                            const isPlaying = curM && curM.status === 'playing';
+                                            const isPending = curM && curM.status === 'pending';
+                                            const isFree = !curM || tObj?.status === 'free';
+                                            const canLaunch = !isPlaying && !busyInfo.busy;
+
+                                            return (
+                                              <button
+                                                key={tId}
+                                                type="button"
+                                                className={canLaunch ? "btn btn-neon" : "btn btn-outline"}
+                                                disabled={!canLaunch}
+                                                style={{
+                                                  fontSize: '0.65rem',
+                                                  padding: '2px 7px',
+                                                  height: '22px',
+                                                  fontWeight: canLaunch ? 800 : 600,
+                                                  color: isPlaying ? 'rgba(255,255,255,0.3)' : (busyInfo.busy ? 'rgba(255,183,3,0.5)' : '#000'),
+                                                  background: isPlaying ? 'rgba(255,255,255,0.03)' : (busyInfo.busy ? 'rgba(255,183,3,0.08)' : 'var(--accent-primary)'),
+                                                  borderColor: isPlaying ? 'rgba(255,255,255,0.08)' : (busyInfo.busy ? 'rgba(255,183,3,0.2)' : 'var(--accent-primary)'),
+                                                  opacity: canLaunch ? 1 : 0.45,
+                                                  cursor: canLaunch ? 'pointer' : 'not-allowed'
+                                                }}
+                                                title={
+                                                  busyInfo.busy ? `Impossible : ${busyInfo.playerName} joue actuellement sur ${busyInfo.tableName}` :
+                                                  isPlaying ? `Occupé : un match est déjà en cours de jeu sur ${tObj?.name || label}` :
+                                                  isPending ? `Table ${label} : un match est en attente. Cliquez pour remplacer et lancer immédiatement ce match.` :
+                                                  `Lancer immédiatement ce match sur ${tObj?.name || label}`
+                                                }
+                                                onClick={() => {
+                                                  if (busyInfo.busy) {
+                                                    return alert(`Impossible : ${busyInfo.playerName} joue actuellement sur ${busyInfo.tableName}`);
+                                                  }
+                                                  if (isPlaying) {
+                                                    return alert(`Un match est déjà en cours de jeu sur ${tObj?.name || label}.`);
+                                                  }
+                                                  if (isPending) {
+                                                    const confirmReplace = window.confirm(
+                                                      `Le billard ${tObj?.name || label} a un match programmé en attente de démarrage.\n\nVoulez-vous remplacer ce match et lancer immédiatement celui-ci ?`
+                                                    );
+                                                    if (!confirmReplace) return;
+                                                  }
+                                                  const res = launchMatchOnTable(match.id, tId);
+                                                  if (!res.success && res.reason) {
+                                                    alert(res.reason);
+                                                  }
+                                                }}
+                                              >
+                                                🚀 {label} {isFree ? '(Libre)' : (isPending ? '(Prêt)' : '')}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -7464,6 +7621,71 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
           </div>
         );
       })()}
+
+      {/* Modal: QR Code pour rejoindre l'application / tournoi */}
+      {showJoinQRModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(5px)',
+          padding: '1rem'
+        }}>
+          <div className="glass-card" style={{
+            maxWidth: '420px',
+            width: '100%',
+            padding: '2rem',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '1.2rem',
+            position: 'relative',
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+          }}>
+            <button
+              onClick={() => setShowJoinQRModal(false)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div>
+              <h2 style={{ fontSize: '1.3rem', color: 'var(--accent-primary)', marginBottom: '0.3rem', fontWeight: 800 }}>
+                {activeTournament?.name || currentClub.name}
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                Scannez ce QR Code avec un smartphone pour rejoindre et suivre l'application en direct
+              </p>
+            </div>
+
+            <div style={{ background: '#fff', padding: '16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <QRCode value={getClubShareUrl()} size={200} />
+            </div>
+
+            <button
+              className="btn btn-outline"
+              style={{ width: '100%', justifyContent: 'center' }}
+              onClick={() => setShowJoinQRModal(false)}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
