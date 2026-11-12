@@ -28,7 +28,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     createTournament, addPlayer, updatePlayer, deletePlayer,
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
-    assignMatchToTable, updateFinishedMatchScore, startTournamentMatch,
+    assignMatchToTable, launchMatchOnTable, updateFinishedMatchScore, startTournamentMatch,
     startCustomLiveMatch,
     launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream,
     updateTournamentSettings, recomputePlayerStats
@@ -339,6 +339,19 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
   // Postpone Match Modal (Choose replacement from waiting queue)
   const [postponingMatchModal, setPostponingMatchModal] = useState<{ matchId: string; tableId: string } | null>(null);
+
+  // Saisie directe du score d'un match (match joué sans avoir été lancé sur un billard)
+  const [directScoreModalMatch, setDirectScoreModalMatch] = useState<any | null>(null);
+  const [directScore1, setDirectScore1] = useState(0);
+  const [directScore2, setDirectScore2] = useState(0);
+
+  const openDirectScoreModal = (m: any) => {
+    setDirectScoreModalMatch(m);
+    const tour = m.tournamentId ? tournaments[m.tournamentId] : activeTournament;
+    const rules = getMatchScoringRules(m, tour, players);
+    setDirectScore1(m.score1 || rules.minScore1 || 0);
+    setDirectScore2(m.score2 || rules.minScore2 || 0);
+  };
 
   // Measure live tournament tables deck container height dynamically
   const [deckHeight, setDeckHeight] = useState<number>(0);
@@ -3047,46 +3060,89 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 </div>
                               )}
 
-                              {/* Quick assign buttons if tournament tables exist */}
-                              {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
-                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Placer :</span>
+                              {/* Actions : Lancer sur un billard disponible ou Marquer le score directement */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Lancer sur un billard :</span>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    style={{
+                                      fontSize: '0.65rem',
+                                      padding: '2px 7px',
+                                      height: '20px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      color: 'var(--accent-primary)',
+                                      borderColor: 'rgba(0, 255, 170, 0.35)',
+                                      background: 'rgba(0, 255, 170, 0.08)'
+                                    }}
+                                    onClick={() => openDirectScoreModal(match)}
+                                    title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
+                                  >
+                                    <Edit2 size={10} /> 📝 Saisir score
+                                  </button>
+                                </div>
+
+                                {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
                                   <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                                     {activeTournament.settings.tableIds.map(tId => {
                                       const tObj = tables[tId];
                                       const label = tObj ? `T.${tObj.number}` : tId;
+                                      const curM = tObj?.currentMatchId ? matches[tObj.currentMatchId] : null;
+                                      const isPlaying = curM && curM.status === 'playing';
+                                      const isPending = curM && curM.status === 'pending';
+                                      const isFree = !curM || tObj?.status === 'free';
+
                                       return (
                                         <button
                                           key={tId}
-                                          className="btn btn-outline"
-                                          disabled={busyInfo.busy}
+                                          className={isFree ? "btn btn-neon" : "btn btn-outline"}
+                                          disabled={busyInfo.busy || isPlaying}
                                           style={{
                                             fontSize: '0.65rem',
-                                            padding: '2px 6px',
-                                            height: '20px',
-                                            lineHeight: 1,
-                                            opacity: busyInfo.busy ? 0.35 : 1,
-                                            cursor: busyInfo.busy ? 'not-allowed' : 'pointer'
+                                            padding: '2px 7px',
+                                            height: '22px',
+                                            fontWeight: isFree ? 800 : 600,
+                                            color: isPlaying ? 'rgba(255,255,255,0.25)' : (isFree ? '#000' : 'var(--text-muted)'),
+                                            background: isPlaying ? 'rgba(255,255,255,0.03)' : (isFree ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)'),
+                                            borderColor: isPlaying ? 'rgba(255,255,255,0.08)' : (isFree ? 'var(--accent-primary)' : 'rgba(255,255,255,0.15)'),
+                                            opacity: (busyInfo.busy || isPlaying) ? 0.4 : 1,
+                                            cursor: (busyInfo.busy || isPlaying) ? 'not-allowed' : 'pointer'
                                           }}
-                                          title={busyInfo.busy ? `Impossible : ${busyInfo.playerName} est déjà sur ${busyInfo.tableName}` : `Assigner directement à ${tObj?.name || label}`}
+                                          title={
+                                            busyInfo.busy ? `Impossible : ${busyInfo.playerName} est déjà sur ${busyInfo.tableName}` :
+                                            isPlaying ? `Occupé : match en cours sur ${tObj?.name || label}` :
+                                            isPending ? `Table ${label} a un match en attente. Cliquez pour remplacer et lancer immédiatement ce match.` :
+                                            `Lancer immédiatement ce match sur ${tObj?.name || label}`
+                                          }
                                           onClick={() => {
                                             if (busyInfo.busy) {
-                                              alert(`Impossible : ${busyInfo.playerName} est déjà sur ${busyInfo.tableName}`);
-                                              return;
+                                              return alert(`Impossible : ${busyInfo.playerName} est déjà sur ${busyInfo.tableName}`);
                                             }
-                                            const res = assignMatchToTable(match.id, tId);
+                                            if (isPlaying) {
+                                              return alert(`Un match est déjà en cours de jeu sur ${tObj?.name || label}.`);
+                                            }
+                                            if (isPending) {
+                                              const confirmReplace = window.confirm(
+                                                `Le billard ${tObj?.name || label} a déjà un match programmé.\n\nVoulez-vous remplacer ce match et lancer immédiatement celui-ci ?`
+                                              );
+                                              if (!confirmReplace) return;
+                                            }
+                                            const res = launchMatchOnTable(match.id, tId);
                                             if (!res.success && res.reason) {
                                               alert(res.reason);
                                             }
                                           }}
                                         >
-                                          ▶ {label}
+                                          🚀 {label} {isFree ? '(Libre)' : ''}
                                         </button>
                                       );
                                     })}
                                   </div>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                           );
                         })
@@ -3229,6 +3285,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       }}
                                     >
                                       <Play size={12} /> Démarrer
+                                    </button>
+                                    <button
+                                      className="btn btn-outline"
+                                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: 'var(--accent-primary)', borderColor: 'rgba(0, 255, 170, 0.35)' }}
+                                      title="Marquer le score directement si ce match a été joué sans utiliser l'application"
+                                      onClick={() => openDirectScoreModal(match)}
+                                    >
+                                      <Edit2 size={12} /> Score
                                     </button>
                                     <button
                                       className="btn btn-outline"
@@ -5749,6 +5813,35 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
                       <button
                         className="btn btn-outline"
+                        style={{
+                          width: '100%',
+                          justifyContent: 'center',
+                          color: 'var(--accent-primary)',
+                          borderColor: 'rgba(0, 255, 170, 0.4)',
+                          fontSize: '0.88rem',
+                          fontWeight: 700,
+                          padding: '0.65rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        onClick={() => openDirectScoreModal(match)}
+                      >
+                        <Edit2 size={16} /> 📝 Saisir le score (match déjà joué sans QR code)
+                      </button>
+
+                      {matchesWaiting.length > 0 && (
+                        <button
+                          className="btn btn-outline"
+                          style={{ width: '100%', justifyContent: 'center', color: '#fff', borderColor: 'rgba(255,255,255,0.2)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                          onClick={() => setPostponingMatchModal({ matchId: match.id, tableId: table.id })}
+                        >
+                          <ArrowUpDown size={15} /> Remplacer par un match de la file d'attente
+                        </button>
+                      )}
+
+                      <button
+                        className="btn btn-outline"
                         style={{ width: '100%', justifyContent: 'center', color: 'var(--text-muted)', borderColor: 'var(--border-color)', fontSize: '0.85rem' }}
                         onClick={() => {
                           freeTable(table.id);
@@ -5762,12 +5855,122 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 )
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: 'var(--text-muted)', width: '100%' }}>
-                  <div style={{ fontSize: '1.2rem', color: '#fff' }}>Aucun match assigné</div>
-                  <p style={{ margin: 0, textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 800 }}>Aucun match assigné</div>
+                  <p style={{ margin: 0, textAlign: 'center', fontSize: '0.9rem' }}>
                     {activeTournament?.settings?.tableIds.includes(table.id)
-                      ? 'En attente du prochain match du tournoi.'
+                      ? 'Ce billard est disponible pour accueillir un match du tournoi.'
                       : "Ce billard n'est pas utilisé par le tournoi en cours."}
                   </p>
+
+                  {/* Liste des matchs en attente pouvant être lancés sur ce billard */}
+                  {activeTournament?.settings?.tableIds.includes(table.id) && matchesWaiting.length > 0 && (
+                    <div style={{
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(0, 255, 170, 0.25)',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.7rem',
+                      boxSizing: 'border-box'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Users size={16} style={{ color: 'var(--accent-secondary)' }} />
+                          Lancer un match de la file sur ce billard :
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-secondary)', background: 'rgba(0, 229, 255, 0.12)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                          {matchesWaiting.length} en attente
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '0.2rem' }}>
+                        {matchesWaiting.map((wm, idx) => {
+                          const busy = getBusyPlayerInfo(wm);
+                          const p1 = players[wm.player1Id];
+                          const p2 = players[wm.player2Id];
+
+                          return (
+                            <div
+                              key={wm.id}
+                              style={{
+                                background: 'rgba(0, 0, 0, 0.35)',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                borderRadius: '8px',
+                                padding: '0.6rem 0.8rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.6rem'
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                                  {wm.poolName && (
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 700, background: 'rgba(0, 255, 204, 0.1)', padding: '1px 5px', borderRadius: '4px' }}>
+                                      {wm.poolName}
+                                    </span>
+                                  )}
+                                  {wm.stage && (
+                                    <span style={{ fontSize: '0.65rem', color: '#ffd700', fontWeight: 700 }}>
+                                      {wm.stage}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {p1?.name || 'Joueur 1'} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.75rem' }}>VS</span> {p2?.name || 'Joueur 2'}
+                                </div>
+                                {busy.busy && (
+                                  <div style={{ fontSize: '0.65rem', color: '#ffb703' }}>
+                                    ⚠️ {busy.playerName} déjà sur {busy.tableName}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  style={{ fontSize: '0.72rem', padding: '0.35rem 0.6rem', color: 'var(--accent-primary)', borderColor: 'rgba(0, 255, 170, 0.3)' }}
+                                  onClick={() => openDirectScoreModal(wm)}
+                                  title="Marquer le score si ce match a déjà été joué sans l'application"
+                                >
+                                  <Edit2 size={12} /> Score
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-neon"
+                                  disabled={busy.busy}
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    padding: '0.35rem 0.8rem',
+                                    fontWeight: 800,
+                                    color: '#000',
+                                    opacity: busy.busy ? 0.35 : 1,
+                                    cursor: busy.busy ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  onClick={() => {
+                                    if (busy.busy) return alert(`Impossible : ${busy.playerName} est déjà sur ${busy.tableName}`);
+                                    const res = launchMatchOnTable(wm.id, table.id);
+                                    if (!res.success && res.reason) {
+                                      alert(res.reason);
+                                    }
+                                  }}
+                                >
+                                  <Play size={12} /> Lancer
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {table.status === 'occupied' && (
                     <button
@@ -6858,6 +7061,371 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                   }}
                 >
                   ✓ Appliquer les règles
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========================================================================= */}
+      {/* MODAL : SAISIE DIRECTE DU SCORE (MATCH NON LANCÉ SUR UN BILLARD)          */}
+      {/* ========================================================================= */}
+      {directScoreModalMatch && (() => {
+        const m = directScoreModalMatch;
+        const tour = m.tournamentId ? tournaments[m.tournamentId] : activeTournament;
+        const rules = getMatchScoringRules(m, tour, players);
+        const p1 = players[m.player1Id];
+        const p2 = players[m.player2Id];
+        const p1Name = p1?.name || 'Joueur 1';
+        const p2Name = p2?.name || 'Joueur 2';
+        const isP1Prestige = p1?.level === 'Prestige' || p1?.level === 'Confirmé';
+        const isP2Prestige = p2?.level === 'Prestige' || p2?.level === 'Confirmé';
+
+        const isTieForbidden = Boolean(m.stage && m.stage !== 'qualif');
+        const minS1 = rules.minScore1 || 0;
+        const minS2 = rules.minScore2 || 0;
+
+        const canInc1 = rules.isWinningSets
+          ? (directScore1 < rules.maxSets && directScore2 < rules.maxSets)
+          : ((directScore1 + directScore2) < rules.maxSets);
+        const canDec1 = directScore1 > minS1;
+
+        const canInc2 = rules.isWinningSets
+          ? (directScore1 < rules.maxSets && directScore2 < rules.maxSets)
+          : ((directScore1 + directScore2) < rules.maxSets);
+        const canDec2 = directScore2 > minS2;
+
+        const winnerName = directScore1 > directScore2 ? p1Name : (directScore2 > directScore1 ? p2Name : null);
+
+        // Generate quick presets
+        const presets: [number, number][] = [];
+        if (rules.isWinningSets) {
+          const max = rules.maxSets;
+          for (let s = minS2; s < max; s++) {
+            presets.push([max, s]);
+          }
+          for (let s = minS1; s < max; s++) {
+            presets.push([s, max]);
+          }
+        } else {
+          const max = rules.maxSets;
+          for (let s1 = max; s1 >= 0; s1--) {
+            const s2 = max - s1;
+            if (s1 >= minS1 && s2 >= minS2) {
+              presets.push([s1, s2]);
+            }
+          }
+        }
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0, 0, 0, 0.85)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 10600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem'
+            }}
+            onClick={() => setDirectScoreModalMatch(null)}
+          >
+            <div
+              className="glass-card"
+              style={{
+                maxWidth: '560px',
+                width: '100%',
+                maxHeight: '92vh',
+                overflowY: 'auto',
+                padding: '1.8rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.2rem',
+                border: '1px solid var(--accent-primary)',
+                boxShadow: '0 0 35px rgba(0, 255, 170, 0.25)',
+                background: '#070b1e',
+                animation: 'fadeIn 0.2s ease'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <div style={{
+                    width: '42px', height: '42px', borderRadius: '50%',
+                    background: 'rgba(0, 255, 170, 0.15)', border: '1px solid var(--accent-primary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)'
+                  }}>
+                    <Trophy size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 900, color: '#fff' }}>
+                      Saisie directe du score
+                    </h3>
+                    <p style={{ margin: '0.1rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      Match joué en autonomie (non lancé officiellement sur un billard)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ padding: '4px 8px', borderColor: 'transparent', color: 'var(--text-muted)' }}
+                  onClick={() => setDirectScoreModalMatch(null)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Match info banner */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                padding: '0.6rem 0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {m.poolName && (
+                    <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 800, background: 'rgba(0, 255, 204, 0.15)', padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(0, 255, 204, 0.3)' }}>
+                      {m.poolName}
+                    </span>
+                  )}
+                  {m.stage && (
+                    <span style={{ fontSize: '0.72rem', color: '#ffd700', fontWeight: 800, background: 'rgba(255, 215, 0, 0.15)', padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(255, 215, 0, 0.3)' }}>
+                      {m.stage === 'final' ? '🏆 Finale' : m.stage === 'semi' ? '⚔️ 1/2 Finale' : m.stage === 'third_place' ? '🥉 Petite Finale' : m.stage}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--accent-secondary)', fontWeight: 600 }}>
+                  Format : {rules.formatLabel}
+                </span>
+              </div>
+
+              {/* Handicap notice if any */}
+              {(minS1 > 0 || minS2 > 0) && (
+                <div style={{ fontSize: '0.75rem', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '4px 8px', borderRadius: '6px' }}>
+                  ⚡ Handicap appliqué : +{minS1 > 0 ? `${minS1} manche(s) pour ${p1Name}` : `${minS2} manche(s) pour ${p2Name}`}
+                </div>
+              )}
+
+              {/* Player 1 vs Player 2 Duel Scoring Card */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto 1fr',
+                gap: '0.8rem',
+                alignItems: 'center',
+                background: 'rgba(0, 0, 0, 0.3)',
+                padding: '1.2rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                {/* Player 1 */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center' }}>
+                  {p1 && (
+                    <img
+                      src={getPlayerAvatar(p1)}
+                      alt={p1Name}
+                      style={{
+                        width: '56px', height: '56px', borderRadius: '50%',
+                        objectFit: 'cover', border: `3px solid ${isP1Prestige ? '#ffd700' : 'var(--accent-primary)'}`
+                      }}
+                    />
+                  )}
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff', wordBreak: 'break-word' }}>{p1Name}</div>
+                    <span style={{ fontSize: '0.65rem', color: isP1Prestige ? '#ffd700' : 'var(--accent-secondary)', fontWeight: 700 }}>
+                      {isP1Prestige ? '👑 Prestige' : 'Amateur'}
+                    </span>
+                  </div>
+
+                  {/* Stepper Player 1 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={!canDec1}
+                      style={{ width: '36px', height: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', opacity: canDec1 ? 1 : 0.3 }}
+                      onClick={() => canDec1 && setDirectScore1(directScore1 - 1)}
+                    >
+                      <Minus size={16} />
+                    </button>
+                    <span style={{ fontSize: '2.4rem', fontWeight: 900, minWidth: '45px', textAlign: 'center', color: directScore1 > directScore2 ? 'var(--accent-primary)' : '#fff' }}>
+                      {directScore1}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={!canInc1}
+                      style={{ width: '36px', height: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', opacity: canInc1 ? 1 : 0.3 }}
+                      onClick={() => canInc1 && setDirectScore1(directScore1 + 1)}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* VS Center */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <div style={{
+                    width: '32px', height: '32px', borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-muted)'
+                  }}>
+                    VS
+                  </div>
+                </div>
+
+                {/* Player 2 */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center' }}>
+                  {p2 && (
+                    <img
+                      src={getPlayerAvatar(p2)}
+                      alt={p2Name}
+                      style={{
+                        width: '56px', height: '56px', borderRadius: '50%',
+                        objectFit: 'cover', border: `3px solid ${isP2Prestige ? '#ffd700' : 'var(--accent-primary)'}`
+                      }}
+                    />
+                  )}
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff', wordBreak: 'break-word' }}>{p2Name}</div>
+                    <span style={{ fontSize: '0.65rem', color: isP2Prestige ? '#ffd700' : 'var(--accent-secondary)', fontWeight: 700 }}>
+                      {isP2Prestige ? '👑 Prestige' : 'Amateur'}
+                    </span>
+                  </div>
+
+                  {/* Stepper Player 2 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={!canDec2}
+                      style={{ width: '36px', height: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', opacity: canDec2 ? 1 : 0.3 }}
+                      onClick={() => canDec2 && setDirectScore2(directScore2 - 1)}
+                    >
+                      <Minus size={16} />
+                    </button>
+                    <span style={{ fontSize: '2.4rem', fontWeight: 900, minWidth: '45px', textAlign: 'center', color: directScore2 > directScore1 ? 'var(--accent-primary)' : '#fff' }}>
+                      {directScore2}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={!canInc2}
+                      style={{ width: '36px', height: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', opacity: canInc2 ? 1 : 0.3 }}
+                      onClick={() => canInc2 && setDirectScore2(directScore2 + 1)}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              {presets.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Scores rapides :</span>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {presets.map(([s1, s2], idx) => {
+                      const isSelected = directScore1 === s1 && directScore2 === s2;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          className="btn"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            border: isSelected ? '2px solid var(--accent-primary)' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isSelected ? 'rgba(0, 255, 170, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                            color: isSelected ? 'var(--accent-primary)' : '#fff'
+                          }}
+                          onClick={() => {
+                            setDirectScore1(s1);
+                            setDirectScore2(s2);
+                          }}
+                        >
+                          {s1} - {s2}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Winner Status Banner */}
+              <div style={{
+                background: winnerName ? 'rgba(0, 255, 170, 0.08)' : (isTieForbidden ? 'rgba(255, 68, 102, 0.12)' : 'rgba(255, 255, 255, 0.04)'),
+                border: `1px solid ${winnerName ? 'rgba(0, 255, 170, 0.3)' : (isTieForbidden ? 'rgba(255, 68, 102, 0.35)' : 'rgba(255, 255, 255, 0.1)')}`,
+                borderRadius: '8px',
+                padding: '0.7rem 1rem',
+                textAlign: 'center',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                color: winnerName ? 'var(--accent-primary)' : (isTieForbidden ? '#ff4466' : 'var(--text-muted)')
+              }}>
+                {winnerName ? (
+                  <span>🏆 Victoire de <strong>{winnerName}</strong> ({directScore1} - {directScore2})</span>
+                ) : isTieForbidden ? (
+                  <span>⚠️ Égalité interdite en phase finale ! Un joueur doit remporter le match.</span>
+                ) : (
+                  <span>Égalité ({directScore1} - {directScore2})</span>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ flex: 1, padding: '0.75rem', justifyContent: 'center' }}
+                  onClick={() => setDirectScoreModalMatch(null)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-neon"
+                  disabled={isTieForbidden && directScore1 === directScore2}
+                  style={{
+                    flex: 2,
+                    padding: '0.75rem',
+                    justifyContent: 'center',
+                    color: '#000',
+                    fontWeight: 900,
+                    fontSize: '0.95rem',
+                    opacity: (isTieForbidden && directScore1 === directScore2) ? 0.35 : 1,
+                    cursor: (isTieForbidden && directScore1 === directScore2) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  onClick={() => {
+                    if (isTieForbidden && directScore1 === directScore2) {
+                      return alert("Impossible d'enregistrer un match de phase finale sur une égalité !");
+                    }
+                    if (directScore1 === 0 && directScore2 === 0) {
+                      const confirmZero = window.confirm("Le score saisi est de 0 - 0. Voulez-vous vraiment enregistrer ce score ?");
+                      if (!confirmZero) return;
+                    }
+                    updateFinishedMatchScore(m.id, directScore1, directScore2);
+                    if (selectedTableForQR && tables[selectedTableForQR]?.currentMatchId === m.id) {
+                      setSelectedTableForQR(null);
+                    }
+                    setDirectScoreModalMatch(null);
+                  }}
+                >
+                  <CheckCircle2 size={18} /> ✓ Valider et enregistrer le match
                 </button>
               </div>
             </div>

@@ -44,6 +44,7 @@ interface AppState {
   updateMatchScore: (matchId: string, score1: number, score2: number) => void;
   updateFinishedMatchScore: (matchId: string, score1: number, score2: number) => void;
   assignMatchToTable: (matchId: string, tableId: string) => { success: boolean; reason?: string };
+  launchMatchOnTable: (matchId: string, tableId: string) => { success: boolean; reason?: string };
   finishMatch: (matchId?: string) => void;
   freeTable: (tableId: string) => void;
   updateTablePosition: (tableId: string, x: number, y: number) => void;
@@ -1617,6 +1618,13 @@ export const useStore = create<AppState>((set, get) => ({
     });
 
     return result;
+  },
+
+  launchMatchOnTable: (matchId, tableId) => {
+    const res = get().assignMatchToTable(matchId, tableId);
+    if (!res.success) return res;
+    get().startTournamentMatch(matchId, false);
+    return { success: true };
   },
 
   finishMatch: (targetMatchId?: string) => {
