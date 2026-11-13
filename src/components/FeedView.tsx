@@ -4,6 +4,7 @@ import { Activity, Clock, Trophy, Lock, Award } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
+import { isRealFinishedMatch } from '../utils/bracket';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 const FeedView: React.FC = () => {
@@ -13,11 +14,11 @@ const FeedView: React.FC = () => {
   const allTournaments = Object.values(tournaments);
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
 
-  const { hasSureQualifiers } = getTournamentQualificationStatus(activeTournament, matches);
+  const { hasSureQualifiers } = getTournamentQualificationStatus(activeTournament, matches, players);
 
   const allMatches = Object.values(matches).sort((a, b) => b.startTime - a.startTime);
-  const liveMatches = allMatches.filter(m => m.status === 'playing');
-  const finishedMatches = allMatches.filter(m => m.status === 'finished').slice(0, 5);
+  const liveMatches = allMatches.filter(m => m.status === 'playing' && Boolean(m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id]));
+  const finishedMatches = allMatches.filter(m => isRealFinishedMatch(m, players)).slice(0, 5);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>

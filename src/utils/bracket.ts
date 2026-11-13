@@ -106,6 +106,38 @@ export function isFinalStageMatch(m: Match): boolean {
 }
 
 /**
+ * Vérifie si un match est un "Blanc" (Bye / exempt sans adversaire) ou un slot incomplet.
+ */
+export function isByeMatch(m?: Match | null): boolean {
+  if (!m) return true;
+  if (!m.player1Id || !m.player2Id) {
+    // S'il est marqué terminé alors qu'il manque un joueur, c'est un Blanc (Bye)
+    if (m.status === 'finished') return true;
+  }
+  const p1 = (m.player1Id || '').toUpperCase();
+  const p2 = (m.player2Id || '').toUpperCase();
+  if (p1 === 'BYE' || p2 === 'BYE' || p1.includes('BYE') || p2.includes('BYE') || p1.includes('BLANC') || p2.includes('BLANC')) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Vérifie si un match est véritablement terminé entre deux vrais joueurs avec un score joué (> 0).
+ * Exclut tous les Blancs (Byes), les slots sans adversaire et les matchs non joués (0-0).
+ */
+export function isRealFinishedMatch(m?: Match | null, players?: Record<string, { name?: string }>): boolean {
+  if (!m || m.status !== 'finished') return false;
+  if (!m.player1Id || !m.player2Id) return false;
+  if (isByeMatch(m)) return false;
+  if (players) {
+    if (!players[m.player1Id]?.name || !players[m.player2Id]?.name) return false;
+  }
+  if ((m.score1 || 0) === 0 && (m.score2 || 0) === 0) return false;
+  return true;
+}
+
+/**
  * Libellé lisible pour chaque stade de compétition.
  */
 export function getRoundLabel(stage?: MatchStage): string {

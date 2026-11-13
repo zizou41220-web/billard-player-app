@@ -9,6 +9,7 @@ import { APP_VERSION } from '../version';
 import LeaderboardView from './LeaderboardView';
 import TournamentBracketView from './TournamentBracketView';
 import { getMatchScoringRules } from '../utils/rules';
+import { isRealFinishedMatch } from '../utils/bracket';
 import { getPlayerAvatar } from '../utils/avatar';
 import {
   isVoiceAnnouncerEnabled,
@@ -124,10 +125,10 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
   // Last finished matches
   const recentFinishedMatches = useMemo(() => {
     return Object.values(matches)
-      .filter(m => m.status === 'finished')
+      .filter(m => isRealFinishedMatch(m, players))
       .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))
       .slice(0, 5);
-  }, [matches]);
+  }, [matches, players]);
 
   // All club tables
   const tableList = useMemo(() => {

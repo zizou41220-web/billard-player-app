@@ -820,7 +820,10 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  createTournament: (name, format, settings, participants) => {
+  createTournament: (name, format, settings, rawParticipants) => {
+    const participants = Array.from(
+      new Set((rawParticipants || []).filter(pId => Boolean(pId && get().players[pId]?.name)))
+    );
     const tourId = `tour_${Date.now()}`;
     const newMatches: Record<string, Match> = {};
     const matchIds: string[] = [];
@@ -1089,7 +1092,8 @@ export const useStore = create<AppState>((set, get) => ({
         clearedTables,
         allMatches,
         allTournaments,
-        tourId
+        tourId,
+        state.players
       );
 
       return {

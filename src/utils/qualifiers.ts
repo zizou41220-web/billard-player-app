@@ -16,7 +16,7 @@ export type PlayerQualifStat = {
   isSure: boolean;
 };
 
-import { isFinalStageMatch } from './bracket';
+import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from './bracket';
 
 export function getTournamentQualificationStatus(
   tournament: Tournament | null,
@@ -41,7 +41,7 @@ export function getTournamentQualificationStatus(
   }
 
   const allTourMatches = tournament.matches.map(id => matches[id]).filter(Boolean);
-  const qualifMatches = allTourMatches.filter(m => !isFinalStageMatch(m));
+  const qualifMatches = allTourMatches.filter(m => !isFinalStageMatch(m) && Boolean(m.player1Id && m.player2Id) && !isByeMatch(m));
   const finalMatches = allTourMatches.filter(isFinalStageMatch);
 
   const isFinalLaunched = Boolean(
@@ -50,7 +50,7 @@ export function getTournamentQualificationStatus(
     finalMatches.length > 0
   );
   const totalQualifMatches = qualifMatches.length;
-  const finishedQualifMatches = qualifMatches.filter(m => m.status === 'finished').length;
+  const finishedQualifMatches = qualifMatches.filter(m => isRealFinishedMatch(m, players)).length;
   const isQualifAllDone = totalQualifMatches > 0 && finishedQualifMatches === totalQualifMatches;
 
   const reqQualifiers = tournament.settings?.qualifNbQualifiers || 4;
@@ -116,10 +116,12 @@ export function getTournamentQualificationStatus(
       });
 
       poolQualifMatches.forEach(m => {
-        if (poolStats[m.player1Id]) poolStats[m.player1Id].totalMatches++;
-        if (poolStats[m.player2Id]) poolStats[m.player2Id].totalMatches++;
+        if (poolStats[m.player1Id] && poolStats[m.player2Id]) {
+          poolStats[m.player1Id].totalMatches++;
+          poolStats[m.player2Id].totalMatches++;
+        }
 
-        if (m.status === 'finished') {
+        if (isRealFinishedMatch(m, players)) {
           const p1 = poolStats[m.player1Id];
           const p2 = poolStats[m.player2Id];
           if (p1 && p2) {
@@ -203,10 +205,12 @@ export function getTournamentQualificationStatus(
 
   // Calculate total scheduled matches per player in qualifs
   qualifMatches.forEach(m => {
-    if (pStats[m.player1Id]) pStats[m.player1Id].totalMatches++;
-    if (pStats[m.player2Id]) pStats[m.player2Id].totalMatches++;
+    if (pStats[m.player1Id] && pStats[m.player2Id]) {
+      pStats[m.player1Id].totalMatches++;
+      pStats[m.player2Id].totalMatches++;
+    }
 
-    if (m.status === 'finished') {
+    if (isRealFinishedMatch(m, players)) {
       const p1 = pStats[m.player1Id];
       const p2 = pStats[m.player2Id];
       if (p1 && p2) {

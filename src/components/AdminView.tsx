@@ -26,7 +26,7 @@ import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules } from '../utils/rules';
-import { isFinalStageMatch } from '../utils/bracket';
+import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
 import { getPlayerAvatar, isCustomPlayerPhoto } from '../utils/avatar';
 
 interface AdminViewProps {
@@ -173,6 +173,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const maxAllowedQualifiers = isPoolFormat && selectedPlayers.length >= 3
     ? selectedPlayers.length - 1
     : (isPoolFormat && selectedPlayers.length === 2 ? 2 : 128);
+
+  // Nettoyer automatiquement selectedPlayers si un joueur a été supprimé ou est invalide
+  React.useEffect(() => {
+    setSelectedPlayers(prev => {
+      const cleaned = prev.filter(id => Boolean(id && players[id]?.name));
+      return cleaned.length === prev.length ? prev : cleaned;
+    });
+  }, [players]);
 
   React.useEffect(() => {
     if (isPoolFormat && selectedPlayers.length >= 3) {
@@ -434,20 +442,28 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     qualifStatus.isFinalLaunched
   );
 
-  const allTourMatches = activeTournament ? Object.values(matches).filter(m => activeTournament.matches.includes(m.id)) : [];
+  const rawTourMatches = activeTournament ? Object.values(matches).filter(m => activeTournament.matches.includes(m.id)) : [];
+  // Exclure les Blancs (Byes) et les slots terminés sans adversaire / à 0-0
+  const allTourMatches = rawTourMatches.filter(m => {
+    if (isByeMatch(m)) return false;
+    if (m.status === 'finished' && !isRealFinishedMatch(m, players)) return false;
+    return true;
+  });
   const activeMatches = allTourMatches.filter(m => {
     if (m.status !== 'playing') return false;
+    if (!m.player1Id || !m.player2Id || !players[m.player1Id] || !players[m.player2Id]) return false;
     if (isFinalStageActive && !isFinalStageMatch(m)) return false;
     return true;
   });
   const pendingTourMatches = allTourMatches.filter(m => {
     if (m.status === 'finished') return false;
+    if (!m.player1Id || !m.player2Id || !players[m.player1Id] || !players[m.player2Id]) return false;
     if (isFinalStageActive && !isFinalStageMatch(m)) return false;
     return true;
   });
-  const finishedTourMatches = allTourMatches.filter(m => m.status === 'finished');
+  const finishedTourMatches = allTourMatches.filter(m => isRealFinishedMatch(m, players));
   const unplayedQualifMatches = (isFinalStageActive && activeTournament)
-    ? allTourMatches.filter(m => !isFinalStageMatch(m) && m.status !== 'finished')
+    ? allTourMatches.filter(m => !isFinalStageMatch(m) && m.status !== 'finished' && Boolean(m.player1Id && m.player2Id))
     : [];
 
   // Table mapping for all occupied tables
@@ -1011,6 +1027,28 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, padding: '0.55rem 0.95rem', fontSize: '0.84rem' }}
           >
             <Trophy size={16} /> Classement Club
+          </button>
+
+          <button
+            className={`btn ${voiceEnabled ? 'btn-neon' : 'btn-outline'}`}
+            onClick={toggleVoiceAnnouncer}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontWeight: 800,
+              padding: '0.55rem 0.9rem',
+              fontSize: '0.82rem',
+              color: voiceEnabled ? '#041210' : 'var(--text-muted)',
+              borderColor: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)',
+              background: voiceEnabled ? undefined : 'rgba(255,255,255,0.04)'
+            }}
+            title={voiceEnabled
+              ? "Appel vocal automatique des matchs activé (cliquez pour couper)"
+              : "Appel vocal automatique des matchs coupé (cliquez pour activer)"}
+          >
+            {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {voiceEnabled ? '🔊 Appel Vocal ON' : '🔇 Appel Vocal OFF'}
           </button>
 
           <button
@@ -2927,7 +2965,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
               pStats[pId] = { id: pId, name: players[pId]?.name || 'Inconnu', played: 0, won: 0, lost: 0, sf: 0, sa: 0, pts: 0 };
             });
             allTourMatches.filter(m => !m.stage || m.stage === 'qualif').forEach(m => {
-              if (m.status === 'finished') {
+              if (isRealFinishedMatch(m, players)) {
                 const p1 = pStats[m.player1Id];
                 const p2 = pStats[m.player2Id];
                 if (p1 && p2) {
@@ -2951,7 +2989,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             if (diffDiff !== 0) return diffDiff;
             if (b.sf !== a.sf) return b.sf - a.sf;
             const directMatch = allTourMatches.find(
-              m => (!m.stage || m.stage === 'qualif') && m.status === 'finished' &&
+              m => (!m.stage || m.stage === 'qualif') && isRealFinishedMatch(m, players) &&
                 ((m.player1Id === a.id && m.player2Id === b.id) || (m.player1Id === b.id && m.player2Id === a.id))
             );
             if (directMatch) {
@@ -2964,7 +3002,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             return a.id.localeCompare(b.id);
           });
 
-          const finishedMatches = allTourMatches.filter(m => m.status === 'finished').reverse();
+          const finishedMatches = allTourMatches.filter(m => isRealFinishedMatch(m, players)).reverse();
 
           if (dashboardSubTab === 'bracket') {
             return (
