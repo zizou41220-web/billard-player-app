@@ -36,9 +36,11 @@ interface AppState {
     player1Id: string;
     player2Id: string;
     targetSets: number;
+    durationMinutes?: number;
     handicapP1?: number;
     handicapP2?: number;
   }) => string;
+  updateMatchDuration: (matchId: string, durationMinutes: number, resetStartTime?: boolean) => void;
   createTournament: (name: string, format: TournamentFormat, settings: TournamentSettings, participants: string[]) => void;
   startTournamentMatch: (matchId: string, asCurrentUser?: boolean) => void;
   updateScore: (playerId: string, delta: number) => void;
@@ -747,9 +749,10 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  startCustomLiveMatch: ({ tableId = 'live', player1Id, player2Id, targetSets, handicapP1 = 0, handicapP2 = 0 }) => {
+  startCustomLiveMatch: ({ tableId = 'live', player1Id, player2Id, targetSets, durationMinutes = 0, handicapP1 = 0, handicapP2 = 0 }) => {
     const cleanTarget = Math.max(1, targetSets);
-    const matchId = `m_live_${cleanTarget}_${Date.now()}`;
+    const cleanDuration = Math.max(0, Math.round(durationMinutes || 0));
+    const matchId = `m_live_${cleanTarget}_${cleanDuration}_${Date.now()}`;
     set((state) => {
       const table = state.tables[tableId];
       let savedStream: string | undefined = table?.liveStreamUrl;
@@ -780,6 +783,7 @@ export const useStore = create<AppState>((set, get) => ({
         player1Id,
         player2Id,
         targetSets: cleanTarget,
+        durationMinutes: cleanDuration > 0 ? cleanDuration : undefined,
         score1: Math.max(0, handicapP1),
         score2: Math.max(0, handicapP2),
         handicapP1: handicapP1 > 0 ? handicapP1 : undefined,
@@ -809,6 +813,24 @@ export const useStore = create<AppState>((set, get) => ({
       };
     });
     return matchId;
+  },
+
+  updateMatchDuration: (matchId, durationMinutes, resetStartTime = false) => {
+    const cleanDuration = Math.max(0, Math.round(durationMinutes || 0));
+    set((state) => {
+      const m = state.matches[matchId];
+      if (!m) return state;
+      return {
+        matches: {
+          ...state.matches,
+          [matchId]: {
+            ...m,
+            durationMinutes: cleanDuration,
+            ...(resetStartTime ? { startTime: Date.now() } : {})
+          }
+        }
+      };
+    });
   },
 
   deletePlayer: (id) => {

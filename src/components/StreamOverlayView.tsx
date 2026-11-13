@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { Club, Match, Player, Table, Tournament } from '../types';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
-import { getMatchScoringRules } from '../utils/rules';
+import { getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { getPlayerAvatar } from '../utils/avatar';
+import MatchTimerBadge from './MatchTimerBadge';
 
 interface StreamOverlayViewProps {
   tableParam: string;
@@ -191,6 +192,14 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
             <span style={{ color: 'var(--accent-primary, #F59E0B)', fontWeight: 900, fontSize: '0.82rem' }}>
               {table.name || `BILLARD ${table.number}`}
             </span>
+            {match && (
+              <MatchTimerBadge
+                startTime={match.startTime}
+                durationMinutes={match.durationMinutes ?? resolveMatchDurationMinutes(match, activeTournament)}
+                status={match.status}
+                size="sm"
+              />
+            )}
           </div>
           <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>
             {rulesText || activeTournament?.name || currentClub.name}
@@ -1124,7 +1133,14 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
               )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
+              <MatchTimerBadge
+                startTime={match.startTime}
+                durationMinutes={match.durationMinutes ?? resolveMatchDurationMinutes(match, activeTournament)}
+                status={match.status}
+                size="md"
+                showElapsedWhenUnlimited={true}
+              />
               {!isStandaloneLive && activeTournament && <span>{activeTournament.name}</span>}
               {rulesText && (
                 <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px', color: '#fff' }}>

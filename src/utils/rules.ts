@@ -6,6 +6,7 @@ export interface MatchScoringRules {
   minScore1: number;
   minScore2: number;
   formatLabel: string;
+  durationMinutes?: number;
 }
 
 /**
@@ -222,12 +223,45 @@ export function getMatchScoringRules(
 
   const minScore1 = match.handicapP1 || 0;
   const minScore2 = match.handicapP2 || 0;
+  const durationMinutes = resolveMatchDurationMinutes(match, tournament);
 
   const formatLabel = isWinningSets
     ? `${maxSets} manche${maxSets > 1 ? 's' : ''} gagnante${maxSets > 1 ? 's' : ''}`
     : `${maxSets} manche${maxSets > 1 ? 's' : ''} fixe${maxSets > 1 ? 's' : ''}`;
 
-  return { maxSets, isWinningSets, minScore1, minScore2, formatLabel };
+  return { maxSets, isWinningSets, minScore1, minScore2, formatLabel, durationMinutes };
+}
+
+/**
+ * Résout le temps imparti (en minutes) pour un match selon sa configuration propre ou celle de la phase du tournoi.
+ * Retourne 0 si aucune limite de temps n'est définie.
+ */
+export function resolveMatchDurationMinutes(
+  match?: Match | null,
+  tournament?: Tournament | null
+): number {
+  if (!match) return 0;
+  if (match.durationMinutes !== undefined && match.durationMinutes >= 0) {
+    return match.durationMinutes;
+  }
+  const settings = tournament?.settings;
+  if (!settings) return 0;
+
+  const stage = match.stage || (match.id.includes('_third_place_') ? 'third_place' : (match.id.includes('_final_') ? 'final' : undefined));
+  const isGrandFinal = stage === 'final';
+  const isThirdPlace = stage === 'third_place';
+  const isFinal = isGrandFinal || isThirdPlace || match.stage === 'quarter' || match.stage === 'semi' || (match.bracketRound !== undefined);
+
+  if (isGrandFinal && settings.grandFinalCustom && settings.grandFinalMatchDurationMinutes !== undefined) {
+    return Math.max(0, settings.grandFinalMatchDurationMinutes);
+  }
+  if (isThirdPlace && settings.thirdPlaceCustom && settings.thirdPlaceMatchDurationMinutes !== undefined) {
+    return Math.max(0, settings.thirdPlaceMatchDurationMinutes);
+  }
+  if (isFinal) {
+    return Math.max(0, settings.finalMatchDurationMinutes ?? settings.matchDurationMinutes ?? 0);
+  }
+  return Math.max(0, settings.qualifMatchDurationMinutes ?? settings.matchDurationMinutes ?? 0);
 }
 
 /**

@@ -8,7 +8,8 @@ import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { APP_VERSION } from '../version';
 import LeaderboardView from './LeaderboardView';
 import TournamentBracketView from './TournamentBracketView';
-import { getMatchScoringRules } from '../utils/rules';
+import MatchTimerBadge from './MatchTimerBadge';
+import { getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { isRealFinishedMatch } from '../utils/bracket';
 import { getPlayerAvatar } from '../utils/avatar';
 import {
@@ -570,6 +571,14 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      {isOccupied && currentMatch && (
+                        <MatchTimerBadge
+                          startTime={currentMatch.startTime}
+                          durationMinutes={currentMatch.durationMinutes ?? resolveMatchDurationMinutes(currentMatch, activeTournament)}
+                          status={currentMatch.status}
+                          size="sm"
+                        />
+                      )}
                       {isOccupied && currentMatch?.stage && renderStageBadge(currentMatch.stage)}
                       <span style={{
                         background: isOccupied ? 'rgba(0, 255, 170, 0.12)' : 'rgba(255, 255, 255, 0.06)',

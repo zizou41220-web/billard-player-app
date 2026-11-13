@@ -145,11 +145,20 @@ export const mapDBToMatch = (d: any): Match => {
   }
 
   let parsedTargetSets = d.target_sets || undefined;
-  if (!parsedTargetSets && typeof d.id === 'string' && d.id.startsWith('m_live_')) {
+  let parsedDurationMinutes = d.duration_minutes !== undefined ? d.duration_minutes : undefined;
+  if (typeof d.id === 'string' && d.id.startsWith('m_live_')) {
     const parts = d.id.split('_');
-    const maybeSets = parseInt(parts[2], 10);
-    if (!isNaN(maybeSets) && maybeSets > 0 && maybeSets < 100) {
-      parsedTargetSets = maybeSets;
+    if (!parsedTargetSets) {
+      const maybeSets = parseInt(parts[2], 10);
+      if (!isNaN(maybeSets) && maybeSets > 0 && maybeSets < 100) {
+        parsedTargetSets = maybeSets;
+      }
+    }
+    if (parsedDurationMinutes === undefined && parts.length >= 5) {
+      const maybeDur = parseInt(parts[3], 10);
+      if (!isNaN(maybeDur) && maybeDur >= 0 && maybeDur <= 600) {
+        parsedDurationMinutes = maybeDur > 0 ? maybeDur : undefined;
+      }
     }
   }
 
@@ -160,6 +169,7 @@ export const mapDBToMatch = (d: any): Match => {
     player1Id: d.player1_id || '',
     player2Id: d.player2_id || '',
     targetSets: parsedTargetSets,
+    durationMinutes: parsedDurationMinutes,
     score1: d.score1 || 0,
     score2: d.score2 || 0,
     handicapP1: d.handicap_p1 || undefined,
@@ -444,6 +454,7 @@ export const initSync = async () => {
                 ...existingM,
                 ...parsedM,
                 targetSets: parsedM.targetSets ?? existingM?.targetSets,
+                durationMinutes: parsedM.durationMinutes ?? existingM?.durationMinutes,
                 handicapP1: parsedM.handicapP1 ?? existingM?.handicapP1,
                 handicapP2: parsedM.handicapP2 ?? existingM?.handicapP2,
                 stage: parsedM.stage || existingM?.stage,

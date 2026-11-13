@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { Flag, Minus, Plus, Radio } from 'lucide-react';
-import { getMatchScoringRules } from '../utils/rules';
+import { getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
+import MatchTimerBadge from './MatchTimerBadge';
 import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl } from '../utils/video';
 
 const MatchView: React.FC = () => {
@@ -124,11 +125,20 @@ const MatchView: React.FC = () => {
             </a>
           )}
         </div>
-        {table && match.tournamentId && (
-          <div style={{ background: 'var(--bg-surface)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700 }}>
-            {table.name || (table.number ? `Table ${table.number}` : 'Billard')}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <MatchTimerBadge
+            startTime={match.startTime}
+            durationMinutes={match.durationMinutes ?? resolveMatchDurationMinutes(match, match.tournamentId ? tournaments[match.tournamentId] : null)}
+            status={match.status}
+            size="md"
+            showElapsedWhenUnlimited={true}
+          />
+          {table && (
+            <div style={{ background: 'var(--bg-surface)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700 }}>
+              {table.name || (table.number ? `Table ${table.number}` : 'Billard')}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Live Video Player on Match View */}

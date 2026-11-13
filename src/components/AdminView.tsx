@@ -7,11 +7,12 @@ import {
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
   Radio, Tv, Smartphone, ExternalLink, Trash2, Shuffle,
-  Search, X, Facebook, Youtube, Volume2, VolumeX
+  Search, X, Facebook, Youtube, Volume2, VolumeX, Clock
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
 import { LiveOverlayEditorPanel } from './LiveOverlayEditorPanel';
+import MatchTimerBadge from './MatchTimerBadge';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { computeTournamentScheduleContext, sortTournamentMatchesForScheduling, getMatchStakeInfo } from '../utils/matchScheduler';
 import {
@@ -26,7 +27,7 @@ import {
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
-import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules } from '../utils/rules';
+import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
 import { getPlayerAvatar, isCustomPlayerPhoto } from '../utils/avatar';
 
@@ -41,7 +42,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     updateTablePosition, addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
     launchMatchOnTable, updateFinishedMatchScore, startTournamentMatch,
-    startCustomLiveMatch,
+    startCustomLiveMatch, updateMatchDuration,
     launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream,
     updateTournamentSettings, recomputePlayerStats
   } = useStore();
@@ -142,7 +143,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const [finalIsWinningSets, setFinalIsWinningSets] = useState(true);
   const [seedByMerit, setSeedByMerit] = useState(true);
   const [qualifHandicapAmateurSets, setQualifHandicapAmateurSets] = useState(0);
+  const [qualifMatchDurationMinutes, setQualifMatchDurationMinutes] = useState(0);
   const [finalHandicapAmateurSets, setFinalHandicapAmateurSets] = useState(0);
+  const [finalMatchDurationMinutes, setFinalMatchDurationMinutes] = useState(0);
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(true);
 
   // Configuration spécifique Grande Finale
@@ -307,6 +310,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
   // Standalone Live Studio State ('live_studio' tab)
   const [liveStudioTargetSets, setLiveStudioTargetSets] = useState<number>(3);
+  const [liveStudioDurationMinutes, setLiveStudioDurationMinutes] = useState<number>(0);
   const [liveStudioHandicapP1, setLiveStudioHandicapP1] = useState<number>(0);
   const [liveStudioHandicapP2, setLiveStudioHandicapP2] = useState<number>(0);
   const [liveStudioStreamUrl, setLiveStudioStreamUrl] = useState<string>(() => {
@@ -2153,6 +2157,58 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               </div>
                             )}
                           </div>
+
+                          {/* Temps imparti par match en Qualifications */}
+                          <div style={{ gridColumn: 'span 2', marginTop: '0.5rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <label style={{ fontSize: '0.95rem', color: 'var(--accent-primary)', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Clock size={16} /> Temps imparti par match (Poules / Qualifications)
+                              </label>
+                              <span style={{ fontSize: '0.72rem', background: qualifMatchDurationMinutes > 0 ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: qualifMatchDurationMinutes > 0 ? 'var(--accent-primary)' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 204, 0.3)' }}>
+                                {qualifMatchDurationMinutes > 0 ? `${qualifMatchDurationMinutes} min / match` : 'Temps illimité'}
+                              </span>
+                            </div>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0 0 0.8rem 0', lineHeight: '1.4' }}>
+                              Décompte affiché sur les billards, le live et le téléphone des joueurs (0 = Pas de limite de temps).
+                            </p>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {[0, 15, 20, 30, 45, 60].map(mins => {
+                                const isSel = qualifMatchDurationMinutes === mins;
+                                return (
+                                  <button
+                                    key={mins}
+                                    type="button"
+                                    onClick={() => setQualifMatchDurationMinutes(mins)}
+                                    className="btn"
+                                    style={{
+                                      padding: '0.45rem 0.85rem',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 800,
+                                      borderRadius: '8px',
+                                      border: isSel ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.15)',
+                                      background: isSel ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
+                                      color: isSel ? 'var(--accent-primary)' : '#fff'
+                                    }}
+                                  >
+                                    {mins === 0 ? 'Illimité (0)' : `${mins} min`}
+                                  </button>
+                                );
+                              })}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Personnalisé :</span>
+                                <input
+                                  type="number"
+                                  className="input-field"
+                                  min={0}
+                                  max={240}
+                                  value={qualifMatchDurationMinutes}
+                                  onChange={e => setQualifMatchDurationMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                  style={{ width: '70px', padding: '0.35rem 0.5rem', textAlign: 'center', fontWeight: 700 }}
+                                />
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>min</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2295,6 +2351,58 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               ⚠️ <strong>1 manche gagnante pour l'affiche Amateur vs Prestige en phase finale :</strong> aucun handicap ne peut être accordé, sinon l'amateur l'emporterait à 1-0 dès le coup d'envoi sans jouer.
                             </div>
                           )}
+                        </div>
+
+                        {/* Temps imparti par match en Phase Finale */}
+                        <div style={{ gridColumn: 'span 2', marginTop: '0.5rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <label style={{ fontSize: '0.95rem', color: 'var(--accent-secondary)', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Clock size={16} /> Temps imparti par match (Phase Finale)
+                            </label>
+                            <span style={{ fontSize: '0.72rem', background: finalMatchDurationMinutes > 0 ? 'rgba(0, 229, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: finalMatchDurationMinutes > 0 ? 'var(--accent-secondary)' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.3)' }}>
+                              {finalMatchDurationMinutes > 0 ? `${finalMatchDurationMinutes} min / match` : 'Temps illimité'}
+                            </span>
+                          </div>
+                          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0 0 0.8rem 0', lineHeight: '1.4' }}>
+                            Décompte affiché sur les billards, le live et le téléphone des joueurs pour tous les matchs de phase finale (0 = Pas de limite de temps).
+                          </p>
+                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {[0, 15, 20, 30, 45, 60].map(mins => {
+                              const isSel = finalMatchDurationMinutes === mins;
+                              return (
+                                <button
+                                  key={mins}
+                                  type="button"
+                                  onClick={() => setFinalMatchDurationMinutes(mins)}
+                                  className="btn"
+                                  style={{
+                                    padding: '0.45rem 0.85rem',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 800,
+                                    borderRadius: '8px',
+                                    border: isSel ? '2px solid var(--accent-secondary)' : '1px solid rgba(255,255,255,0.15)',
+                                    background: isSel ? 'rgba(0, 229, 255, 0.22)' : 'rgba(255,255,255,0.03)',
+                                    color: isSel ? 'var(--accent-secondary)' : '#fff'
+                                  }}
+                                >
+                                  {mins === 0 ? 'Illimité (0)' : `${mins} min`}
+                                </button>
+                              );
+                            })}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Personnalisé :</span>
+                              <input
+                                type="number"
+                                className="input-field"
+                                min={0}
+                                max={240}
+                                value={finalMatchDurationMinutes}
+                                onChange={e => setFinalMatchDurationMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                style={{ width: '70px', padding: '0.35rem 0.5rem', textAlign: 'center', fontWeight: 700 }}
+                              />
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>min</span>
+                            </div>
+                          </div>
                         </div>
 
                         {/* ======================================================== */}
@@ -2718,6 +2826,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           qualifHandicapAmateurSets,
                           finalHandicapAmateurSets,
                           handicapAmateurSets: finalHandicapAmateurSets,
+                          matchDurationMinutes: finalMatchDurationMinutes || qualifMatchDurationMinutes || 0,
+                          qualifMatchDurationMinutes,
+                          finalMatchDurationMinutes,
                           hasThirdPlaceMatch,
 
                           grandFinalCustom,
@@ -3592,7 +3703,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   </div>
                                   {match.status === 'playing' ? (
                                     <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                                      <div style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                                        <div style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
+                                        <MatchTimerBadge
+                                          startTime={match.startTime}
+                                          durationMinutes={match.durationMinutes ?? resolveMatchDurationMinutes(match, activeTournament)}
+                                          status={match.status}
+                                          size="sm"
+                                        />
+                                      </div>
                                       {effTableId && (
                                         <button
                                           className="btn btn-outline"
@@ -5048,6 +5167,62 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                   </div>
                 </div>
 
+                {/* Match Duration Selection for Match Live */}
+                <div style={{
+                  background: 'rgba(0,0,0,0.25)',
+                  padding: '0.9rem',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.78rem', color: '#ffd700', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px', margin: 0 }}>
+                      <Clock size={14} /> Temps imparti par match (Chrono Live)
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: liveStudioDurationMinutes > 0 ? '#ffd700' : 'var(--text-muted)', fontWeight: 700 }}>
+                      {liveStudioDurationMinutes > 0 ? `${liveStudioDurationMinutes} min` : 'Illimité (sans chrono)'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {[0, 15, 20, 30, 45, 60].map(mins => {
+                      const isSel = liveStudioDurationMinutes === mins;
+                      return (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setLiveStudioDurationMinutes(mins)}
+                          className="btn"
+                          style={{
+                            padding: '0.35rem 0.65rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            borderRadius: '6px',
+                            border: isSel ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.12)',
+                            background: isSel ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.03)',
+                            color: isSel ? '#ffd700' : '#fff'
+                          }}
+                        >
+                          {mins === 0 ? 'Illimité' : `${mins} min`}
+                        </button>
+                      );
+                    })}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: 'auto' }}>
+                      <input
+                        type="number"
+                        className="input-field"
+                        min={0}
+                        max={240}
+                        value={liveStudioDurationMinutes}
+                        onChange={e => setLiveStudioDurationMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        style={{ width: '60px', padding: '0.3rem 0.4rem', textAlign: 'center', fontWeight: 700, fontSize: '0.78rem' }}
+                      />
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>min</span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Player 1 Card */}
                 {renderPlayerSelectorCard(
                   '🟦 JOUEUR 1 (Gauche)',
@@ -5180,6 +5355,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       player1Id: finalP1Id,
                       player2Id: finalP2Id,
                       targetSets: liveStudioTargetSets,
+                      durationMinutes: liveStudioDurationMinutes,
                       handicapP1: liveStudioHandicapP1,
                       handicapP2: liveStudioHandicapP2
                     });
@@ -5225,6 +5401,72 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       flexDirection: 'column',
                       gap: '1rem'
                     }}>
+                      {/* Chrono / Match Timer Live Bar */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.6rem',
+                        flexWrap: 'wrap',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        padding: '0.6rem 0.9rem',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <MatchTimerBadge
+                            startTime={studioMatch.startTime}
+                            durationMinutes={studioMatch.durationMinutes || 0}
+                            status={studioMatch.status}
+                            size="md"
+                            showElapsedWhenUnlimited={true}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.74rem', padding: '3px 8px', fontWeight: 700 }}
+                            onClick={() => {
+                              const cur = studioMatch.durationMinutes || 0;
+                              updateMatchDuration(studioMatch.id, cur + 5);
+                            }}
+                            title="Ajouter 5 minutes au temps imparti"
+                          >
+                            +5 min
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.74rem', padding: '3px 8px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={() => {
+                              const input = prompt("Temps imparti en minutes pour ce match (0 = Illimité) :", String(studioMatch.durationMinutes || 0));
+                              if (input !== null) {
+                                const val = Math.max(0, parseInt(input, 10) || 0);
+                                updateMatchDuration(studioMatch.id, val);
+                              }
+                            }}
+                            title="Changer la durée du match"
+                          >
+                            <Clock size={12} /> Régler durée
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.74rem', padding: '3px 8px', fontWeight: 700, color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.35)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={() => {
+                              if (window.confirm("Relancer le chronomètre de ce match depuis le début ?")) {
+                                updateMatchDuration(studioMatch.id, studioMatch.durationMinutes || 0, true);
+                              }
+                            }}
+                            title="Relancer le chrono à zéro"
+                          >
+                            <RotateCcw size={12} /> Relancer
+                          </button>
+                        </div>
+                      </div>
+
                       {/* Player 1 Score Row */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1rem', borderRadius: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
@@ -6028,6 +6270,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 1.5s infinite' }} />
                             MATCH EN DIRECT
                           </span>
+                          <MatchTimerBadge
+                            startTime={match.startTime}
+                            durationMinutes={scoringRules.durationMinutes ?? resolveMatchDurationMinutes(match, matchTour)}
+                            status={match.status}
+                            size="sm"
+                            showElapsedWhenUnlimited={true}
+                          />
                           <span style={{ fontSize: '0.76rem', background: 'rgba(255,255,255,0.05)', color: 'var(--card-text-muted)', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', fontWeight: 600 }}>
                             Format : {formatLabel}
                           </span>
@@ -7453,6 +7702,53 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 </button>
               </div>
 
+              {/* SECTION 0: QUALIFICATIONS (si format poules/cartésien) */}
+              {activeTournament.format !== 'direct_ko' && activeTournament.format !== 'double_ko_bracket' && (
+                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-primary)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={16} /> Temps imparti par match (Qualifications)
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {[0, 15, 20, 30, 45, 60].map(mins => {
+                      const curMins = editTourSettings.qualifMatchDurationMinutes ?? 0;
+                      const isSel = curMins === mins;
+                      return (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setEditTourSettings({ ...editTourSettings, qualifMatchDurationMinutes: mins })}
+                          className="btn"
+                          style={{
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            borderRadius: '8px',
+                            border: isSel ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.15)',
+                            background: isSel ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.02)',
+                            color: isSel ? 'var(--accent-primary)' : '#fff'
+                          }}
+                        >
+                          {mins === 0 ? 'Illimité (0)' : `${mins} min`}
+                        </button>
+                      );
+                    })}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Personnalisé :</span>
+                      <input
+                        type="number"
+                        className="input-field"
+                        min={0}
+                        max={240}
+                        value={editTourSettings.qualifMatchDurationMinutes ?? 0}
+                        onChange={e => setEditTourSettings({ ...editTourSettings, qualifMatchDurationMinutes: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                        style={{ width: '65px', padding: '0.3rem 0.4rem', textAlign: 'center', fontWeight: 700, fontSize: '0.8rem' }}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>min</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* SECTION 1: TABLEAU FINAL (GÉNÉRAL / 1/4 & 1/2) */}
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-secondary)', marginBottom: '0.6rem' }}>
@@ -7531,6 +7827,54 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           {v === 0 ? '0 (Aucun)' : `+${v}`}
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Temps imparti par match en Phase Finale */}
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--accent-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.3rem' }}>
+                      <Clock size={15} /> Temps imparti par match (Phase Finale) : {editTourSettings.finalMatchDurationMinutes ? `${editTourSettings.finalMatchDurationMinutes} min` : 'Illimité'}
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {[0, 15, 20, 30, 45, 60].map(mins => {
+                        const curMins = editTourSettings.finalMatchDurationMinutes ?? 0;
+                        const isSel = curMins === mins;
+                        return (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => setEditTourSettings({ ...editTourSettings, finalMatchDurationMinutes: mins, matchDurationMinutes: mins || editTourSettings.qualifMatchDurationMinutes || 0 })}
+                            className="btn"
+                            style={{
+                              padding: '0.4rem 0.8rem',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              borderRadius: '8px',
+                              border: isSel ? '2px solid var(--accent-secondary)' : '1px solid rgba(255,255,255,0.15)',
+                              background: isSel ? 'rgba(0, 229, 255, 0.2)' : 'rgba(255,255,255,0.02)',
+                              color: isSel ? 'var(--accent-secondary)' : '#fff'
+                            }}
+                          >
+                            {mins === 0 ? 'Illimité (0)' : `${mins} min`}
+                          </button>
+                        );
+                      })}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Perso :</span>
+                        <input
+                          type="number"
+                          className="input-field"
+                          min={0}
+                          max={240}
+                          value={editTourSettings.finalMatchDurationMinutes ?? 0}
+                          onChange={e => {
+                            const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                            setEditTourSettings({ ...editTourSettings, finalMatchDurationMinutes: val, matchDurationMinutes: val || editTourSettings.qualifMatchDurationMinutes || 0 });
+                          }}
+                          style={{ width: '65px', padding: '0.3rem 0.4rem', textAlign: 'center', fontWeight: 700, fontSize: '0.8rem' }}
+                        />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>min</span>
+                      </div>
                     </div>
                   </div>
                 </div>

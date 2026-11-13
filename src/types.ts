@@ -84,6 +84,7 @@ export type Match = {
   loserMatchId?: string;
   bracketType?: 'winner' | 'loser' | 'grand_final';
   targetSets?: number; // Nombre de manches spécifiques allouées à ce duel
+  durationMinutes?: number; // Temps imparti pour ce match (en minutes, 0 ou undefined = illimité)
   handicapP1?: number;
   handicapP2?: number;
   poolName?: string; // Ex: 'Poule A', 'Poule B'
@@ -114,6 +115,13 @@ export type TournamentSettings = {
   finalStageLaunched?: boolean;
   handicapAmateurSets?: number; // Rétrocompatibilité globale
   hasThirdPlaceMatch?: boolean; // Petite finale pour la 3ème place
+
+  // Temps imparti par match (en minutes, 0 ou undefined = sans limite)
+  matchDurationMinutes?: number;
+  qualifMatchDurationMinutes?: number;
+  finalMatchDurationMinutes?: number;
+  grandFinalMatchDurationMinutes?: number;
+  thirdPlaceMatchDurationMinutes?: number;
 
   // Configuration spécifique Grande Finale
   grandFinalCustom?: boolean;
