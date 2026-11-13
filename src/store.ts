@@ -4,6 +4,7 @@ import { getMatchHandicap } from './utils/handicap';
 import { getTournamentQualificationStatus } from './utils/qualifiers';
 import { buildBracketMatches, isFinalStageMatch } from './utils/bracket';
 import { buildDoubleKOBracketMatches } from './utils/doubleBracket';
+import { computeTournamentScheduleContext, compareMatchesForScheduling } from './utils/matchScheduler';
 import {
   getMatchScoringRules,
   clampMatchScores,
@@ -589,14 +590,13 @@ export const dispatchTournamentMatches = (
       });
     };
 
-    const playCount: Record<string, number> = {};
-    tournament.matches.forEach(mId => {
-      const m = newMatches[mId];
-      if (m && m.status !== 'pending') {
-        playCount[m.player1Id] = (playCount[m.player1Id] || 0) + 1;
-        playCount[m.player2Id] = (playCount[m.player2Id] || 0) + 1;
-      }
-    });
+    // Contexte complet de programmation (enjeux, éliminations, équité des matchs joués, repos)
+    const scheduleContext = computeTournamentScheduleContext(
+      tournament,
+      newMatches,
+      players,
+      newTables
+    );
 
     for (const table of availableTables) {
       // Find all ready pending matches whose players are not busy
@@ -618,31 +618,7 @@ export const dispatchTournamentMatches = (
           !isPlayerBusy(m.player2Id)
         );
       }).sort((a, b) => {
-        const ma = newMatches[a];
-        const mb = newMatches[b];
-
-        const isFinalStageActive = Boolean(tournament.finalStageLaunched || tournament.settings?.finalStageLaunched);
-        if (isFinalStageActive) {
-          const isFinalA = isFinalStageMatch(ma);
-          const isFinalB = isFinalStageMatch(mb);
-          if (isFinalA !== isFinalB) return isFinalA ? -1 : 1;
-        }
-
-        // 1. Bracket round if defined (round 1 before round 2, etc.)
-        if (ma.bracketRound !== undefined && mb.bracketRound !== undefined && ma.bracketRound !== mb.bracketRound) {
-          return ma.bracketRound - mb.bracketRound;
-        }
-        if (ma.bracketPosition !== undefined && mb.bracketPosition !== undefined && ma.bracketPosition !== mb.bracketPosition) {
-          return ma.bracketPosition - mb.bracketPosition;
-        }
-
-        // 2. Player fairness (fewest matches played)
-        const pa = (playCount[ma.player1Id] || 0) + (playCount[ma.player2Id] || 0);
-        const pb = (playCount[mb.player1Id] || 0) + (playCount[mb.player2Id] || 0);
-        if (pa !== pb) return pa - pb;
-
-        // 3. Preserve original match order in tournament
-        return tournament.matches.indexOf(a) - tournament.matches.indexOf(b);
+        return compareMatchesForScheduling(newMatches[a], newMatches[b], scheduleContext);
       });
 
       if (eligibleMatchIds.length > 0) {

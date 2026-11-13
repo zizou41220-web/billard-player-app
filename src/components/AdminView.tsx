@@ -12,6 +12,7 @@ import {
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
+import { computeTournamentScheduleContext, sortTournamentMatchesForScheduling, getMatchStakeInfo } from '../utils/matchScheduler';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
@@ -442,6 +443,11 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     return match?.tableId || tableByCurrentMatchId[match?.id];
   };
 
+  // Contexte complet de programmation (enjeux, qualifications, équité des matchs joués, repos)
+  const scheduleContext = React.useMemo(() => {
+    return computeTournamentScheduleContext(activeTournament, matches, players, tables);
+  }, [activeTournament, matches, players, tables]);
+
   // Safe, strictly deduplicated matchesToPlay: 1 match max per table, no player on 2 tables at once
   const { matchesToPlay, matchesWaiting } = (() => {
     const tableAssigned = new Map<string, any>();
@@ -473,7 +479,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
     const toPlay = Array.from(tableAssigned.values());
     const toPlayIds = new Set(toPlay.map(m => m.id));
-    const waiting = pendingTourMatches.filter(m => !toPlayIds.has(m.id));
+    const rawWaiting = pendingTourMatches.filter(m => !toPlayIds.has(m.id));
+    const waiting = sortTournamentMatchesForScheduling(rawWaiting, scheduleContext);
 
     return { matchesToPlay: toPlay, matchesWaiting: waiting };
   })();
@@ -1193,10 +1200,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                           Format : <b style={{ color: '#fff' }}>
                             {activeTournament.format === 'cartesien' ? `Cartésien${activeTournament.settings?.qualifNbPoules && activeTournament.settings.qualifNbPoules > 1 ? ` (${activeTournament.settings.qualifNbPoules} poules)` : ''}` :
-                             activeTournament.format === 'robin' ? `Poules Robin${activeTournament.settings?.qualifNbPoules && activeTournament.settings.qualifNbPoules > 1 ? ` (${activeTournament.settings.qualifNbPoules} poules)` : ''}` :
-                             activeTournament.format === 'double_ko_bracket' ? 'Double KO (Arbre Gagnants / Repêchage)' :
-                             activeTournament.format === 'direct_ko' ? 'Tableau Direct (KO)' :
-                             'Double KO (Poules & Rattrapage)'}
+                              activeTournament.format === 'robin' ? `Poules Robin${activeTournament.settings?.qualifNbPoules && activeTournament.settings.qualifNbPoules > 1 ? ` (${activeTournament.settings.qualifNbPoules} poules)` : ''}` :
+                                activeTournament.format === 'double_ko_bracket' ? 'Double KO (Arbre Gagnants / Repêchage)' :
+                                  activeTournament.format === 'direct_ko' ? 'Tableau Direct (KO)' :
+                                    'Double KO (Poules & Rattrapage)'}
                           </b>
                         </span>
                       </div>
@@ -3053,6 +3060,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             ) : (
                               filteredWaitingMatches.map((match, idx) => {
                                 const busyInfo = getBusyPlayerInfo(match);
+                                const stakeInfo = getMatchStakeInfo(match, scheduleContext);
 
                                 return (
                                   <div
@@ -3067,7 +3075,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       gap: '0.3rem'
                                     }}
                                   >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
                                         {match.poolName && (
@@ -3075,17 +3083,44 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                             {match.poolName}
                                           </span>
                                         )}
+                                        {/* Badge d'enjeu de qualification calculé */}
+                                        <span
+                                          title={stakeInfo.description}
+                                          style={{
+                                            fontSize: '0.65rem',
+                                            fontWeight: 700,
+                                            background: stakeInfo.badgeBg,
+                                            border: `1px solid ${stakeInfo.badgeBorder}`,
+                                            color: stakeInfo.badgeColor,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center'
+                                          }}
+                                        >
+                                          {stakeInfo.label}
+                                        </span>
                                       </div>
-                                      {match.stage && (
+                                      {match.stage && match.stage !== 'qualif' && (
                                         <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                           {match.stage}
                                         </span>
                                       )}
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                                      <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player1Id]?.name || 'Attente...'}</span>
+                                      <span style={{ fontWeight: 600, color: '#fff' }}>
+                                        {players[match.player1Id]?.name || 'Attente...'}
+                                        <small style={{ color: 'var(--text-muted)', fontSize: '0.67rem', fontWeight: 500, marginLeft: '4px' }}>
+                                          ({stakeInfo.p1Played}M)
+                                        </small>
+                                      </span>
                                       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '0 4px' }}>VS</span>
-                                      <span style={{ fontWeight: 600, color: '#fff' }}>{players[match.player2Id]?.name || 'Attente...'}</span>
+                                      <span style={{ fontWeight: 600, color: '#fff' }}>
+                                        {players[match.player2Id]?.name || 'Attente...'}
+                                        <small style={{ color: 'var(--text-muted)', fontSize: '0.67rem', fontWeight: 500, marginLeft: '4px' }}>
+                                          ({stakeInfo.p2Played}M)
+                                        </small>
+                                      </span>
                                     </div>
 
                                     {/* Warning badge if player is busy on another table (ACTUALLY PLAYING) */}
@@ -3152,9 +3187,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                                 }}
                                                 title={
                                                   busyInfo.busy ? `Impossible : ${busyInfo.playerName} joue actuellement sur ${busyInfo.tableName}` :
-                                                  isPlaying ? `Occupé : un match est déjà en cours de jeu sur ${tObj?.name || label}` :
-                                                  isPending ? `Table ${label} : un match est en attente. Cliquez pour remplacer et lancer immédiatement ce match.` :
-                                                  `Lancer immédiatement ce match sur ${tObj?.name || label}`
+                                                    isPlaying ? `Occupé : un match est déjà en cours de jeu sur ${tObj?.name || label}` :
+                                                      isPending ? `Table ${label} : un match est en attente. Cliquez pour remplacer et lancer immédiatement ce match.` :
+                                                        `Lancer immédiatement ce match sur ${tObj?.name || label}`
                                                 }
                                                 onClick={() => {
                                                   if (busyInfo.busy) {
@@ -3270,6 +3305,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             const effTableId = getEffectiveTableId(match);
                             const tableObj = effTableId ? tables[effTableId] : null;
                             const tableName = tableObj?.name || (effTableId ? `Table ${tableObj?.number || effTableId}` : 'Table');
+                            const stakeInfo = getMatchStakeInfo(match, scheduleContext);
 
                             return (
                               <div
@@ -3292,7 +3328,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   <QRCode value={getMatchShareUrl(match.id, effTableId || match.tableId, match.tournamentId || activeTournament.id)} size={80} />
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem', flexWrap: 'wrap', gap: '4px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                       <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
                                       {match.poolName && (
@@ -3308,6 +3344,20 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                           {match.poolName}
                                         </span>
                                       )}
+                                      <span
+                                        title={stakeInfo.description}
+                                        style={{
+                                          fontSize: '0.65rem',
+                                          fontWeight: 800,
+                                          background: stakeInfo.badgeBg,
+                                          border: `1px solid ${stakeInfo.badgeBorder}`,
+                                          color: stakeInfo.badgeColor,
+                                          padding: '1px 5px',
+                                          borderRadius: '4px'
+                                        }}
+                                      >
+                                        {stakeInfo.label}
+                                      </span>
                                     </div>
                                     {match.stage && match.stage !== 'qualif' && (
                                       <span style={{
@@ -3323,9 +3373,19 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       </span>
                                     )}
                                   </div>
-                                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player1Id]?.name}</div>
+                                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                                    {players[match.player1Id]?.name}
+                                    <small style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 500, marginLeft: '4px' }}>
+                                      ({stakeInfo.p1Played}M)
+                                    </small>
+                                  </div>
                                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
-                                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{players[match.player2Id]?.name}</div>
+                                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                                    {players[match.player2Id]?.name}
+                                    <small style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 500, marginLeft: '4px' }}>
+                                      ({stakeInfo.p2Played}M)
+                                    </small>
+                                  </div>
                                   {match.status === 'playing' ? (
                                     <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                                       <div style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 'bold' }}>Match en cours</div>
