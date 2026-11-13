@@ -1085,21 +1085,23 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             letterSpacing: '0.5px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-              <div style={{
-                background: '#ffffff',
-                padding: '2px 6px',
-                borderRadius: '6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
-              }}>
-                <img 
-                  src={getClubLogoUrl(currentClub.logoUrl)} 
-                  alt={currentClub.name} 
-                  style={{ height: '22px', objectFit: 'contain' }} 
-                  onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
-                />
-              </div>
+              {!isStandaloneLive && (
+                <div style={{
+                  background: '#ffffff',
+                  padding: '2px 6px',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                }}>
+                  <img 
+                    src={getClubLogoUrl(currentClub.logoUrl)} 
+                    alt={currentClub.name} 
+                    style={{ height: '22px', objectFit: 'contain' }} 
+                    onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
+                  />
+                </div>
+              )}
               <span style={{ 
                 display: 'inline-flex', 
                 alignItems: 'center', 
@@ -1379,29 +1381,31 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
           gap: '1.2rem',
           boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
         }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '3px 8px',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-            flexShrink: 0
-          }}>
-            <img 
-              src={getClubLogoUrl(currentClub.logoUrl)} 
-              alt={currentClub.name} 
-              style={{ height: '36px', objectFit: 'contain' }} 
-              onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
-            />
-          </div>
+          {!isStandaloneLive && (
+            <div style={{
+              background: '#ffffff',
+              padding: '3px 8px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              flexShrink: 0
+            }}>
+              <img 
+                src={getClubLogoUrl(currentClub.logoUrl)} 
+                alt={currentClub.name} 
+                style={{ height: '36px', objectFit: 'contain' }} 
+                onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
+              />
+            </div>
+          )}
           <div>
             <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--accent-primary, #00ffcc)' }}>
               {isStandaloneLive ? 'Match Live' : (table ? (table.name || `Billard ${table.number}`) : `Table ${tableParam}`)}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>
-              {currentClub.name} • En attente du prochain match...
+              {isStandaloneLive ? 'En attente du prochain match...' : `${currentClub.name} • En attente du prochain match...`}
             </div>
           </div>
         </div>
