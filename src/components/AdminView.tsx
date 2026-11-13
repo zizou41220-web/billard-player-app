@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
+import { LiveOverlayEditorPanel } from './LiveOverlayEditorPanel';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { computeTournamentScheduleContext, sortTournamentMatchesForScheduling, getMatchStakeInfo } from '../utils/matchScheduler';
 import {
@@ -5348,6 +5349,26 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     </div>
                   );
                 })() : null}
+
+                {/* CUSTOM OVERLAY EDITOR: IMAGES (ANY FORMAT/POSITION) & FREE TEXT INFO */}
+                <LiveOverlayEditorPanel
+                  clubId={currentClub.id}
+                  channelId={studioChannelId}
+                  player1Name={
+                    studioMatch
+                      ? (players[studioMatch.player1Id]?.name || 'Joueur 1')
+                      : (liveP1Mode === 'existing' ? (selectedP1Obj?.name || 'Joueur 1') : (liveP1Name.trim() || 'Joueur 1'))
+                  }
+                  player2Name={
+                    studioMatch
+                      ? (players[studioMatch.player2Id]?.name || 'Joueur 2')
+                      : (liveP2Mode === 'existing' ? (selectedP2Obj?.name || 'Joueur 2') : (liveP2Name.trim() || 'Joueur 2'))
+                  }
+                  score1={studioMatch ? studioMatch.score1 : liveStudioHandicapP1}
+                  score2={studioMatch ? studioMatch.score2 : liveStudioHandicapP2}
+                  overlayPos={overlayPos}
+                  onChangeOverlayPos={setOverlayPos}
+                />
 
                 {/* FULL LIVE & STREAMING HUB */}
                 <div style={{

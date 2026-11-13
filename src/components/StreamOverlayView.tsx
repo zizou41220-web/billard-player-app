@@ -10,6 +10,13 @@ interface StreamOverlayViewProps {
 }
 
 import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl } from '../utils/video';
+import {
+  LiveOverlayConfig,
+  loadLiveOverlayConfig,
+  saveLiveOverlayConfig,
+  subscribeToLiveOverlayConfig
+} from '../utils/liveOverlay';
+import { LiveCustomOverlayLayer } from './LiveCustomOverlayLayer';
 
 interface MultiTableTileProps {
   table: Table;
@@ -371,7 +378,31 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const [fillScreen, setFillScreen] = useState<boolean>(true);
   const [videoZoom, setVideoZoom] = useState<number>(1);
   const [videoRotation, setVideoRotation] = useState<number>(0);
+  const [overlayConfig, setOverlayConfig] = useState<LiveOverlayConfig>(() =>
+    loadLiveOverlayConfig(currentClub.id, 'live')
+  );
+  const [interactiveOverlayEdit, setInteractiveOverlayEdit] = useState<boolean>(false);
+  const [selectedOverlayItemId, setSelectedOverlayItemId] = useState<string | null>(null);
+  const [draggingScoreboard, setDraggingScoreboard] = useState<{
+    startX: number;
+    startY: number;
+    initX: number;
+    initY: number;
+  } | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const screenContainerRef = React.useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setOverlayConfig(loadLiveOverlayConfig(currentClub.id, 'live'));
+    return subscribeToLiveOverlayConfig(currentClub.id, 'live', (updated) => {
+      setOverlayConfig(updated);
+    });
+  }, [currentClub.id]);
+
+  const handleUpdateOverlayConfig = (next: LiveOverlayConfig) => {
+    setOverlayConfig(next);
+    saveLiveOverlayConfig(currentClub.id, next, 'live', true);
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -646,20 +677,40 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const hasVideoLayer = Boolean(vdoRoom || isLocalBroadcast || effectiveExternalVideo);
 
   return (
-    <div style={{
-      width: '100vw',
-      height: '100vh',
-      backgroundColor: hasVideoLayer ? '#000' : 'transparent',
-      overflow: 'hidden',
-      position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: position === 'top' ? 'flex-start' : 'flex-end',
-      alignItems: 'center',
-      padding: '2.5rem',
-      boxSizing: 'border-box',
-      fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
-    }}>
+    <div
+      ref={screenContainerRef}
+      onPointerMove={(e) => {
+        if (!draggingScoreboard || !screenContainerRef.current) return;
+        const rect = screenContainerRef.current.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const dx = ((e.clientX - draggingScoreboard.startX) / rect.width) * 100;
+        const dy = ((e.clientY - draggingScoreboard.startY) / rect.height) * 100;
+        const nextX = Math.max(8, Math.min(92, Math.round((draggingScoreboard.initX + dx) * 10) / 10));
+        const nextY = Math.max(6, Math.min(94, Math.round((draggingScoreboard.initY + dy) * 10) / 10));
+        handleUpdateOverlayConfig({
+          ...overlayConfig,
+          scoreboardCustomPos: true,
+          scoreboardX: nextX,
+          scoreboardY: nextY
+        });
+      }}
+      onPointerUp={() => setDraggingScoreboard(null)}
+      onPointerCancel={() => setDraggingScoreboard(null)}
+      style={{
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: hasVideoLayer ? '#000' : 'transparent',
+        overflow: 'hidden',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: position === 'top' ? 'flex-start' : 'flex-end',
+        alignItems: 'center',
+        padding: '2.5rem',
+        boxSizing: 'border-box',
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
+      }}
+    >
       {/* 1. VDO.Ninja Wireless Camera Background (Smartphone or PC WebRTC) */}
       {vdoRoom && (
         <div style={{
@@ -858,7 +909,16 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
           </button>
           <button
             type="button"
-            onClick={() => setPosition(position === 'top' ? 'bottom' : 'top')}
+            onClick={() => {
+              const nextPos = position === 'top' ? 'bottom' : 'top';
+              setPosition(nextPos);
+              handleUpdateOverlayConfig({
+                ...overlayConfig,
+                scoreboardCustomPos: false,
+                scoreboardX: 50,
+                scoreboardY: nextPos === 'bottom' ? 86 : 13
+              });
+            }}
             style={{
               background: 'rgba(255,255,255,0.1)',
               color: '#fff',
@@ -871,6 +931,23 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             }}
           >
             Score : {position === 'top' ? '⬆ Haut' : '⬇ Bas'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setInteractiveOverlayEdit(!interactiveOverlayEdit)}
+            style={{
+              background: interactiveOverlayEdit ? '#F59E0B' : 'rgba(245, 158, 11, 0.2)',
+              color: interactiveOverlayEdit ? '#000' : '#FBBF24',
+              border: '1px solid rgba(245, 158, 11, 0.5)',
+              borderRadius: '6px',
+              padding: '4px 9px',
+              fontSize: '0.73rem',
+              cursor: 'pointer',
+              fontWeight: 800
+            }}
+            title="Activer pour déplacer librement le score, les images et les textes à la souris sur cet écran"
+          >
+            {interactiveOverlayEdit ? '✓ Déplacement Actif' : '✋ Déplacer Éléments'}
           </button>
           <button
             type="button"
@@ -944,19 +1021,50 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
         </div>
       )}
       
+      {/* Custom Images & Text Banners Layer (configured in Studio Match Live) */}
+      <LiveCustomOverlayLayer
+        config={overlayConfig}
+        interactive={interactiveOverlayEdit}
+        selectedItemId={selectedOverlayItemId}
+        onSelectItem={setSelectedOverlayItemId}
+        onChangeConfig={handleUpdateOverlayConfig}
+        previewScale={1}
+      />
+
       {/* Broadcast Scoreboard Graphic */}
       {(table || isStandaloneLive) && match && p1 && p2 ? (
-        <div style={{
-          position: 'relative',
-          zIndex: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          animation: 'fadeInDown 0.4s ease',
-          filter: 'drop-shadow(0 12px 28px rgba(0,0,0,0.8))',
-          maxWidth: '900px',
-          width: '100%'
-        }}>
+        <div
+          onPointerDown={(e) => {
+            if (!interactiveOverlayEdit) return;
+            e.stopPropagation();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDraggingScoreboard({
+              startX: e.clientX,
+              startY: e.clientY,
+              initX: overlayConfig.scoreboardCustomPos ? (overlayConfig.scoreboardX ?? 50) : 50,
+              initY: overlayConfig.scoreboardCustomPos ? (overlayConfig.scoreboardY ?? 13) : (position === 'bottom' ? 86 : 13)
+            });
+          }}
+          style={{
+            position: overlayConfig.scoreboardCustomPos ? 'absolute' : 'relative',
+            left: overlayConfig.scoreboardCustomPos ? `${overlayConfig.scoreboardX ?? 50}%` : undefined,
+            top: overlayConfig.scoreboardCustomPos ? `${overlayConfig.scoreboardY ?? 13}%` : undefined,
+            transform: overlayConfig.scoreboardCustomPos
+              ? `translate(-50%, -50%) scale(${overlayConfig.scoreboardScale || 1})`
+              : undefined,
+            cursor: interactiveOverlayEdit ? 'grab' : 'default',
+            outline: interactiveOverlayEdit ? '2px dashed #F59E0B' : 'none',
+            outlineOffset: '6px',
+            zIndex: 15,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            animation: 'fadeInDown 0.4s ease',
+            filter: 'drop-shadow(0 12px 28px rgba(0,0,0,0.8))',
+            maxWidth: '900px',
+            width: '100%'
+          }}
+        >
           
           {/* Top Bar: Tournament & Table Header */}
           <div style={{
