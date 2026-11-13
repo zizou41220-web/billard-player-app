@@ -113,16 +113,24 @@ function App() {
   };
 
   return (
-    <div style={{ position: 'relative', height: '100dvh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+    <div style={{
+      position: 'relative',
+      height: '100dvh',
+      width: '100vw',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      background: 'radial-gradient(circle at 50% 20%, rgba(15, 118, 110, 0.28) 0%, #030b0a 75%)'
+    }}>
       {isDesktop && (
-        <div style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+        <div style={{ position: 'absolute', top: '1.5rem', right: '1.8rem', display: 'flex', alignItems: 'center', gap: '0.75rem', zIndex: 50 }}>
           <span style={{
-            fontSize: '0.8rem',
-            color: 'var(--accent-primary)',
-            background: 'rgba(0, 255, 170, 0.12)',
+            fontSize: '0.78rem',
+            color: '#FBBF24',
+            background: 'rgba(245, 158, 11, 0.16)',
             padding: '4px 10px',
             borderRadius: '10px',
-            border: '1px solid rgba(0, 255, 170, 0.3)',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
             fontWeight: 800
           }}>
             {APP_VERSION}
@@ -130,16 +138,16 @@ function App() {
           <button 
             onClick={() => setAppMode('kiosk')}
             className="btn btn-outline"
-            style={{ background: '#050816', color: 'var(--accent-primary)', borderColor: 'rgba(0, 255, 170, 0.4)' }}
+            style={{ background: 'rgba(4, 24, 21, 0.9)', color: '#34D399', borderColor: 'rgba(52, 211, 153, 0.45)', padding: '0.55rem 1rem', fontSize: '0.84rem' }}
           >
-            <Tv size={18} style={{marginRight: '0.5rem'}}/> Mode Kiosque TV
+            <Tv size={17} /> Mode Kiosque TV
           </button>
           <button 
             onClick={() => setAppMode('admin')}
             className="btn btn-outline"
-            style={{ background: '#050816' }}
+            style={{ background: 'rgba(4, 24, 21, 0.9)', padding: '0.55rem 1rem', fontSize: '0.84rem' }}
           >
-            <Settings size={20} style={{marginRight: '0.5rem'}}/> Retour Écran Gérant (TV)
+            <Settings size={18} /> Retour Écran Gérant (TV)
           </button>
         </div>
       )}
@@ -148,16 +156,17 @@ function App() {
         {/* Version indicator for mobile */}
         <div style={{
           position: 'absolute',
-          top: '10px',
-          right: '12px',
+          top: '12px',
+          right: '14px',
           zIndex: 99,
           fontSize: '0.7rem',
-          color: 'var(--accent-primary)',
-          background: 'rgba(0, 255, 170, 0.12)',
+          color: '#FBBF24',
+          background: 'rgba(245, 158, 11, 0.18)',
           padding: '2px 8px',
           borderRadius: '8px',
-          border: '1px solid rgba(0, 255, 170, 0.3)',
+          border: '1px solid rgba(245, 158, 11, 0.4)',
           fontWeight: 800,
+          backdropFilter: 'blur(8px)',
           pointerEvents: 'none'
         }}>
           {APP_VERSION}

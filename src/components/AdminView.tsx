@@ -884,41 +884,62 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-primary)', overflow: 'hidden' }}>
 
       {/* Main Header */}
-      <header style={{ padding: '1.2rem 2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', background: 'rgba(5, 8, 22, 0.7)', backdropFilter: 'blur(12px)', position: 'relative', zIndex: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+      <header style={{
+        padding: '0.95rem 2rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottom: '1px solid rgba(255, 215, 0, 0.18)',
+        background: 'linear-gradient(180deg, rgba(4, 24, 21, 0.96) 0%, rgba(6, 33, 29, 0.92) 100%)',
+        backdropFilter: 'blur(16px)',
+        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.45)',
+        position: 'relative',
+        zIndex: 20,
+        gap: '1rem',
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{
             background: '#ffffff',
-            padding: '3px 8px',
-            borderRadius: '10px',
+            padding: '4px 9px',
+            borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4), 0 0 0 2px rgba(245, 158, 11, 0.35)',
             flexShrink: 0
           }}>
-            <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '44px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
+            <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '42px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.6rem', margin: 0, fontWeight: 900, color: 'var(--accent-primary)', letterSpacing: '-0.5px' }}>
+            <h1 style={{
+              fontSize: '1.45rem',
+              margin: 0,
+              fontWeight: 900,
+              background: 'linear-gradient(90deg, #FBBF24 0%, #34D399 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.5px'
+            }}>
               {currentClub.name}
             </h1>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <span>Espace Gérant & Tournois • {currentClub.name}</span>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.55rem', marginTop: '2px' }}>
+              <span>Espace Gérant & Tournois</span>
               <span style={{
-                background: 'rgba(0, 255, 170, 0.15)',
-                color: 'var(--accent-primary)',
-                padding: '3px 9px',
+                background: 'rgba(245, 158, 11, 0.16)',
+                color: '#FBBF24',
+                padding: '2px 8px',
                 borderRadius: '8px',
-                fontSize: '0.75rem',
+                fontSize: '0.72rem',
                 fontWeight: 800,
-                border: '1px solid rgba(0, 255, 170, 0.4)',
-                boxShadow: '0 0 10px rgba(0, 255, 170, 0.2)'
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                boxShadow: '0 0 10px rgba(245, 158, 11, 0.15)'
               }}>
                 {APP_VERSION}
               </span>
               {activeTournament && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.3)' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-primary)', boxShadow: '0 0 6px var(--accent-primary)' }} />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(16, 185, 129, 0.15)', color: '#34D399', padding: '2px 9px', borderRadius: '12px', fontSize: '0.73rem', fontWeight: 700, border: '1px solid rgba(52, 211, 153, 0.35)' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34D399', boxShadow: '0 0 8px #34D399' }} />
                   {activeTournament.name}
                 </span>
               )}
@@ -927,13 +948,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
         </div>
 
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             className={`btn ${activeTab === 'launcher' ? 'btn-neon' : 'btn-outline'}`}
             onClick={() => setActiveTab('launcher')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, padding: '0.55rem 0.95rem', fontSize: '0.84rem' }}
           >
-            <Rocket size={18} /> Lanceur de tournoi
+            <Rocket size={16} /> Lanceur de tournoi
           </button>
 
           <button
@@ -942,15 +963,17 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.45rem',
               fontWeight: 700,
+              padding: '0.55rem 0.95rem',
+              fontSize: '0.84rem',
               position: 'relative'
             }}
           >
             {isTournamentActive ? (
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ffaa', boxShadow: '0 0 8px #00ffaa' }} />
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeTab === 'dashboard' ? '#041210' : '#00ffaa', boxShadow: activeTab === 'dashboard' ? 'none' : '0 0 8px #00ffaa' }} />
             ) : (
-              <MonitorPlay size={18} />
+              <MonitorPlay size={16} />
             )}
             Vue d'ensemble
           </button>
@@ -961,31 +984,33 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.45rem',
               fontWeight: 800,
-              borderColor: activeTab === 'live_studio' ? undefined : 'rgba(255, 34, 68, 0.5)',
-              background: activeTab === 'live_studio' ? undefined : 'rgba(255, 34, 68, 0.12)',
-              color: activeTab === 'live_studio' ? undefined : '#ff8a96'
+              padding: '0.55rem 0.95rem',
+              fontSize: '0.84rem',
+              borderColor: activeTab === 'live_studio' ? undefined : 'rgba(255, 59, 92, 0.5)',
+              background: activeTab === 'live_studio' ? undefined : 'rgba(255, 59, 92, 0.14)',
+              color: activeTab === 'live_studio' ? undefined : '#ff9aa4'
             }}
             title="Lancer un match en direct (hors tournoi ou amical) avec choix/création des joueurs, photo, club, logo et régie vidéo"
           >
-            <Radio size={18} style={{ color: activeTab === 'live_studio' ? '#000' : '#ff2244' }} /> 🎥 Match Live
+            <Radio size={16} style={{ color: activeTab === 'live_studio' ? '#000' : '#ff3b5c' }} /> 🎥 Match Live
           </button>
 
           <button
             className={`btn ${activeTab === 'admin' ? 'btn-neon' : 'btn-outline'}`}
             onClick={() => setActiveTab('admin')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, padding: '0.55rem 0.95rem', fontSize: '0.84rem' }}
           >
-            <Settings size={18} /> Administration
+            <Settings size={16} /> Administration
           </button>
 
           <button
             className={`btn ${activeTab === 'leaderboard' ? 'btn-neon' : 'btn-outline'}`}
             onClick={() => setActiveTab('leaderboard')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, padding: '0.55rem 0.95rem', fontSize: '0.84rem' }}
           >
-            <Trophy size={18} /> Classement Club
+            <Trophy size={16} /> Classement Club
           </button>
 
           <button
@@ -994,17 +1019,19 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.45rem',
+              gap: '0.4rem',
               fontWeight: 800,
-              color: voiceEnabled ? '#000' : 'var(--text-muted)',
+              padding: '0.55rem 0.9rem',
+              fontSize: '0.82rem',
+              color: voiceEnabled ? '#041210' : 'var(--text-muted)',
               borderColor: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)',
-              background: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.04)'
+              background: voiceEnabled ? undefined : 'rgba(255,255,255,0.04)'
             }}
             title={voiceEnabled
               ? "Appel vocal automatique des matchs activé (cliquez pour couper)"
               : "Appel vocal automatique des matchs coupé (cliquez pour activer)"}
           >
-            {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             {voiceEnabled ? '🔊 Appel Vocal ON' : '🔇 Appel Vocal OFF'}
           </button>
 
@@ -1015,15 +1042,17 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
+                gap: '0.45rem',
                 fontWeight: 700,
-                color: 'var(--accent-primary)',
-                borderColor: 'rgba(0, 255, 170, 0.4)',
-                background: 'rgba(0, 255, 170, 0.08)'
+                padding: '0.55rem 0.95rem',
+                fontSize: '0.84rem',
+                color: '#34D399',
+                borderColor: 'rgba(52, 211, 153, 0.45)',
+                background: 'rgba(16, 185, 129, 0.12)'
               }}
               title="Lancer le mode plein écran pour le grand écran TV du club"
             >
-              <Tv size={18} /> Mode Kiosque TV
+              <Tv size={16} /> Mode Kiosque TV
             </button>
           )}
         </div>
@@ -3127,13 +3156,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   <div
                                     key={match.id}
                                     style={{
-                                      background: 'rgba(255,255,255,0.03)',
-                                      border: '1px solid rgba(255,255,255,0.08)',
-                                      borderRadius: '8px',
-                                      padding: '0.6rem 0.8rem',
+                                      background: 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.22) 100%)',
+                                      border: '1px solid rgba(255,255,255,0.12)',
+                                      boxShadow: '0 4px 12px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
+                                      borderRadius: '11px',
+                                      padding: '0.65rem 0.85rem',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '0.3rem'
+                                      gap: '0.35rem',
+                                      transition: 'transform 0.15s ease, border-color 0.15s ease'
                                     }}
                                   >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
@@ -3435,19 +3466,27 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 key={match.id}
                                 style={{
                                   flex: '1 1 290px',
-                                  maxWidth: (matchesToPlay.length <= 2) ? '335px' : '360px',
+                                  maxWidth: (matchesToPlay.length <= 2) ? '345px' : '365px',
                                   minWidth: '260px',
-                                  background: 'rgba(255,255,255,0.02)',
-                                  border: '1px solid var(--border-color)',
-                                  borderRadius: '12px',
-                                  padding: '0.9rem 1rem',
+                                  background: 'linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(0,0,0,0.28) 100%)',
+                                  border: '1px solid rgba(255,255,255,0.14)',
+                                  boxShadow: '0 8px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+                                  borderRadius: '14px',
+                                  padding: '0.95rem 1.05rem',
                                   display: 'flex',
-                                  gap: '0.9rem',
+                                  gap: '0.95rem',
                                   alignItems: 'center',
                                   boxSizing: 'border-box'
                                 }}
                               >
-                                <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '8px', opacity: match.status === 'playing' ? 0.3 : 1 }}>
+                                <div style={{
+                                  background: '#fff',
+                                  padding: '0.5rem',
+                                  borderRadius: '10px',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+                                  opacity: match.status === 'playing' ? 0.35 : 1,
+                                  transition: 'opacity 0.2s ease'
+                                }}>
                                   <QRCode value={getMatchShareUrl(match.id, effTableId || match.tableId, match.tournamentId || activeTournament.id)} size={80} />
                                 </div>
                                 <div style={{ flex: 1 }}>
