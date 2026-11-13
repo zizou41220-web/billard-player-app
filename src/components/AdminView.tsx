@@ -3108,12 +3108,12 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 270px) 1fr minmax(460px, 490px)', gap: '1.2rem', flex: 1, minHeight: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(285px, 310px) 1fr minmax(430px, 470px)', gap: '1.2rem', flex: 1, minHeight: 0 }}>
 
                 {/* LEFT: FILE D'ATTENTE PLEINE HAUTEUR (100% DE LA COLONNE) */}
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
                   {/* File d'attente (Prend 100% de la hauteur) */}
-                  <div className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+                  <div className="glass-card" style={{ padding: '1rem 1.05rem', display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
                     {(() => {
                       const filteredWaitingMatches = matchesWaiting.filter(m => {
                         if (!playerSearchQuery.trim()) return true;
@@ -3176,7 +3176,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             )}
                           </div>
 
-                          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingRight: '0.2rem' }}>
+                          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingRight: '0.25rem' }}>
                             {matchesWaiting.length === 0 ? (
                               <div style={{ color: 'var(--card-text-muted)', fontSize: '0.8rem', textAlign: 'center', marginTop: '1.5rem' }}>
                                 Aucun match en attente.
@@ -3194,26 +3194,27 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   <div
                                     key={match.id}
                                     style={{
-                                      background: 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.22) 100%)',
+                                      background: 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.24) 100%)',
                                       border: '1px solid rgba(255,255,255,0.12)',
                                       boxShadow: '0 4px 12px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
-                                      borderRadius: '11px',
-                                      padding: '0.65rem 0.85rem',
+                                      borderRadius: '12px',
+                                      padding: '0.7rem 0.8rem',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '0.35rem',
-                                      transition: 'transform 0.15s ease, border-color 0.15s ease'
+                                      gap: '0.45rem',
+                                      boxSizing: 'border-box',
+                                      width: '100%'
                                     }}
                                   >
+                                    {/* En-tête de carte : numéro + poule + enjeu */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>#{idx + 1}</span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800 }}>#{idx + 1}</span>
                                         {match.poolName && (
                                           <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 700, background: 'rgba(0, 255, 204, 0.12)', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(0, 255, 204, 0.25)' }}>
                                             {match.poolName}
                                           </span>
                                         )}
-                                        {/* Badge d'enjeu de qualification calculé */}
                                         <span
                                           title={stakeInfo.description}
                                           style={{
@@ -3222,7 +3223,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                             background: stakeInfo.badgeBg,
                                             border: `1px solid ${stakeInfo.badgeBorder}`,
                                             color: stakeInfo.badgeColor,
-                                            padding: '1px 5px',
+                                            padding: '1px 6px',
                                             borderRadius: '4px',
                                             display: 'inline-flex',
                                             alignItems: 'center'
@@ -3232,86 +3233,107 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                         </span>
                                       </div>
                                       {match.stage && match.stage !== 'qualif' && (
-                                        <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
                                           {match.stage}
                                         </span>
                                       )}
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                                      <span style={{ fontWeight: 600, color: '#fff' }}>
-                                        {players[match.player1Id]?.name || 'Attente...'}
-                                        <small style={{ color: 'var(--text-muted)', fontSize: '0.67rem', fontWeight: 500, marginLeft: '4px' }}>
-                                          ({stakeInfo.p1Played}M)
-                                        </small>
-                                      </span>
-                                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '0 4px' }}>VS</span>
-                                      <span style={{ fontWeight: 600, color: '#fff' }}>
-                                        {players[match.player2Id]?.name || 'Attente...'}
-                                        <small style={{ color: 'var(--text-muted)', fontSize: '0.67rem', fontWeight: 500, marginLeft: '4px' }}>
-                                          ({stakeInfo.p2Played}M)
-                                        </small>
-                                      </span>
+
+                                    {/* Joueurs empilés proprement pour une lisibilité parfaite sans coupure */}
+                                    <div style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '0.22rem',
+                                      background: 'rgba(0,0,0,0.22)',
+                                      padding: '0.45rem 0.6rem',
+                                      borderRadius: '8px',
+                                      border: '1px solid rgba(255,255,255,0.06)'
+                                    }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {players[match.player1Id]?.name || 'Attente...'}
+                                        </span>
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}>
+                                          {stakeInfo.p1Played}M
+                                        </span>
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+                                        <span style={{ fontSize: '0.6rem', color: 'var(--accent-primary)', fontWeight: 800, letterSpacing: '0.5px' }}>VS</span>
+                                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+                                      </div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {players[match.player2Id]?.name || 'Attente...'}
+                                        </span>
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}>
+                                          {stakeInfo.p2Played}M
+                                        </span>
+                                      </div>
                                     </div>
 
                                     {/* Warning badge if player is busy on another table (ACTUALLY PLAYING) */}
                                     {busyInfo.busy && (
-                                      <div style={{ fontSize: '0.65rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255, 183, 3, 0.3)', marginTop: '0.1rem' }}>
-                                        ⚠️ {busyInfo.playerName} joue actuellement sur {busyInfo.tableName}
+                                      <div style={{ fontSize: '0.66rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '3px 7px', borderRadius: '6px', border: '1px solid rgba(255, 183, 3, 0.3)' }}>
+                                        ⚠️ {busyInfo.playerName} joue sur {busyInfo.tableName}
                                       </div>
                                     )}
 
-                                    {/* Actions : Lancer sur un billard disponible, Pré-appel vocal ou Marquer le score directement */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Lancer sur un billard :</span>
-                                        <div style={{ display: 'flex', gap: '4px' }}>
-                                          <button
-                                            type="button"
-                                            className="btn btn-outline"
-                                            style={{
-                                              fontSize: '0.64rem',
-                                              padding: '2px 6px',
-                                              height: '20px',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '3px',
-                                              color: '#ffd700',
-                                              borderColor: 'rgba(255, 215, 0, 0.35)',
-                                              background: 'rgba(255, 215, 0, 0.08)'
-                                            }}
-                                            onClick={() => announceWaitingMatchPrep({
-                                              player1Name: players[match.player1Id]?.name || 'Joueur 1',
-                                              player2Name: players[match.player2Id]?.name || 'Joueur 2',
-                                              rankIndex: idx + 1
-                                            })}
-                                            title="Pré-appeler ces deux joueurs au micro pour qu'ils se tiennent prêts"
-                                          >
-                                            <Volume2 size={10} /> 📢 Pré-appel
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="btn btn-outline"
-                                            style={{
-                                              fontSize: '0.64rem',
-                                              padding: '2px 6px',
-                                              height: '20px',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '3px',
-                                              color: 'var(--accent-primary)',
-                                              borderColor: 'rgba(0, 255, 170, 0.35)',
-                                              background: 'rgba(0, 255, 170, 0.08)'
-                                            }}
-                                            onClick={() => openDirectScoreModal(match)}
-                                            title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
-                                          >
-                                            <Edit2 size={10} /> 📝 Score
-                                          </button>
-                                        </div>
+                                    {/* Actions : Pré-appel + Score sur une ligne, Billards sur la ligne suivante */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingTop: '0.2rem' }}>
+                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
+                                        <button
+                                          type="button"
+                                          className="btn btn-outline"
+                                          style={{
+                                            fontSize: '0.68rem',
+                                            padding: '4px 6px',
+                                            height: '25px',
+                                            borderRadius: '7px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px',
+                                            color: '#ffd700',
+                                            borderColor: 'rgba(255, 215, 0, 0.35)',
+                                            background: 'rgba(255, 215, 0, 0.08)',
+                                            width: '100%'
+                                          }}
+                                          onClick={() => announceWaitingMatchPrep({
+                                            player1Name: players[match.player1Id]?.name || 'Joueur 1',
+                                            player2Name: players[match.player2Id]?.name || 'Joueur 2',
+                                            rankIndex: idx + 1
+                                          })}
+                                          title="Pré-appeler ces deux joueurs au micro pour qu'ils se tiennent prêts"
+                                        >
+                                          <Volume2 size={11} /> Pré-appel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn btn-outline"
+                                          style={{
+                                            fontSize: '0.68rem',
+                                            padding: '4px 6px',
+                                            height: '25px',
+                                            borderRadius: '7px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px',
+                                            color: '#34D399',
+                                            borderColor: 'rgba(52, 211, 153, 0.4)',
+                                            background: 'rgba(16, 185, 129, 0.1)',
+                                            width: '100%'
+                                          }}
+                                          onClick={() => openDirectScoreModal(match)}
+                                          title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
+                                        >
+                                          <Edit2 size={11} /> Saisir score
+                                        </button>
                                       </div>
 
                                       {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
-                                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                                           {activeTournament.settings.tableIds.map(tId => {
                                             const tObj = tables[tId];
                                             const label = tObj ? `T.${tObj.number}` : tId;
@@ -3330,13 +3352,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                                 className={canLaunch ? "btn btn-neon" : "btn btn-outline"}
                                                 disabled={!canLaunch}
                                                 style={{
-                                                  fontSize: '0.65rem',
-                                                  padding: '2px 7px',
-                                                  height: '22px',
+                                                  flex: '1 1 auto',
+                                                  fontSize: '0.68rem',
+                                                  padding: '3px 8px',
+                                                  height: '24px',
+                                                  borderRadius: '7px',
                                                   fontWeight: canLaunch ? 800 : 600,
-                                                  color: isPlaying ? 'rgba(255,255,255,0.3)' : (busyInfo.busy ? 'rgba(255,183,3,0.5)' : '#000'),
-                                                  background: isPlaying ? 'rgba(255,255,255,0.03)' : (busyInfo.busy ? 'rgba(255,183,3,0.08)' : 'var(--accent-primary)'),
-                                                  borderColor: isPlaying ? 'rgba(255,255,255,0.08)' : (busyInfo.busy ? 'rgba(255,183,3,0.2)' : 'var(--accent-primary)'),
+                                                  color: isPlaying ? 'rgba(255,255,255,0.35)' : (busyInfo.busy ? 'rgba(255,183,3,0.55)' : '#041210'),
+                                                  background: isPlaying ? 'rgba(255,255,255,0.03)' : (busyInfo.busy ? 'rgba(255,183,3,0.08)' : undefined),
+                                                  borderColor: isPlaying ? 'rgba(255,255,255,0.08)' : (busyInfo.busy ? 'rgba(255,183,3,0.2)' : undefined),
                                                   opacity: canLaunch ? 1 : 0.45,
                                                   cursor: canLaunch ? 'pointer' : 'not-allowed'
                                                 }}
@@ -3491,7 +3515,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           justifyContent: 'center',
                           gap: '0.9rem',
                           width: '100%',
-                          maxWidth: (matchesToPlay.length <= 2) ? '700px' : '960px'
+                          maxWidth: (matchesToPlay.length <= 2) ? '840px' : '1020px'
                         }}>
                           {matchesToPlay.map(match => {
                             const effTableId = getEffectiveTableId(match);
@@ -3503,9 +3527,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                               <div
                                 key={match.id}
                                 style={{
-                                  flex: '1 1 290px',
-                                  maxWidth: (matchesToPlay.length <= 2) ? '345px' : '365px',
-                                  minWidth: '260px',
+                                  flex: '1 1 320px',
+                                  maxWidth: (matchesToPlay.length <= 2) ? '405px' : '420px',
+                                  minWidth: '295px',
                                   background: 'linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(0,0,0,0.28) 100%)',
                                   border: '1px solid rgba(255,255,255,0.14)',
                                   boxShadow: '0 8px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
@@ -3523,13 +3547,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   borderRadius: '10px',
                                   boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
                                   opacity: match.status === 'playing' ? 0.35 : 1,
-                                  transition: 'opacity 0.2s ease'
+                                  transition: 'opacity 0.2s ease',
+                                  flexShrink: 0
                                 }}>
-                                  <QRCode value={getMatchShareUrl(match.id, effTableId || match.tableId, match.tournamentId || activeTournament.id)} size={80} />
+                                  <QRCode value={getMatchShareUrl(match.id, effTableId || match.tableId, match.tournamentId || activeTournament.id)} size={78} />
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem', flexWrap: 'wrap', gap: '4px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                       <span style={{ color: 'var(--accent-secondary)', fontWeight: 800, fontSize: '0.9rem' }}>{tableName}</span>
                                       {match.poolName && (
                                         <span style={{
@@ -3573,14 +3598,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       </span>
                                     )}
                                   </div>
-                                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                                  <div style={{ fontWeight: 700, fontSize: '0.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {players[match.player1Id]?.name}
                                     <small style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 500, marginLeft: '4px' }}>
                                       ({stakeInfo.p1Played}M)
                                     </small>
                                   </div>
-                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>VS</div>
-                                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                                  <div style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 800 }}>VS</div>
+                                  <div style={{ fontWeight: 700, fontSize: '0.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {players[match.player2Id]?.name}
                                     <small style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 500, marginLeft: '4px' }}>
                                       ({stakeInfo.p2Played}M)
@@ -3600,10 +3625,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       )}
                                     </div>
                                   ) : (
-                                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem', marginTop: '0.55rem' }}>
                                       <button
                                         className="btn btn-neon"
-                                        style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#000', fontWeight: 800 }}
+                                        style={{ fontSize: '0.73rem', padding: '0.35rem 0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.28rem', color: '#041210', fontWeight: 800, borderRadius: '8px', width: '100%' }}
                                         onClick={() => {
                                           startTournamentMatch(match.id, false);
                                           if (effTableId) setSelectedTableForQR(effTableId);
@@ -3613,7 +3638,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       </button>
                                       <button
                                         className="btn btn-outline"
-                                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.4)', background: 'rgba(255, 215, 0, 0.08)' }}
+                                        style={{ fontSize: '0.73rem', padding: '0.35rem 0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.28rem', color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.4)', background: 'rgba(255, 215, 0, 0.1)', borderRadius: '8px', width: '100%' }}
                                         title={`Appeler vocalement ${players[match.player1Id]?.name || 'Joueur 1'} et ${players[match.player2Id]?.name || 'Joueur 2'} sur ${tableName}`}
                                         onClick={() => announceMatchOnTable({
                                           match,
@@ -3624,11 +3649,11 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                           isReminder: true
                                         })}
                                       >
-                                        <Volume2 size={12} /> 📢 Appeler
+                                        <Volume2 size={12} /> Appeler
                                       </button>
                                       <button
                                         className="btn btn-outline"
-                                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: 'var(--accent-primary)', borderColor: 'rgba(0, 255, 170, 0.35)' }}
+                                        style={{ fontSize: '0.73rem', padding: '0.35rem 0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.28rem', color: '#34D399', borderColor: 'rgba(52, 211, 153, 0.4)', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '8px', width: '100%' }}
                                         title="Marquer le score directement si ce match a été joué sans utiliser l'application"
                                         onClick={() => openDirectScoreModal(match)}
                                       >
@@ -3636,7 +3661,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       </button>
                                       <button
                                         className="btn btn-outline"
-                                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                                        style={{ fontSize: '0.73rem', padding: '0.35rem 0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.28rem', borderRadius: '8px', width: '100%' }}
                                         onClick={() => {
                                           if (effTableId && matchesWaiting.length > 0) {
                                             setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
