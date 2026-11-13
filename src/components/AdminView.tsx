@@ -1010,7 +1010,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             }}
             title="Lancer un match en direct (hors tournoi ou amical) avec choix/création des joueurs, photo, club, logo et régie vidéo"
           >
-            <Radio size={16} style={{ color: activeTab === 'live_studio' ? '#000' : '#ff3b5c' }} /> 🎥 Match Live
+            <Radio size={16} style={{ color: activeTab === 'live_studio' ? '#000' : '#ff3b5c' }} /> Match Live
           </button>
 
           <button
@@ -3253,7 +3253,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                     {/* Warning badge if player is busy on another table (ACTUALLY PLAYING) */}
                                     {busyInfo.busy && (
                                       <div style={{ fontSize: '0.66rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '3px 7px', borderRadius: '6px', border: '1px solid rgba(255, 183, 3, 0.3)' }}>
-                                        ⚠️ {busyInfo.playerName} joue sur {busyInfo.tableName}
+                                        {busyInfo.playerName} joue sur {busyInfo.tableName}
                                       </div>
                                     )}
 
@@ -3367,7 +3367,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                                   }
                                                 }}
                                               >
-                                                🚀 {label} {isFree ? '(Libre)' : (isPending ? '(Prêt)' : '')}
+                                                {label} {isFree ? '(Libre)' : (isPending ? '(Prêt)' : '')}
                                               </button>
                                             );
                                           })}
@@ -3473,7 +3473,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             }}
                             title="Appeler vocalement au micro tous les matchs en attente de démarrage sur les billards"
                           >
-                            <Volume2 size={14} /> 📢 Appeler tous les matchs
+                            <Volume2 size={14} /> Appeler tous les matchs
                           </button>
                         )}
                         <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.12)', color: 'var(--accent-secondary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.25)' }}>
@@ -5184,7 +5184,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     });
                   }}
                 >
-                  <Play size={20} /> 🚀 Lancer le Match Live
+                  <Play size={20} /> Lancer le Match Live
                 </button>
               </div>
 
@@ -5712,7 +5712,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           <input
                             type="url"
                             className="input-field"
-                            placeholder="👉 https://youtube.com/live/... ou https://www.youtube.com/watch?v=..."
+                            placeholder=" https://youtube.com/live/... ou https://www.youtube.com/watch?v=..."
                             defaultValue={(() => {
                               const raw = activeStudioStreamUrl || '';
                               const qIdx = raw.indexOf('?');
@@ -5819,7 +5819,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                           <input
                             type="url"
                             className="input-field"
-                            placeholder="👉 https://www.facebook.com/.../videos/... ou https://fb.watch/..."
+                            placeholder=" https://www.facebook.com/.../videos/... ou https://fb.watch/..."
                             defaultValue={(() => {
                               const raw = activeStudioStreamUrl || '';
                               const qIdx = raw.indexOf('?');
@@ -6896,7 +6896,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         <input
                           type="url"
                           className="input-field"
-                          placeholder="👉 https://youtube.com/live/... ou https://www.youtube.com/watch?v=..."
+                          placeholder=" https://youtube.com/live/... ou https://www.youtube.com/watch?v=..."
                           defaultValue={(() => {
                             const raw = table.liveStreamUrl || match?.liveStreamUrl || '';
                             const qIdx = raw.indexOf('?');
