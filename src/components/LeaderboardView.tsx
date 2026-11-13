@@ -4,6 +4,7 @@ import { Trophy, Medal, Award, Crown, Target, Search, Flame, User } from 'lucide
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { Player } from '../types';
 import { getPlayerAvatar } from '../utils/avatar';
+import { computeAllPlayersStats, calculatePlayerClubPoints } from '../utils/playerStats';
 
 interface LeaderboardViewProps {
   compact?: boolean;
@@ -11,19 +12,24 @@ interface LeaderboardViewProps {
 }
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = false }) => {
-  const { players, currentClub } = useStore();
+  const { players, matches, tournaments, currentClub } = useStore();
   const [filterLevel, setFilterLevel] = useState<'all' | 'Prestige' | 'Amateur'>('all');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'points' | 'winRate' | 'wins' | 'tournamentsWon'>('points');
 
   const allPlayers = useMemo(() => {
-    return Object.values(players).filter(p => Boolean(p && p.id));
-  }, [players]);
+    const computed = computeAllPlayersStats(players, matches, tournaments);
+    return Object.values(computed).filter(p => Boolean(p && p.id));
+  }, [players, matches, tournaments]);
 
   const matchesLevel = (p: Player) => {
     if (filterLevel === 'all') return true;
     if (filterLevel === 'Prestige') return p.level === 'Prestige' || p.level === 'Confirmé';
     return p.level === filterLevel;
+  };
+
+  const getPoints = (p: Player) => {
+    return p.stats.points ?? calculatePlayerClubPoints(p.stats);
   };
 
   const filteredAndSortedPlayers = useMemo(() => {
@@ -39,8 +45,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
         const statsA = a.stats;
         const statsB = b.stats;
         if (sortBy === 'points') {
-          const ptsA = statsA.points ?? ((statsA.wins * 3) + statsA.matchesPlayed + ((statsA.tournamentsWon || 0) * 10) + Math.max(0, statsA.setDiff || 0));
-          const ptsB = statsB.points ?? ((statsB.wins * 3) + statsB.matchesPlayed + ((statsB.tournamentsWon || 0) * 10) + Math.max(0, statsB.setDiff || 0));
+          const ptsA = getPoints(a);
+          const ptsB = getPoints(b);
           if (ptsB !== ptsA) return ptsB - ptsA;
           return (statsB.winRate || 0) - (statsA.winRate || 0);
         }
@@ -71,8 +77,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
     return allPlayers
       .filter(matchesLevel)
       .sort((a, b) => {
-        const ptsA = a.stats.points ?? ((a.stats.wins * 3) + a.stats.matchesPlayed + ((a.stats.tournamentsWon || 0) * 10) + Math.max(0, a.stats.setDiff || 0));
-        const ptsB = b.stats.points ?? ((b.stats.wins * 3) + b.stats.matchesPlayed + ((b.stats.tournamentsWon || 0) * 10) + Math.max(0, b.stats.setDiff || 0));
+        const ptsA = getPoints(a);
+        const ptsB = getPoints(b);
         if (ptsB !== ptsA) return ptsB - ptsA;
         return (b.stats.winRate || 0) - (a.stats.winRate || 0);
       })
@@ -85,10 +91,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
 
   const countPrestige = allPlayers.filter(p => p.level === 'Prestige' || p.level === 'Confirmé').length;
   const countAmateur = allPlayers.filter(p => p.level === 'Amateur').length;
-
-  const getPoints = (p: Player) => {
-    return p.stats.points ?? ((p.stats.wins * 3) + p.stats.matchesPlayed + ((p.stats.tournamentsWon || 0) * 10) + Math.max(0, p.stats.setDiff || 0));
-  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', color: '#fff' }}>
@@ -143,7 +145,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
                 </span>
               </div>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                {currentClub.name} • Barème club : 3 pts / victoire, 1 pt / match, 10 pts / titre
+                {currentClub.name} • Barème club : 3 pts / victoire (+1 pt vs Prestige), 1 pt / match joué, Podium : 🥇 +5 pts, 🥈 +3 pts, 🥉 +2 pts
               </p>
             </div>
           </div>
@@ -682,6 +684,19 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                         <span style={{ color: 'var(--accent-primary)' }}>{player.stats.wins}V</span> - <span style={{ color: '#ff4444' }}>{player.stats.losses ?? (player.stats.matchesPlayed - player.stats.wins)}D</span>
                       </div>
+                      {(player.stats.prestigeWins ?? 0) > 0 && (
+                        <div
+                          title={`${player.stats.prestigeWins} victoire(s) contre un joueur Prestige (+${player.stats.prestigeWins} pt bonus)`}
+                          style={{
+                            fontSize: '0.64rem',
+                            color: '#ffd700',
+                            fontWeight: 700,
+                            marginTop: '2px'
+                          }}
+                        >
+                          👑 +{player.stats.prestigeWins} vs Prestige
+                        </div>
+                      )}
                     </td>
 
                     {/* Win Rate Progress Bar */}
@@ -716,26 +731,45 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
                       </span>
                     </td>
 
-                    {/* Tournaments Won */}
+                    {/* Tournaments Podiums (1st, 2nd, 3rd) */}
                     <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
-                      {(player.stats.tournamentsWon ?? 0) > 0 ? (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          color: '#ffd700',
-                          fontWeight: 800,
-                          fontSize: '0.85rem'
-                        }}>
-                          🏆 {player.stats.tournamentsWon}
-                        </span>
+                      {((player.stats.tournamentsWon ?? 0) > 0 || (player.stats.tournamentsSecond ?? 0) > 0 || (player.stats.tournamentsThird ?? 0) > 0) ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                          {(player.stats.tournamentsWon ?? 0) > 0 && (
+                            <span
+                              title={`${player.stats.tournamentsWon}x 1er (+${(player.stats.tournamentsWon ?? 0) * 5} pts)`}
+                              style={{ color: '#ffd700', fontWeight: 800, fontSize: '0.82rem' }}
+                            >
+                              🥇 {player.stats.tournamentsWon}
+                            </span>
+                          )}
+                          {(player.stats.tournamentsSecond ?? 0) > 0 && (
+                            <span
+                              title={`${player.stats.tournamentsSecond}x 2ème (+${(player.stats.tournamentsSecond ?? 0) * 3} pts)`}
+                              style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '0.82rem' }}
+                            >
+                              🥈 {player.stats.tournamentsSecond}
+                            </span>
+                          )}
+                          {(player.stats.tournamentsThird ?? 0) > 0 && (
+                            <span
+                              title={`${player.stats.tournamentsThird}x 3ème (+${(player.stats.tournamentsThird ?? 0) * 2} pts)`}
+                              style={{ color: '#f59e0b', fontWeight: 800, fontSize: '0.82rem' }}
+                            >
+                              🥉 {player.stats.tournamentsThird}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>-</span>
                       )}
                     </td>
 
                     {/* Club Points */}
-                    <td style={{ padding: '0.8rem 1.2rem', textAlign: 'right' }}>
+                    <td
+                      style={{ padding: '0.8rem 1.2rem', textAlign: 'right' }}
+                      title={`Détail : ${player.stats.wins * 3} pts victoires + ${player.stats.prestigeWins || 0} pt(s) bonus vs Prestige + ${player.stats.matchesPlayed} pts matchs joués + ${((player.stats.tournamentsWon || 0) * 5) + ((player.stats.tournamentsSecond || 0) * 3) + ((player.stats.tournamentsThird || 0) * 2)} pts podium + ${Math.max(0, player.stats.setDiff || 0)} pts diff. manches`}
+                    >
                       <span style={{
                         fontWeight: 900,
                         fontSize: '1.2rem',

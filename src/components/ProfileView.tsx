@@ -1,14 +1,19 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useStore } from '../store';
 import { Trophy, Crosshair, Swords } from 'lucide-react';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getPlayerAvatar } from '../utils/avatar';
+import { computeAllPlayersStats, calculatePlayerClubPoints } from '../utils/playerStats';
 
 const ProfileView: React.FC = () => {
-  const { currentUser, players, currentClub } = useStore();
-  const me = players[currentUser];
+  const { currentUser, players, matches, tournaments, currentClub } = useStore();
+  const computedPlayers = useMemo(() => {
+    return computeAllPlayersStats(players, matches, tournaments);
+  }, [players, matches, tournaments]);
+  const me = computedPlayers[currentUser] || players[currentUser];
 
   if (!me) return null;
+  const clubPoints = me.stats.points ?? calculatePlayerClubPoints(me.stats);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -70,10 +75,10 @@ const ProfileView: React.FC = () => {
         </div>
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', padding: '1rem' }}>
           <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ffd700' }}>
-            🏆 {me.stats.tournamentsWon ?? 0}
+            🥇 {me.stats.tournamentsWon ?? 0} • 🥈 {me.stats.tournamentsSecond ?? 0} • 🥉 {me.stats.tournamentsThird ?? 0}
           </span>
           <span style={{ fontSize: '0.72rem', color: '#CCFBF1', fontWeight: 600 }}>
-            TITRES DE TOURNOI ({me.stats.tournamentsPlayed ?? 0} disputés)
+            PODIUMS ({me.stats.tournamentsPlayed ?? 0} tournois • {clubPoints} pts club)
           </span>
         </div>
       </div>

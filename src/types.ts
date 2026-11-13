@@ -15,7 +15,10 @@ export type PlayerStats = {
   setsLost?: number;
   setDiff?: number;
   tournamentsPlayed?: number;
-  tournamentsWon?: number;
+  tournamentsWon?: number; // 1ère place (+5 pts)
+  tournamentsSecond?: number; // 2ème place (+3 pts)
+  tournamentsThird?: number; // 3ème place (+2 pts)
+  prestigeWins?: number; // Victoires contre un joueur Prestige (+1 pt bonus)
   points?: number; // Points de classement général du club
   nemesisId?: string; // Player they lose the most to
   nemesisLosses?: number;
