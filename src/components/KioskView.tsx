@@ -411,7 +411,7 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
             }}
           >
             {voiceEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            {voiceEnabled ? '🔊 Appel Vocal ON' : '🔇 Appel Vocal OFF'}
+            {voiceEnabled ? 'Appel Vocal ON' : 'Appel Vocal OFF'}
           </button>
 
           {/* Auto-rotation Toggle */}

@@ -1048,29 +1048,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
               : "Appel vocal automatique des matchs coupé (cliquez pour activer)"}
           >
             {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            {voiceEnabled ? '🔊 Appel Vocal ON' : '🔇 Appel Vocal OFF'}
-          </button>
-
-          <button
-            className={`btn ${voiceEnabled ? 'btn-neon' : 'btn-outline'}`}
-            onClick={toggleVoiceAnnouncer}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              fontWeight: 800,
-              padding: '0.55rem 0.9rem',
-              fontSize: '0.82rem',
-              color: voiceEnabled ? '#041210' : 'var(--text-muted)',
-              borderColor: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)',
-              background: voiceEnabled ? undefined : 'rgba(255,255,255,0.04)'
-            }}
-            title={voiceEnabled
-              ? "Appel vocal automatique des matchs activé (cliquez pour couper)"
-              : "Appel vocal automatique des matchs coupé (cliquez pour activer)"}
-          >
-            {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            {voiceEnabled ? '🔊 Appel Vocal ON' : '🔇 Appel Vocal OFF'}
+            {voiceEnabled ? 'Appel Vocal ON' : 'Appel Vocal OFF'}
           </button>
 
           {onOpenKiosk && (
