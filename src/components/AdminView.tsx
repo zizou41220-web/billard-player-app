@@ -7,12 +7,21 @@ import {
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
   Radio, Tv, Smartphone, ExternalLink, Trash2, Shuffle,
-  Search, X, Facebook, Youtube
+  Search, X, Facebook, Youtube, Volume2, VolumeX
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { computeTournamentScheduleContext, sortTournamentMatchesForScheduling, getMatchStakeInfo } from '../utils/matchScheduler';
+import {
+  isVoiceAnnouncerEnabled,
+  setVoiceAnnouncerEnabled,
+  announceMatchOnTable,
+  announceWaitingMatchPrep,
+  announceAllReadyMatches,
+  processAutoVoiceAnnouncements,
+  speakAnnouncement
+} from '../utils/voiceAnnouncer';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
@@ -62,7 +71,17 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const [overlayPos, setOverlayPos] = useState<'top' | 'bottom'>('top');
   const [dismissedQualifAlertTourId, setDismissedQualifAlertTourId] = useState<string | null>(null);
   const [playerSearchQuery, setPlayerSearchQuery] = useState('');
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => isVoiceAnnouncerEnabled());
   const matchStatusAtOpenRef = React.useRef<string | null>(null);
+
+  const toggleVoiceAnnouncer = () => {
+    const next = !voiceEnabled;
+    setVoiceEnabled(next);
+    setVoiceAnnouncerEnabled(next);
+    if (next) {
+      speakAnnouncement("Appel vocal des matchs activé.", true);
+    }
+  };
 
   // Club Configuration State
   const [clubNameInput, setClubNameInput] = useState(currentClub.name);
@@ -484,6 +503,28 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
     return { matchesToPlay: toPlay, matchesWaiting: waiting };
   })();
+
+  // Appel vocal automatique dès qu'un nouveau match est assigné à un billard libre
+  useEffect(() => {
+    if (!activeTournament) return;
+    const readyList = matchesToPlay
+      .filter(m => m && m.status === 'pending')
+      .map(m => {
+        const effTableId = getEffectiveTableId(m) || '';
+        const tObj = effTableId ? tables[effTableId] : null;
+        const tableName = tObj?.name || (effTableId ? `Billard ${tObj?.number || effTableId}` : 'Billard');
+        const stakeInfo = getMatchStakeInfo(m, scheduleContext);
+        return {
+          match: m,
+          tableId: effTableId,
+          tableName,
+          player1Name: players[m.player1Id]?.name || 'Joueur 1',
+          player2Name: players[m.player2Id]?.name || 'Joueur 2',
+          stakeLabel: stakeInfo.label
+        };
+      });
+    processAutoVoiceAnnouncements(readyList);
+  }, [matchesToPlay, activeTournament, tables, players, scheduleContext]);
 
   // Helper to check if any player in a match is already busy on an assigned table (only if ACTUALLY playing)
   const getBusyPlayerInfo = (m: any) => {
@@ -945,6 +986,26 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
           >
             <Trophy size={18} /> Classement Club
+          </button>
+
+          <button
+            className={`btn ${voiceEnabled ? 'btn-neon' : 'btn-outline'}`}
+            onClick={toggleVoiceAnnouncer}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              fontWeight: 800,
+              color: voiceEnabled ? '#000' : 'var(--text-muted)',
+              borderColor: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)',
+              background: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.04)'
+            }}
+            title={voiceEnabled
+              ? "Appel vocal automatique des matchs activé (cliquez pour couper)"
+              : "Appel vocal automatique des matchs coupé (cliquez pour activer)"}
+          >
+            {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            {voiceEnabled ? '🔊 Appel Vocal ON' : '🔇 Appel Vocal OFF'}
           </button>
 
           {onOpenKiosk && (
@@ -3130,29 +3191,54 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       </div>
                                     )}
 
-                                    {/* Actions : Lancer sur un billard disponible ou Marquer le score directement */}
+                                    {/* Actions : Lancer sur un billard disponible, Pré-appel vocal ou Marquer le score directement */}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
                                         <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Lancer sur un billard :</span>
-                                        <button
-                                          type="button"
-                                          className="btn btn-outline"
-                                          style={{
-                                            fontSize: '0.65rem',
-                                            padding: '2px 7px',
-                                            height: '20px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            color: 'var(--accent-primary)',
-                                            borderColor: 'rgba(0, 255, 170, 0.35)',
-                                            background: 'rgba(0, 255, 170, 0.08)'
-                                          }}
-                                          onClick={() => openDirectScoreModal(match)}
-                                          title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
-                                        >
-                                          <Edit2 size={10} /> 📝 Saisir score
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline"
+                                            style={{
+                                              fontSize: '0.64rem',
+                                              padding: '2px 6px',
+                                              height: '20px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '3px',
+                                              color: '#ffd700',
+                                              borderColor: 'rgba(255, 215, 0, 0.35)',
+                                              background: 'rgba(255, 215, 0, 0.08)'
+                                            }}
+                                            onClick={() => announceWaitingMatchPrep({
+                                              player1Name: players[match.player1Id]?.name || 'Joueur 1',
+                                              player2Name: players[match.player2Id]?.name || 'Joueur 2',
+                                              rankIndex: idx + 1
+                                            })}
+                                            title="Pré-appeler ces deux joueurs au micro pour qu'ils se tiennent prêts"
+                                          >
+                                            <Volume2 size={10} /> 📢 Pré-appel
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline"
+                                            style={{
+                                              fontSize: '0.64rem',
+                                              padding: '2px 6px',
+                                              height: '20px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '3px',
+                                              color: 'var(--accent-primary)',
+                                              borderColor: 'rgba(0, 255, 170, 0.35)',
+                                              background: 'rgba(0, 255, 170, 0.08)'
+                                            }}
+                                            onClick={() => openDirectScoreModal(match)}
+                                            title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
+                                          >
+                                            <Edit2 size={10} /> 📝 Score
+                                          </button>
+                                        </div>
                                       </div>
 
                                       {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
@@ -3279,13 +3365,50 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
                   {/* Matchs à démarrer */}
                   <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1rem 1.4rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexShrink: 0, gap: '0.5rem', flexWrap: 'wrap' }}>
                       <h2 style={{ fontSize: '1.25rem', color: '#fff', margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Matchs à démarrer
                       </h2>
-                      <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.12)', color: 'var(--accent-secondary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.25)' }}>
-                        {matchesToPlay.length} {matchesToPlay.length > 1 ? 'matchs prêts' : 'match prêt'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {matchesToPlay.some(m => m.status === 'pending') && (
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{
+                              fontSize: '0.73rem',
+                              padding: '3px 10px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontWeight: 800,
+                              color: '#ffd700',
+                              borderColor: 'rgba(255, 215, 0, 0.45)',
+                              background: 'rgba(255, 215, 0, 0.1)'
+                            }}
+                            onClick={() => {
+                              const pendingItems = matchesToPlay
+                                .filter(m => m.status === 'pending')
+                                .map(m => {
+                                  const effId = getEffectiveTableId(m);
+                                  const tObj = effId ? tables[effId] : null;
+                                  const tName = tObj?.name || (effId ? `Billard ${tObj?.number || effId}` : 'Billard');
+                                  return {
+                                    tableName: tName,
+                                    player1Name: players[m.player1Id]?.name || 'Joueur 1',
+                                    player2Name: players[m.player2Id]?.name || 'Joueur 2'
+                                  };
+                                });
+                              announceAllReadyMatches(pendingItems);
+                            }}
+                            title="Appeler vocalement au micro tous les matchs en attente de démarrage sur les billards"
+                          >
+                            <Volume2 size={14} /> 📢 Appeler tous les matchs
+                          </button>
+                        )}
+                        <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.12)', color: 'var(--accent-secondary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.25)' }}>
+                          {matchesToPlay.length} {matchesToPlay.length > 1 ? 'matchs prêts' : 'match prêt'}
+                        </span>
+                      </div>
                     </div>
                     {matchesToPlay.length === 0 ? (
                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
@@ -3400,7 +3523,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                       )}
                                     </div>
                                   ) : (
-                                    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+                                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                                       <button
                                         className="btn btn-neon"
                                         style={{ flex: 1, fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#000', fontWeight: 800 }}
@@ -3410,6 +3533,21 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                         }}
                                       >
                                         <Play size={12} /> Démarrer
+                                      </button>
+                                      <button
+                                        className="btn btn-outline"
+                                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.4)', background: 'rgba(255, 215, 0, 0.08)' }}
+                                        title={`Appeler vocalement ${players[match.player1Id]?.name || 'Joueur 1'} et ${players[match.player2Id]?.name || 'Joueur 2'} sur ${tableName}`}
+                                        onClick={() => announceMatchOnTable({
+                                          match,
+                                          tableName,
+                                          player1Name: players[match.player1Id]?.name || 'Joueur 1',
+                                          player2Name: players[match.player2Id]?.name || 'Joueur 2',
+                                          stakeLabel: stakeInfo.label,
+                                          isReminder: true
+                                        })}
+                                      >
+                                        <Volume2 size={12} /> 📢 Appeler
                                       </button>
                                       <button
                                         className="btn btn-outline"

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store';
 import {
   Tv, Maximize2, Minimize2, RotateCcw, X, Trophy,
-  Clock, Radio, CheckCircle2, Swords
+  Clock, Radio, CheckCircle2, Swords, Volume2, VolumeX
 } from 'lucide-react';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { APP_VERSION } from '../version';
@@ -10,6 +10,12 @@ import LeaderboardView from './LeaderboardView';
 import TournamentBracketView from './TournamentBracketView';
 import { getMatchScoringRules } from '../utils/rules';
 import { getPlayerAvatar } from '../utils/avatar';
+import {
+  isVoiceAnnouncerEnabled,
+  setVoiceAnnouncerEnabled,
+  processAutoVoiceAnnouncements,
+  speakAnnouncement
+} from '../utils/voiceAnnouncer';
 
 interface KioskViewProps {
   onExit?: () => void;
@@ -23,6 +29,16 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const [rotationProgress, setRotationProgress] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(Boolean(document.fullscreenElement));
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => isVoiceAnnouncerEnabled());
+
+  const toggleVoiceAnnouncer = () => {
+    const next = !voiceEnabled;
+    setVoiceEnabled(next);
+    setVoiceAnnouncerEnabled(next);
+    if (next) {
+      speakAnnouncement("Appel vocal des matchs activé sur l'écran TV.", true);
+    }
+  };
 
   const ROTATION_INTERVAL_SEC = 25;
 
@@ -117,6 +133,26 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
   const tableList = useMemo(() => {
     return Object.values(tables).sort((a, b) => a.number - b.number);
   }, [tables]);
+
+  // Appel vocal automatique en mode Kiosque TV
+  useEffect(() => {
+    const readyList = tableList
+      .map(table => {
+        const curM = (table.currentMatchId && matches[table.currentMatchId])
+          ? matches[table.currentMatchId]
+          : Object.values(matches).find(m => m.tableId === table.id && m.status !== 'finished');
+        if (!curM || curM.status !== 'pending') return null;
+        return {
+          match: curM,
+          tableId: table.id,
+          tableName: table.name || `Billard ${table.number}`,
+          player1Name: players[curM.player1Id]?.name || 'Joueur 1',
+          player2Name: players[curM.player2Id]?.name || 'Joueur 2'
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => Boolean(x));
+    processAutoVoiceAnnouncements(readyList);
+  }, [tableList, matches, players]);
 
   // Render match stage label & badge
   const renderStageBadge = (stage?: string) => {
@@ -354,6 +390,28 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
               </button>
             )}
           </div>
+
+          {/* Voice Announcer Toggle */}
+          <button
+            onClick={toggleVoiceAnnouncer}
+            title={voiceEnabled ? "Appel vocal activé (cliquez pour couper)" : "Appel vocal coupé (cliquez pour activer)"}
+            style={{
+              background: voiceEnabled ? 'rgba(255, 215, 0, 0.16)' : 'rgba(255,255,255,0.05)',
+              color: voiceEnabled ? '#ffd700' : 'var(--text-muted)',
+              border: `1px solid ${voiceEnabled ? 'rgba(255, 215, 0, 0.45)' : 'rgba(255,255,255,0.1)'}`,
+              padding: '6px 12px',
+              borderRadius: '10px',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            {voiceEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            {voiceEnabled ? '🔊 Appel Vocal ON' : '🔇 Appel Vocal OFF'}
+          </button>
 
           {/* Auto-rotation Toggle */}
           <button
