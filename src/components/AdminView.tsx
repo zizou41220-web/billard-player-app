@@ -7,7 +7,7 @@ import {
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
   Radio, Tv, Smartphone, ExternalLink, Trash2, Shuffle,
-  Search, X, Facebook, Youtube, Volume2, VolumeX, Clock
+  Search, X, Facebook, Youtube, Volume2, VolumeX, Clock, UserPlus
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
@@ -128,6 +128,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
   const [newTourFormat, setNewTourFormat] = useState<any>('cartesien');
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [launcherPlayerSearch, setLauncherPlayerSearch] = useState('');
   const [qualifNbSetsAmateur, setQualifNbSetsAmateur] = useState(1);
   const [qualifNbSetsPrestige, setQualifNbSetsPrestige] = useState(1);
   const [qualifNbSetsMixed, setQualifNbSetsMixed] = useState(1);
@@ -1147,7 +1148,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
             <span>Tournoi : <b style={{ color: '#fff' }}>{activeTournament.name}</b></span>
             <span style={{
               background: 'rgba(0, 255, 170, 0.1)',
@@ -1160,6 +1161,57 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             }}>
               {activeTournament.settings?.qualifNbQualifiers || 4} qualifiés
             </span>
+
+            {/* Match Duration Badge on Dashboard */}
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              background: (activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
+                ? 'rgba(255, 215, 0, 0.18)'
+                : 'rgba(255, 255, 255, 0.06)',
+              color: (activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
+                ? '#ffd700'
+                : 'var(--text-muted)',
+              padding: '3px 10px',
+              borderRadius: '12px',
+              fontWeight: 800,
+              fontSize: '0.75rem',
+              border: (activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
+                ? '1px solid rgba(255, 215, 0, 0.45)'
+                : '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <Clock size={13} />
+              {(activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
+                ? `⏱️ ${activeTournament.settings.finalMatchDurationMinutes || activeTournament.settings.qualifMatchDurationMinutes || activeTournament.settings.matchDurationMinutes} min / match`
+                : '⏱️ Temps illimité'}
+            </span>
+
+            {/* Quick Button to Edit Rules & Time directly from Dashboard */}
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{
+                fontSize: '0.75rem',
+                padding: '3px 9px',
+                color: '#ffd700',
+                borderColor: 'rgba(255, 215, 0, 0.45)',
+                background: 'rgba(255, 215, 0, 0.1)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: 700
+              }}
+              onClick={() => {
+                if (activeTournament.settings) {
+                  setEditTourSettings({ ...activeTournament.settings });
+                  setShowEditRulesModal(true);
+                }
+              }}
+              title="Modifier les règles, la durée des matchs et les handicaps du tournoi en cours"
+            >
+              <Clock size={13} /> Régler Temps & Règles
+            </button>
           </div>
         </div>
       )}
@@ -1291,7 +1343,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
         {/* 1. TOURNAMENT LAUNCHER TAB                                                */}
         {/* ========================================================================= */}
         {activeTab === 'launcher' && (
-          <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div style={{ maxWidth: '1480px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
             {/* If a tournament is currently ACTIVE and manager hasn't clicked "new tournament form" */}
             {activeTournament && !showNewTourForm ? (
@@ -1391,6 +1443,21 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Progression Matchs</div>
                       <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{finishedTourMatches.length} <span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>/ {allTourMatches.length}</span></div>
                     </div>
+                    <div style={{ background: 'rgba(255, 215, 0, 0.08)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.35)' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#ffd700', marginBottom: '0.3rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Clock size={14} /> Temps par match
+                      </div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#ffd700' }}>
+                        {(activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
+                          ? `${activeTournament.settings.finalMatchDurationMinutes || activeTournament.settings.qualifMatchDurationMinutes || activeTournament.settings.matchDurationMinutes} min`
+                          : 'Illimité'}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.2rem' }}>
+                        {activeTournament.format !== 'direct_ko'
+                          ? `Poules : ${activeTournament.settings?.qualifMatchDurationMinutes ? `${activeTournament.settings.qualifMatchDurationMinutes}m` : 'Illimité'} • Final : ${activeTournament.settings?.finalMatchDurationMinutes ? `${activeTournament.settings.finalMatchDurationMinutes}m` : 'Illimité'}`
+                          : 'Compte à rebours actif'}
+                      </div>
+                    </div>
                     {(Boolean(activeTournament.settings?.qualifHandicapAmateurSets) || Boolean(activeTournament.settings?.finalHandicapAmateurSets) || Boolean(activeTournament.settings?.handicapAmateurSets)) && (
                       <div style={{ background: 'rgba(255, 215, 0, 0.12)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.35)' }}>
                         <div style={{ fontSize: '0.8rem', color: '#ffd700', marginBottom: '0.4rem', fontWeight: 700 }}>Handicap Niveaux</div>
@@ -1425,6 +1492,14 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         </button>
                       </div>
                       <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <div style={{ color: '#ffd700', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Clock size={13} />
+                          <span>Temps imparti : </span>
+                          {activeTournament.format !== 'direct_ko' && (
+                            <span>Poules {activeTournament.settings?.qualifMatchDurationMinutes ? `${activeTournament.settings.qualifMatchDurationMinutes} min` : 'Illimité'} • </span>
+                          )}
+                          <span>Tableau Final {activeTournament.settings?.finalMatchDurationMinutes ? `${activeTournament.settings.finalMatchDurationMinutes} min` : 'Illimité'}</span>
+                        </div>
                         {activeTournament.format !== 'direct_ko' && (
                           <div style={{ color: 'var(--accent-primary)' }}>
                             <span style={{ fontWeight: 700 }}>Poules : </span>
@@ -1667,27 +1742,75 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '2.5rem', alignItems: 'start' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)',
+                  gap: '2rem',
+                  alignItems: 'start'
+                }}>
 
                   {/* Left Column: Rules & Tables Configuration */}
-                  <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  <div className="glass-card" style={{
+                    padding: '2rem 2.2rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.8rem',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(0, 255, 204, 0.22)',
+                    background: 'linear-gradient(180deg, rgba(7, 30, 26, 0.85) 0%, rgba(4, 20, 17, 0.95) 100%)',
+                    boxShadow: '0 12px 35px rgba(0,0,0,0.45)'
+                  }}>
+                    {/* Panel Header */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid rgba(0, 255, 204, 0.2)',
+                      paddingBottom: '1rem',
+                      flexWrap: 'wrap',
+                      gap: '0.6rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '10px',
+                          background: 'rgba(0, 255, 204, 0.15)',
+                          border: '1px solid rgba(0, 255, 204, 0.35)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--accent-primary)'
+                        }}>
+                          <Settings size={20} />
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 900, color: '#fff' }}>
+                            1. Paramètres & Format du Tournoi
+                          </h3>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            Règles de jeu, chronomètre et billards alloués
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Tour Name */}
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>Nom du Tournoi</label>
+                      <label style={{ display: 'block', marginBottom: '0.6rem', color: '#fff', fontWeight: 700, fontSize: '0.95rem' }}>Nom du Tournoi</label>
                       <input
                         type="text"
                         className="input-field"
                         placeholder="Ex: Open de Printemps 2026"
                         value={newTourName}
                         onChange={e => setNewTourName(e.target.value)}
-                        style={{ fontSize: '1.1rem', padding: '0.9rem' }}
+                        style={{ fontSize: '1.1rem', padding: '0.9rem', border: '1px solid rgba(0, 255, 204, 0.35)', background: 'rgba(0,0,0,0.35)' }}
                       />
                     </div>
 
                     {/* Format Selector */}
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>Format de compétition</label>
+                      <label style={{ display: 'block', marginBottom: '0.6rem', color: '#fff', fontWeight: 700, fontSize: '0.95rem' }}>Format de compétition</label>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
                         {[
                           { id: 'direct_ko', label: 'Tableau Direct (KO)', badge: 'Arbre immédiat' },
@@ -1702,15 +1825,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             style={{
                               padding: '1.1rem 0.8rem',
                               borderRadius: '12px',
-                              border: newTourFormat === fmt.id ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                              background: newTourFormat === fmt.id ? 'rgba(0, 255, 204, 0.12)' : 'rgba(255,255,255,0.02)',
+                              border: newTourFormat === fmt.id ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.12)',
+                              background: newTourFormat === fmt.id ? 'rgba(0, 255, 204, 0.16)' : 'rgba(255,255,255,0.02)',
                               cursor: 'pointer',
                               textAlign: 'center',
+                              boxShadow: newTourFormat === fmt.id ? '0 0 15px rgba(0, 255, 204, 0.2)' : 'none',
                               transition: 'all 0.2s'
                             }}
                           >
-                            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : '#fff' }}>{fmt.label}</div>
-                            <div style={{ fontSize: '0.72rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : 'var(--text-muted)', marginTop: '0.2rem' }}>{fmt.badge}</div>
+                            <div style={{ fontWeight: 800, fontSize: '0.95rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : '#fff' }}>{fmt.label}</div>
+                            <div style={{ fontSize: '0.74rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : 'var(--text-muted)', marginTop: '0.25rem', fontWeight: 600 }}>{fmt.badge}</div>
                           </div>
                         ))}
                       </div>
@@ -1745,6 +1869,111 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         </div>
                       </div>
                     )}
+
+                    {/* Prominent Match Duration Card right under format */}
+                    <div style={{
+                      padding: '1.3rem 1.5rem',
+                      background: 'rgba(255, 215, 0, 0.06)',
+                      borderRadius: '14px',
+                      border: '1.5px solid rgba(255, 215, 0, 0.45)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.85rem',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <label style={{ fontSize: '1rem', color: '#ffd700', margin: 0, fontWeight: 900, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Clock size={19} /> Temps imparti par match (Chronomètre)
+                        </label>
+                        <span style={{ fontSize: '0.78rem', background: (finalMatchDurationMinutes > 0 || qualifMatchDurationMinutes > 0) ? 'rgba(255, 215, 0, 0.22)' : 'rgba(255, 255, 255, 0.06)', color: (finalMatchDurationMinutes > 0 || qualifMatchDurationMinutes > 0) ? '#ffd700' : 'var(--text-muted)', padding: '3px 10px', borderRadius: '10px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)' }}>
+                          {(finalMatchDurationMinutes > 0 || qualifMatchDurationMinutes > 0)
+                            ? `${isPoolFormat ? `Poules : ${qualifMatchDurationMinutes ? `${qualifMatchDurationMinutes}m` : 'Illimité'} • Final : ${finalMatchDurationMinutes ? `${finalMatchDurationMinutes}m` : 'Illimité'}` : `${finalMatchDurationMinutes} min / match`}`
+                            : 'Temps illimité (0 min)'}
+                        </span>
+                      </div>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0, lineHeight: '1.4' }}>
+                        Le compte à rebours s'affichera en temps réel sur les billards, le live streaming, le grand écran TV et les smartphones des joueurs.
+                      </p>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {[0, 15, 20, 30, 45, 60].map(mins => {
+                          const isSel = (qualifMatchDurationMinutes === mins && finalMatchDurationMinutes === mins);
+                          return (
+                            <button
+                              key={mins}
+                              type="button"
+                              onClick={() => {
+                                setQualifMatchDurationMinutes(mins);
+                                setFinalMatchDurationMinutes(mins);
+                              }}
+                              className="btn"
+                              style={{
+                                padding: '0.5rem 0.85rem',
+                                fontSize: '0.85rem',
+                                fontWeight: 800,
+                                borderRadius: '8px',
+                                border: isSel ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+                                background: isSel ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255,255,255,0.03)',
+                                color: isSel ? '#ffd700' : '#fff',
+                                boxShadow: isSel ? '0 0 12px rgba(255, 215, 0, 0.25)' : 'none'
+                              }}
+                            >
+                              {mins === 0 ? 'Illimité (0)' : `${mins} min`}
+                            </button>
+                          );
+                        })}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 600 }}>Perso :</span>
+                          <input
+                            type="number"
+                            className="input-field"
+                            min={0}
+                            max={240}
+                            value={finalMatchDurationMinutes || qualifMatchDurationMinutes || 0}
+                            onChange={e => {
+                              const v = Math.max(0, parseInt(e.target.value, 10) || 0);
+                              setQualifMatchDurationMinutes(v);
+                              setFinalMatchDurationMinutes(v);
+                            }}
+                            style={{ width: '70px', padding: '0.4rem 0.5rem', textAlign: 'center', fontWeight: 800, fontSize: '0.9rem', border: '1px solid rgba(255, 215, 0, 0.4)' }}
+                          />
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>min</span>
+                        </div>
+                      </div>
+
+                      {isPoolFormat && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginTop: '0.3rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,215,0,0.15)' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--accent-primary)', fontWeight: 700, marginBottom: '0.25rem' }}>
+                              ⏱️ Temps Poules (min)
+                            </label>
+                            <input
+                              type="number"
+                              className="input-field"
+                              min={0}
+                              max={240}
+                              value={qualifMatchDurationMinutes}
+                              onChange={e => setQualifMatchDurationMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                              style={{ width: '100%', padding: '0.4rem', fontWeight: 700, fontSize: '0.85rem' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--accent-secondary)', fontWeight: 700, marginBottom: '0.25rem' }}>
+                              ⏱️ Temps Tableau Final (min)
+                            </label>
+                            <input
+                              type="number"
+                              className="input-field"
+                              min={0}
+                              max={240}
+                              value={finalMatchDurationMinutes}
+                              onChange={e => setFinalMatchDurationMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                              style={{ width: '100%', padding: '0.4rem', fontWeight: 700, fontSize: '0.85rem' }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Qualif Rules (uniquement pour les formats avec poules) */}
                     {isPoolFormat && (
@@ -2858,156 +3087,308 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                   </div>
 
                   {/* Right Column: Player Registration Selection */}
-                  <div className="glass-card" style={{ padding: '2rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <h3 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 800 }}>Joueurs inscrits</h3>
-                      <span style={{ color: 'var(--accent-primary)', fontSize: '1.3rem', fontWeight: 800 }}>
-                        {selectedPlayers.length}
+                  <div
+                    className="glass-card"
+                    style={{
+                      padding: '2rem 2.2rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1.2rem',
+                      background: 'linear-gradient(180deg, rgba(7, 30, 26, 0.85) 0%, rgba(4, 20, 17, 0.95) 100%)',
+                      border: '1px solid rgba(0, 255, 204, 0.22)'
+                    }}
+                  >
+                    {/* Header harmonized with left column */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 255, 204, 0.15)', paddingBottom: '0.9rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+                      <h2 style={{ fontSize: '1.35rem', margin: 0, fontWeight: 900, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <Users size={20} />
+                        2. Joueurs Inscrits
+                      </h2>
+                      <span style={{
+                        background: selectedPlayers.length > 0 ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.06)',
+                        color: selectedPlayers.length > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
+                        border: selectedPlayers.length > 0 ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)',
+                        padding: '0.35rem 0.9rem',
+                        borderRadius: '20px',
+                        fontWeight: 800,
+                        fontSize: '0.92rem'
+                      }}>
+                        {selectedPlayers.length} / {Object.keys(players).length} sélectionnés
                       </span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', fontSize: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+
+                    {/* Filter search & Quick actions */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      <div style={{ position: 'relative' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Rechercher un joueur ou un club..."
+                          value={launcherPlayerSearch}
+                          onChange={e => setLauncherPlayerSearch(e.target.value)}
+                          style={{
+                            width: '100%',
+                            paddingLeft: '38px',
+                            paddingRight: launcherPlayerSearch ? '34px' : '12px',
+                            height: '42px',
+                            fontSize: '0.9rem',
+                            borderRadius: '10px'
+                          }}
+                        />
+                        {launcherPlayerSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setLauncherPlayerSearch('')}
+                            style={{
+                              position: 'absolute',
+                              right: '10px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <X size={15} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.78rem', padding: '0.35rem 0.8rem', borderRadius: '8px' }}
+                            onClick={() => setSelectedPlayers(Object.keys(players))}
+                          >
+                            Tout cocher ({Object.keys(players).length})
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.78rem', padding: '0.35rem 0.8rem', borderRadius: '8px' }}
+                            onClick={() => setSelectedPlayers([])}
+                          >
+                            Tout décocher
+                          </button>
+                        </div>
                         <button
                           type="button"
-                          className="btn btn-outline"
-                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
-                          onClick={() => setSelectedPlayers(Object.keys(players))}
+                          className="btn"
+                          style={{ fontSize: '0.78rem', padding: '0.35rem 0.85rem', background: 'rgba(0, 255, 204, 0.12)', border: '1px solid rgba(0, 255, 204, 0.3)', color: 'var(--accent-primary)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}
+                          onClick={() => { setActiveTab('admin'); setAdminSubTab('players'); }}
                         >
-                          Tout cocher
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
-                          onClick={() => setSelectedPlayers([])}
-                        >
-                          Tout décocher
+                          <UserPlus size={14} />
+                          + Nouveau joueur
                         </button>
                       </div>
-                      <button
-                        className="btn"
-                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', background: 'rgba(255,255,255,0.06)' }}
-                        onClick={() => { setActiveTab('admin'); setAdminSubTab('players'); }}
-                      >
-                        + Ajouter un joueur
-                      </button>
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '580px', paddingRight: '0.3rem' }}>
-                      {Object.values(players).map(p => (
-                        <div
-                          key={p.id}
-                          onClick={() => togglePlayerSelection(p.id)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.8rem',
-                            background: selectedPlayers.includes(p.id) ? 'rgba(0, 255, 204, 0.15)' : 'rgba(255,255,255,0.02)',
-                            border: selectedPlayers.includes(p.id) ? '1px solid var(--accent-primary)' : '1px solid transparent',
-                            borderRadius: '12px', cursor: 'pointer', transition: 'all 0.15s'
-                          }}
-                        >
-                          <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selectedPlayers.includes(p.id) ? 'var(--accent-primary)' : 'transparent', flexShrink: 0 }}>
-                            {selectedPlayers.includes(p.id) && <div style={{ width: '10px', height: '10px', background: '#000' }} />}
-                          </div>
-                          <img src={getPlayerAvatar(p)} alt={p.name} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                          <div style={{ flex: 1, overflow: 'hidden' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{p.name}</span>
-                              {(p.clubName || p.stats?.clubName) && (
-                                <span style={{ fontSize: '0.68rem', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.25)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                  {(p.clubLogoUrl || p.stats?.clubLogoUrl) && (
-                                    <img src={p.clubLogoUrl || p.stats?.clubLogoUrl} alt="" style={{ width: '12px', height: '12px', objectFit: 'contain', background: '#fff', borderRadius: '2px' }} />
+                    {/* Players List with clean scroll and no text truncation */}
+                    <div style={{
+                      flex: 1,
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.55rem',
+                      maxHeight: '680px',
+                      paddingRight: '0.4rem'
+                    }}>
+                      {Object.values(players)
+                        .filter(p => {
+                          if (!launcherPlayerSearch.trim()) return true;
+                          const q = launcherPlayerSearch.toLowerCase().trim();
+                          const nameMatch = p.name.toLowerCase().includes(q);
+                          const clubMatch = (p.clubName || p.stats?.clubName || '').toLowerCase().includes(q);
+                          return nameMatch || clubMatch;
+                        })
+                        .map(p => {
+                          const isSelected = selectedPlayers.includes(p.id);
+                          const isPrestige = p.level === 'Prestige' || p.level === 'Confirmé';
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => togglePlayerSelection(p.id)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.85rem',
+                                padding: '0.8rem 1rem',
+                                background: isSelected ? 'rgba(0, 255, 204, 0.14)' : 'rgba(255,255,255,0.03)',
+                                border: isSelected ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.07)',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {/* Custom checkbox */}
+                              <div
+                                style={{
+                                  width: '22px',
+                                  height: '22px',
+                                  borderRadius: '6px',
+                                  border: isSelected ? '2px solid var(--accent-primary)' : '2px solid rgba(255,255,255,0.3)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: isSelected ? 'var(--accent-primary)' : 'transparent',
+                                  flexShrink: 0,
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                {isSelected && <Check size={14} color="#000" strokeWidth={3} />}
+                              </div>
+
+                              <img
+                                src={getPlayerAvatar(p)}
+                                alt={p.name}
+                                style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                  flexShrink: 0,
+                                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.15)'
+                                }}
+                              />
+
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
+                                  <span style={{ fontWeight: 700, fontSize: '0.98rem', color: '#fff' }}>
+                                    {p.name}
+                                  </span>
+                                  {(p.clubName || p.stats?.clubName) && (
+                                    <span style={{
+                                      fontSize: '0.72rem',
+                                      background: 'rgba(0, 255, 170, 0.12)',
+                                      color: 'var(--accent-primary)',
+                                      padding: '2px 7px',
+                                      borderRadius: '4px',
+                                      fontWeight: 700,
+                                      border: '1px solid rgba(0, 255, 170, 0.28)',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      {(p.clubLogoUrl || p.stats?.clubLogoUrl) && (
+                                        <img src={p.clubLogoUrl || p.stats?.clubLogoUrl} alt="" style={{ width: '13px', height: '13px', objectFit: 'contain', background: '#fff', borderRadius: '2px' }} />
+                                      )}
+                                      {p.clubName || p.stats?.clubName}
+                                    </span>
                                   )}
-                                  {p.clubName || p.stats?.clubName}
-                                </span>
-                              )}
-                              {(p.level === 'Prestige' || p.level === 'Confirmé') ? (
-                                <span style={{ fontSize: '0.65rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(255, 215, 0, 0.4)', flexShrink: 0 }}>
-                                  👑 Prestige
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: '0.65rem', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600, flexShrink: 0 }}>
-                                  Amateur
-                                </span>
-                              )}
+                                  {isPrestige ? (
+                                    <span style={{
+                                      fontSize: '0.68rem',
+                                      background: 'rgba(255, 215, 0, 0.18)',
+                                      color: '#ffd700',
+                                      padding: '2px 7px',
+                                      borderRadius: '4px',
+                                      fontWeight: 800,
+                                      border: '1px solid rgba(255, 215, 0, 0.4)'
+                                    }}>
+                                      👑 Prestige
+                                    </span>
+                                  ) : (
+                                    <span style={{
+                                      fontSize: '0.68rem',
+                                      background: 'rgba(255, 255, 255, 0.06)',
+                                      color: 'rgba(255,255,255,0.65)',
+                                      padding: '2px 7px',
+                                      borderRadius: '4px',
+                                      fontWeight: 600,
+                                      border: '1px solid rgba(255,255,255,0.1)'
+                                    }}>
+                                      Amateur
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                  {p.stats.matchesPlayed} matchs • {p.stats.winRate}% vict. ({p.stats.wins}V - {p.stats.losses ?? (p.stats.matchesPlayed - p.stats.wins)}D)
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                                <button
+                                  type="button"
+                                  title={`Modifier la fiche et le club de ${p.name}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveTab('admin');
+                                    setAdminSubTab('players');
+                                    setEditingPlayerId(p.id);
+                                    setEditPlayerName(p.name);
+                                    setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
+                                    setEditPlayerPhoto(null);
+                                    setEditPlayerClubName(p.clubName || p.stats?.clubName || '');
+                                    setEditPlayerClubLogo(p.clubLogoUrl || p.stats?.clubLogoUrl || null);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'rgba(255, 255, 255, 0.45)',
+                                    cursor: 'pointer',
+                                    padding: '7px',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseEnter={e => {
+                                    e.currentTarget.style.color = 'var(--accent-primary)';
+                                    e.currentTarget.style.background = 'rgba(0, 255, 170, 0.12)';
+                                  }}
+                                  onMouseLeave={e => {
+                                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.45)';
+                                    e.currentTarget.style.background = 'transparent';
+                                  }}
+                                >
+                                  <Edit2 size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  title={`Supprimer définitivement ${p.name} du club`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
+                                      deletePlayer(p.id);
+                                      setSelectedPlayers(prev => prev.filter(id => id !== p.id));
+                                    }
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'rgba(255, 68, 68, 0.45)',
+                                    cursor: 'pointer',
+                                    padding: '7px',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseEnter={e => {
+                                    e.currentTarget.style.color = '#ff4444';
+                                    e.currentTarget.style.background = 'rgba(255, 68, 68, 0.12)';
+                                  }}
+                                  onMouseLeave={e => {
+                                    e.currentTarget.style.color = 'rgba(255, 68, 68, 0.45)';
+                                    e.currentTarget.style.background = 'transparent';
+                                  }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              {p.stats.matchesPlayed} matchs • {p.stats.winRate}% vict. ({p.stats.wins}V - {p.stats.losses ?? (p.stats.matchesPlayed - p.stats.wins)}D)
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                            <button
-                              type="button"
-                              title={`Modifier la fiche et le club de ${p.name}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveTab('admin');
-                                setAdminSubTab('players');
-                                setEditingPlayerId(p.id);
-                                setEditPlayerName(p.name);
-                                setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
-                                setEditPlayerPhoto(null);
-                                setEditPlayerClubName(p.clubName || p.stats?.clubName || '');
-                                setEditPlayerClubLogo(p.clubLogoUrl || p.stats?.clubLogoUrl || null);
-                              }}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'rgba(255, 255, 255, 0.45)',
-                                cursor: 'pointer',
-                                padding: '6px',
-                                borderRadius: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s'
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.color = 'var(--accent-primary)';
-                                e.currentTarget.style.background = 'rgba(0, 255, 170, 0.12)';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.45)';
-                                e.currentTarget.style.background = 'transparent';
-                              }}
-                            >
-                              <Edit2 size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              title={`Supprimer définitivement ${p.name} du club`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
-                                  deletePlayer(p.id);
-                                  setSelectedPlayers(prev => prev.filter(id => id !== p.id));
-                                }
-                              }}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'rgba(255, 68, 68, 0.45)',
-                                cursor: 'pointer',
-                                padding: '6px',
-                                borderRadius: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s'
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.color = '#ff4444';
-                                e.currentTarget.style.background = 'rgba(255, 68, 68, 0.12)';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.color = 'rgba(255, 68, 68, 0.45)';
-                                e.currentTarget.style.background = 'transparent';
-                              }}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                          );
+                        })}
                     </div>
                   </div>
 
