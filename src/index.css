@@ -30,49 +30,49 @@
   --input-border: rgba(45, 212, 191, 0.4);
 }
 
-/* Thème Clair — Salon de Billard Lumineux & Haute Lisibilité */
+/* Thème Clair avec Carrés Verts comme dans le mode sombre */
 [data-theme="light"],
 body.theme-light {
-  --bg-color: #F8FAFC;
-  --bg-header: linear-gradient(180deg, #FFFFFF 0%, #F1F5F9 100%);
-  --bg-surface: #FFFFFF;
-  --bg-surface-active: #E2E8F0;
-  --bg-subtle: rgba(15, 23, 42, 0.04);
-  --bg-subtle-hover: rgba(15, 23, 42, 0.08);
-  --bg-panel: #FFFFFF;
-  --border-panel: rgba(13, 148, 136, 0.28);
-  --accent-primary: #D97706;
-  --accent-secondary: #0D9488;
+  --bg-color: #E2E8F0;
+  --bg-header: linear-gradient(180deg, #FFFFFF 0%, #E2E8F0 100%);
+  --bg-surface: #0D5C54;
+  --bg-surface-active: #0F766E;
+  --bg-subtle: rgba(13, 92, 84, 0.35);
+  --bg-subtle-hover: rgba(13, 92, 84, 0.55);
+  --bg-panel: linear-gradient(155deg, rgba(14, 90, 82, 0.95) 0%, rgba(7, 46, 42, 0.98) 100%);
+  --border-panel: rgba(45, 212, 191, 0.45);
+  --accent-primary: #FBBF24;
+  --accent-secondary: #10B981;
   --text-primary: #0F172A;
   --text-muted: #475569;
-  --border-color: rgba(15, 23, 42, 0.12);
-  --shadow-neon: 0 6px 20px -2px rgba(217, 119, 6, 0.22), 0 0 12px rgba(13, 148, 136, 0.15);
+  --border-color: rgba(45, 212, 191, 0.35);
+  --shadow-neon: 0 6px 20px -2px rgba(251, 191, 36, 0.35), 0 0 12px rgba(16, 185, 129, 0.2);
 
-  --card-bg: #FFFFFF;
-  --card-text: #0F172A;
-  --card-text-muted: #475569;
-  --card-border: rgba(13, 148, 136, 0.22);
+  --card-bg: linear-gradient(155deg, rgba(14, 90, 82, 0.95) 0%, rgba(7, 46, 42, 0.98) 100%);
+  --card-text: #FFFFFF;
+  --card-text-muted: #CCFBF1;
+  --card-border: rgba(45, 212, 191, 0.4);
 
-  --input-bg: #FFFFFF;
-  --input-text: #0F172A;
-  --input-border: #CBD5E1;
+  --input-bg: rgba(5, 30, 27, 0.85);
+  --input-text: #FFFFFF;
+  --input-border: rgba(45, 212, 191, 0.4);
 }
 
 [data-theme="light"] body,
 body.theme-light {
-  background-color: #F8FAFC !important;
+  background-color: #E2E8F0 !important;
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(13, 148, 136, 0.09) 0%, rgba(248, 250, 252, 0) 70%),
-    radial-gradient(ellipse 60% 50% at 85% 100%, rgba(217, 119, 6, 0.06) 0%, rgba(248, 250, 252, 0) 70%) !important;
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(13, 148, 136, 0.12) 0%, rgba(226, 232, 240, 0) 70%),
+    radial-gradient(ellipse 60% 50% at 85% 100%, rgba(251, 191, 36, 0.08) 0%, rgba(226, 232, 240, 0) 70%) !important;
   color: #0F172A !important;
 }
 
 [data-theme="light"] .glass-card,
 body.theme-light .glass-card {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-  border: 1px solid rgba(13, 148, 136, 0.24) !important;
-  box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.04) !important;
+  background: linear-gradient(155deg, rgba(14, 90, 82, 0.95) 0%, rgba(7, 46, 42, 0.98) 100%) !important;
+  color: #FFFFFF !important;
+  border: 1.5px solid rgba(45, 212, 191, 0.45) !important;
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.45), 0 0 16px rgba(16, 185, 129, 0.25) !important;
 }
 
 [data-theme="light"] .glass-card h1,
@@ -83,47 +83,47 @@ body.theme-light .glass-card h1,
 body.theme-light .glass-card h2,
 body.theme-light .glass-card h3,
 body.theme-light .glass-card h4 {
-  color: #0F172A;
+  color: #FFFFFF !important;
 }
 
-[data-theme="light"] .input-field,
-body.theme-light .input-field {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-  border: 1px solid #CBD5E1 !important;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+[data-theme="light"] .glass-card .input-field,
+body.theme-light .glass-card .input-field {
+  background: rgba(5, 30, 27, 0.85) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(45, 212, 191, 0.4) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-[data-theme="light"] .input-field::placeholder,
-body.theme-light .input-field::placeholder {
-  color: #94A3B8 !important;
+[data-theme="light"] .glass-card .input-field::placeholder,
+body.theme-light .glass-card .input-field::placeholder {
+  color: rgba(204, 251, 241, 0.5) !important;
 }
 
-[data-theme="light"] .input-field:focus,
-body.theme-light .input-field:focus {
-  background: #FFFFFF !important;
-  border-color: #D97706 !important;
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15) !important;
+[data-theme="light"] .glass-card .input-field:focus,
+body.theme-light .glass-card .input-field:focus {
+  background: rgba(5, 30, 27, 0.95) !important;
+  border-color: #FBBF24 !important;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.25) !important;
 }
 
-[data-theme="light"] select.input-field option,
-body.theme-light select.input-field option {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
+[data-theme="light"] .glass-card select.input-field option,
+body.theme-light .glass-card select.input-field option {
+  background: #072e29 !important;
+  color: #FFFFFF !important;
 }
 
-[data-theme="light"] .btn-outline,
-body.theme-light .btn-outline {
-  background: #FFFFFF !important;
-  border-color: rgba(13, 148, 136, 0.35) !important;
-  color: #0F766E !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+[data-theme="light"] .glass-card .btn-outline,
+body.theme-light .glass-card .btn-outline {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(45, 212, 191, 0.45) !important;
+  color: #FBBF24 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-[data-theme="light"] .btn-outline:hover:not(:disabled),
-body.theme-light .btn-outline:hover:not(:disabled) {
-  background: rgba(13, 148, 136, 0.08) !important;
-  border-color: #0D9488 !important;
+[data-theme="light"] .glass-card .btn-outline:hover:not(:disabled),
+body.theme-light .glass-card .btn-outline:hover:not(:disabled) {
+  background: rgba(251, 191, 36, 0.15) !important;
+  border-color: #FBBF24 !important;
 }
 
 [data-theme="light"] .mobile-container,

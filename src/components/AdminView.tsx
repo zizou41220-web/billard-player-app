@@ -1791,7 +1791,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     borderRadius: '16px',
                     border: '1.5px solid var(--border-panel)',
                     background: 'var(--bg-panel)',
-                    boxShadow: theme === 'light' ? '0 10px 25px -4px rgba(15, 23, 42, 0.06)' : '0 18px 45px -4px rgba(0, 0, 0, 0.85), 0 0 16px rgba(251, 191, 36, 0.22)'
+                    boxShadow: '0 18px 45px -4px rgba(0, 0, 0, 0.75), 0 0 18px rgba(16, 185, 129, 0.22)'
                   }}>
                     {/* Panel Header */}
                     <div style={{
@@ -3130,7 +3130,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       borderRadius: '16px',
                       background: 'var(--bg-panel)',
                       border: '1.5px solid var(--border-panel)',
-                      boxShadow: theme === 'light' ? '0 10px 25px -4px rgba(15, 23, 42, 0.06)' : '0 18px 45px -4px rgba(0, 0, 0, 0.85), 0 0 16px rgba(251, 191, 36, 0.22)'
+                      boxShadow: '0 18px 45px -4px rgba(0, 0, 0, 0.75), 0 0 18px rgba(16, 185, 129, 0.22)'
                     }}
                   >
                     {/* Header harmonized with left column */}
