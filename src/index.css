@@ -1,29 +1,33 @@
 :root {
-  --bg-color: #051311;
-  --bg-header: linear-gradient(180deg, rgba(4, 24, 21, 0.96) 0%, rgba(6, 33, 29, 0.92) 100%);
-  --bg-surface: #0D5C54;
-  --bg-surface-active: #0F766E;
-  --bg-subtle: rgba(255, 255, 255, 0.03);
-  --bg-subtle-hover: rgba(255, 255, 255, 0.06);
-  --bg-panel: linear-gradient(180deg, rgba(7, 30, 26, 0.88) 0%, rgba(4, 20, 17, 0.96) 100%);
-  --border-panel: rgba(0, 255, 204, 0.22);
+  /* ========================================================================= */
+  /* THÈME VERT BILLARD LUMINEUX + CARRÉS SOMBRES DORÉS (DEMANDE UTILISATEUR)  */
+  /* ========================================================================= */
+  --bg-color: #0D6355;
+  --bg-billiard-gradient: radial-gradient(ellipse 90% 55% at 50% -5%, #189883 0%, #0F6B5C 45%, #0A4F44 100%), radial-gradient(ellipse 70% 60% at 85% 100%, rgba(20, 150, 130, 0.45) 0%, transparent 70%);
+  --bg-header: linear-gradient(180deg, #071714 0%, #030C0B 100%);
+  --bg-surface: #071714;
+  --bg-surface-active: #0c2420;
+  --bg-subtle: rgba(0, 0, 0, 0.4);
+  --bg-subtle-hover: rgba(0, 0, 0, 0.6);
+  --bg-panel: linear-gradient(175deg, #091C19 0%, #040E0C 100%);
+  --border-panel: #FBBF24;
   --accent-primary: #FBBF24;
   /* Or Championnat lumineux */
-  --accent-secondary: #10B981;
-  /* Émeraude Tapis de Billard */
-  --text-primary: #F8FAFC;
-  --text-muted: #A7F3D0;
-  --border-color: rgba(45, 212, 191, 0.24);
-  --shadow-neon: 0 6px 20px -2px rgba(251, 191, 36, 0.38), 0 0 12px rgba(16, 185, 129, 0.22);
+  --accent-secondary: #34D399;
+  /* Émeraude lumineux */
+  --text-primary: #FFFFFF;
+  --text-muted: #D1FAE5;
+  --border-color: rgba(251, 191, 36, 0.45);
+  --shadow-neon: 0 6px 22px -2px rgba(251, 191, 36, 0.45), 0 0 14px rgba(52, 211, 153, 0.25);
 
-  --card-bg: linear-gradient(155deg, rgba(14, 90, 82, 0.92) 0%, rgba(7, 46, 42, 0.96) 100%);
+  --card-bg: linear-gradient(175deg, #091C19 0%, #040E0C 100%);
   --card-text: #FFFFFF;
-  --card-text-muted: #CCFBF1;
-  --card-border: rgba(45, 212, 191, 0.28);
+  --card-text-muted: #D1FAE5;
+  --card-border: #FBBF24;
 
-  --input-bg: rgba(4, 18, 16, 0.65);
+  --input-bg: #051412;
   --input-text: #FFFFFF;
-  --input-border: rgba(45, 212, 191, 0.3);
+  --input-border: rgba(251, 191, 36, 0.45);
 }
 
 /* Thème Clair — Salon de Billard Lumineux & Haute Lisibilité */
@@ -179,9 +183,7 @@ body.theme-light .nav-item.active {
 
 body {
   background-color: var(--bg-color);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(16, 185, 129, 0.18) 0%, rgba(5, 19, 17, 0) 70%),
-    radial-gradient(ellipse 60% 50% at 85% 100%, rgba(13, 148, 136, 0.12) 0%, rgba(5, 19, 17, 0) 70%);
+  background-image: var(--bg-billiard-gradient);
   color: var(--text-primary);
   font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   overflow: hidden;
@@ -203,12 +205,10 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
-  border-left: 1px solid var(--border-color);
-  border-right: 1px solid var(--border-color);
-  box-shadow: 0 0 60px rgba(0, 0, 0, 0.65);
-  background:
-    radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.2) 0%, rgba(5, 19, 17, 0.98) 70%),
-    var(--bg-color);
+  border-left: 1.5px solid var(--card-border);
+  border-right: 1.5px solid var(--card-border);
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.75);
+  background: var(--bg-billiard-gradient);
 }
 
 .view-content {
@@ -222,19 +222,20 @@ body {
   display: none;
 }
 
-/* Glass Card — Effet Salon de Billard Prestige */
+/* Glass Card — Effet Salon de Billard Prestige avec bordure dorée franche */
 .glass-card {
   --text-muted: var(--card-text-muted);
   background: var(--card-bg);
   color: var(--card-text);
-  border: 1px solid var(--card-border);
+  border: 1.5px solid var(--card-border);
   border-radius: 18px;
   padding: 1.25rem;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow:
-    0 14px 32px -6px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    0 16px 38px -6px rgba(0, 0, 0, 0.8),
+    0 0 16px rgba(251, 191, 36, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
