@@ -7,7 +7,8 @@ import {
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
   Radio, Tv, Smartphone, ExternalLink, Trash2, Shuffle,
-  Search, X, Facebook, Youtube, Volume2, VolumeX, Clock, UserPlus
+  Search, X, Facebook, Youtube, Volume2, VolumeX, Clock, UserPlus,
+  Sun, Moon
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
@@ -26,6 +27,7 @@ import {
 } from '../utils/voiceAnnouncer';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
+import { useTheme } from '../utils/theme';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
@@ -46,6 +48,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
     launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream,
     updateTournamentSettings, recomputePlayerStats
   } = useStore();
+  const [theme, , toggleTheme] = useTheme();
 
   const allTournaments = Object.values(tournaments);
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
@@ -911,10 +914,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderBottom: '1px solid rgba(255, 215, 0, 0.18)',
-        background: 'linear-gradient(180deg, rgba(4, 24, 21, 0.96) 0%, rgba(6, 33, 29, 0.92) 100%)',
+        borderBottom: '1px solid var(--border-color)',
+        background: 'var(--bg-header)',
         backdropFilter: 'blur(16px)',
-        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.45)',
+        boxShadow: theme === 'light' ? '0 2px 12px rgba(15, 23, 42, 0.06)' : '0 8px 30px rgba(0, 0, 0, 0.45)',
         position: 'relative',
         zIndex: 20,
         gap: '1rem',
@@ -1055,6 +1058,27 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
           >
             {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             {voiceEnabled ? 'Appel Vocal ON' : 'Appel Vocal OFF'}
+          </button>
+
+          {/* Bouton Commutateur Mode Clair / Mode Sombre */}
+          <button
+            className="btn btn-outline"
+            onClick={toggleTheme}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              fontWeight: 800,
+              padding: '0.55rem 0.95rem',
+              fontSize: '0.84rem',
+              color: theme === 'light' ? '#D97706' : '#FBBF24',
+              borderColor: theme === 'light' ? 'rgba(217, 119, 6, 0.5)' : 'rgba(251, 191, 36, 0.35)',
+              background: theme === 'light' ? 'rgba(217, 119, 6, 0.12)' : 'rgba(255, 255, 255, 0.04)'
+            }}
+            title={theme === 'light' ? "Basculer en Mode Sombre 🌙" : "Basculer en Mode Clair ☀️ (plus lumineux)"}
+          >
+            {theme === 'light' ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === 'light' ? 'Mode Clair ☀️' : 'Mode Sombre 🌙'}
           </button>
 
           {onOpenKiosk && (
@@ -1756,9 +1780,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     flexDirection: 'column',
                     gap: '1.8rem',
                     borderRadius: '16px',
-                    border: '1px solid rgba(0, 255, 204, 0.22)',
-                    background: 'linear-gradient(180deg, rgba(7, 30, 26, 0.85) 0%, rgba(4, 20, 17, 0.95) 100%)',
-                    boxShadow: '0 12px 35px rgba(0,0,0,0.45)'
+                    border: '1px solid var(--border-panel)',
+                    background: 'var(--bg-panel)',
+                    boxShadow: theme === 'light' ? '0 10px 25px -4px rgba(15, 23, 42, 0.06)' : '0 12px 35px rgba(0,0,0,0.45)'
                   }}>
                     {/* Panel Header */}
                     <div style={{
@@ -3094,8 +3118,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '1.2rem',
-                      background: 'linear-gradient(180deg, rgba(7, 30, 26, 0.85) 0%, rgba(4, 20, 17, 0.95) 100%)',
-                      border: '1px solid rgba(0, 255, 204, 0.22)'
+                      background: 'var(--bg-panel)',
+                      border: '1px solid var(--border-panel)'
                     }}
                   >
                     {/* Header harmonized with left column */}
@@ -3221,8 +3245,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 alignItems: 'center',
                                 gap: '0.85rem',
                                 padding: '0.8rem 1rem',
-                                background: isSelected ? 'rgba(0, 255, 204, 0.14)' : 'rgba(255,255,255,0.03)',
-                                border: isSelected ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.07)',
+                                background: isSelected ? (theme === 'light' ? 'rgba(13, 148, 136, 0.12)' : 'rgba(0, 255, 204, 0.14)') : 'var(--bg-subtle)',
+                                border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                                 borderRadius: '12px',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease'
@@ -3234,7 +3258,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   width: '22px',
                                   height: '22px',
                                   borderRadius: '6px',
-                                  border: isSelected ? '2px solid var(--accent-primary)' : '2px solid rgba(255,255,255,0.3)',
+                                  border: isSelected ? '2px solid var(--accent-primary)' : '2px solid var(--border-color)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -3255,13 +3279,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                   borderRadius: '50%',
                                   objectFit: 'cover',
                                   flexShrink: 0,
-                                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.15)'
+                                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'
                                 }}
                               />
 
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
-                                  <span style={{ fontWeight: 700, fontSize: '0.98rem', color: '#fff' }}>
+                                  <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--text-primary)' }}>
                                     {p.name}
                                   </span>
                                   {(p.clubName || p.stats?.clubName) && (

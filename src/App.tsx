@@ -7,9 +7,10 @@ import FeedView from './components/FeedView';
 import AdminView from './components/AdminView';
 import StreamOverlayView from './components/StreamOverlayView';
 import KioskView from './components/KioskView';
-import { QrCode, User, Activity, Settings, Tv } from 'lucide-react';
+import { QrCode, User, Activity, Settings, Tv, Sun, Moon } from 'lucide-react';
 import { initSync } from './sync';
 import { APP_VERSION } from './version';
+import { useTheme } from './utils/theme';
 
 export type Tab = 'scan' | 'feed' | 'profile';
 
@@ -29,6 +30,7 @@ function App() {
   });
   const [activeTab, setActiveTab] = useState<Tab>('scan');
   const { activeMatchId } = useStore();
+  const [theme, , toggleTheme] = useTheme();
 
   useEffect(() => {
     initSync();
@@ -153,23 +155,50 @@ function App() {
       )}
 
       <div className="mobile-container">
-        {/* Version indicator for mobile */}
+        {/* Controls header for mobile (theme + version) */}
         <div style={{
           position: 'absolute',
           top: '12px',
           right: '14px',
           zIndex: 99,
-          fontSize: '0.7rem',
-          color: '#FBBF24',
-          background: 'rgba(245, 158, 11, 0.18)',
-          padding: '2px 8px',
-          borderRadius: '8px',
-          border: '1px solid rgba(245, 158, 11, 0.4)',
-          fontWeight: 800,
-          backdropFilter: 'blur(8px)',
-          pointerEvents: 'none'
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px'
         }}>
-          {APP_VERSION}
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: theme === 'light' ? 'rgba(217, 119, 6, 0.12)' : 'rgba(255, 255, 255, 0.08)',
+              border: `1px solid ${theme === 'light' ? '#D97706' : 'rgba(251, 191, 36, 0.4)'}`,
+              color: theme === 'light' ? '#B45309' : '#FBBF24',
+              borderRadius: '8px',
+              padding: '2px 7px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              backdropFilter: 'blur(8px)'
+            }}
+            title={theme === 'light' ? "Mode Sombre 🌙" : "Mode Clair ☀️"}
+          >
+            {theme === 'light' ? <Sun size={12} /> : <Moon size={12} />}
+            {theme === 'light' ? 'Clair' : 'Sombre'}
+          </button>
+          <div style={{
+            fontSize: '0.7rem',
+            color: theme === 'light' ? '#D97706' : '#FBBF24',
+            background: theme === 'light' ? 'rgba(217, 119, 6, 0.12)' : 'rgba(245, 158, 11, 0.18)',
+            padding: '2px 8px',
+            borderRadius: '8px',
+            border: `1px solid ${theme === 'light' ? 'rgba(217, 119, 6, 0.3)' : 'rgba(245, 158, 11, 0.4)'}`,
+            fontWeight: 800,
+            backdropFilter: 'blur(8px)',
+            pointerEvents: 'none'
+          }}>
+            {APP_VERSION}
+          </div>
         </div>
       <div className="view-content">
         {renderView()}
