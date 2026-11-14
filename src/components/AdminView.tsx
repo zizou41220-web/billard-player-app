@@ -923,10 +923,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderBottom: theme === 'light' ? '1px solid var(--border-color)' : '2px solid rgba(251, 191, 36, 0.45)',
+        borderBottom: theme === 'light' ? '1px solid var(--border-color)' : '2px solid rgba(45, 212, 191, 0.4)',
         background: 'var(--bg-header)',
         backdropFilter: 'blur(16px)',
-        boxShadow: theme === 'light' ? '0 2px 12px rgba(15, 23, 42, 0.06)' : '0 8px 30px rgba(0, 0, 0, 0.7), 0 0 16px rgba(251, 191, 36, 0.2)',
+        boxShadow: theme === 'light' ? '0 2px 12px rgba(15, 23, 42, 0.06)' : '0 8px 30px rgba(0, 0, 0, 0.7), 0 0 16px rgba(16, 185, 129, 0.2)',
         position: 'relative',
         zIndex: 20,
         gap: '1rem',
@@ -1837,7 +1837,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         placeholder="Ex: Open de Printemps 2026"
                         value={newTourName}
                         onChange={e => setNewTourName(e.target.value)}
-                        style={{ fontSize: '1.1rem', padding: '0.9rem', border: '1.5px solid rgba(251, 191, 36, 0.45)', background: '#051412' }}
+                        style={{ fontSize: '1.1rem', padding: '0.9rem', border: '1.5px solid rgba(45, 212, 191, 0.4)', background: 'rgba(5, 30, 27, 0.85)', color: '#fff' }}
                       />
                     </div>
 
@@ -1858,16 +1858,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                             style={{
                               padding: '1.1rem 0.8rem',
                               borderRadius: '12px',
-                              border: newTourFormat === fmt.id ? '2px solid #FBBF24' : '1px solid rgba(251, 191, 36, 0.28)',
-                              background: newTourFormat === fmt.id ? 'rgba(251, 191, 36, 0.18)' : 'rgba(0, 0, 0, 0.45)',
+                              border: newTourFormat === fmt.id ? '2px solid var(--accent-primary)' : '1px solid rgba(45, 212, 191, 0.3)',
+                              background: newTourFormat === fmt.id ? 'rgba(0, 255, 204, 0.22)' : 'rgba(7, 46, 42, 0.65)',
                               cursor: 'pointer',
                               textAlign: 'center',
-                              boxShadow: newTourFormat === fmt.id ? '0 0 16px rgba(251, 191, 36, 0.3)' : 'none',
+                              boxShadow: newTourFormat === fmt.id ? '0 0 16px rgba(0, 255, 204, 0.3)' : 'none',
                               transition: 'all 0.2s'
                             }}
                           >
-                            <div style={{ fontWeight: 800, fontSize: '0.95rem', color: newTourFormat === fmt.id ? '#FBBF24' : '#fff' }}>{fmt.label}</div>
-                            <div style={{ fontSize: '0.74rem', color: newTourFormat === fmt.id ? '#FBBF24' : 'var(--text-muted)', marginTop: '0.25rem', fontWeight: 600 }}>{fmt.badge}</div>
+                            <div style={{ fontWeight: 800, fontSize: '0.95rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : '#fff' }}>{fmt.label}</div>
+                            <div style={{ fontSize: '0.74rem', color: newTourFormat === fmt.id ? 'var(--accent-primary)' : 'var(--text-muted)', marginTop: '0.25rem', fontWeight: 600 }}>{fmt.badge}</div>
                           </div>
                         ))}
                       </div>
@@ -3256,8 +3256,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 alignItems: 'center',
                                 gap: '0.85rem',
                                 padding: '0.8rem 1rem',
-                                background: isSelected ? (theme === 'light' ? 'rgba(13, 148, 136, 0.12)' : 'rgba(251, 191, 36, 0.16)') : 'rgba(0, 0, 0, 0.45)',
-                                border: isSelected ? '1.5px solid #FBBF24' : '1px solid rgba(251, 191, 36, 0.2)',
+                                background: isSelected ? (theme === 'light' ? 'rgba(13, 148, 136, 0.12)' : 'rgba(0, 255, 204, 0.22)') : 'rgba(7, 46, 42, 0.6)',
+                                border: isSelected ? '1.5px solid var(--accent-primary)' : '1px solid rgba(45, 212, 191, 0.25)',
                                 borderRadius: '12px',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease'
