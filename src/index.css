@@ -410,12 +410,167 @@ h3 {
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.45;
     transform: scale(0.92);
   }
+}
+
+/* 1. Lueur dorée balayante sur les bordures prestigieuses (Shimmer) */
+@keyframes goldShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-gold-border {
+  position: relative;
+}
+
+.shimmer-gold-border::after {
+  content: '';
+  position: absolute;
+  top: -1px; left: -1px; right: -1px; bottom: -1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.6) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: goldShimmer 3.5s infinite linear;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.75;
+}
+
+/* 2. Respiration vivante des tables occupées (Live Pulse) */
+@keyframes liveTablePulse {
+  0%, 100% {
+    box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.7), 0 0 12px rgba(16, 185, 129, 0.25);
+    border-color: rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 14px 34px -2px rgba(0, 0, 0, 0.8), 0 0 24px rgba(16, 185, 129, 0.65);
+    border-color: rgba(52, 211, 153, 0.9);
+  }
+}
+
+.live-table-glow {
+  animation: liveTablePulse 2.4s ease-in-out infinite;
+}
+
+/* 3. Animation d'odomètre / saut de score lors d'un point marqué */
+@keyframes scoreBump {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  35% {
+    transform: scale(1.32) translateY(-4px);
+    filter: brightness(1.6) drop-shadow(0 0 18px var(--accent-primary));
+  }
+  70% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.animate-score-bump {
+  animation: scoreBump 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 4. Effet d'impact de bille au clic (Billiard Ripple Effect) */
+@keyframes billiardImpact {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+  }
+  70% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 14px rgba(255, 255, 255, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+.btn:active:not(:disabled) {
+  animation: billiardImpact 0.25s ease-out;
+}
+
+/* 5. Vague sonore animée (Soundwave) pour les appels vocaux / pré-appels */
+@keyframes soundwaveBar {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 16px;
+  }
+}
+
+.soundwave-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+
+.soundwave-bar {
+  width: 2.5px;
+  background: currentColor;
+  border-radius: 2px;
+  animation: soundwaveBar 0.9s ease-in-out infinite;
+}
+.soundwave-bar:nth-child(2) { animation-delay: 0.18s; }
+.soundwave-bar:nth-child(3) { animation-delay: 0.36s; }
+.soundwave-bar:nth-child(4) { animation-delay: 0.54s; }
+
+/* 6. Alerte critique d'urgence / dernière minute du chrono */
+@keyframes timerCriticalPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 22px rgba(239, 68, 68, 0.9), 0 0 8px #ef4444;
+  }
+}
+
+.timer-critical-pulse {
+  animation: timerCriticalPulse 0.85s infinite ease-in-out;
+}
+
+/* 7. Carte avec entrée fluide en file d'attente (Smooth Queue Slide) */
+@keyframes queueItemSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.queue-card-anim {
+  animation: queueItemSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.queue-card-anim:hover {
+  transform: translateX(4px);
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), 0 0 12px rgba(251, 191, 36, 0.2) !important;
 }

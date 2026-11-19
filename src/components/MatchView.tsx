@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { Flag, Minus, Plus, Radio } from 'lucide-react';
 import { getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import MatchTimerBadge from './MatchTimerBadge';
 import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl } from '../utils/video';
+import ConfettiCelebration from './ConfettiCelebration';
 
 const MatchView: React.FC = () => {
   const { players, matches, activeMatchId, updateScore, finishMatch, tables, tournaments } = useStore();
@@ -36,12 +37,45 @@ const MatchView: React.FC = () => {
   const score1 = match.score1;
   const score2 = match.score2;
 
+  const [animScore1, setAnimScore1] = useState(false);
+  const [animScore2, setAnimScore2] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+
+  const prevScore1 = useRef(score1);
+  const prevScore2 = useRef(score2);
+
   const tournament = match.tournamentId ? tournaments[match.tournamentId] : null;
   const { maxSets: maxScore, isWinningSets, minScore1, minScore2, formatLabel } = getMatchScoringRules(match, tournament, players);
 
   const canFinish = isWinningSets
     ? (match.score1 >= maxScore || match.score2 >= maxScore)
     : ((match.score1 + match.score2) >= maxScore);
+
+  useEffect(() => {
+    if (score1 !== prevScore1.current) {
+      prevScore1.current = score1;
+      setAnimScore1(true);
+      const timer = setTimeout(() => setAnimScore1(false), 450);
+      return () => clearTimeout(timer);
+    }
+  }, [score1]);
+
+  useEffect(() => {
+    if (score2 !== prevScore2.current) {
+      prevScore2.current = score2;
+      setAnimScore2(true);
+      const timer = setTimeout(() => setAnimScore2(false), 450);
+      return () => clearTimeout(timer);
+    }
+  }, [score2]);
+
+  useEffect(() => {
+    if (canFinish && !showCelebration) {
+      setShowCelebration(true);
+      const timer = setTimeout(() => setShowCelebration(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [canFinish]);
 
   const handleScore = (playerId: string, delta: number) => {
     // Prevent exceeding max score for fixed sets, or winning sets
@@ -67,7 +101,8 @@ const MatchView: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', position: 'relative' }}>
+      <ConfettiCelebration active={showCelebration} />
       {/* Top Bar */}
       <div style={{ padding: '1.2rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -270,7 +305,19 @@ const MatchView: React.FC = () => {
             <Minus size={24} />
           </button>
 
-          <span style={{ fontSize: '6rem', fontWeight: 800, color: 'var(--text-muted)', lineHeight: 1, width: '100px', textAlign: 'center' }}>
+          <span
+            className={animScore2 ? 'animate-score-bump' : ''}
+            style={{
+              fontSize: '6rem',
+              fontWeight: 800,
+              color: 'var(--text-muted)',
+              lineHeight: 1,
+              width: '100px',
+              textAlign: 'center',
+              display: 'inline-block',
+              transition: 'transform 0.15s ease'
+            }}
+          >
             {score2}
           </span>
 
@@ -314,7 +361,7 @@ const MatchView: React.FC = () => {
             <Minus size={32} />
           </button>
 
-          <span className="text-gradient" style={{ fontSize: '7rem', fontWeight: 800, lineHeight: 1, width: '120px', textAlign: 'center' }}>
+          <span className={`text-gradient ${animScore1 ? 'animate-score-bump' : ''}`} style={{ fontSize: '7rem', fontWeight: 800, lineHeight: 1, width: '120px', textAlign: 'center', display: 'inline-block' }}>
             {score1}
           </span>
 

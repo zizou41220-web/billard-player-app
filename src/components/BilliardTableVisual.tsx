@@ -33,6 +33,7 @@ export const BilliardTableVisual: React.FC<BilliardTableVisualProps> = ({
 
   return (
     <div
+      className={isOccupied ? 'live-table-glow' : ''}
       style={{
         position: 'relative',
         display: 'flex',

@@ -2670,7 +2670,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                         {/* ======================================================== */}
                         {/* Paramètres Spécifiques Grande Finale                    */}
                         {/* ======================================================== */}
-                        <div style={{
+                        <div
+                          className={grandFinalCustom ? 'shimmer-gold-border' : ''}
+                          style={{
                           gridColumn: 'span 2',
                           marginTop: '0.8rem',
                           padding: '1.2rem',
@@ -3699,6 +3701,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                 return (
                                   <div
                                     key={match.id}
+                                    className="queue-card-anim"
                                     style={{
                                       background: 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.24) 100%)',
                                       border: '1px solid rgba(255,255,255,0.12)',
@@ -3812,7 +3815,12 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                                           })}
                                           title="Pré-appeler ces deux joueurs au micro pour qu'ils se tiennent prêts"
                                         >
-                                          <Volume2 size={11} /> Pré-appel
+                                          <div className="soundwave-container" style={{ height: '11px', gap: '2px', display: 'inline-flex' }}>
+                                            <span className="soundwave-bar" style={{ width: '2px', height: '6px' }} />
+                                            <span className="soundwave-bar" style={{ width: '2px', height: '11px' }} />
+                                            <span className="soundwave-bar" style={{ width: '2px', height: '8px' }} />
+                                          </div>
+                                          <span>Pré-appel</span>
                                         </button>
                                         <button
                                           type="button"

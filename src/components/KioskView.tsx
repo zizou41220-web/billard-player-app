@@ -525,6 +525,7 @@ export const KioskView: React.FC<KioskViewProps> = ({ onExit }) => {
               return (
                 <div
                   key={table.id}
+                  className={isOccupied ? 'live-table-glow' : ''}
                   style={{
                     background: isOccupied
                       ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.85) 0%, rgba(5, 8, 22, 0.95) 100%)'
