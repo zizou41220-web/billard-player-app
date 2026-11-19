@@ -5,6 +5,7 @@ import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { Player } from '../types';
 import { getPlayerAvatar } from '../utils/avatar';
 import { computeAllPlayersStats, calculatePlayerClubPoints } from '../utils/playerStats';
+import { PlayerStatsModal } from './PlayerStatsDashboard';
 
 interface LeaderboardViewProps {
   compact?: boolean;
@@ -16,6 +17,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
   const [filterLevel, setFilterLevel] = useState<'all' | 'Prestige' | 'Amateur'>('all');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'points' | 'winRate' | 'wins' | 'tournamentsWon'>('points');
+  const [statsPlayerId, setStatsPlayerId] = useState<string | null>(null);
 
   const allPlayers = useMemo(() => {
     const computed = computeAllPlayersStats(players, matches, tournaments);
@@ -595,7 +597,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
                 return (
                   <tr
                     key={player.id}
+                    onClick={() => setStatsPlayerId(player.id)}
+                    title="Voir le tableau de bord du joueur"
                     style={{
+                      cursor: 'pointer',
                       borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                       background: isTop1
                         ? 'rgba(255, 215, 0, 0.05)'
@@ -794,6 +799,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ compact = fals
           </div>
         )}
       </div>
+      {statsPlayerId && (
+        <PlayerStatsModal playerId={statsPlayerId} onClose={() => setStatsPlayerId(null)} />
+      )}
     </div>
   );
 };

@@ -27,6 +27,7 @@ import {
 } from '../utils/voiceAnnouncer';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
+import { NeonToggleButton } from './NeonBackdrop';
 import { useTheme } from '../utils/theme';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
@@ -1110,6 +1111,44 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
               <Tv size={16} /> Mode Kiosque TV
             </button>
           )}
+
+          <button
+            className="btn btn-outline"
+            onClick={() => window.open(`${window.location.origin}${window.location.pathname}?broadcast=1`, '_blank')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              fontWeight: 700,
+              padding: '0.55rem 0.95rem',
+              fontSize: '0.84rem',
+              color: '#FBBF24',
+              borderColor: 'rgba(251, 191, 36, 0.45)',
+              background: 'rgba(251, 191, 36, 0.1)'
+            }}
+            title="Ouvrir le Broadcast TV (bandeau de score + mur de bracket live) dans un nouvel onglet"
+          >
+            📺 Broadcast TV
+          </button>
+          <button
+            className="btn btn-outline"
+            onClick={() => window.open(`${window.location.origin}${window.location.pathname}?broadcast=1&scene=bracket`, '_blank')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              fontWeight: 700,
+              padding: '0.55rem 0.95rem',
+              fontSize: '0.84rem',
+              color: '#a78bfa',
+              borderColor: 'rgba(167, 139, 250, 0.45)',
+              background: 'rgba(167, 139, 250, 0.1)'
+            }}
+            title="Ouvrir le mur de bracket live en plein écran (nouvel onglet)"
+          >
+            🌳 Mur Bracket
+          </button>
+          <NeonToggleButton />
         </div>
       </header>
 
@@ -1370,7 +1409,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
       )}
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, padding: activeTab === 'dashboard' ? '1rem 1.8rem' : '2.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <main key={activeTab} className="page-transition" style={{ flex: 1, padding: activeTab === 'dashboard' ? '1rem 1.8rem' : '2.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
         {/* ========================================================================= */}
         {/* 1. TOURNAMENT LAUNCHER TAB                                                */}

@@ -726,3 +726,113 @@ h3 {
   border-color: var(--accent-primary) !important;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), 0 0 12px rgba(251, 191, 36, 0.2) !important;
 }
+
+/* ========================================================================= */
+/* v1.5.0 - AMBIANCE NÉON / GLASSMORPHISM + BROADCAST TV + BRACKET LIVE        */
+/* ========================================================================= */
+
+/* Transition de page (fondu glissé) */
+@keyframes pageFadeSlide {
+  from { opacity: 0; transform: translateY(14px) scale(0.99); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.page-transition {
+  animation: pageFadeSlide 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Fenêtre statistiques joueur */
+@keyframes statsModalPop {
+  from { opacity: 0; transform: translateY(24px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stats-modal-pop { animation: statsModalPop 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Ambiance néon : le fond animé (canvas) devient visible, les panneaux passent en verre dépoli émeraude */
+body.fx-neon #root > div,
+body.fx-neon #root div[style*="--bg-color"],
+body.fx-neon #root div[style*="#050816"] {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+body.fx-neon .glass-card {
+  background: linear-gradient(155deg, rgba(14, 90, 82, 0.55) 0%, rgba(7, 46, 42, 0.68) 100%) !important;
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1.5px solid rgba(52, 211, 153, 0.5) !important;
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 0 22px rgba(16, 185, 129, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+body.fx-neon header {
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+body.fx-neon .btn-neon {
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.55), 0 0 36px rgba(16, 185, 129, 0.3);
+}
+
+body.fx-neon .btn-outline:hover:not(:disabled) {
+  box-shadow: 0 0 14px rgba(52, 211, 153, 0.45);
+}
+
+/* Broadcast TV */
+.broadcast-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.07) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%);
+  animation: broadcastGridDrift 18s linear infinite;
+}
+@keyframes broadcastGridDrift {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 56px 56px, 56px 56px; }
+}
+
+@keyframes broadcastEnter {
+  from { opacity: 0; transform: translateY(40px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.broadcast-enter { animation: broadcastEnter 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes liveDotBlink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,255,255,0.8); }
+  50% { opacity: 0.35; box-shadow: 0 0 0 7px rgba(255,255,255,0); }
+}
+.live-dot { animation: liveDotBlink 1.2s ease-in-out infinite; }
+
+@keyframes broadcastTicker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.broadcast-ticker { animation: broadcastTicker 55s linear infinite; }
+
+/* Mur de bracket : traits lumineux animés et carte en direct */
+@keyframes bracketFlow {
+  to { stroke-dashoffset: -40; }
+}
+.bracket-flow {
+  stroke-dasharray: 8 12;
+  animation: bracketFlow 1.4s linear infinite;
+}
+@keyframes bracketLivePulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(52, 211, 153, 0.4); }
+  50% { box-shadow: 0 0 26px rgba(52, 211, 153, 0.95); }
+}
+.bracket-card-live { animation: bracketLivePulse 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition, .broadcast-enter, .stats-modal-pop, .broadcast-ticker, .broadcast-grid, .bracket-flow, .bracket-card-live, .live-dot {
+    animation: none !important;
+  }
+}

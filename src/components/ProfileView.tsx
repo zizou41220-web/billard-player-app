@@ -1,12 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { Trophy, Crosshair, Swords } from 'lucide-react';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getPlayerAvatar } from '../utils/avatar';
 import { computeAllPlayersStats, calculatePlayerClubPoints } from '../utils/playerStats';
+import { PlayerStatsModal } from './PlayerStatsDashboard';
 
 const ProfileView: React.FC = () => {
   const { currentUser, players, matches, tournaments, currentClub } = useStore();
+  const [showStats, setShowStats] = useState(false);
   const computedPlayers = useMemo(() => {
     return computeAllPlayersStats(players, matches, tournaments);
   }, [players, matches, tournaments]);
@@ -116,9 +118,10 @@ const ProfileView: React.FC = () => {
         </div>
       </div>
 
-      <button className="btn btn-surface" style={{ marginTop: 'auto' }}>
-        Voir l'historique complet
+      <button className="btn btn-surface" style={{ marginTop: 'auto' }} onClick={() => setShowStats(true)}>
+        📊 Mon tableau de bord complet
       </button>
+      {showStats && <PlayerStatsModal playerId={me.id} onClose={() => setShowStats(false)} />}
     </div>
   );
 };

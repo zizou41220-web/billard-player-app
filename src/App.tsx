@@ -7,6 +7,8 @@ import FeedView from './components/FeedView';
 import AdminView from './components/AdminView';
 import StreamOverlayView from './components/StreamOverlayView';
 import KioskView from './components/KioskView';
+import BroadcastTVView from './components/BroadcastTVView';
+import { NeonBackdrop, NeonToggleButton } from './components/NeonBackdrop';
 import { QrCode, User, Activity, Settings, Tv, Sun, Moon } from 'lucide-react';
 import { initSync } from './sync';
 import { APP_VERSION } from './version';
@@ -18,6 +20,7 @@ function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const overlayTableParam = urlParams.get('overlay') || urlParams.get('stream');
   const kioskParam = urlParams.get('kiosk') || urlParams.get('tv');
+  const broadcastParam = urlParams.get('broadcast');
   const matchParam = urlParams.get('match');
   const tableParam = urlParams.get('table');
   const clubParam = urlParams.get('club');
@@ -85,23 +88,44 @@ function App() {
     return <StreamOverlayView tableParam={overlayTableParam} />;
   }
 
+  // Mode Broadcast TV (bandeau de score façon retransmission + mur de bracket live)
+  if (broadcastParam) {
+    return (
+      <BroadcastTVView
+        sceneParam={urlParams.get('scene')}
+        tournamentParam={urlParams.get('tournament')}
+      />
+    );
+  }
+
   if (appMode === 'kiosk') {
-    return <KioskView onExit={() => setAppMode(isDesktop ? 'admin' : 'player')} />;
+    return (
+      <>
+        <NeonBackdrop />
+        <KioskView onExit={() => setAppMode(isDesktop ? 'admin' : 'player')} />
+      </>
+    );
   }
 
   if (appMode === 'admin') {
     return (
-      <div style={{ position: 'relative', width: '100vw', height: '100dvh' }}>
-        <AdminView onOpenKiosk={() => setAppMode('kiosk')} />
-      </div>
+      <>
+        <NeonBackdrop />
+        <div style={{ position: 'relative', width: '100vw', height: '100dvh' }}>
+          <AdminView onOpenKiosk={() => setAppMode('kiosk')} />
+        </div>
+      </>
     );
   }
 
   if (activeMatchId) {
     return (
-      <div className="mobile-container" style={{ overflowY: 'auto' }}>
-        <MatchView />
-      </div>
+      <>
+        <NeonBackdrop />
+        <div className="mobile-container" style={{ overflowY: 'auto' }}>
+          <MatchView />
+        </div>
+      </>
     );
   }
 
@@ -115,6 +139,8 @@ function App() {
   };
 
   return (
+    <>
+    <NeonBackdrop />
     <div style={{
       position: 'relative',
       height: '100dvh',
@@ -144,6 +170,14 @@ function App() {
           >
             <Tv size={17} /> Mode Kiosque TV
           </button>
+          <button 
+            onClick={() => window.open(`${window.location.origin}${window.location.pathname}?broadcast=1`, '_blank')}
+            className="btn btn-outline"
+            style={{ background: 'rgba(4, 24, 21, 0.9)', color: '#FBBF24', borderColor: 'rgba(251, 191, 36, 0.45)', padding: '0.55rem 1rem', fontSize: '0.84rem' }}
+          >
+            📺 Broadcast TV
+          </button>
+          <NeonToggleButton />
           <button 
             onClick={() => setAppMode('admin')}
             className="btn btn-outline"
@@ -186,6 +220,7 @@ function App() {
             {theme === 'light' ? <Sun size={12} /> : <Moon size={12} />}
             {theme === 'light' ? 'Clair' : 'Sombre'}
           </button>
+          <NeonToggleButton compact />
           <div style={{
             fontSize: '0.7rem',
             color: theme === 'light' ? '#D97706' : '#FBBF24',
@@ -200,7 +235,7 @@ function App() {
             {APP_VERSION}
           </div>
         </div>
-      <div className="view-content">
+      <div className="view-content page-transition" key={activeTab}>
         {renderView()}
       </div>
 
@@ -230,6 +265,7 @@ function App() {
       </nav>
       </div>
     </div>
+    </>
   );
 }
 
