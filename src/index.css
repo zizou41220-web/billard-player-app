@@ -787,8 +787,8 @@ body.fx-neon .btn-outline:hover:not(:disabled) {
   z-index: 1;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(52, 211, 153, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(52, 211, 153, 0.07) 1px, transparent 1px);
+    linear-gradient(rgba(52, 211, 153, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.035) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%);
   -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%);

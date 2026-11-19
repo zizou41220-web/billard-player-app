@@ -61,13 +61,13 @@ const BroadcastScore: React.FC<{ value: number; color: string }> = ({ value, col
     <div
       className={bump ? 'animate-score-bump' : ''}
       style={{
-        minWidth: '150px',
+        minWidth: '88px',
         textAlign: 'center',
-        fontSize: 'clamp(4rem, 11vw, 9rem)',
+        fontSize: 'clamp(2.6rem, 5.5vw, 4.6rem)',
         fontWeight: 900,
         lineHeight: 1,
         color: '#fff',
-        textShadow: `0 0 30px ${color}, 0 0 60px ${color}88`,
+        textShadow: `0 2px 16px ${color}66`,
         fontVariantNumeric: 'tabular-nums'
       }}
     >
@@ -91,7 +91,7 @@ const PlayerBlock: React.FC<{
       display: 'flex',
       flexDirection: reverse ? 'row-reverse' : 'row',
       alignItems: 'center',
-      gap: '1.2rem',
+      gap: '0.9rem',
       textAlign: reverse ? 'right' : 'left'
     }}>
       {player && (
@@ -99,23 +99,23 @@ const PlayerBlock: React.FC<{
           src={getPlayerAvatar(player)}
           alt={player.name}
           style={{
-            width: 'clamp(70px, 9vw, 130px)',
-            height: 'clamp(70px, 9vw, 130px)',
+            width: 'clamp(54px, 6vw, 82px)',
+            height: 'clamp(54px, 6vw, 82px)',
             borderRadius: '50%',
             objectFit: 'cover',
-            border: `4px solid ${isPrestige ? '#ffd700' : color}`,
-            boxShadow: `0 0 28px ${color}aa`,
+            border: `2.5px solid ${isPrestige ? '#ffd700' : color}`,
+            boxShadow: `0 0 14px ${color}44`,
             flexShrink: 0
           }}
         />
       )}
       <div style={{ minWidth: 0 }}>
         <div style={{
-          fontSize: 'clamp(1.3rem, 3vw, 2.6rem)',
+          fontSize: 'clamp(1.05rem, 2vw, 1.75rem)',
           fontWeight: 900,
           color: '#fff',
           textTransform: 'uppercase',
-          letterSpacing: '1px',
+          letterSpacing: '0.5px',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis'
@@ -165,17 +165,34 @@ const BroadcastTVView: React.FC<BroadcastTVViewProps> = ({ sceneParam, tablePara
 
   const forcedScene: Scene | null = sceneParam === 'live' || sceneParam === 'bracket' ? sceneParam : null;
 
+  const activeTournament = useMemo(() => {
+    if (tournamentParam && tournaments[tournamentParam]) {
+      return tournaments[tournamentParam];
+    }
+    const ongoing = Object.values(tournaments).find(t => t && t.status === 'ongoing');
+    if (ongoing) return ongoing;
+    const list = Object.values(tournaments).filter(Boolean);
+    return list.length > 0 ? list[list.length - 1] : null;
+  }, [tournaments, tournamentParam]);
+
+  const belongsToActiveTournament = (m: Match) => {
+    if (!activeTournament) return true;
+    if (m.tournamentId) return m.tournamentId === activeTournament.id;
+    return Array.isArray(activeTournament.matches) && activeTournament.matches.includes(m.id);
+  };
+
   const playingMatches = useMemo(() => {
     return Object.values(matches)
-      .filter(m => m.status === 'playing' && !isByeMatch(m) && (!tableParam || m.tableId === tableParam))
+      .filter(m => m.status === 'playing' && !isByeMatch(m) && belongsToActiveTournament(m) && (!tableParam || m.tableId === tableParam))
       .sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
-  }, [matches, tableParam]);
+  }, [matches, tableParam, activeTournament]);
 
   const hasBracket = useMemo(() => {
-    return Object.values(tournaments).some(
-      t => t && (!tournamentParam || t.id === tournamentParam) && t.matches?.some(id => matches[id] && isFinalStageMatch(matches[id]))
-    );
-  }, [tournaments, matches, tournamentParam]);
+    if (activeTournament) {
+      return Boolean(activeTournament.matches?.some(id => matches[id] && isFinalStageMatch(matches[id])));
+    }
+    return false;
+  }, [activeTournament, matches]);
 
   const [scene, setScene] = useState<Scene>(forcedScene || 'live');
   const [featuredIdx, setFeaturedIdx] = useState(0);
@@ -208,25 +225,21 @@ const BroadcastTVView: React.FC<BroadcastTVViewProps> = ({ sceneParam, tablePara
   const featured: Match | undefined = playingMatches[featuredIdx % Math.max(1, playingMatches.length)];
   const others = playingMatches.filter(m => m.id !== featured?.id);
 
-  const activeTournament = featured?.tournamentId
-    ? tournaments[featured.tournamentId]
-    : Object.values(tournaments).find(t => t.status === 'ongoing') || null;
-
   const waitingMatches = useMemo(() => {
     return Object.values(matches)
-      .filter(m => m.status === 'pending' && !isByeMatch(m) && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
+      .filter(m => m.status === 'pending' && !isByeMatch(m) && belongsToActiveTournament(m) && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
       .slice(0, 6);
-  }, [matches, players]);
+  }, [matches, players, activeTournament]);
 
   const tickerItems = useMemo(() => {
     const finished = Object.values(matches)
-      .filter(m => m.status === 'finished' && !isByeMatch(m) && players[m.player1Id] && players[m.player2Id])
+      .filter(m => m.status === 'finished' && !isByeMatch(m) && belongsToActiveTournament(m) && players[m.player1Id] && players[m.player2Id])
       .sort((a, b) => (b.endTime || b.startTime || 0) - (a.endTime || a.startTime || 0))
       .slice(0, 8)
       .map(m => `✅ ${players[m.player1Id].name} ${m.score1} - ${m.score2} ${players[m.player2Id].name}`);
     const upcoming = waitingMatches.slice(0, 4).map(m => `⏳ À suivre : ${players[m.player1Id].name} vs ${players[m.player2Id].name}`);
     return [...finished, ...upcoming];
-  }, [matches, players, waitingMatches]);
+  }, [matches, players, waitingMatches, activeTournament]);
 
   const tableLabel = (m: Match) => {
     const t = m.tableId ? tables[m.tableId] : undefined;
@@ -245,44 +258,44 @@ const BroadcastTVView: React.FC<BroadcastTVViewProps> = ({ sceneParam, tablePara
     const p2 = players[m.player2Id];
     const isFinal = m.stage === 'final';
     return (
-      <div key={m.id} className="broadcast-enter" style={{ width: '100%', maxWidth: '1500px', margin: '0 auto' }}>
+      <div key={m.id} className="broadcast-enter" style={{ width: '100%', maxWidth: '1160px', margin: '0 auto' }}>
         {/* Bandeau supérieur */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.7rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
           <span style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '8px',
-            background: '#ef4444',
+            gap: '6px',
+            background: '#dc2626',
             color: '#fff',
             fontWeight: 900,
-            padding: '6px 16px',
-            borderRadius: '8px',
-            letterSpacing: '2px',
-            fontSize: 'clamp(0.9rem, 1.5vw, 1.3rem)'
+            padding: '4px 12px',
+            borderRadius: '6px',
+            letterSpacing: '1.5px',
+            fontSize: 'clamp(0.72rem, 1.1vw, 0.92rem)'
           }}>
-            <span className="live-dot" style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} />
+            <span className="live-dot" style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />
             EN DIRECT
           </span>
           <span style={{
-            fontWeight: 900,
+            fontWeight: 800,
             color: isFinal ? '#04120f' : '#FBBF24',
-            background: isFinal ? '#FBBF24' : 'rgba(251,191,36,0.15)',
-            border: '1px solid rgba(251,191,36,0.6)',
-            padding: '6px 16px',
-            borderRadius: '8px',
-            fontSize: 'clamp(0.9rem, 1.5vw, 1.3rem)',
+            background: isFinal ? '#FBBF24' : 'rgba(251,191,36,0.12)',
+            border: '1px solid rgba(251,191,36,0.45)',
+            padding: '4px 12px',
+            borderRadius: '6px',
+            fontSize: 'clamp(0.72rem, 1.1vw, 0.92rem)',
             textTransform: 'uppercase',
             letterSpacing: '1px'
           }}>
             {stageLabel(m)}
           </span>
           <span style={{
-            fontWeight: 800,
+            fontWeight: 700,
             color: '#CCFBF1',
-            background: 'rgba(255,255,255,0.08)',
-            padding: '6px 16px',
-            borderRadius: '8px',
-            fontSize: 'clamp(0.9rem, 1.5vw, 1.3rem)'
+            background: 'rgba(255,255,255,0.06)',
+            padding: '4px 12px',
+            borderRadius: '6px',
+            fontSize: 'clamp(0.72rem, 1.1vw, 0.92rem)'
           }}>
             🎱 {tableLabel(m)}
           </span>
@@ -294,25 +307,25 @@ const BroadcastTVView: React.FC<BroadcastTVViewProps> = ({ sceneParam, tablePara
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '1.5rem',
-            padding: 'clamp(1rem, 2.5vw, 2.2rem)',
-            borderRadius: '24px',
-            background: 'linear-gradient(90deg, rgba(16,185,129,0.22) 0%, rgba(4,18,16,0.92) 35%, rgba(4,18,16,0.92) 65%, rgba(56,189,248,0.22) 100%)',
-            border: '2px solid rgba(45,212,191,0.5)',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.65), 0 0 40px rgba(16,185,129,0.25)',
+            gap: '1rem',
+            padding: 'clamp(0.85rem, 1.6vw, 1.35rem) clamp(1rem, 2vw, 1.8rem)',
+            borderRadius: '18px',
+            background: 'linear-gradient(90deg, rgba(16,185,129,0.14) 0%, rgba(4,18,16,0.88) 32%, rgba(4,18,16,0.88) 68%, rgba(56,189,248,0.14) 100%)',
+            border: '1px solid rgba(45,212,191,0.35)',
+            boxShadow: '0 14px 36px rgba(0,0,0,0.5)',
             backdropFilter: 'blur(10px)'
           }}
         >
           <PlayerBlock player={p1} color={P1_COLOR} align="left" handicap={m.handicapP1} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
             <BroadcastScore value={m.score1} color={P1_COLOR} />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: 'clamp(1rem, 2vw, 1.8rem)', fontWeight: 900, color: '#FBBF24' }}>VS</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: 'clamp(0.85rem, 1.4vw, 1.2rem)', fontWeight: 900, color: '#FBBF24' }}>VS</span>
               <MatchTimerBadge
                 startTime={m.startTime}
                 durationMinutes={rules.durationMinutes ?? 0}
                 status={m.status}
-                size="lg"
+                size="md"
                 showElapsedWhenUnlimited
               />
             </div>
@@ -322,7 +335,7 @@ const BroadcastTVView: React.FC<BroadcastTVViewProps> = ({ sceneParam, tablePara
         </div>
 
         {/* Pied : format */}
-        <div style={{ textAlign: 'center', marginTop: '1rem', color: '#CCFBF1', fontWeight: 700, fontSize: 'clamp(0.9rem, 1.4vw, 1.2rem)', letterSpacing: '1px' }}>
+        <div style={{ textAlign: 'center', marginTop: '0.75rem', color: 'rgba(204,251,241,0.85)', fontWeight: 700, fontSize: 'clamp(0.78rem, 1.1vw, 0.98rem)', letterSpacing: '0.8px' }}>
           {rules.formatLabel.toUpperCase()}
           {activeTournament ? ` • ${activeTournament.name}` : ''}
         </div>
@@ -460,13 +473,13 @@ const BroadcastTVView: React.FC<BroadcastTVViewProps> = ({ sceneParam, tablePara
           zIndex: 2,
           overflow: 'hidden',
           whiteSpace: 'nowrap',
-          background: 'linear-gradient(90deg, #072e29, #0b4a42)',
-          borderTop: '2px solid rgba(251,191,36,0.6)',
-          padding: '0.55rem 0'
+          background: 'rgba(7, 46, 41, 0.92)',
+          borderTop: '1px solid rgba(45, 212, 191, 0.35)',
+          padding: '0.45rem 0'
         }}>
-          <div className="broadcast-ticker" style={{ display: 'inline-block', fontWeight: 800, fontSize: '1.1rem', color: '#fff' }}>
+          <div className="broadcast-ticker" style={{ display: 'inline-block', fontWeight: 700, fontSize: '0.94rem', color: '#CCFBF1' }}>
             {[...tickerItems, ...tickerItems].map((item, i) => (
-              <span key={i} style={{ margin: '0 2.5rem' }}>{item}</span>
+              <span key={i} style={{ margin: '0 2rem' }}>{item}</span>
             ))}
           </div>
         </footer>
