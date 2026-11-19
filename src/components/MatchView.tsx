@@ -4,7 +4,7 @@ import { Flag, Minus, Plus, Radio } from 'lucide-react';
 import { getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import MatchTimerBadge from './MatchTimerBadge';
 import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl } from '../utils/video';
-import ConfettiCelebration from './ConfettiCelebration';
+import BilliardBreakCelebration from './BilliardBreakCelebration';
 
 const MatchView: React.FC = () => {
   const { players, matches, activeMatchId, updateScore, finishMatch, tables, tournaments } = useStore();
@@ -102,7 +102,7 @@ const MatchView: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', position: 'relative' }}>
-      <ConfettiCelebration active={showCelebration} />
+      <BilliardBreakCelebration active={showCelebration} />
       {/* Top Bar */}
       <div style={{ padding: '1.2rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
