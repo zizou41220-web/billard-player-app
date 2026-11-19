@@ -1114,25 +1114,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
           <button
             className="btn btn-outline"
-            onClick={() => window.open(`${window.location.origin}${window.location.pathname}?broadcast=1`, '_blank')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              fontWeight: 700,
-              padding: '0.55rem 0.95rem',
-              fontSize: '0.84rem',
-              color: '#FBBF24',
-              borderColor: 'rgba(251, 191, 36, 0.45)',
-              background: 'rgba(251, 191, 36, 0.1)'
-            }}
-            title="Ouvrir le Broadcast TV (bandeau de score + mur de bracket live) dans un nouvel onglet"
-          >
-            📺 Broadcast TV
-          </button>
-          <button
-            className="btn btn-outline"
-            onClick={() => window.open(`${window.location.origin}${window.location.pathname}?broadcast=1&scene=bracket`, '_blank')}
+            onClick={() => window.open(`${window.location.origin}${window.location.pathname}?bracket=1`, '_blank')}
             style={{
               display: 'flex',
               alignItems: 'center',
