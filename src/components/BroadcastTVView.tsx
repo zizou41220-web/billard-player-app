@@ -4,6 +4,7 @@ import { getPlayerAvatar } from '../utils/avatar';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMatchScoringRules } from '../utils/rules';
 import { isByeMatch, isFinalStageMatch } from '../utils/bracket';
+import { extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl, formatEmbedVideoUrl } from '../utils/video';
 import MatchTimerBadge from './MatchTimerBadge';
 import LiveBracketWall from './LiveBracketWall';
 import { Match, Player } from '../types';
@@ -225,6 +226,18 @@ const BroadcastTVView: React.FC<BroadcastTVViewProps> = ({ sceneParam, tablePara
   const featured: Match | undefined = playingMatches[featuredIdx % Math.max(1, playingMatches.length)];
   const others = playingMatches.filter(m => m.id !== featured?.id);
 
+  const featuredVideoSrc = useMemo(() => {
+    if (!featured) return '';
+    const table = featured.tableId ? tables[featured.tableId] : undefined;
+    const raw = featured.liveStreamUrl || table?.liveStreamUrl;
+    if (!raw) return '';
+    const ext = extractExternalVideoFromStreamUrl(raw);
+    if (ext) return formatEmbedVideoUrl(ext);
+    const vdo = extractVdoRoomFromStreamUrl(raw);
+    if (vdo) return `https://vdo.ninja/?view=${encodeURIComponent(vdo)}&cleanoutput&autoplay&muted`;
+    return '';
+  }, [featured, tables]);
+
   const waitingMatches = useMemo(() => {
     return Object.values(matches)
       .filter(m => m.status === 'pending' && !isByeMatch(m) && belongsToActiveTournament(m) && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
@@ -432,23 +445,56 @@ const BroadcastTVView: React.FC<BroadcastTVViewProps> = ({ sceneParam, tablePara
       </header>
 
       {/* Scène */}
-      <main style={{ position: 'relative', zIndex: 2, flex: 1, minHeight: 0, padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column' }}>
+      <main style={{ position: 'relative', zIndex: 2, flex: 1, minHeight: 0, padding: '0.85rem 2rem', display: 'flex', flexDirection: 'column' }}>
         {scene === 'live' ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2rem' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: featured ? 'flex-start' : 'center', gap: '0.9rem' }}>
             {featured ? renderFeatured(featured) : renderIdle()}
+
+            {/* Flux Vidéo en Direct si la table ou le match a une caméra configurée */}
+            {featured && featuredVideoSrc && (
+              <div style={{
+                flex: 1,
+                minHeight: 0,
+                width: '100%',
+                maxWidth: '1160px',
+                margin: '0 auto',
+                borderRadius: '16px',
+                overflow: 'hidden',
+                background: '#000',
+                border: '1px solid rgba(45,212,191,0.35)',
+                boxShadow: '0 14px 40px rgba(0,0,0,0.6)',
+                position: 'relative'
+              }}>
+                <iframe
+                  src={featuredVideoSrc}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; camera; microphone"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 'none'
+                  }}
+                  title="Direct Vidéo Broadcast TV"
+                />
+              </div>
+            )}
+
             {others.length > 0 && (
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
                 {others.map(m => (
                   <div key={m.id} style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.8rem',
-                    padding: '0.6rem 1.1rem',
-                    borderRadius: '14px',
-                    background: 'rgba(14,90,82,0.55)',
-                    border: '1px solid rgba(45,212,191,0.4)',
+                    gap: '0.7rem',
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '12px',
+                    background: 'rgba(14,90,82,0.5)',
+                    border: '1px solid rgba(45,212,191,0.35)',
                     fontWeight: 800,
-                    fontSize: '1.05rem'
+                    fontSize: '0.95rem'
                   }}>
                     <span style={{ color: '#FBBF24' }}>{tableLabel(m)}</span>
                     <span>{players[m.player1Id]?.name}</span>
