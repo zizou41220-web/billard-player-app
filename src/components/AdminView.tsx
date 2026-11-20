@@ -13,6 +13,7 @@ import {
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
 import { LiveOverlayEditorPanel } from './LiveOverlayEditorPanel';
+import MultiCamDirectorPanel from './MultiCamDirectorPanel';
 import MatchTimerBadge from './MatchTimerBadge';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { computeTournamentScheduleContext, sortTournamentMatchesForScheduling, getMatchStakeInfo } from '../utils/matchScheduler';
@@ -5532,16 +5533,23 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
 
           return (
             <div style={{
-              maxWidth: '1320px',
+              maxWidth: '1400px',
               width: '100%',
               margin: '0 auto',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
-              gap: '1.8rem',
-              alignItems: 'start',
-              paddingBottom: '2rem',
-              overflowY: 'auto'
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.6rem',
+              paddingBottom: '2rem'
             }}>
+              <MultiCamDirectorPanel getAppBaseUrl={getAppBaseUrl} />
+
+              <div style={{
+                width: '100%',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+                gap: '1.8rem',
+                alignItems: 'start'
+              }}>
               {/* LEFT COLUMN: CONFIGURE & LAUNCH LIVE MATCH */}
               <div className="glass-card" style={{ padding: '1.6rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -6572,6 +6580,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
                     </div>
                   )}
                 </div>
+              </div>
               </div>
             </div>
           );

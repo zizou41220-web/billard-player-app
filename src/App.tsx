@@ -8,6 +8,7 @@ import AdminView from './components/AdminView';
 import StreamOverlayView from './components/StreamOverlayView';
 import KioskView from './components/KioskView';
 import LiveBracketWall from './components/LiveBracketWall';
+import SmartphoneCameraSenderView from './components/SmartphoneCameraSenderView';
 import { NeonBackdrop, NeonToggleButton } from './components/NeonBackdrop';
 import { QrCode, User, Activity, Settings, Tv, Sun, Moon } from 'lucide-react';
 import { initSync } from './sync';
@@ -18,6 +19,7 @@ export type Tab = 'scan' | 'feed' | 'profile';
 
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
+  const cameraParam = urlParams.get('camera');
   const overlayTableParam = urlParams.get('overlay') || urlParams.get('stream');
   const kioskParam = urlParams.get('kiosk') || urlParams.get('tv');
   const bracketParam = urlParams.get('bracket');
@@ -82,6 +84,16 @@ function App() {
       openMatchFromUrl();
     }
   }, []);
+
+  // Dedicated Smartphone Camera Sender Mode (?camera=cam_1&club=...)
+  if (cameraParam) {
+    return (
+      <SmartphoneCameraSenderView
+        cameraId={cameraParam}
+        clubId={clubParam || useStore.getState().currentClub.id}
+      />
+    );
+  }
 
   // Dedicated Overlay Mode for OBS / Prism Live Studio / Facebook / YouTube streams
   if (overlayTableParam) {

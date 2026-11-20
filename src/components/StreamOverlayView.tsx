@@ -18,6 +18,7 @@ import {
   subscribeToLiveOverlayConfig
 } from '../utils/liveOverlay';
 import { LiveCustomOverlayLayer } from './LiveCustomOverlayLayer';
+import DirectorTvOutputView from './DirectorTvOutputView';
 
 interface MultiTableTileProps {
   table: Table;
@@ -472,6 +473,11 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const allTournaments = Object.values(tournaments);
   const activeTournament: Tournament | null = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
 
+  // MULTI-CAMERA DIRECTOR OUTPUT VIEW (?overlay=director)
+  if (activeTableParam === 'director') {
+    return <DirectorTvOutputView onExitToAll={() => setActiveTableParam('all')} />;
+  }
+
   // MULTI-TABLE MOSAIC VIEW (?overlay=all or toggled via button)
   if (activeTableParam === 'all') {
     const allSortedTables = Object.values(tables).sort((a, b) => a.number - b.number);
@@ -551,6 +557,22 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setActiveTableParam('director')}
+              style={{
+                background: 'rgba(245, 158, 11, 0.2)',
+                color: '#FBBF24',
+                border: '1px solid rgba(245, 158, 11, 0.45)',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                fontWeight: 800
+              }}
+            >
+              🎛️ Régie Multi-Caméras
+            </button>
             <button
               type="button"
               onClick={() => setOnlyLiveTables(!onlyLiveTables)}

@@ -1,7 +1,26 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import os from 'node:os'
+import { attachRtmpRelayToHttpServer, findFfmpegBinary } from './server/rtmp-relay.mjs'
+
+function rtmpRelayPlugin(): Plugin {
+  const attach = (server: any) => {
+    if (server.httpServer) {
+      attachRtmpRelayToHttpServer(server.httpServer, '/api/rtmp-relay')
+    }
+    server.middlewares.use('/api/rtmp-relay/health', (_req: any, res: any) => {
+      const ffmpegPath = findFfmpegBinary()
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify({ ok: true, ffmpegAvailable: Boolean(ffmpegPath), ffmpegPath }))
+    })
+  }
+  return {
+    name: 'mcb-rtmp-relay',
+    configureServer: attach,
+    configurePreviewServer: attach
+  }
+}
 
 // Détecte automatiquement l'adresse IP du PC sur le Wi-Fi courant (maison, club...)
 // pour que le QR code "rejoindre l'application" pointe toujours vers la bonne adresse.
@@ -25,7 +44,7 @@ console.log(`\n  📱 Adresse pour les smartphones : ${lanUrl}\n`)
 
 export default defineConfig({
   base: './',
-  plugins: [react(), basicSsl()],
+  plugins: [react(), basicSsl(), rtmpRelayPlugin()],
   server: { host: true, port: PORT, strictPort: true },
   define: { __LAN_URL__: JSON.stringify(lanUrl) },
 })

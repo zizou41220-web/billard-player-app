@@ -1,12 +1,13 @@
 {
   "name": "billard-player-app",
   "private": true,
-  "version": "1.5.3",
+  "version": "1.5.4",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "relay": "node server/rtmp-relay.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
