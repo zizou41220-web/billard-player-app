@@ -903,6 +903,29 @@ export class LiveCompositeBroadcaster {
       ctx.rotate((slot.rotation * Math.PI) / 180);
       ctx.scale(finalScale, finalScale);
       ctx.drawImage(video, -vw / 2, -vh / 2, vw, vh);
+    } else if ((slot.sourceType === 'external' && slot.externalUrl) || slot.sourceType === 'vdo') {
+      const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+      grad.addColorStop(0, '#091529');
+      grad.addColorStop(1, '#040a16');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, w, h);
+
+      ctx.fillStyle = '#38BDF8';
+      ctx.font = '800 18px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(
+        slot.sourceType === 'vdo'
+          ? `📡 VDO.Ninja actif — ${slot.name}`
+          : `🌐 Lien Externe actif — ${slot.name}`,
+        x + w / 2,
+        y + h / 2 - 10
+      );
+      if (slot.externalUrl && slot.sourceType === 'external') {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = '600 13px Inter, system-ui, sans-serif';
+        ctx.fillText(slot.externalUrl.slice(0, 48), x + w / 2, y + h / 2 + 16);
+      }
     } else {
       ctx.fillStyle = '#0b1224';
       ctx.fillRect(x, y, w, h);

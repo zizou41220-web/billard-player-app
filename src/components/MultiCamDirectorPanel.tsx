@@ -1186,8 +1186,21 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   };
 
   const handleUpdateSlot = (cameraId: string, patch: Partial<DirectorCameraSlot>) => {
+    const extUrl = typeof patch.externalUrl === 'string' ? patch.externalUrl.trim() : '';
+    const isCueScoreLink = Boolean(extUrl && /cuescore\.com\/tournament/i.test(extUrl));
+    const currentRm = directorState.regionalMatch || DEFAULT_REGIONAL_MATCH;
+    const shouldPrefillCueScore = isCueScoreLink && !(currentRm.cueScoreInput || '').trim();
+
     updateDirector({
       ...directorState,
+      ...(shouldPrefillCueScore
+        ? {
+            regionalMatch: {
+              ...currentRm,
+              cueScoreInput: extUrl
+            }
+          }
+        : {}),
       cameras: directorState.cameras.map(c => (c.id === cameraId ? { ...c, ...patch } : c))
     });
   };
@@ -2551,29 +2564,232 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             </div>
           </div>
 
-          <canvas
-            ref={(el) => {
-              previewCanvasRef.current = el;
-              broadcasterRef.current?.setPreviewCanvas(el);
-            }}
-            onClick={handlePreviewCanvasClick}
-            width={960}
-            height={540}
-            title={
-              directorState.broadcastMode === 'mosaic'
-                ? 'Aperçu en direct de l’Écran Multiple — Cliquez sur un cadran pour le diffuser seul'
-                : 'Cliquez sur l’aperçu pour revenir à l’Écran Multiple'
-            }
+          <div
             style={{
+              position: 'relative',
               width: '100%',
               aspectRatio: '16 / 9',
               borderRadius: '10px',
+              overflow: 'hidden',
               background: '#000',
-              display: 'block',
-              cursor: 'pointer',
               border: '1px solid rgba(255,255,255,0.12)'
             }}
-          />
+          >
+            <canvas
+              ref={(el) => {
+                previewCanvasRef.current = el;
+                broadcasterRef.current?.setPreviewCanvas(el);
+              }}
+              onClick={handlePreviewCanvasClick}
+              width={960}
+              height={540}
+              title={
+                directorState.broadcastMode === 'mosaic'
+                  ? 'Aperçu en direct de l’Écran Multiple — Cliquez sur un cadran pour le diffuser seul'
+                  : 'Cliquez sur l’aperçu pour revenir à l’Écran Multiple'
+              }
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'block',
+                cursor: 'pointer'
+              }}
+            />
+
+            {/* Superposition des sources Iframe (Lien Externe / VDO.Ninja) dans l'aperçu Mosaïque ou Plein Écran */}
+            {(() => {
+              const renderPreviewIframe = (slot: DirectorCameraSlot) => {
+                const iframeSrc =
+                  slot.sourceType === 'external' && slot.externalUrl
+                    ? formatEmbedVideoUrl(slot.externalUrl)
+                    : `https://vdo.ninja/?view=${encodeURIComponent(slot.vdoRoom || `MCB_${currentClub.id}_${slot.id}`)}&cleanoutput&autoplay&muted`;
+                return (
+                  <iframe
+                    key={`${slot.id}-${slot.sourceType}-${slot.externalUrl || slot.vdoRoom || ''}`}
+                    src={iframeSrc}
+                    allow="autoplay; camera; microphone; encrypted-media; picture-in-picture"
+                    title={`Aperçu ${slot.name}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      border: 'none',
+                      pointerEvents: 'none',
+                      transform: `rotate(${slot.rotation || 0}deg) scale(${slot.zoom || 1})`,
+                      transformOrigin: 'center center',
+                      display: 'block'
+                    }}
+                  />
+                );
+              };
+
+              if (directorState.broadcastMode === 'single') {
+                const singleSlot = focusedCam || enabledCams[0];
+                const isSingleIframe =
+                  singleSlot &&
+                  ((singleSlot.sourceType === 'external' && Boolean(singleSlot.externalUrl?.trim())) ||
+                    singleSlot.sourceType === 'vdo');
+                if (!singleSlot || !isSingleIframe) return null;
+
+                const singleAssign =
+                  focusedAssignment ||
+                  resolveCameraAssignment(
+                    singleSlot,
+                    { tables, matches, players, tournaments, currentClub },
+                    directorState
+                  );
+                const hasSingleMatchBanner =
+                  singleAssign.isMatchView &&
+                  singleAssign.p1Name &&
+                  singleAssign.p2Name &&
+                  singleAssign.score1 !== undefined &&
+                  singleAssign.score2 !== undefined;
+
+                return (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      zIndex: 2,
+                      pointerEvents: 'none',
+                      overflow: 'hidden',
+                      background: '#050814'
+                    }}
+                  >
+                    {renderPreviewIframe(singleSlot)}
+
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '3%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: hasSingleMatchBanner ? '82%' : 'auto',
+                        maxWidth: '92%',
+                        background: 'rgba(6, 12, 24, 0.9)',
+                        border: '1.5px solid rgba(0, 255, 170, 0.7)',
+                        borderRadius: '10px',
+                        padding: '5px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '3px',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.68rem', fontWeight: 800 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ background: '#ff2244', color: '#fff', padding: '1px 5px', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 900 }}>
+                            LIVE
+                          </span>
+                          <span style={{ color: '#00ffaa' }}>
+                            {singleAssign.title}
+                            {singleAssign.rulesLabel ? ` • ${singleAssign.rulesLabel}` : ''}
+                          </span>
+                        </div>
+                        <span style={{ color: 'rgba(255,255,255,0.68)', fontSize: '0.64rem' }}>
+                          {currentClub.name}
+                        </span>
+                      </div>
+
+                      {hasSingleMatchBanner ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.82rem', fontWeight: 900 }}>
+                          <span style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {singleAssign.p1Name}
+                            {singleAssign.p1Club ? <span style={{ color: '#34D399', fontSize: '0.64rem', marginLeft: '5px' }}>({singleAssign.p1Club})</span> : null}
+                          </span>
+                          <span style={{ background: '#F59E0B', color: '#000', padding: '1px 9px', borderRadius: '6px', flexShrink: 0 }}>
+                            {singleAssign.score1} - {singleAssign.score2}
+                          </span>
+                          <span style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                            {singleAssign.p2Club ? <span style={{ color: '#FBBF24', fontSize: '0.64rem', marginRight: '5px' }}>({singleAssign.p2Club})</span> : null}
+                            {singleAssign.p2Name}
+                          </span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.78)' }}>
+                          {singleAssign.subtitle}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              const previewList = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
+              const previewRects = getMosaicGridRects(previewList.length, directorState.mosaicLayout, 1280, 720);
+
+              return previewList.map((slot, idx) => {
+                const isIframeSlot =
+                  (slot.sourceType === 'external' && Boolean(slot.externalUrl?.trim())) ||
+                  slot.sourceType === 'vdo';
+                if (!isIframeSlot) return null;
+                const rect = previewRects[idx];
+                if (!rect) return null;
+
+                const cellAssign = resolveCameraAssignment(
+                  slot,
+                  { tables, matches, players, tournaments, currentClub },
+                  directorState
+                );
+                const isAudioActive =
+                  directorState.activeAudioCameraId === slot.id &&
+                  !slot.forceMuted &&
+                  !isVirtualScreenSource(slot.sourceType);
+                const hasCellMatch =
+                  cellAssign.isMatchView &&
+                  cellAssign.p1Name &&
+                  cellAssign.p2Name &&
+                  cellAssign.score1 !== undefined &&
+                  cellAssign.score2 !== undefined;
+
+                return (
+                  <div
+                    key={`preview-cell-${slot.id}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${(rect.x / 1280) * 100}%`,
+                      top: `${(rect.y / 720) * 100}%`,
+                      width: `${(rect.w / 1280) * 100}%`,
+                      height: `${(rect.h / 720) * 100}%`,
+                      zIndex: 2,
+                      pointerEvents: 'none',
+                      overflow: 'hidden',
+                      background: '#050814',
+                      boxSizing: 'border-box',
+                      border: isAudioActive
+                        ? '2px solid #10B981'
+                        : '1px solid rgba(255,255,255,0.22)'
+                    }}
+                  >
+                    {renderPreviewIframe(slot)}
+
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '5px',
+                        left: '5px',
+                        right: '5px',
+                        background: 'rgba(6, 10, 22, 0.86)',
+                        padding: '3px 6px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1px'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#00ffaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {isAudioActive ? '🔊 ' : ''}{cellAssign.title}
+                      </div>
+                      <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {hasCellMatch
+                          ? `${cellAssign.p1Name}  ${cellAssign.score1} - ${cellAssign.score2}  ${cellAssign.p2Name}`
+                          : cellAssign.subtitle}
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
 
           <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
             <span>
