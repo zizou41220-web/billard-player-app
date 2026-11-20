@@ -112,6 +112,21 @@ export function getMosaicGridRects(
   return rects;
 }
 
+export function formatTournamentStageLabel(match?: Match, tournament?: Tournament | null): string {
+  if (!match) return '';
+  if (match.poolName) return match.poolName;
+  if (match.stage === 'final') return 'Grande Finale';
+  if (match.stage === 'third_place') return 'Petite Finale';
+  if (match.stage === 'semi') return '1/2 Finale';
+  if (match.stage === 'quarter') return '1/4 Finale';
+  if (match.stage === 'round_of_16') return '1/8 Finale';
+  if (match.stage === 'round_of_32') return '1/16 Finale';
+  if (match.stage === 'round_of_64') return '1/32 Finale';
+  if (match.stage === 'qualif') return 'Qualifications';
+  if (tournament) return tournament.finalStageLaunched ? 'Phase Finale' : 'Match Tournoi';
+  return '';
+}
+
 export function resolveCameraAssignment(
   slot: DirectorCameraSlot,
   data: {
@@ -225,17 +240,59 @@ export function resolveCameraAssignment(
     };
   }
 
+  if (slot.assignmentType === 'tournament_match') {
+    let tMatch = slot.tournamentMatchId ? matches[slot.tournamentMatchId] : undefined;
+    if (tMatch && tMatch.status === 'finished' && tMatch.tableId) {
+      const nextOnSameTable = Object.values(matches).find(
+        m => m.tableId === tMatch!.tableId && m.status !== 'finished'
+      );
+      if (nextOnSameTable) {
+        tMatch = nextOnSameTable;
+      }
+    }
+    const matchTour = (tMatch?.tournamentId ? tournaments[tMatch.tournamentId] : null) || activeTournament;
+    const table = tMatch?.tableId ? tables[tMatch.tableId] : undefined;
+    const p1 = tMatch ? players[tMatch.player1Id] : undefined;
+    const p2 = tMatch ? players[tMatch.player2Id] : undefined;
+    const rulesLabel = tMatch ? (getMatchScoringRules(tMatch, matchTour, players).formatLabel || '') : '';
+    const stageLabel = formatTournamentStageLabel(tMatch, matchTour);
+    const tableLabel = table ? (table.name || `Billard ${table.number}`) : '';
+    const title = [tableLabel, matchTour?.name || 'Tournoi Appli', stageLabel].filter(Boolean).join(' • ');
+    return {
+      title,
+      subtitle: tMatch && p1 && p2 ? `${p1.name} vs ${p2.name}` : 'Match en attente',
+      table,
+      match: tMatch,
+      p1,
+      p2,
+      p1Name: p1?.name,
+      p1Club: p1?.clubName || p1?.stats?.clubName,
+      p2Name: p2?.name,
+      p2Club: p2?.clubName || p2?.stats?.clubName,
+      score1: tMatch?.score1,
+      score2: tMatch?.score2,
+      rulesLabel,
+      isMatchView: true
+    };
+  }
+
   if (slot.assignmentType === 'table') {
     const table = slot.tableId ? tables[slot.tableId] : undefined;
     const match = table?.currentMatchId
       ? matches[table.currentMatchId]
       : Object.values(matches).find(m => m.tableId === table?.id && m.status !== 'finished');
     const validMatch = match && match.status !== 'finished' ? match : undefined;
+    const matchTour = (validMatch?.tournamentId ? tournaments[validMatch.tournamentId] : null) || activeTournament;
+    const stageLabel = validMatch ? formatTournamentStageLabel(validMatch, matchTour) : '';
+    const tableTitle = table ? (table.name || `Billard ${table.number}`) : 'Billard non assigné';
+    const title = validMatch && matchTour
+      ? [tableTitle, matchTour.name, stageLabel].filter(Boolean).join(' • ')
+      : tableTitle;
     const p1 = validMatch ? players[validMatch.player1Id] : undefined;
     const p2 = validMatch ? players[validMatch.player2Id] : undefined;
-    const rulesLabel = validMatch ? (getMatchScoringRules(validMatch, activeTournament, players).formatLabel || '') : '';
+    const rulesLabel = validMatch ? (getMatchScoringRules(validMatch, matchTour, players).formatLabel || '') : '';
     return {
-      title: table ? (table.name || `Billard ${table.number}`) : 'Billard non assigné',
+      title,
       subtitle: validMatch && p1 && p2 ? `${p1.name} vs ${p2.name}` : 'En attente de match',
       table,
       match: validMatch,

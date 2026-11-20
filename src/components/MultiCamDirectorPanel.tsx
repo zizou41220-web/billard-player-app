@@ -66,6 +66,7 @@ import {
   BroadcasterStatusSnapshot,
   LiveCompositeBroadcaster,
   drawVirtualScreenToCanvas,
+  formatTournamentStageLabel,
   getMosaicGridRects,
   resolveCameraAssignment
 } from '../utils/liveBroadcaster';
@@ -96,6 +97,7 @@ interface CameraTileCardProps {
   onOpenQr: (cameraId: string) => void;
   onReconnectWebRtc: (cameraId: string) => void;
   onScoreClubMatch: (matchId: string, score1: number, score2: number) => void;
+  onFinishClubMatch: (matchId: string) => void;
   registerVideoEl: (cameraId: string, el: HTMLVideoElement | null) => void;
   canDelete: boolean;
 }
@@ -116,6 +118,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   onOpenQr,
   onReconnectWebRtc,
   onScoreClubMatch,
+  onFinishClubMatch,
   registerVideoEl,
   canDelete
 }) => {
@@ -194,8 +197,26 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
     directorState
   );
 
+  const activeTournament =
+    Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
+  const activeTournamentMatches = Object.values(matches)
+    .filter(
+      m =>
+        m.status !== 'finished' &&
+        Boolean(m.player1Id && m.player2Id) &&
+        (activeTournament ? m.tournamentId === activeTournament.id : Boolean(m.tournamentId))
+    )
+    .sort((a, b) => {
+      if (a.status === 'playing' && b.status !== 'playing') return -1;
+      if (a.status !== 'playing' && b.status === 'playing') return 1;
+      return (a.tableId ? 0 : 1) - (b.tableId ? 0 : 1);
+    });
+
   const assignmentSelectValue = (() => {
     if (slot.assignmentType === 'table') return `table:${slot.tableId || ''}`;
+    if (slot.assignmentType === 'tournament_match') {
+      return `tournament_match:${assignment.match?.id || slot.tournamentMatchId || ''}`;
+    }
     if (slot.assignmentType === 'live_match') return 'live_match';
     const title = slot.customViewTitle || CUSTOM_VIEW_PRESETS[0];
     if (CUSTOM_VIEW_PRESETS.includes(title)) return `preset:${title}`;
@@ -207,22 +228,34 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
       setEditingCustomTitle(false);
       onUpdateSlot(slot.id, {
         assignmentType: 'table' as DirectorAssignmentType,
-        tableId: val.slice('table:'.length)
+        tableId: val.slice('table:'.length),
+        tournamentMatchId: undefined
+      });
+    } else if (val.startsWith('tournament_match:')) {
+      setEditingCustomTitle(false);
+      onUpdateSlot(slot.id, {
+        assignmentType: 'tournament_match' as DirectorAssignmentType,
+        tournamentMatchId: val.slice('tournament_match:'.length)
       });
     } else if (val === 'live_match') {
       setEditingCustomTitle(false);
-      onUpdateSlot(slot.id, { assignmentType: 'live_match' });
+      onUpdateSlot(slot.id, {
+        assignmentType: 'live_match',
+        tournamentMatchId: undefined
+      });
     } else if (val.startsWith('preset:')) {
       setEditingCustomTitle(false);
       onUpdateSlot(slot.id, {
         assignmentType: 'custom_view',
-        customViewTitle: val.slice('preset:'.length)
+        customViewTitle: val.slice('preset:'.length),
+        tournamentMatchId: undefined
       });
     } else if (val === 'custom_text') {
       setEditingCustomTitle(true);
       onUpdateSlot(slot.id, {
         assignmentType: 'custom_view',
-        customViewTitle: slot.customViewTitle || 'Vue personnalisée'
+        customViewTitle: slot.customViewTitle || 'Vue personnalisée',
+        tournamentMatchId: undefined
       });
     }
   };
@@ -530,7 +563,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                 <Minus size={11} />
               </button>
               <span style={{ fontWeight: 900, color: '#FBBF24' }}>{assignment.match.score2}</span>
-              <span style={{ fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '68px' }}>
+              <span style={{ fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '64px' }}>
                 {assignment.p2Name}
               </span>
               <button
@@ -540,6 +573,24 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                 style={{ width: '22px', height: '22px', padding: 0, justifyContent: 'center', color: '#000' }}
               >
                 <Plus size={11} />
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={assignment.match.score1 === assignment.match.score2}
+                onClick={() => onFinishClubMatch(assignment.match!.id)}
+                style={{
+                  width: 'auto',
+                  height: '22px',
+                  padding: '0 6px',
+                  fontSize: '0.62rem',
+                  fontWeight: 900,
+                  borderColor: assignment.match.score1 !== assignment.match.score2 ? '#10B981' : 'rgba(255,255,255,0.16)',
+                  color: assignment.match.score1 !== assignment.match.score2 ? '#34D399' : 'rgba(255,255,255,0.4)'
+                }}
+                title={assignment.match.score1 !== assignment.match.score2 ? 'Valider la fin du match et passer au suivant' : 'Égalité : modifiez le score avant de valider'}
+              >
+                ✅ Fin
               </button>
             </div>
           </div>
@@ -551,7 +602,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               className="input-field"
               value={assignmentSelectValue}
               onChange={(e) => handleAssignmentChange(e.target.value)}
-              title="Attitrer cette caméra à un billard ou une autre vue"
+              title="Attitrer cette caméra à un billard, un match du tournoi ou une autre vue"
               style={{
                 flex: '1 1 95px',
                 fontSize: '0.7rem',
@@ -561,13 +612,40 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                 fontWeight: 800
               }}
             >
-              <optgroup label="🎱 Billards du Club">
-                {sortedTables.map(t => (
-                  <option key={t.id} value={`table:${t.id}`}>
-                    🎱 {t.name || `Billard ${t.number}`}
-                  </option>
-                ))}
+              <optgroup label="🎱 Billards du Club (Rotation auto)">
+                {sortedTables.map(t => {
+                  const tblMatch = t.currentMatchId
+                    ? matches[t.currentMatchId]
+                    : Object.values(matches).find(m => m.tableId === t.id && m.status !== 'finished');
+                  const validTblMatch = tblMatch && tblMatch.status !== 'finished' ? tblMatch : undefined;
+                  const tp1 = validTblMatch ? players[validTblMatch.player1Id]?.name : undefined;
+                  const tp2 = validTblMatch ? players[validTblMatch.player2Id]?.name : undefined;
+                  const duelLabel = validTblMatch && tp1 && tp2 ? ` • ${tp1} ${validTblMatch.score1}-${validTblMatch.score2} ${tp2}` : '';
+                  return (
+                    <option key={t.id} value={`table:${t.id}`}>
+                      🎱 {t.name || `Billard ${t.number}`}{duelLabel}
+                    </option>
+                  );
+                })}
               </optgroup>
+              {activeTournamentMatches.length > 0 && (
+                <optgroup label="🏆 Matchs du Tournoi de l'Appli">
+                  {activeTournamentMatches.map(tm => {
+                    const tmP1 = players[tm.player1Id]?.name || 'Joueur 1';
+                    const tmP2 = players[tm.player2Id]?.name || 'Joueur 2';
+                    const tmTbl = tm.tableId ? tables[tm.tableId] : undefined;
+                    const tmTour = tm.tournamentId ? tournaments[tm.tournamentId] : activeTournament;
+                    const tmStage = formatTournamentStageLabel(tm, tmTour);
+                    const tblPrefix = tmTbl ? `[${tmTbl.name || `Billard ${tmTbl.number}`}] ` : '';
+                    const stageSuffix = tmStage ? ` • ${tmStage}` : '';
+                    return (
+                      <option key={tm.id} value={`tournament_match:${tm.id}`}>
+                        🏆 {tblPrefix}{tmP1} {tm.score1}-{tm.score2} {tmP2}{stageSuffix}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              )}
               <optgroup label="🎥 Match Spécial">
                 <option value="live_match">🎥 Match Studio Live</option>
               </optgroup>
@@ -836,7 +914,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     players,
     tournaments,
     currentClub,
-    updateMatchScore
+    updateMatchScore,
+    startTournamentMatch,
+    finishMatch,
+    launchMatchOnTable
   } = useStore();
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
     loadDirectorState(currentClub.id)
@@ -857,6 +938,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [copiedCamUrl, setCopiedCamUrl] = useState<boolean>(false);
   const [showCustomRtmp, setShowCustomRtmp] = useState<boolean>(false);
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
+
+  const [pendingLaunchMatchId, setPendingLaunchMatchId] = useState<string>('');
+  const [pendingLaunchTableId, setPendingLaunchTableId] = useState<string>('');
 
   const [cueScoreData, setCueScoreData] = useState<CueScoreTournamentData | null>(null);
   const [cueScoreLoading, setCueScoreLoading] = useState<boolean>(false);
@@ -1227,8 +1311,12 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     updateDirector({ ...directorState, cameras: [...directorState.cameras, newSlot] });
   };
 
-  const handleAddStandingsScreen = () => {
-    const existing = directorState.cameras.find(c => c.sourceType === 'tournament_standings');
+  const handleAddVirtualScreen = (
+    sourceType: DirectorCameraSourceType,
+    name: string,
+    title: string
+  ) => {
+    const existing = directorState.cameras.find(c => c.sourceType === sourceType);
     if (existing) {
       if (!existing.enabled) {
         handleUpdateSlot(existing.id, { enabled: true });
@@ -1244,9 +1332,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             ? {
                 ...c,
                 enabled: true,
-                sourceType: 'tournament_standings',
-                name: 'Classement Tournoi',
-                customViewTitle: 'Classement du Tournoi'
+                sourceType,
+                name,
+                customViewTitle: title
               }
             : c
         )
@@ -1257,20 +1345,63 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       alert('Maximum 8 fenêtres simultanées dans la régie.');
       return;
     }
-    const standingsSlot: DirectorCameraSlot = {
+    const screenSlot: DirectorCameraSlot = {
       id: `scr_${Date.now().toString(36).slice(-4)}`,
-      name: 'Classement Tournoi',
+      name,
       enabled: true,
-      sourceType: 'tournament_standings',
+      sourceType,
       assignmentType: 'custom_view',
-      customViewTitle: 'Classement du Tournoi',
+      customViewTitle: title,
       customViewShowAllScores: false,
       rotation: 0,
       zoom: 1,
       fillMode: 'contain',
       forceMuted: true
     };
-    updateDirector({ ...directorState, cameras: [...directorState.cameras, standingsSlot] });
+    updateDirector({ ...directorState, cameras: [...directorState.cameras, screenSlot] });
+  };
+
+  const handleAddStandingsScreen = () => {
+    handleAddVirtualScreen('tournament_standings', 'Classement Tournoi', 'Classement du Tournoi');
+  };
+
+  const handleAssignTourMatchToCamera = (
+    cameraId: string,
+    matchId: string,
+    tableId?: string,
+    focus: boolean = false
+  ) => {
+    const nextCams = directorState.cameras.map(c => {
+      if (c.id !== cameraId) return c;
+      if (tableId) {
+        return {
+          ...c,
+          enabled: true,
+          assignmentType: 'table' as DirectorAssignmentType,
+          tableId,
+          tournamentMatchId: undefined
+        };
+      }
+      return {
+        ...c,
+        enabled: true,
+        assignmentType: 'tournament_match' as DirectorAssignmentType,
+        tournamentMatchId: matchId
+      };
+    });
+    const targetCam = nextCams.find(c => c.id === cameraId);
+    const keepMic = targetCam && isVirtualScreenSource(targetCam.sourceType);
+    updateDirector({
+      ...directorState,
+      cameras: nextCams,
+      ...(focus
+        ? {
+            broadcastMode: 'single' as const,
+            focusedCameraId: cameraId,
+            activeAudioCameraId: keepMic ? directorState.activeAudioCameraId : cameraId
+          }
+        : {})
+    });
   };
 
   const handleRemoveSlot = (cameraId: string) => {
@@ -1554,6 +1685,43 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const cueScoreMatchesTotal = rm.cueScoreMatchesCount ?? cueScoreData?.matches.length ?? 0;
   const cueScorePlayingTotal = rm.cueScorePlayingCount ?? csPlayingMatches.length;
 
+  const ongoingTournament =
+    Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
+  const latestTournament = Object.values(tournaments).slice().reverse()[0] || null;
+  const appTournament = ongoingTournament || latestTournament;
+
+  const appTourMatches = appTournament
+    ? Object.values(matches).filter(m => m.tournamentId === appTournament.id)
+    : [];
+
+  const getMatchEffectiveTable = (m: typeof appTourMatches[number]) =>
+    (m.tableId ? tables[m.tableId] : undefined) ||
+    Object.values(tables).find(t => t.currentMatchId === m.id);
+
+  const activeTableTourMatches = appTourMatches
+    .filter(m => m.status !== 'finished' && Boolean(getMatchEffectiveTable(m)))
+    .sort((a, b) => {
+      const ta = getMatchEffectiveTable(a)?.number ?? 999;
+      const tb = getMatchEffectiveTable(b)?.number ?? 999;
+      return ta - tb;
+    });
+
+  const pendingReadyTourMatches = appTourMatches.filter(
+    m =>
+      m.status === 'pending' &&
+      !getMatchEffectiveTable(m) &&
+      Boolean(m.player1Id && m.player2Id)
+  );
+  const finishedTourMatchesCount = appTourMatches.filter(m => m.status === 'finished').length;
+
+  const effectiveLaunchMatchId = pendingReadyTourMatches.some(m => m.id === pendingLaunchMatchId)
+    ? pendingLaunchMatchId
+    : (pendingReadyTourMatches[0]?.id || '');
+  const firstFreeTable = sortedTables.find(t => t.status === 'free' || !t.currentMatchId);
+  const effectiveLaunchTableId = sortedTables.some(t => t.id === pendingLaunchTableId)
+    ? pendingLaunchTableId
+    : (firstFreeTable?.id || sortedTables[0]?.id || '');
+
   return (
     <div style={{
       maxWidth: '1480px',
@@ -1604,7 +1772,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 cursor: 'pointer'
               }}
             >
-              🏠 Live au Club (Billards)
+              🏠🎱 Live Club & Tournoi Appli
             </button>
             <button
               type="button"
@@ -1801,6 +1969,301 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           </a>
         </div>
       </div>
+
+      {/* 1A. 🏆 TOURNOI DE L'APPLI EN DIRECT (PILOTAGE & DIFFUSION SANS QUITTER LE LIVE) */}
+      {directorState.situation === 'club_tables' && appTournament && (
+        <div style={{
+          background: 'rgba(8, 16, 30, 0.94)',
+          border: '1.5px solid rgba(16, 185, 129, 0.45)',
+          borderRadius: '14px',
+          padding: '0.75rem 0.95rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.65rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#34D399', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <Trophy size={15} /> Tournoi Appli : {appTournament.name}
+              </span>
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                padding: '2px 7px',
+                borderRadius: '6px',
+                background: appTournament.finalStageLaunched ? 'rgba(245, 158, 11, 0.18)' : 'rgba(16, 185, 129, 0.16)',
+                color: appTournament.finalStageLaunched ? '#FBBF24' : '#34D399',
+                border: `1px solid ${appTournament.finalStageLaunched ? 'rgba(245,158,11,0.45)' : 'rgba(16,185,129,0.4)'}`
+              }}>
+                {appTournament.finalStageLaunched
+                  ? 'Phase Finale'
+                  : appTournament.status === 'ongoing'
+                    ? 'Qualifications / En cours'
+                    : 'Terminé'}
+              </span>
+              <span style={{ fontSize: '0.71rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                {activeTableTourMatches.length} sur billard • {pendingReadyTourMatches.length} en attente • {finishedTourMatchesCount} terminé(s)
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => handleAddVirtualScreen('tournament_standings', 'Classement Tournoi', 'Classement du Tournoi')}
+                style={{ width: 'auto', padding: '3px 8px', fontSize: '0.7rem', fontWeight: 800, color: '#FBBF24', borderColor: 'rgba(245,158,11,0.45)' }}
+              >
+                + 🏆 Écran Classement
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => handleAddVirtualScreen('tournament_bracket', 'Tableau Final', 'Tableau Phases Finales')}
+                style={{ width: 'auto', padding: '3px 8px', fontSize: '0.7rem', fontWeight: 800, color: '#38BDF8', borderColor: 'rgba(56,189,248,0.45)' }}
+              >
+                + 🌳 Écran Tableau Final
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => handleAddVirtualScreen('matches_live_board', 'Scores Billards', 'Scores en Direct')}
+                style={{ width: 'auto', padding: '3px 8px', fontSize: '0.7rem', fontWeight: 800, color: '#34D399', borderColor: 'rgba(16,185,129,0.45)' }}
+              >
+                + 🎱 Écran Scores
+              </button>
+            </div>
+          </div>
+
+          {activeTableTourMatches.length > 0 && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))',
+              gap: '0.55rem'
+            }}>
+              {activeTableTourMatches.map(m => {
+                const effTable = getMatchEffectiveTable(m);
+                const p1Name = players[m.player1Id]?.name || 'Joueur 1';
+                const p2Name = players[m.player2Id]?.name || 'Joueur 2';
+                const stageLabel = formatTournamentStageLabel(m, appTournament);
+                return (
+                  <div
+                    key={m.id}
+                    style={{
+                      background: m.status === 'playing' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+                      border: `1px solid ${m.status === 'playing' ? 'rgba(16, 185, 129, 0.38)' : 'rgba(255, 255, 255, 0.14)'}`,
+                      borderRadius: '10px',
+                      padding: '0.5rem 0.65rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', fontSize: '0.68rem', fontWeight: 800 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <span style={{ background: 'rgba(245, 158, 11, 0.18)', color: '#FBBF24', padding: '1px 6px', borderRadius: '5px' }}>
+                          🎱 {effTable?.name || `Billard ${effTable?.number || ''}`}
+                        </span>
+                        {stageLabel && (
+                          <span style={{ color: '#93C5FD' }}>{stageLabel}</span>
+                        )}
+                      </div>
+                      <span style={{ color: m.status === 'playing' ? '#34D399' : '#CBD5E1' }}>
+                        {m.status === 'playing' ? '🔴 EN COURS' : '⏳ PRÊT'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px', minWidth: 0 }}>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => updateMatchScore(m.id, Math.max(0, m.score1 - 1), m.score2)}
+                          style={{ width: '24px', height: '24px', padding: 0, justifyContent: 'center' }}
+                        >
+                          <Minus size={11} />
+                        </button>
+                        <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '88px' }}>
+                          {p1Name}
+                        </span>
+                        <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#FBBF24', minWidth: '16px', textAlign: 'center' }}>
+                          {m.score1}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-neon"
+                          onClick={() => updateMatchScore(m.id, m.score1 + 1, m.score2)}
+                          style={{ width: '24px', height: '24px', padding: 0, justifyContent: 'center', color: '#000' }}
+                        >
+                          <Plus size={11} />
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px', minWidth: 0 }}>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => updateMatchScore(m.id, m.score1, Math.max(0, m.score2 - 1))}
+                          style={{ width: '24px', height: '24px', padding: 0, justifyContent: 'center' }}
+                        >
+                          <Minus size={11} />
+                        </button>
+                        <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#FBBF24', minWidth: '16px', textAlign: 'center' }}>
+                          {m.score2}
+                        </span>
+                        <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '88px' }}>
+                          {p2Name}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-neon"
+                          onClick={() => updateMatchScore(m.id, m.score1, m.score2 + 1)}
+                          style={{ width: '24px', height: '24px', padding: 0, justifyContent: 'center', color: '#000' }}
+                        >
+                          <Plus size={11} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        {m.status === 'pending' && (
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => startTournamentMatch(m.id, false)}
+                            style={{ width: 'auto', padding: '2px 7px', fontSize: '0.66rem', fontWeight: 800, color: '#00ffaa', borderColor: 'rgba(0,255,170,0.45)' }}
+                          >
+                            ▶️ Lancer
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          disabled={m.score1 === m.score2}
+                          onClick={() => finishMatch(m.id)}
+                          style={{
+                            width: 'auto',
+                            padding: '2px 7px',
+                            fontSize: '0.66rem',
+                            fontWeight: 800,
+                            borderColor: m.score1 !== m.score2 ? '#10B981' : 'rgba(255,255,255,0.16)',
+                            color: m.score1 !== m.score2 ? '#34D399' : 'rgba(255,255,255,0.4)'
+                          }}
+                          title={m.score1 !== m.score2 ? 'Valider le vainqueur et envoyer automatiquement le match suivant sur ce billard' : 'Score à égalité'}
+                        >
+                          ✅ Valider fin
+                        </button>
+                      </div>
+
+                      <select
+                        className="input-field"
+                        value=""
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) return;
+                          const [action, camId] = v.split(':');
+                          if (camId) {
+                            handleAssignTourMatchToCamera(
+                              camId,
+                              m.id,
+                              effTable?.id,
+                              action === 'focus'
+                            );
+                          }
+                        }}
+                        style={{ flex: '1 1 130px', fontSize: '0.66rem', padding: '2px 5px', background: '#0b1426', color: '#FBBF24', fontWeight: 700 }}
+                      >
+                        <option value="">📷 Diffuser sur...</option>
+                        {directorState.cameras.filter(c => !isVirtualScreenSource(c.sourceType)).map(cam => (
+                          <React.Fragment key={cam.id}>
+                            <option value={`assign:${cam.id}`}>📷 Assigner à {cam.name}</option>
+                            <option value={`focus:${cam.id}`}>📺 Plein Écran sur {cam.name}</option>
+                          </React.Fragment>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {pendingReadyTourMatches.length > 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              flexWrap: 'wrap',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '8px',
+              padding: '0.45rem 0.65rem'
+            }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#FBBF24', whiteSpace: 'nowrap' }}>
+                🎱 Lancer un match du tournoi :
+              </span>
+              <select
+                className="input-field"
+                value={effectiveLaunchMatchId}
+                onChange={(e) => setPendingLaunchMatchId(e.target.value)}
+                style={{ flex: '1 1 220px', fontSize: '0.72rem', padding: '3px 6px', background: '#0b1426', color: '#fff', fontWeight: 700 }}
+              >
+                {pendingReadyTourMatches.map(pm => {
+                  const p1N = players[pm.player1Id]?.name || 'J1';
+                  const p2N = players[pm.player2Id]?.name || 'J2';
+                  const stg = formatTournamentStageLabel(pm, appTournament);
+                  return (
+                    <option key={pm.id} value={pm.id}>
+                      {p1N} vs {p2N}{stg ? ` • ${stg}` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+              <select
+                className="input-field"
+                value={effectiveLaunchTableId}
+                onChange={(e) => setPendingLaunchTableId(e.target.value)}
+                style={{ flex: '0 1 170px', fontSize: '0.72rem', padding: '3px 6px', background: '#0b1426', color: '#FBBF24', fontWeight: 700 }}
+              >
+                {sortedTables.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.name || `Billard ${t.number}`} ({t.status === 'free' ? 'Libre' : 'Occupé'})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-neon"
+                disabled={!effectiveLaunchMatchId || !effectiveLaunchTableId}
+                onClick={() => {
+                  if (!effectiveLaunchMatchId || !effectiveLaunchTableId) return;
+                  const res = launchMatchOnTable(effectiveLaunchMatchId, effectiveLaunchTableId);
+                  if (!res.success) {
+                    alert(res.reason || 'Impossible de lancer ce match sur ce billard.');
+                    return;
+                  }
+                  const camOnTable =
+                    directorState.cameras.find(
+                      c => c.assignmentType === 'table' && c.tableId === effectiveLaunchTableId && !isVirtualScreenSource(c.sourceType)
+                    ) ||
+                    directorState.cameras.find(c => !isVirtualScreenSource(c.sourceType));
+                  if (camOnTable) {
+                    handleAssignTourMatchToCamera(
+                      camOnTable.id,
+                      effectiveLaunchMatchId,
+                      effectiveLaunchTableId,
+                      false
+                    );
+                  }
+                }}
+                style={{ width: 'auto', padding: '4px 10px', fontSize: '0.72rem', fontWeight: 900, color: '#000' }}
+              >
+                🎱 Envoyer sur le billard & Diffuser
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 1B. MODE LIVE CUESCORE (GARDE UNIQUEMENT LES INFOS CUESCORE + AJOUT OPTIONNEL) */}
       {directorState.situation === 'cuescore_live' && (
@@ -2507,6 +2970,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               onOpenQr={setQrModalCamId}
               onReconnectWebRtc={setupWebRtcForCamera}
               onScoreClubMatch={updateMatchScore}
+              onFinishClubMatch={finishMatch}
               registerVideoEl={registerVideoEl}
               canDelete={directorState.cameras.length > 2}
             />

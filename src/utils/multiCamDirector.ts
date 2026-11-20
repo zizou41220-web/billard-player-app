@@ -18,7 +18,7 @@ export function isVirtualScreenSource(sourceType: DirectorCameraSourceType): boo
     sourceType === 'club_leaderboard'
   );
 }
-export type DirectorAssignmentType = 'table' | 'live_match' | 'custom_view';
+export type DirectorAssignmentType = 'table' | 'tournament_match' | 'live_match' | 'custom_view';
 export type DirectorBroadcastMode = 'mosaic' | 'single';
 export type DirectorMosaicLayout = 'auto' | 'side_by_side' | 'stacked' | 'grid_2x2';
 export type DirectorLiveSituation = 'club_tables' | 'regional_match' | 'cuescore_live';
@@ -65,6 +65,7 @@ export interface DirectorCameraSlot {
   vdoRoom?: string;
   assignmentType: DirectorAssignmentType;
   tableId?: string;
+  tournamentMatchId?: string;
   customViewTitle?: string;
   customViewShowAllScores?: boolean;
   rotation: number; // 0 | 90 | 180 | 270
