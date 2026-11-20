@@ -315,15 +315,7 @@ const AdminView: React.FC = () => {
   const [liveStudioDurationMinutes, setLiveStudioDurationMinutes] = useState<number>(0);
   const [liveStudioHandicapP1, setLiveStudioHandicapP1] = useState<number>(0);
   const [liveStudioHandicapP2, setLiveStudioHandicapP2] = useState<number>(0);
-  const [liveStudioStreamUrl, setLiveStudioStreamUrl] = useState<string>(() => {
-    if (typeof window === 'undefined') return '';
-    try {
-      const saved = JSON.parse(localStorage.getItem(`mb_live_streams_${currentClub.id}`) || '{}');
-      return saved['live'] || '';
-    } catch {
-      return '';
-    }
-  });
+  const [liveStudioSubTab, setLiveStudioSubTab] = useState<'cameras' | 'match' | 'overlay'>('cameras');
 
   const [liveP1Mode, setLiveP1Mode] = useState<'existing' | 'new'>('existing');
   const [liveP1ExistingId, setLiveP1ExistingId] = useState<string>('');
@@ -1349,7 +1341,7 @@ const AdminView: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <main key={activeTab} className="page-transition" style={{ flex: 1, padding: activeTab === 'dashboard' ? '1rem 1.8rem' : '2.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <main key={activeTab} className="page-transition" style={{ flex: 1, padding: (activeTab === 'dashboard' || activeTab === 'live_studio') ? '1rem 1.8rem' : '2.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
         {/* ========================================================================= */}
         {/* 1. TOURNAMENT LAUNCHER TAB                                                */}
@@ -5097,16 +5089,9 @@ const AdminView: React.FC = () => {
           const studioMatch = Object.values(matches).find(
             m => m.tableId === studioChannelId && m.status !== 'finished'
           ) || null;
-          const activeStudioStreamUrl = studioMatch?.liveStreamUrl || liveStudioStreamUrl;
           const sortedPlayers = Object.values(players).slice().sort((a, b) => a.name.localeCompare(b.name));
           const selectedP1Obj = liveP1ExistingId ? players[liveP1ExistingId] : null;
           const selectedP2Obj = liveP2ExistingId ? players[liveP2ExistingId] : null;
-
-          const updateStudioStream = (newUrl?: string) => {
-            setLiveStudioStreamUrl(newUrl || '');
-            setTableLiveStream(studioChannelId, newUrl);
-            if (studioMatch) setMatchLiveStream(studioMatch.id, newUrl);
-          };
 
           const renderPlayerSelectorCard = (
             slotLabel: string,
@@ -5490,21 +5475,109 @@ const AdminView: React.FC = () => {
 
           return (
             <div style={{
-              maxWidth: '1400px',
+              maxWidth: '1440px',
               width: '100%',
               margin: '0 auto',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1.6rem',
-              paddingBottom: '2rem'
+              gap: '1rem',
+              paddingBottom: '1.5rem'
             }}>
-              <MultiCamDirectorPanel getAppBaseUrl={getAppBaseUrl} />
+              {/* Clean 3 Sub-Tabs for Match Live */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.6rem',
+                background: 'rgba(0,0,0,0.35)',
+                padding: '0.45rem 0.65rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}>
+                <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setLiveStudioSubTab('cameras')}
+                    style={{
+                      background: liveStudioSubTab === 'cameras' ? 'var(--accent-primary)' : 'transparent',
+                      color: liveStudioSubTab === 'cameras' ? '#000' : 'var(--text-muted)',
+                      fontWeight: 800,
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.84rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem'
+                    }}
+                  >
+                    🎥 Régie Multi-Caméras
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLiveStudioSubTab('match')}
+                    style={{
+                      background: liveStudioSubTab === 'match' ? 'var(--accent-primary)' : 'transparent',
+                      color: liveStudioSubTab === 'match' ? '#000' : 'var(--text-muted)',
+                      fontWeight: 800,
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.84rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem'
+                    }}
+                  >
+                    🎱 Duel & Score Live
+                    {studioMatch && (
+                      <span style={{
+                        background: liveStudioSubTab === 'match' ? '#000' : '#ff2244',
+                        color: liveStudioSubTab === 'match' ? 'var(--accent-primary)' : '#fff',
+                        fontSize: '0.68rem',
+                        padding: '1px 6px',
+                        borderRadius: '999px',
+                        fontWeight: 900
+                      }}>
+                        {studioMatch.score1}-{studioMatch.score2}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLiveStudioSubTab('overlay')}
+                    style={{
+                      background: liveStudioSubTab === 'overlay' ? 'var(--accent-primary)' : 'transparent',
+                      color: liveStudioSubTab === 'overlay' ? '#000' : 'var(--text-muted)',
+                      fontWeight: 800,
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.84rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem'
+                    }}
+                  >
+                    🎨 Habillage TV (Logos & Textes)
+                  </button>
+                </div>
+              </div>
 
+              {liveStudioSubTab === 'cameras' && (
+                <MultiCamDirectorPanel getAppBaseUrl={getAppBaseUrl} />
+              )}
+
+              {liveStudioSubTab === 'match' && (
               <div style={{
                 width: '100%',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
-                gap: '1.8rem',
+                gap: '1.6rem',
                 alignItems: 'start'
               }}>
               {/* LEFT COLUMN: CONFIGURE & LAUNCH LIVE MATCH */}
@@ -5780,7 +5853,7 @@ const AdminView: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
                   <div>
                     <h3 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--accent-primary)' }}>
-                      🎥 Match en Direct — Score & Diffusion
+                      🎯 Score du Match Live en Direct
                     </h3>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       {studioMatch ? 'Match en direct actif' : 'Aucun match en cours (lancez-en un à gauche)'}
@@ -6002,543 +6075,47 @@ const AdminView: React.FC = () => {
                   );
                 })() : null}
 
-                {/* CUSTOM OVERLAY EDITOR: IMAGES (ANY FORMAT/POSITION) & FREE TEXT INFO */}
-                <LiveOverlayEditorPanel
-                  clubId={currentClub.id}
-                  channelId={studioChannelId}
-                  player1Name={
-                    studioMatch
-                      ? (players[studioMatch.player1Id]?.name || 'Joueur 1')
-                      : (liveP1Mode === 'existing' ? (selectedP1Obj?.name || 'Joueur 1') : (liveP1Name.trim() || 'Joueur 1'))
-                  }
-                  player2Name={
-                    studioMatch
-                      ? (players[studioMatch.player2Id]?.name || 'Joueur 2')
-                      : (liveP2Mode === 'existing' ? (selectedP2Obj?.name || 'Joueur 2') : (liveP2Name.trim() || 'Joueur 2'))
-                  }
-                  score1={studioMatch ? studioMatch.score1 : liveStudioHandicapP1}
-                  score2={studioMatch ? studioMatch.score2 : liveStudioHandicapP2}
-                  overlayPos={overlayPos}
-                  onChangeOverlayPos={setOverlayPos}
-                />
-
-                {/* FULL LIVE & STREAMING HUB */}
-                <div style={{
-                  background: 'rgba(5, 12, 28, 0.94)',
-                  border: '1px solid rgba(0, 255, 170, 0.35)',
-                  borderRadius: '16px',
-                  padding: '1.2rem',
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  boxShadow: '0 8px 30px rgba(0,0,0,0.6)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 900, color: 'var(--accent-primary)', fontSize: '1.05rem' }}>
-                      <Radio size={20} style={{ color: '#ff2244', animation: 'pulse 1.5s infinite' }} /> Régie Live & Streaming
-                    </div>
-                    {Boolean(activeStudioStreamUrl) ? (
-                      <span style={{ fontSize: '0.72rem', background: '#ff2244', color: '#fff', padding: '3px 10px', borderRadius: '12px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />
-                        DIRECT CONNECTÉ
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', padding: '3px 10px', borderRadius: '12px' }}>
-                        En attente de diffusion
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Active Stream Banner */}
-                  {Boolean(activeStudioStreamUrl) && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '0.5rem',
-                      background: 'rgba(255, 34, 68, 0.14)',
-                      border: '1px solid rgba(255, 34, 68, 0.45)',
-                      padding: '0.55rem 0.8rem',
-                      borderRadius: '10px',
-                      flexWrap: 'wrap'
-                    }}>
-                      <span style={{ fontSize: '0.78rem', color: '#ff8a96', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        🔴 Diffusion active sur ce flux
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <a
-                          href={resolveStreamHref(activeStudioStreamUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-neon"
-                          style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
-                        >
-                          <ExternalLink size={13} /> 👁️ Voir le Direct
-                        </a>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', color: '#ff6b81', borderColor: 'rgba(255,107,129,0.4)', whiteSpace: 'nowrap' }}
-                          onClick={() => updateStudioStream(undefined)}
-                        >
-                          ⏹ Couper le direct
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* PROMPT: QUESTION DU SUPPORT DE DIFFUSION */}
+                {!studioMatch && (
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(0, 255, 170, 0.25)',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px dashed rgba(255,255,255,0.16)',
                     borderRadius: '12px',
-                    padding: '0.75rem 0.9rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.3rem'
+                    padding: '2rem 1.2rem',
+                    textAlign: 'center',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.88rem',
+                    lineHeight: '1.5'
                   }}>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>🎯</span> Sur quel support souhaitez-vous diffuser votre direct ?
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                      Choisissez ci-dessous votre support pour afficher la solution la plus simple :
-                    </div>
+                    Aucun duel hors-tournoi en cours.<br />
+                    Sélectionnez les 2 joueurs à gauche puis cliquez sur <b style={{ color: 'var(--accent-primary)' }}>Lancer le Match Live</b>.
                   </div>
+                )}
+              </div>
+              </div>
+              )}
 
-                  {/* 4 BOUTONS DE CHOIX DU SUPPORT */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.45rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => setLiveStreamTab('obs')}
-                      style={{
-                        padding: '0.6rem 0.5rem',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        borderRadius: '10px',
-                        border: liveStreamTab === 'obs' ? '2px solid #a855f7' : '1px solid rgba(168, 85, 247, 0.35)',
-                        cursor: 'pointer',
-                        background: liveStreamTab === 'obs' ? '#9333ea' : 'rgba(168, 85, 247, 0.1)',
-                        color: '#fff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease',
-                        boxShadow: liveStreamTab === 'obs' ? '0 0 16px rgba(147, 51, 234, 0.5)' : 'none'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Tv size={16} /> OBS STUDIO
-                      </div>
-                      <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>PC & Régie</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setLiveStreamTab('phone')}
-                      style={{
-                        padding: '0.6rem 0.5rem',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        borderRadius: '10px',
-                        border: liveStreamTab === 'phone' ? '2px solid var(--accent-primary)' : '1px solid rgba(0, 255, 170, 0.35)',
-                        cursor: 'pointer',
-                        background: liveStreamTab === 'phone' ? 'var(--accent-primary)' : 'rgba(0, 255, 170, 0.1)',
-                        color: liveStreamTab === 'phone' ? '#000' : 'var(--accent-primary)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease',
-                        boxShadow: liveStreamTab === 'phone' ? '0 0 16px rgba(0, 255, 170, 0.4)' : 'none'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Smartphone size={16} /> SMARTPHONE
-                      </div>
-                      <span style={{ fontSize: '0.68rem', opacity: 0.85, fontWeight: 600 }}>Caméra sans fil</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setLiveStreamTab('youtube')}
-                      style={{
-                        padding: '0.6rem 0.5rem',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        borderRadius: '10px',
-                        border: liveStreamTab === 'youtube' ? '2px solid #ff3344' : '1px solid rgba(255, 51, 68, 0.35)',
-                        cursor: 'pointer',
-                        background: liveStreamTab === 'youtube' ? '#ff0033' : 'rgba(255, 0, 51, 0.1)',
-                        color: '#fff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease',
-                        boxShadow: liveStreamTab === 'youtube' ? '0 0 16px rgba(255, 0, 51, 0.5)' : 'none'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Youtube size={16} /> YOUTUBE
-                      </div>
-                      <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>Chaîne club</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setLiveStreamTab('facebook')}
-                      style={{
-                        padding: '0.6rem 0.5rem',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        borderRadius: '10px',
-                        border: liveStreamTab === 'facebook' ? '2px solid #3b82f6' : '1px solid rgba(24, 119, 242, 0.35)',
-                        cursor: 'pointer',
-                        background: liveStreamTab === 'facebook' ? '#1877f2' : 'rgba(24, 119, 242, 0.1)',
-                        color: '#fff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease',
-                        boxShadow: liveStreamTab === 'facebook' ? '0 0 16px rgba(24, 119, 242, 0.5)' : 'none'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Facebook size={16} /> FACEBOOK
-                      </div>
-                      <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>Page ou Groupe</span>
-                    </button>
-                  </div>
-
-                  {/* 1. OBS STUDIO PANEL */}
-                  {liveStreamTab === 'obs' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                      <div style={{ background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.35)', borderRadius: '12px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.86rem', color: '#c084fc', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Tv size={16} /> Incrustation dynamique OBS Studio (PC)
-                        </div>
-                        <p style={{ fontSize: '0.78rem', color: '#e9d5ff', margin: 0, lineHeight: '1.45' }}>
-                          Affichez le bandeau TV du score avec les photos des joueurs et logos des clubs par-dessus votre caméra sur fond transparent.
-                        </p>
-
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '8px' }}>
-                          <span>Position du bandeau sur l'écran :</span>
-                          <div style={{ display: 'flex', gap: '0.35rem' }}>
-                            <button
-                              type="button"
-                              className="btn btn-outline"
-                              style={{ width: 'auto', fontSize: '0.72rem', padding: '2px 9px', background: overlayPos === 'top' ? 'rgba(168, 85, 247, 0.3)' : 'transparent', borderColor: overlayPos === 'top' ? '#c084fc' : 'rgba(255,255,255,0.15)', color: '#fff' }}
-                              onClick={() => setOverlayPos('top')}
-                            >
-                              ⬆ Haut
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-outline"
-                              style={{ width: 'auto', fontSize: '0.72rem', padding: '2px 9px', background: overlayPos === 'bottom' ? 'rgba(168, 85, 247, 0.3)' : 'transparent', borderColor: overlayPos === 'bottom' ? '#c084fc' : 'rgba(255,255,255,0.15)', color: '#fff' }}
-                              onClick={() => setOverlayPos('bottom')}
-                            >
-                              ⬇ Bas
-                            </button>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            style={{ flex: 1, minWidth: '200px', fontSize: '0.78rem', padding: '0.55rem 0.8rem', justifyContent: 'center', background: 'rgba(168, 85, 247, 0.15)', borderColor: '#9333ea', color: '#fff', fontWeight: 700 }}
-                            onClick={() => {
-                              const baseUrl = getAppBaseUrl();
-                              const overlayUrl = `${baseUrl}/?overlay=${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`;
-                              navigator.clipboard.writeText(overlayUrl);
-                              setCopiedOverlay(true);
-                              setTimeout(() => setCopiedOverlay(false), 2500);
-                            }}
-                          >
-                            {copiedOverlay ? '✓ URL OBS copiée dans le presse-papiers !' : '📋 Copier l\'URL Overlay OBS'}
-                          </button>
-                          <a
-                            href={`${getAppBaseUrl()}/?overlay=${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-outline"
-                            style={{ width: 'auto', fontSize: '0.78rem', padding: '0.55rem 0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}
-                          >
-                            <ExternalLink size={13} /> Tester Score
-                          </a>
-                        </div>
-
-                        <div style={{ fontSize: '0.73rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.4', background: 'rgba(255,255,255,0.03)', padding: '6px 8px', borderRadius: '6px' }}>
-                          💡 <b>Configuration OBS :</b> Sources &gt; <b>+</b> &gt; <b>Navigateur (Browser)</b> &gt; Coller l'URL &gt; Largeur: <b>1920</b>, Hauteur: <b>1080</b>.
-                        </div>
-                      </div>
-
-                      {/* Option Caméra USB locale */}
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.7rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.78rem', color: '#fff' }}>
-                          📺 TV du Club — Plein écran Caméra USB + Score
-                        </div>
-                        <a
-                          href={`${getAppBaseUrl()}/?overlay=${studioChannelId}&broadcast=1&pos=${overlayPos}&club=${currentClub.id}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-outline"
-                          style={{ fontSize: '0.76rem', padding: '0.45rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                        >
-                          <ExternalLink size={13} /> Ouvrir la caméra USB locale + Score en plein écran
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 2. SMARTPHONE PANEL */}
-                  {liveStreamTab === 'phone' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'center', textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.45', textAlign: 'left', width: '100%', background: 'rgba(0, 255, 170, 0.05)', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(0, 255, 170, 0.2)' }}>
-                        <div><b style={{ color: 'var(--accent-primary)' }}>Étape 1 :</b> Posez un smartphone face au billard et flashez ce QR Code (il ouvre la caméra sans rien installer).</div>
-                        <div style={{ marginTop: '5px' }}><b style={{ color: 'var(--accent-primary)' }}>Étape 2 :</b> Cliquez sur le bouton ci-dessous pour diffuser la vidéo + le score en direct dans l'application !</div>
-                      </div>
-
-                      <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'inline-block' }}>
-                        <QRCode value={`https://vdo.ninja/?push=MCB_${currentClub.id}_${studioChannelId}&webcam&facingmode=environment`} size={130} />
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn btn-neon"
-                        style={{ width: '100%', fontSize: '0.84rem', padding: '0.65rem', justifyContent: 'center', fontWeight: 800 }}
-                        onClick={() => {
-                          const baseUrl = getAppBaseUrl();
-                          const liveViewerUrl = `${baseUrl}/?overlay=${studioChannelId}&vdo=MCB_${currentClub.id}_${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`;
-                          updateStudioStream(liveViewerUrl);
-                        }}
-                      >
-                        🔴 Activer le Direct Smartphone (Vidéo + Score TV)
-                      </button>
-                    </div>
-                  )}
-
-                  {/* 3. YOUTUBE LIVE PANEL */}
-                  {liveStreamTab === 'youtube' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                      <div style={{ background: 'rgba(255, 0, 51, 0.08)', border: '1px solid rgba(255, 0, 51, 0.35)', borderRadius: '12px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.86rem', color: '#ff6b81', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Youtube size={16} /> Diffuser en Live sur YouTube
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#ffe4e6', lineHeight: '1.45' }}>
-                          <b>Pour afficher le score en direct sur YouTube :</b>
-                          <ul style={{ margin: '4px 0 0 1.1rem', padding: 0 }}>
-                            <li><b>Sur PC avec OBS :</b> Dans OBS &gt; Paramètres &gt; Stream &gt; YouTube, et ajoutez une source Navigateur avec l'URL ci-dessous.</li>
-                            <li><b>Sur Smartphone avec Prism :</b> Dans l'application Prism Live Studio, liez votre compte YouTube et ajoutez l'URL ci-dessous comme Widget Web.</li>
-                          </ul>
-                        </div>
-
-                        <div style={{ fontSize: '0.73rem', color: '#ffb3ba', lineHeight: '1.4', background: 'rgba(255, 0, 51, 0.08)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255, 0, 51, 0.25)' }}>
-                          ⚠️ <b>Important sur YouTube :</b> Tous les formats de liens sont acceptés (<code>youtube.com/watch?v=...</code>, <code>youtu.be/...</code>, <code>youtube.com/live/...</code>). Dans YouTube Studio &gt; Paramètres du flux, veillez à ce que <b>« Autoriser l'intégration »</b> soit activé.
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            style={{ flex: 1, minWidth: '200px', fontSize: '0.78rem', padding: '0.55rem 0.8rem', justifyContent: 'center', background: 'rgba(255, 0, 51, 0.15)', borderColor: '#ff0033', color: '#fff', fontWeight: 700 }}
-                            onClick={() => {
-                              const baseUrl = getAppBaseUrl();
-                              const overlayUrl = `${baseUrl}/?overlay=${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`;
-                              navigator.clipboard.writeText(overlayUrl);
-                              setCopiedOverlay(true);
-                              setTimeout(() => setCopiedOverlay(false), 2500);
-                            }}
-                          >
-                            {copiedOverlay ? '✓ URL Incrustation Copiée !' : '📋 Copier l\'URL d\'incrustation Score YouTube'}
-                          </button>
-                          <a
-                            href={`${getAppBaseUrl()}/?overlay=${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-outline"
-                            style={{ width: 'auto', fontSize: '0.78rem', padding: '0.55rem 0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}
-                          >
-                            <ExternalLink size={13} /> Tester Score
-                          </a>
-                        </div>
-                      </div>
-
-                      {/* Relayer le lien YouTube dans MonClubBillard */}
-                      <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          👁️ Afficher la vidéo YouTube dans l'application pour les spectateurs
-                        </div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                          Collez l'URL de votre Live YouTube ci-dessous pour que les adhérents puissent le regarder directement dans MonClubBillard :
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          <input
-                            type="url"
-                            className="input-field"
-                            placeholder=" https://youtube.com/live/... ou https://www.youtube.com/watch?v=..."
-                            defaultValue={(() => {
-                              const raw = activeStudioStreamUrl || '';
-                              const qIdx = raw.indexOf('?');
-                              if (qIdx !== -1 && raw.includes('overlay=')) {
-                                const v = new URLSearchParams(raw.slice(qIdx)).get('video');
-                                return v || '';
-                              }
-                              return raw;
-                            })()}
-                            id="studio-stream-input-live"
-                            style={{
-                              width: '100%',
-                              fontSize: '0.82rem',
-                              padding: '0.6rem 0.85rem',
-                              background: 'rgba(255, 255, 255, 0.08)',
-                              border: '1px solid rgba(255, 0, 51, 0.5)',
-                              color: '#fff',
-                              borderRadius: '8px'
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-neon"
-                            style={{ width: '100%', fontSize: '0.82rem', padding: '0.6rem 1rem', fontWeight: 800, background: '#ff0033', borderColor: '#ff0033', color: '#fff' }}
-                            onClick={() => {
-                              const input = document.getElementById('studio-stream-input-live') as HTMLInputElement;
-                              const trimmed = input?.value.trim() || '';
-                              if (!trimmed) {
-                                updateStudioStream(undefined);
-                                return;
-                              }
-                              const wrappedUrl = trimmed.includes('?overlay=')
-                                ? trimmed
-                                : `${getAppBaseUrl()}/?overlay=${studioChannelId}&video=${encodeURIComponent(trimmed)}&pos=${overlayPos}&club=${currentClub.id}`;
-                              updateStudioStream(wrappedUrl);
-                            }}
-                          >
-                            🔴 Diffuser ce Live YouTube dans l'application
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 4. FACEBOOK LIVE PANEL */}
-                  {liveStreamTab === 'facebook' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                      <div style={{ background: 'rgba(24, 119, 242, 0.08)', border: '1px solid rgba(24, 119, 242, 0.35)', borderRadius: '12px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Facebook size={16} /> Comment diffuser en direct sur Facebook avec le score ?
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#dbeafe', lineHeight: '1.5' }}>
-                          <b style={{ color: '#fff' }}>📱 Option A — Sur Smartphone avec l'application gratuite PRISM Live (Le plus simple) :</b>
-                          <ol style={{ margin: '4px 0 6px 1.1rem', padding: 0 }}>
-                            <li>Installez <b>PRISM Live Studio</b> (gratuit sur iOS et Android) sur le téléphone filmant le billard.</li>
-                            <li>Dans Prism, choisissez la destination <b>Facebook</b> et connectez la page ou le groupe de votre club.</li>
-                            <li>Appuyez sur <b>Widget Web</b> (source Web) et collez l'URL d'incrustation ci-dessous.</li>
-                            <li>Lancez le direct ! Le bandeau TV du score s'affichera automatiquement sur votre vidéo Facebook.</li>
-                          </ol>
-
-                          <b style={{ color: '#fff' }}>💻 Option B — Sur PC avec OBS Studio :</b>
-                          <ul style={{ margin: '4px 0 0 1.1rem', padding: 0 }}>
-                            <li>Dans OBS, ajoutez une source <b>Navigateur</b> avec l'URL d'incrustation ci-dessous (1920x1080).</li>
-                            <li>Allez dans Paramètres OBS &gt; Stream &gt; <b>Facebook Live</b> et collez votre clé de stream.</li>
-                          </ul>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            style={{ flex: 1, minWidth: '200px', fontSize: '0.78rem', padding: '0.55rem 0.8rem', justifyContent: 'center', background: 'rgba(24, 119, 242, 0.15)', borderColor: '#1877f2', color: '#fff', fontWeight: 700 }}
-                            onClick={() => {
-                              const baseUrl = getAppBaseUrl();
-                              const overlayUrl = `${baseUrl}/?overlay=${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`;
-                              navigator.clipboard.writeText(overlayUrl);
-                              setCopiedOverlay(true);
-                              setTimeout(() => setCopiedOverlay(false), 2500);
-                            }}
-                          >
-                            {copiedOverlay ? '✓ URL Incrustation Copiée !' : '📋 Copier l\'URL d\'incrustation Score Facebook'}
-                          </button>
-                          <a
-                            href={`${getAppBaseUrl()}/?overlay=${studioChannelId}&pos=${overlayPos}&club=${currentClub.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-outline"
-                            style={{ width: 'auto', fontSize: '0.78rem', padding: '0.55rem 0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}
-                          >
-                            <ExternalLink size={13} /> Tester Score
-                          </a>
-                        </div>
-                      </div>
-
-                      {/* Relayer le lien Facebook dans MonClubBillard */}
-                      <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          👁️ Afficher la vidéo Facebook dans l'application pour les adhérents
-                        </div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                          Une fois votre live Facebook lancé, collez son lien ci-dessous pour que tout le monde puisse le voir dans l'application MonClubBillard :
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          <input
-                            type="url"
-                            className="input-field"
-                            placeholder=" https://www.facebook.com/.../videos/... ou https://fb.watch/..."
-                            defaultValue={(() => {
-                              const raw = activeStudioStreamUrl || '';
-                              const qIdx = raw.indexOf('?');
-                              if (qIdx !== -1 && raw.includes('overlay=')) {
-                                const v = new URLSearchParams(raw.slice(qIdx)).get('video');
-                                return v || '';
-                              }
-                              return raw;
-                            })()}
-                            id="studio-stream-input-live-fb"
-                            style={{
-                              width: '100%',
-                              fontSize: '0.82rem',
-                              padding: '0.6rem 0.85rem',
-                              background: 'rgba(255, 255, 255, 0.08)',
-                              border: '1px solid rgba(24, 119, 242, 0.5)',
-                              color: '#fff',
-                              borderRadius: '8px'
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-neon"
-                            style={{ width: '100%', fontSize: '0.82rem', padding: '0.6rem 1rem', fontWeight: 800, background: '#1877f2', borderColor: '#1877f2', color: '#fff' }}
-                            onClick={() => {
-                              const input = document.getElementById('studio-stream-input-live-fb') as HTMLInputElement;
-                              const trimmed = input?.value.trim() || '';
-                              if (!trimmed) {
-                                updateStudioStream(undefined);
-                                return;
-                              }
-                              const wrappedUrl = trimmed.includes('?overlay=')
-                                ? trimmed
-                                : `${getAppBaseUrl()}/?overlay=${studioChannelId}&video=${encodeURIComponent(trimmed)}&pos=${overlayPos}&club=${currentClub.id}`;
-                              updateStudioStream(wrappedUrl);
-                            }}
-                          >
-                            🔵 Diffuser ce Live Facebook dans l'application
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+              {liveStudioSubTab === 'overlay' && (
+                <div style={{ maxWidth: '920px', width: '100%', margin: '0 auto' }}>
+                  <LiveOverlayEditorPanel
+                    clubId={currentClub.id}
+                    channelId={studioChannelId}
+                    player1Name={
+                      studioMatch
+                        ? (players[studioMatch.player1Id]?.name || 'Joueur 1')
+                        : (liveP1Mode === 'existing' ? (selectedP1Obj?.name || 'Joueur 1') : (liveP1Name.trim() || 'Joueur 1'))
+                    }
+                    player2Name={
+                      studioMatch
+                        ? (players[studioMatch.player2Id]?.name || 'Joueur 2')
+                        : (liveP2Mode === 'existing' ? (selectedP2Obj?.name || 'Joueur 2') : (liveP2Name.trim() || 'Joueur 2'))
+                    }
+                    score1={studioMatch ? studioMatch.score1 : liveStudioHandicapP1}
+                    score2={studioMatch ? studioMatch.score2 : liveStudioHandicapP2}
+                    overlayPos={overlayPos}
+                    onChangeOverlayPos={setOverlayPos}
+                  />
                 </div>
-              </div>
-              </div>
+              )}
             </div>
           );
         })()}
