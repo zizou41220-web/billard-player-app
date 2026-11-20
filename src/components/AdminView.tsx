@@ -35,11 +35,7 @@ import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScorin
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
 import { getPlayerAvatar, isCustomPlayerPhoto } from '../utils/avatar';
 
-interface AdminViewProps {
-  onOpenKiosk?: () => void;
-}
-
-const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
+const AdminView: React.FC = () => {
   const {
     tournaments, matches, players, tables, currentClub, setClub,
     createTournament, addPlayer, updatePlayer, deletePlayer,
@@ -1091,27 +1087,6 @@ const AdminView: React.FC<AdminViewProps> = ({ onOpenKiosk }) => {
             {theme === 'light' ? <Sun size={16} /> : <Moon size={16} />}
             {theme === 'light' ? 'Mode Clair ☀️' : 'Mode Sombre 🌙'}
           </button>
-
-          {onOpenKiosk && (
-            <button
-              className="btn btn-outline"
-              onClick={onOpenKiosk}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                fontWeight: 700,
-                padding: '0.55rem 0.95rem',
-                fontSize: '0.84rem',
-                color: '#34D399',
-                borderColor: 'rgba(52, 211, 153, 0.45)',
-                background: 'rgba(16, 185, 129, 0.12)'
-              }}
-              title="Lancer le mode plein écran pour le grand écran TV du club"
-            >
-              <Tv size={16} /> Mode Kiosque TV
-            </button>
-          )}
 
           <button
             className="btn btn-outline"

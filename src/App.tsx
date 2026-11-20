@@ -6,11 +6,10 @@ import ProfileView from './components/ProfileView';
 import FeedView from './components/FeedView';
 import AdminView from './components/AdminView';
 import StreamOverlayView from './components/StreamOverlayView';
-import KioskView from './components/KioskView';
 import LiveBracketWall from './components/LiveBracketWall';
 import SmartphoneCameraSenderView from './components/SmartphoneCameraSenderView';
 import { NeonBackdrop, NeonToggleButton } from './components/NeonBackdrop';
-import { QrCode, User, Activity, Settings, Tv, Sun, Moon } from 'lucide-react';
+import { QrCode, User, Activity, Settings, Sun, Moon } from 'lucide-react';
 import { initSync } from './sync';
 import { APP_VERSION } from './version';
 import { useTheme } from './utils/theme';
@@ -21,15 +20,13 @@ function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const cameraParam = urlParams.get('camera');
   const overlayTableParam = urlParams.get('overlay') || urlParams.get('stream');
-  const kioskParam = urlParams.get('kiosk') || urlParams.get('tv');
   const bracketParam = urlParams.get('bracket');
   const matchParam = urlParams.get('match');
   const tableParam = urlParams.get('table');
   const clubParam = urlParams.get('club');
 
   const isDesktop = window.innerWidth > 768;
-  const [appMode, setAppMode] = useState<'player' | 'admin' | 'kiosk'>(() => {
-    if (kioskParam) return 'kiosk';
+  const [appMode, setAppMode] = useState<'player' | 'admin'>(() => {
     if (matchParam || tableParam) return 'player';
     return isDesktop ? 'admin' : 'player';
   });
@@ -112,21 +109,12 @@ function App() {
     );
   }
 
-  if (appMode === 'kiosk') {
-    return (
-      <>
-        <NeonBackdrop />
-        <KioskView onExit={() => setAppMode(isDesktop ? 'admin' : 'player')} />
-      </>
-    );
-  }
-
   if (appMode === 'admin') {
     return (
       <>
         <NeonBackdrop />
         <div style={{ position: 'relative', width: '100vw', height: '100dvh' }}>
-          <AdminView onOpenKiosk={() => setAppMode('kiosk')} />
+          <AdminView />
         </div>
       </>
     );
@@ -177,13 +165,6 @@ function App() {
           }}>
             {APP_VERSION}
           </span>
-          <button 
-            onClick={() => setAppMode('kiosk')}
-            className="btn btn-outline"
-            style={{ background: 'rgba(4, 24, 21, 0.9)', color: '#34D399', borderColor: 'rgba(52, 211, 153, 0.45)', padding: '0.55rem 1rem', fontSize: '0.84rem' }}
-          >
-            <Tv size={17} /> Mode Kiosque TV
-          </button>
           <NeonToggleButton />
           <button 
             onClick={() => setAppMode('admin')}
