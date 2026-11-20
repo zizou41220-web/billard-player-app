@@ -159,6 +159,54 @@ export function resolveCameraAssignment(
     };
   }
 
+  if (directorState?.situation === 'cuescore_live') {
+    const rm = directorState.regionalMatch;
+    const baseTitle = rm.cueScoreTournamentName?.trim() || 'Live CueScore';
+    const customSub = rm.cueScoreCustomSubtitle?.trim() || '';
+    if (
+      rm.cueScoreHasActiveMatch &&
+      (rm.cueScoreCustomP1Name?.trim() || rm.cueScoreCustomP2Name?.trim())
+    ) {
+      const p1Name = rm.cueScoreCustomP1Name?.trim() || 'Joueur 1';
+      const p2Name = rm.cueScoreCustomP2Name?.trim() || 'Joueur 2';
+      const target = rm.cueScoreCustomTargetSets ?? 0;
+      return {
+        title: customSub ? `${baseTitle} • ${customSub}` : baseTitle,
+        subtitle: `${p1Name} vs ${p2Name}`,
+        p1Name,
+        p1Club: rm.cueScoreCustomP1Club?.trim() || undefined,
+        p2Name,
+        p2Club: rm.cueScoreCustomP2Club?.trim() || undefined,
+        score1: rm.cueScoreCustomScore1 ?? 0,
+        score2: rm.cueScoreCustomScore2 ?? 0,
+        rulesLabel: target > 0 ? `1er à ${target}` : '',
+        isMatchView: true
+      };
+    }
+
+    const infoParts: string[] = [];
+    if (customSub) {
+      infoParts.push(customSub);
+    } else {
+      if (rm.cueScoreVenueName?.trim()) {
+        infoParts.push(rm.cueScoreVenueName.trim());
+      }
+      if ((rm.cueScorePlayersCount ?? 0) > 0) {
+        infoParts.push(`${rm.cueScorePlayersCount} joueur(s) inscrit(s)`);
+      }
+      if ((rm.cueScoreMatchesCount ?? 0) > 0 && (rm.cueScorePlayingCount ?? 0) === 0) {
+        infoParts.push(`${rm.cueScoreMatchesCount} matchs programmés`);
+      }
+    }
+
+    return {
+      title: baseTitle,
+      subtitle: infoParts.length > 0 ? infoParts.join(' • ') : 'Direct CueScore',
+      rulesLabel: '',
+      isMatchView: false
+    };
+  }
+
   if (directorState?.situation === 'regional_match') {
     const rm = directorState.regionalMatch;
     const p1Name = rm.player1Name.trim() || 'Joueur 1';
@@ -1095,7 +1143,13 @@ export class LiveCompositeBroadcaster {
       ctx.fillStyle = '#FBBF24';
       ctx.font = '900 16px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`${currentClub.name} • ÉCRAN MULTIPLE`, 118, 22);
+      const mosaicHeaderTitle =
+        directorState.situation === 'cuescore_live'
+          ? (directorState.regionalMatch.cueScoreTournamentName?.trim() || 'LIVE CUESCORE')
+          : directorState.situation === 'regional_match'
+            ? (directorState.regionalMatch.eventTitle?.trim() || 'TOURNOI RÉGIONAL')
+            : currentClub.name;
+      ctx.fillText(`${mosaicHeaderTitle} • ÉCRAN MULTIPLE`, 118, 22);
 
       const list = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
       const rects = getMosaicGridRects(list.length, directorState.mosaicLayout, W, H);

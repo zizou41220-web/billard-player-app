@@ -684,7 +684,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
             />
           </div>
           <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#F59E0B' }}>
-            📺 ÉCRAN MULTIPLE LIVE • {directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
+            📺 ÉCRAN MULTIPLE LIVE • {directorState.situation === 'cuescore_live' ? (directorState.regionalMatch.cueScoreTournamentName || 'Live CueScore') : directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
           </span>
           {directorState.situation === 'club_tables' && activeTournament && (
             <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>

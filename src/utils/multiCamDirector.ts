@@ -21,7 +21,7 @@ export function isVirtualScreenSource(sourceType: DirectorCameraSourceType): boo
 export type DirectorAssignmentType = 'table' | 'live_match' | 'custom_view';
 export type DirectorBroadcastMode = 'mosaic' | 'single';
 export type DirectorMosaicLayout = 'auto' | 'side_by_side' | 'stacked' | 'grid_2x2';
-export type DirectorLiveSituation = 'club_tables' | 'regional_match';
+export type DirectorLiveSituation = 'club_tables' | 'regional_match' | 'cuescore_live';
 
 export interface RegionalMatchConfig {
   eventTitle: string;
@@ -35,10 +35,24 @@ export interface RegionalMatchConfig {
   cueScoreInput?: string;
   cueScoreTournamentId?: string;
   cueScoreTournamentName?: string;
+  cueScoreVenueName?: string;
+  cueScorePlayersCount?: number;
+  cueScoreMatchesCount?: number;
+  cueScorePlayingCount?: number;
   cueScoreMatchId?: string;
   cueScoreTableFilter?: string;
   cueScoreAutoSync?: boolean;
   cueScoreLastSyncAt?: number;
+  cueScoreHasActiveMatch?: boolean;
+  cueScoreShowCustomPrompt?: boolean;
+  cueScoreCustomSubtitle?: string;
+  cueScoreCustomP1Name?: string;
+  cueScoreCustomP1Club?: string;
+  cueScoreCustomP2Name?: string;
+  cueScoreCustomP2Club?: string;
+  cueScoreCustomScore1?: number;
+  cueScoreCustomScore2?: number;
+  cueScoreCustomTargetSets?: number;
 }
 
 export interface DirectorCameraSlot {
@@ -97,10 +111,24 @@ export const DEFAULT_REGIONAL_MATCH: RegionalMatchConfig = {
   cueScoreInput: '',
   cueScoreTournamentId: '',
   cueScoreTournamentName: '',
+  cueScoreVenueName: '',
+  cueScorePlayersCount: 0,
+  cueScoreMatchesCount: 0,
+  cueScorePlayingCount: 0,
   cueScoreMatchId: '',
   cueScoreTableFilter: '',
   cueScoreAutoSync: false,
-  cueScoreLastSyncAt: 0
+  cueScoreLastSyncAt: 0,
+  cueScoreHasActiveMatch: false,
+  cueScoreShowCustomPrompt: false,
+  cueScoreCustomSubtitle: '',
+  cueScoreCustomP1Name: '',
+  cueScoreCustomP1Club: '',
+  cueScoreCustomP2Name: '',
+  cueScoreCustomP2Club: '',
+  cueScoreCustomScore1: 0,
+  cueScoreCustomScore2: 0,
+  cueScoreCustomTargetSets: 5
 };
 
 export const CUSTOM_VIEW_PRESETS: string[] = [
@@ -219,7 +247,12 @@ export const loadDirectorState = (clubId: string): MultiCamDirectorState => {
     return {
       ...DEFAULT_DIRECTOR_STATE,
       ...parsed,
-      situation: parsed.situation === 'regional_match' ? 'regional_match' : 'club_tables',
+      situation:
+        parsed.situation === 'cuescore_live'
+          ? 'cuescore_live'
+          : parsed.situation === 'regional_match'
+            ? 'regional_match'
+            : 'club_tables',
       regionalMatch: {
         ...DEFAULT_REGIONAL_MATCH,
         ...(parsed.regionalMatch || {})
@@ -284,7 +317,12 @@ export const subscribeToDirectorState = (
   const normalize = (parsed: any): MultiCamDirectorState => ({
     ...DEFAULT_DIRECTOR_STATE,
     ...parsed,
-    situation: parsed?.situation === 'regional_match' ? 'regional_match' : 'club_tables',
+    situation:
+      parsed?.situation === 'cuescore_live'
+        ? 'cuescore_live'
+        : parsed?.situation === 'regional_match'
+          ? 'regional_match'
+          : 'club_tables',
     regionalMatch: {
       ...DEFAULT_REGIONAL_MATCH,
       ...(parsed?.regionalMatch || {})

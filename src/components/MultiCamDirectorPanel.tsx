@@ -126,7 +126,8 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   const [editingCustomTitle, setEditingCustomTitle] = useState(false);
 
   const isVirtual = isVirtualScreenSource(slot.sourceType);
-  const isRegional = directorState.situation === 'regional_match';
+  const isExternalLive =
+    directorState.situation === 'regional_match' || directorState.situation === 'cuescore_live';
   const activeStream =
     slot.sourceType === 'smartphone_webrtc'
       ? remoteStream
@@ -401,7 +402,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                 fontSize: '0.64rem',
                 fontWeight: 800
               }}>
-                {isRegional ? slot.name : assignment.title}
+                {isExternalLive ? slot.name : assignment.title}
               </span>
             )}
           </div>
@@ -484,7 +485,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
         background: 'rgba(4, 8, 18, 0.96)'
       }}>
         {/* Club Mode Quick Live Score Row when table has an active match */}
-        {!isRegional && !isVirtual && assignment.match && assignment.p1Name && assignment.p2Name && (
+        {!isExternalLive && !isVirtual && assignment.match && assignment.p1Name && assignment.p2Name && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -545,7 +546,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
-          {!isVirtual && !isRegional && (
+          {!isVirtual && !isExternalLive && (
             <select
               className="input-field"
               value={assignmentSelectValue}
@@ -692,7 +693,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           </button>
         </div>
 
-        {!isVirtual && !isRegional && (editingCustomTitle || (slot.assignmentType === 'custom_view' && !CUSTOM_VIEW_PRESETS.includes(slot.customViewTitle || ''))) && (
+        {!isVirtual && !isExternalLive && (editingCustomTitle || (slot.assignmentType === 'custom_view' && !CUSTOM_VIEW_PRESETS.includes(slot.customViewTitle || ''))) && (
           <input
             type="text"
             className="input-field"
@@ -835,9 +836,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     players,
     tournaments,
     currentClub,
-    addPlayer,
-    updatePlayer,
-    startCustomLiveMatch,
     updateMatchScore
   } = useStore();
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
@@ -863,8 +861,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [cueScoreData, setCueScoreData] = useState<CueScoreTournamentData | null>(null);
   const [cueScoreLoading, setCueScoreLoading] = useState<boolean>(false);
   const [cueScoreError, setCueScoreError] = useState<string | null>(null);
-  const [showClubCueScorePanel, setShowClubCueScorePanel] = useState<boolean>(false);
-  const [cueScoreSyncNotice, setCueScoreSyncNotice] = useState<string | null>(null);
 
   const [broadcasterStatus, setBroadcasterStatus] = useState<BroadcasterStatusSnapshot>({
     connectedToRelay: false,
@@ -1380,17 +1376,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const rm = directorState.regionalMatch || DEFAULT_REGIONAL_MATCH;
 
-  const updateRegionalMatchLatest = (patch: Partial<RegionalMatchConfig>) => {
-    const latest = directorStateRef.current;
-    updateDirector({
-      ...latest,
-      regionalMatch: {
-        ...(latest.regionalMatch || DEFAULT_REGIONAL_MATCH),
-        ...patch
-      }
-    });
-  };
-
   const playerSuggestions = (() => {
     const map = new Map<string, { id: string; name: string; club: string }>();
     sortedPlayers.forEach(p => {
@@ -1428,99 +1413,35 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     }
   };
 
-  const applyCueScoreMatchToRegional = (
-    match: CueScoreMatch,
-    tournamentName?: string,
-    extraPatch?: Partial<RegionalMatchConfig>
-  ) => {
-    const curRm = directorStateRef.current.regionalMatch || DEFAULT_REGIONAL_MATCH;
-    const cleanTourName = (tournamentName || curRm.cueScoreTournamentName || '').trim();
-    const eventTitle = cleanTourName
-      ? (match.roundName ? `${cleanTourName} • ${match.roundName}` : cleanTourName)
-      : curRm.eventTitle;
-
-    updateRegionalMatchLatest({
-      ...extraPatch,
-      eventTitle,
-      targetSets: match.raceTo > 0 ? match.raceTo : curRm.targetSets,
-      player1Name: match.player1Name || 'Joueur 1',
-      player1Club: match.player1Club || '',
-      player2Name: match.player2Name || 'Joueur 2',
-      player2Club: match.player2Club || '',
-      score1: match.score1,
-      score2: match.score2,
-      cueScoreMatchId: match.matchId,
-      cueScoreLastSyncAt: Date.now()
-    });
-  };
-
-  const ensureClubPlayer = (name: string, club: string): string => {
-    const cleanName = name.trim() || 'Joueur';
-    const currentPlayers = useStore.getState().players;
-    const existing = Object.values(currentPlayers).find(
-      p => p.name.trim().toLowerCase() === cleanName.toLowerCase()
-    );
-    if (existing) {
-      if (club && !existing.clubName) {
-        updatePlayer(existing.id, existing.name, existing.level, undefined, club);
-      }
-      return existing.id;
-    }
-    return addPlayer(cleanName, 'Confirmé', undefined, club || undefined);
-  };
-
-  const syncCueScoreMatchesToClubTables = (data: CueScoreTournamentData): number => {
-    let appliedCount = 0;
-    const playingMatches = data.matches.filter(
-      m => m.status === 'playing' && (m.tableNumber !== null || Boolean(m.tableName))
-    );
-
-    for (const csMatch of playingMatches) {
-      const currentTables = useStore.getState().tables;
-      const targetTable = Object.values(currentTables).find(t => {
-        if (csMatch.tableNumber !== null && t.number === csMatch.tableNumber) return true;
-        if (csMatch.tableName && t.name) {
-          return t.name.toLowerCase().includes(csMatch.tableName.toLowerCase());
-        }
-        return false;
+  const autoFillCueScoreCustomClub = (typedName: string, side: 1 | 2) => {
+    const found = playerSuggestions.find(p => p.name.toLowerCase() === typedName.trim().toLowerCase());
+    if (side === 1) {
+      updateRegionalMatch({
+        cueScoreCustomP1Name: typedName,
+        ...(found?.club ? { cueScoreCustomP1Club: found.club } : {})
       });
-      if (!targetTable) continue;
-
-      const storeState = useStore.getState();
-      const curMatch = targetTable.currentMatchId
-        ? storeState.matches[targetTable.currentMatchId]
-        : Object.values(storeState.matches).find(
-            m => m.tableId === targetTable.id && m.status !== 'finished'
-          );
-
-      const curP1 = curMatch ? storeState.players[curMatch.player1Id] : undefined;
-      const curP2 = curMatch ? storeState.players[curMatch.player2Id] : undefined;
-      const sameMatchOnTable = Boolean(
-        curMatch &&
-          curMatch.status !== 'finished' &&
-          curP1?.name.trim().toLowerCase() === csMatch.player1Name.trim().toLowerCase() &&
-          curP2?.name.trim().toLowerCase() === csMatch.player2Name.trim().toLowerCase()
-      );
-
-      if (sameMatchOnTable && curMatch) {
-        updateMatchScore(curMatch.id, csMatch.score1, csMatch.score2);
-      } else {
-        const p1Id = ensureClubPlayer(csMatch.player1Name, csMatch.player1Club);
-        const p2Id = ensureClubPlayer(csMatch.player2Name, csMatch.player2Club);
-        const targetSets = Math.max(csMatch.raceTo || 0, csMatch.score1, csMatch.score2, 5);
-        const newMatchId = startCustomLiveMatch({
-          tableId: targetTable.id,
-          player1Id: p1Id,
-          player2Id: p2Id,
-          targetSets
-        });
-        updateMatchScore(newMatchId, csMatch.score1, csMatch.score2);
-      }
-      appliedCount += 1;
+    } else {
+      updateRegionalMatch({
+        cueScoreCustomP2Name: typedName,
+        ...(found?.club ? { cueScoreCustomP2Club: found.club } : {})
+      });
     }
-
-    return appliedCount;
   };
+
+  const buildCueScoreMatchPatch = (
+    match: CueScoreMatch,
+    fallbackTarget: number
+  ): Partial<RegionalMatchConfig> => ({
+    cueScoreHasActiveMatch: true,
+    cueScoreMatchId: match.matchId,
+    cueScoreCustomP1Name: match.player1Name || 'Joueur 1',
+    cueScoreCustomP1Club: match.player1Club || '',
+    cueScoreCustomP2Name: match.player2Name || 'Joueur 2',
+    cueScoreCustomP2Club: match.player2Club || '',
+    cueScoreCustomScore1: match.score1,
+    cueScoreCustomScore2: match.score2,
+    cueScoreCustomTargetSets: match.raceTo > 0 ? match.raceTo : fallbackTarget
+  });
 
   const handleLoadCueScore = async (silent: boolean = false) => {
     const latestRm = directorStateRef.current.regionalMatch || DEFAULT_REGIONAL_MATCH;
@@ -1534,7 +1455,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
     if (!silent) {
       setCueScoreLoading(true);
-      setCueScoreSyncNotice(null);
     }
     setCueScoreError(null);
 
@@ -1542,57 +1462,47 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       const data = await fetchCueScoreTournament(rawInput);
       setCueScoreData(data);
 
-      const curSituation = directorStateRef.current.situation;
-      const curRm = directorStateRef.current.regionalMatch || DEFAULT_REGIONAL_MATCH;
-
-      if (curSituation === 'club_tables') {
-        const syncedTables = syncCueScoreMatchesToClubTables(data);
-        updateRegionalMatchLatest({
-          cueScoreTournamentId: data.tournamentId,
-          cueScoreTournamentName: data.name,
-          cueScoreLastSyncAt: Date.now()
-        });
-        if (!silent) {
-          setCueScoreSyncNotice(
-            syncedTables > 0
-              ? `${syncedTables} billard(s) du club mis à jour depuis CueScore (${data.name}).`
-              : `Tournoi « ${data.name} » chargé (${data.matches.length} matchs), mais aucun match en cours ne correspond aux numéros de billard du club.`
-          );
-        }
-        return;
-      }
+      const latestState = directorStateRef.current;
+      const curRm = latestState.regionalMatch || DEFAULT_REGIONAL_MATCH;
+      const playingMatches = data.matches.filter(m => m.status === 'playing');
 
       let chosen: CueScoreMatch | undefined;
       if (curRm.cueScoreTableFilter) {
-        chosen =
-          data.matches.find(
-            m => m.tableName === curRm.cueScoreTableFilter && m.status === 'playing'
-          ) ||
-          data.matches.find(
-            m => m.tableName === curRm.cueScoreTableFilter && m.status === 'waiting'
-          ) ||
-          data.matches.find(m => m.tableName === curRm.cueScoreTableFilter);
+        chosen = playingMatches.find(m => m.tableName === curRm.cueScoreTableFilter);
       }
       if (!chosen && curRm.cueScoreMatchId) {
         chosen = data.matches.find(m => m.matchId === curRm.cueScoreMatchId);
       }
       if (!chosen) {
-        chosen = data.matches.find(m => m.status === 'playing') || data.matches[0];
+        chosen = playingMatches[0];
       }
 
-      if (chosen) {
-        applyCueScoreMatchToRegional(chosen, data.name, {
-          cueScoreTournamentId: data.tournamentId,
-          cueScoreTournamentName: data.name
-        });
-      } else {
-        updateRegionalMatchLatest({
-          cueScoreTournamentId: data.tournamentId,
-          cueScoreTournamentName: data.name,
-          eventTitle: data.name,
-          cueScoreLastSyncAt: Date.now()
-        });
-      }
+      const baseMetaPatch: Partial<RegionalMatchConfig> = {
+        cueScoreTournamentId: data.tournamentId,
+        cueScoreTournamentName: data.name,
+        cueScoreVenueName: data.venueName,
+        cueScorePlayersCount: data.players.length,
+        cueScoreMatchesCount: data.matches.length,
+        cueScorePlayingCount: playingMatches.length,
+        cueScoreLastSyncAt: Date.now()
+      };
+
+      const matchPatch: Partial<RegionalMatchConfig> = chosen
+        ? buildCueScoreMatchPatch(chosen, curRm.cueScoreCustomTargetSets || 5)
+        : {
+            cueScoreMatchId: '',
+            cueScoreHasActiveMatch: Boolean(curRm.cueScoreShowCustomPrompt && curRm.cueScoreHasActiveMatch)
+          };
+
+      updateDirector({
+        ...latestState,
+        situation: 'cuescore_live',
+        regionalMatch: {
+          ...curRm,
+          ...baseMetaPatch,
+          ...matchPatch
+        }
+      });
     } catch (err: any) {
       setCueScoreError(err?.message || 'Erreur lors de la récupération CueScore.');
     } finally {
@@ -1625,6 +1535,12 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     return `${tbl}${m.player1Name} ${m.score1}-${m.score2} ${m.player2Name}${rnd}`;
   };
 
+  const cueScoreTitleDisplay = rm.cueScoreTournamentName?.trim() || cueScoreData?.name || '';
+  const cueScoreVenueDisplay = rm.cueScoreVenueName?.trim() || cueScoreData?.venueName || '';
+  const cueScorePlayersTotal = rm.cueScorePlayersCount ?? cueScoreData?.players.length ?? 0;
+  const cueScoreMatchesTotal = rm.cueScoreMatchesCount ?? cueScoreData?.matches.length ?? 0;
+  const cueScorePlayingTotal = rm.cueScorePlayingCount ?? csPlayingMatches.length;
+
   return (
     <div style={{
       maxWidth: '1480px',
@@ -1638,8 +1554,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       <div style={{
         background: directorState.broadcastMode === 'single'
           ? 'linear-gradient(90deg, rgba(185, 28, 28, 0.25), rgba(8, 14, 28, 0.94))'
-          : 'linear-gradient(90deg, rgba(245, 158, 11, 0.16), rgba(8, 14, 28, 0.94))',
-        border: `1.5px solid ${directorState.broadcastMode === 'single' ? '#ef4444' : 'rgba(245, 158, 11, 0.6)'}`,
+          : directorState.situation === 'cuescore_live'
+            ? 'linear-gradient(90deg, rgba(56, 189, 248, 0.16), rgba(8, 14, 28, 0.94))'
+            : 'linear-gradient(90deg, rgba(245, 158, 11, 0.16), rgba(8, 14, 28, 0.94))',
+        border: `1.5px solid ${directorState.broadcastMode === 'single' ? '#ef4444' : directorState.situation === 'cuescore_live' ? 'rgba(56, 189, 248, 0.6)' : 'rgba(245, 158, 11, 0.6)'}`,
         borderRadius: '14px',
         padding: '0.6rem 0.9rem',
         display: 'flex',
@@ -1656,7 +1574,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             padding: '3px',
             borderRadius: '9px',
             border: '1px solid rgba(255,255,255,0.12)',
-            gap: '3px'
+            gap: '3px',
+            flexWrap: 'wrap'
           }}>
             <button
               type="button"
@@ -1689,6 +1608,22 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               }}
             >
               🏆 Live Tournoi Régional / Match
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetSituation('cuescore_live')}
+              style={{
+                background: directorState.situation === 'cuescore_live' ? '#38BDF8' : 'transparent',
+                color: directorState.situation === 'cuescore_live' ? '#000' : 'rgba(255,255,255,0.75)',
+                border: 'none',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                fontSize: '0.74rem',
+                fontWeight: 900,
+                cursor: 'pointer'
+              }}
+            >
+              🔗 Live CueScore{rm.cueScoreAutoSync ? ' ⚡' : ''}
             </button>
           </div>
 
@@ -1744,7 +1679,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           )}
         </div>
 
-        {/* Right: Audio, Add Cam, Add Standings, CueScore, Platforms Config, Start Live, TV Out */}
+        {/* Right: Audio, Add Cam, Add Standings, Platforms Config, Start Live, TV Out */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           {renderPlatformStatusBadge('facebook')}
           {renderPlatformStatusBadge('youtube')}
@@ -1795,34 +1730,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               <Trophy size={13} /> + Classement
             </button>
           )}
-
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => {
-              if (directorState.situation === 'regional_match') {
-                cueScoreInputRef.current?.focus();
-              } else {
-                setShowClubCueScorePanel(v => !v);
-              }
-            }}
-            style={{
-              width: 'auto',
-              fontSize: '0.72rem',
-              padding: '4px 8px',
-              background: (cueScoreData || rm.cueScoreAutoSync || showClubCueScorePanel)
-                ? 'rgba(56, 189, 248, 0.16)'
-                : 'transparent',
-              borderColor: (cueScoreData || rm.cueScoreAutoSync || showClubCueScorePanel)
-                ? '#38BDF8'
-                : 'rgba(255,255,255,0.2)',
-              color: '#38BDF8',
-              fontWeight: 800
-            }}
-            title="Importer un tournoi, les joueurs et les scores depuis CueScore"
-          >
-            <Link2 size={13} /> CueScore{rm.cueScoreAutoSync ? ' ⚡' : ''}
-          </button>
 
           <button
             type="button"
@@ -1882,402 +1789,651 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         </div>
       </div>
 
-      {/* 1B. CONNEXION CUESCORE + BANDEAU MATCH TOURNOI RÉGIONAL */}
-      {(directorState.situation === 'regional_match' || showClubCueScorePanel) && (
+      {/* 1B. MODE LIVE CUESCORE (GARDE UNIQUEMENT LES INFOS CUESCORE + AJOUT OPTIONNEL) */}
+      {directorState.situation === 'cuescore_live' && (
         <div style={{
           background: 'rgba(8, 16, 30, 0.94)',
-          border: `1.5px solid ${directorState.situation === 'regional_match' ? 'rgba(245, 158, 11, 0.5)' : 'rgba(56, 189, 248, 0.45)'}`,
+          border: '1.5px solid rgba(56, 189, 248, 0.55)',
           borderRadius: '14px',
-          padding: '0.75rem 0.95rem',
+          padding: '0.8rem 0.95rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.7rem'
+          gap: '0.65rem'
         }}>
-          {/* BARRE CUESCORE COMPACTE */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.45rem',
-            background: 'rgba(14, 165, 233, 0.08)',
-            border: '1px solid rgba(56, 189, 248, 0.35)',
-            borderRadius: '10px',
-            padding: '0.55rem 0.7rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span style={{
-                fontSize: '0.74rem',
+          {/* Ligne 1 : Lien / ID CueScore + Charger + Sync Auto */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: '0.76rem',
+              fontWeight: 900,
+              color: '#38BDF8',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              whiteSpace: 'nowrap'
+            }}>
+              <Link2 size={14} /> Tournoi CueScore :
+            </span>
+
+            <input
+              ref={cueScoreInputRef}
+              id="mcb-cuescore-input"
+              type="text"
+              className="input-field"
+              placeholder="Collez le lien ou l'ID CueScore (ex: https://cuescore.com/tournament/.../12345678)"
+              value={rm.cueScoreInput || ''}
+              onChange={(e) => updateRegionalMatch({ cueScoreInput: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleLoadCueScore(false);
+                }
+              }}
+              style={{ flex: '1 1 280px', fontSize: '0.78rem', padding: '5px 9px', minWidth: '220px' }}
+            />
+
+            <button
+              type="button"
+              className="btn btn-neon"
+              disabled={cueScoreLoading}
+              onClick={() => handleLoadCueScore(false)}
+              style={{
+                width: 'auto',
+                padding: '5px 12px',
+                fontSize: '0.75rem',
                 fontWeight: 900,
-                color: '#38BDF8',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                whiteSpace: 'nowrap'
-              }}>
-                <Link2 size={14} /> CueScore :
+                background: '#38BDF8',
+                borderColor: '#38BDF8',
+                color: '#000'
+              }}
+            >
+              <RefreshCw size={13} className={cueScoreLoading ? 'animate-spin' : ''} />
+              {cueScoreLoading ? 'Chargement...' : 'Charger CueScore'}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => updateRegionalMatch({ cueScoreAutoSync: !rm.cueScoreAutoSync })}
+              style={{
+                width: 'auto',
+                padding: '5px 10px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                background: rm.cueScoreAutoSync ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                borderColor: rm.cueScoreAutoSync ? '#10B981' : 'rgba(255,255,255,0.2)',
+                color: rm.cueScoreAutoSync ? '#34D399' : '#CBD5E1'
+              }}
+              title="Actualise automatiquement CueScore toutes les 8 secondes pendant le live"
+            >
+              <Zap size={13} /> Sync Auto 8s : {rm.cueScoreAutoSync ? 'ON' : 'OFF'}
+            </button>
+
+            {rm.cueScoreLastSyncAt ? (
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                Sync {new Date(rm.cueScoreLastSyncAt).toLocaleTimeString('fr-FR')}
               </span>
+            ) : null}
+          </div>
 
-              <input
-                ref={cueScoreInputRef}
-                id="mcb-cuescore-input"
-                type="text"
-                className="input-field"
-                placeholder="Collez le lien ou l'ID du tournoi CueScore (ex: https://cuescore.com/tournament/.../12345678)"
-                value={rm.cueScoreInput || ''}
-                onChange={(e) => updateRegionalMatch({ cueScoreInput: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleLoadCueScore(false);
-                  }
-                }}
-                style={{ flex: '1 1 280px', fontSize: '0.76rem', padding: '4px 8px', minWidth: '200px' }}
-              />
-
-              <button
-                type="button"
-                className="btn btn-neon"
-                disabled={cueScoreLoading}
-                onClick={() => handleLoadCueScore(false)}
-                style={{
-                  width: 'auto',
-                  padding: '4px 10px',
-                  fontSize: '0.74rem',
-                  fontWeight: 900,
-                  background: '#38BDF8',
-                  borderColor: '#38BDF8',
-                  color: '#000'
-                }}
-              >
-                <RefreshCw size={13} className={cueScoreLoading ? 'animate-spin' : ''} />
-                {cueScoreLoading ? 'Chargement...' : 'Charger CueScore'}
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => updateRegionalMatch({ cueScoreAutoSync: !rm.cueScoreAutoSync })}
-                style={{
-                  width: 'auto',
-                  padding: '4px 10px',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  background: rm.cueScoreAutoSync ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-                  borderColor: rm.cueScoreAutoSync ? '#10B981' : 'rgba(255,255,255,0.2)',
-                  color: rm.cueScoreAutoSync ? '#34D399' : '#CBD5E1'
-                }}
-                title="Actualise automatiquement le score CueScore toutes les 8 secondes pendant le live"
-              >
-                <Zap size={13} /> Sync Auto 8s : {rm.cueScoreAutoSync ? 'ON' : 'OFF'}
-              </button>
-
-              {rm.cueScoreLastSyncAt ? (
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                  Sync {new Date(rm.cueScoreLastSyncAt).toLocaleTimeString('fr-FR')}
-                </span>
-              ) : null}
+          {cueScoreError && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.14)',
+              border: '1px solid rgba(239, 68, 68, 0.45)',
+              color: '#fecaca',
+              padding: '5px 9px',
+              borderRadius: '8px',
+              fontSize: '0.74rem',
+              fontWeight: 700
+            }}>
+              ⚠️ {cueScoreError}
             </div>
+          )}
 
-            {cueScoreData && (
+          {/* Ligne 2 : Récapitulatif des informations récupérées de CueScore */}
+          {cueScoreTitleDisplay && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              background: 'rgba(14, 165, 233, 0.08)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              borderRadius: '10px',
+              padding: '0.6rem 0.75rem'
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <span style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 800,
+                  fontSize: '0.76rem',
+                  fontWeight: 900,
                   color: '#34D399',
                   background: 'rgba(16, 185, 129, 0.14)',
                   border: '1px solid rgba(16, 185, 129, 0.35)',
-                  padding: '2px 8px',
-                  borderRadius: '6px'
+                  padding: '3px 9px',
+                  borderRadius: '7px'
                 }}>
-                  ✅ {cueScoreData.name} ({cueScoreData.matches.length} matchs • {cueScoreData.players.length} joueurs)
+                  ✅ Tournoi CueScore : {cueScoreTitleDisplay}
                 </span>
 
-                {directorState.situation === 'regional_match' && cueScoreData.matches.length > 0 && (
-                  <>
+                {cueScoreVenueDisplay && (
+                  <span style={{ fontSize: '0.73rem', color: '#E2E8F0', background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                    📍 {cueScoreVenueDisplay}
+                  </span>
+                )}
+
+                <span style={{ fontSize: '0.73rem', color: '#93C5FD', background: 'rgba(59,130,246,0.14)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                  👥 {cueScorePlayersTotal} joueur(s) • 🎱 {cueScoreMatchesTotal} match(s) ({cueScorePlayingTotal} en cours)
+                </span>
+              </div>
+
+              {cueScorePlayingTotal === 0 && !rm.cueScoreHasActiveMatch && (
+                <div style={{
+                  fontSize: '0.74rem',
+                  color: '#BAE6FD',
+                  fontWeight: 700
+                }}>
+                  ℹ️ Aucun match en direct sur CueScore actuellement — Le live affiche uniquement les informations CueScore du tournoi (sans joueurs fictifs ni score 0-0).
+                </div>
+              )}
+
+              {cueScoreData && cueScoreData.matches.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <select
+                    className="input-field"
+                    value={rm.cueScoreMatchId || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        updateRegionalMatch({
+                          cueScoreMatchId: '',
+                          cueScoreTableFilter: '',
+                          cueScoreHasActiveMatch: false
+                        });
+                        return;
+                      }
+                      const chosen = cueScoreData.matches.find(m => m.matchId === val);
+                      if (chosen) {
+                        updateRegionalMatch(buildCueScoreMatchPatch(chosen, rm.cueScoreCustomTargetSets || 5));
+                      }
+                    }}
+                    title="Sélectionner un match CueScore ou rester sur les infos du tournoi uniquement"
+                    style={{ flex: '1 1 280px', fontSize: '0.74rem', padding: '4px 8px', background: '#0b1426', color: '#fff', fontWeight: 700 }}
+                  >
+                    <option value="">— Aucun match (Infos tournoi CueScore uniquement) —</option>
+                    {csPlayingMatches.length > 0 && (
+                      <optgroup label="🔴 En cours">
+                        {csPlayingMatches.map(m => (
+                          <option key={m.matchId} value={m.matchId}>
+                            {formatCueScoreMatchOption(m)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {csWaitingMatches.length > 0 && (
+                      <optgroup label="⏳ À venir">
+                        {csWaitingMatches.map(m => (
+                          <option key={m.matchId} value={m.matchId}>
+                            {formatCueScoreMatchOption(m)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {csFinishedMatches.length > 0 && (
+                      <optgroup label="✅ Terminés">
+                        {csFinishedMatches.map(m => (
+                          <option key={m.matchId} value={m.matchId}>
+                            {formatCueScoreMatchOption(m)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+
+                  {cueScoreData.tables.length > 0 && (
                     <select
                       className="input-field"
-                      value={rm.cueScoreMatchId || ''}
+                      value={rm.cueScoreTableFilter || ''}
                       onChange={(e) => {
-                        const chosen = cueScoreData.matches.find(m => m.matchId === e.target.value);
-                        if (chosen) {
-                          applyCueScoreMatchToRegional(chosen, cueScoreData.name, {
-                            cueScoreTournamentId: cueScoreData.tournamentId,
-                            cueScoreTournamentName: cueScoreData.name
+                        const tableName = e.target.value;
+                        if (!tableName) {
+                          updateRegionalMatch({ cueScoreTableFilter: '' });
+                          return;
+                        }
+                        const playingOnTable = cueScoreData.matches.find(
+                          m => m.tableName === tableName && m.status === 'playing'
+                        );
+                        if (playingOnTable) {
+                          updateRegionalMatch({
+                            cueScoreTableFilter: tableName,
+                            ...buildCueScoreMatchPatch(playingOnTable, rm.cueScoreCustomTargetSets || 5)
+                          });
+                        } else {
+                          updateRegionalMatch({
+                            cueScoreTableFilter: tableName,
+                            cueScoreMatchId: '',
+                            cueScoreHasActiveMatch: false
                           });
                         }
                       }}
-                      title="Sélectionner un match CueScore à diffuser"
-                      style={{ flex: '1 1 250px', fontSize: '0.74rem', padding: '4px 8px', background: '#0b1426', color: '#fff', fontWeight: 700 }}
+                      title="Suivre automatiquement tous les matchs en cours d'une table CueScore"
+                      style={{ flex: '0 1 230px', fontSize: '0.74rem', padding: '4px 8px', background: '#0b1426', color: '#FBBF24', fontWeight: 800 }}
                     >
-                      <option value="">— Choisir un match CueScore —</option>
-                      {csPlayingMatches.length > 0 && (
-                        <optgroup label="🔴 En cours">
-                          {csPlayingMatches.map(m => (
-                            <option key={m.matchId} value={m.matchId}>
-                              {formatCueScoreMatchOption(m)}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {csWaitingMatches.length > 0 && (
-                        <optgroup label="⏳ À venir">
-                          {csWaitingMatches.map(m => (
-                            <option key={m.matchId} value={m.matchId}>
-                              {formatCueScoreMatchOption(m)}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {csFinishedMatches.length > 0 && (
-                        <optgroup label="✅ Terminés">
-                          {csFinishedMatches.map(m => (
-                            <option key={m.matchId} value={m.matchId}>
-                              {formatCueScoreMatchOption(m)}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
+                      <option value="">Suivi manuel</option>
+                      {cueScoreData.tables.map(tbl => (
+                        <option key={tbl} value={tbl}>
+                          🎱 Suivre auto {tbl}
+                        </option>
+                      ))}
                     </select>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-                    {cueScoreData.tables.length > 0 && (
-                      <select
-                        className="input-field"
-                        value={rm.cueScoreTableFilter || ''}
-                        onChange={(e) => {
-                          const tableName = e.target.value;
-                          if (!tableName) {
-                            updateRegionalMatch({ cueScoreTableFilter: '' });
-                            return;
-                          }
-                          const matched =
-                            cueScoreData.matches.find(m => m.tableName === tableName && m.status === 'playing') ||
-                            cueScoreData.matches.find(m => m.tableName === tableName && m.status === 'waiting') ||
-                            cueScoreData.matches.find(m => m.tableName === tableName);
-                          if (matched) {
-                            applyCueScoreMatchToRegional(matched, cueScoreData.name, {
-                              cueScoreTableFilter: tableName,
-                              cueScoreTournamentId: cueScoreData.tournamentId,
-                              cueScoreTournamentName: cueScoreData.name
-                            });
-                          } else {
-                            updateRegionalMatch({ cueScoreTableFilter: tableName });
-                          }
-                        }}
-                        title="Suivre automatiquement tous les matchs d'une table CueScore"
-                        style={{ flex: '0 1 220px', fontSize: '0.74rem', padding: '4px 8px', background: '#0b1426', color: '#FBBF24', fontWeight: 800 }}
-                      >
-                        <option value="">Suivre le match sélectionné</option>
-                        {cueScoreData.tables.map(tbl => (
-                          <option key={tbl} value={tbl}>
-                            🎱 Suivre auto {tbl}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </>
-                )}
-
-                {directorState.situation === 'club_tables' && (
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => {
-                      const count = syncCueScoreMatchesToClubTables(cueScoreData);
-                      setCueScoreSyncNotice(
-                        count > 0
-                          ? `${count} billard(s) mis à jour avec les matchs en cours de CueScore.`
-                          : "Aucun match CueScore en cours associé à un numéro de billard du club."
-                      );
-                    }}
-                    style={{ width: 'auto', padding: '3px 9px', fontSize: '0.72rem', color: '#34D399', borderColor: '#10B981', fontWeight: 800 }}
-                  >
-                    <Zap size={12} /> Appliquer aux Billards ({csPlayingMatches.length} en cours)
-                  </button>
-                )}
-              </div>
-            )}
-
-            {cueScoreError && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.14)',
-                border: '1px solid rgba(239, 68, 68, 0.45)',
-                color: '#fecaca',
-                padding: '4px 8px',
-                borderRadius: '7px',
-                fontSize: '0.72rem',
-                fontWeight: 700
-              }}>
-                ⚠️ {cueScoreError}
-              </div>
-            )}
-
-            {cueScoreSyncNotice && (
-              <div style={{
-                background: 'rgba(16, 185, 129, 0.14)',
-                border: '1px solid rgba(16, 185, 129, 0.4)',
-                color: '#a7f3d0',
-                padding: '4px 8px',
-                borderRadius: '7px',
-                fontSize: '0.72rem',
-                fontWeight: 700
-              }}>
-                ℹ️ {cueScoreSyncNotice}
-              </div>
-            )}
-          </div>
-
-          {directorState.situation === 'regional_match' && (
+          {/* Ligne 3 : Question à l'utilisateur pour informations complémentaires */}
+          {cueScoreTitleDisplay && (
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1.2fr auto 1.2fr',
-              gap: '0.9rem',
-              alignItems: 'center'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.6rem',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              borderRadius: '10px',
+              padding: '0.55rem 0.8rem'
             }}>
-              <datalist id="mcb-regional-players-list">
-                {playerSuggestions.map(p => (
-                  <option key={p.id} value={p.name} />
-                ))}
-              </datalist>
-
-              {/* PLAYER 1 + SCORE 1 */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-                background: 'rgba(16, 185, 129, 0.08)',
-                border: '1px solid rgba(16, 185, 129, 0.35)',
-                borderRadius: '10px',
-                padding: '0.5rem 0.65rem'
-              }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
-                  <input
-                    type="text"
-                    list="mcb-regional-players-list"
-                    className="input-field"
-                    placeholder="Nom Joueur 1"
-                    value={rm.player1Name}
-                    onChange={(e) => autoFillPlayerClub(e.target.value, 1)}
-                    style={{ fontSize: '0.84rem', fontWeight: 800, padding: '4px 8px' }}
-                  />
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="Club Joueur 1 (ex: BC 41)"
-                    value={rm.player1Club}
-                    onChange={(e) => updateRegionalMatch({ player1Club: e.target.value })}
-                    style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#34D399' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => updateRegionalMatch({ score1: Math.max(0, (rm.score1 || 0) - 1) })}
-                    style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center' }}
-                  >
-                    <Minus size={16} />
-                  </button>
-                  <span style={{ fontSize: '1.8rem', fontWeight: 900, minWidth: '34px', textAlign: 'center', color: '#FBBF24' }}>
-                    {rm.score1}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-neon"
-                    onClick={() => updateRegionalMatch({ score1: (rm.score1 || 0) + 1 })}
-                    style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center', color: '#000' }}
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* CENTER: EVENT TITLE, FORMAT & RESET */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', minWidth: '210px' }}>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="Titre (ex: Tournoi Régional - Finale)"
-                  value={rm.eventTitle}
-                  onChange={(e) => updateRegionalMatch({ eventTitle: e.target.value })}
-                  style={{ fontSize: '0.8rem', fontWeight: 800, padding: '4px 8px', textAlign: 'center', color: '#FBBF24' }}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>1er à :</span>
-                  <input
-                    type="number"
-                    className="input-field"
-                    min={0}
-                    max={35}
-                    value={rm.targetSets}
-                    onChange={(e) => updateRegionalMatch({ targetSets: Math.max(0, parseInt(e.target.value, 10) || 0) })}
-                    style={{ width: '54px', padding: '3px 5px', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center' }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => updateRegionalMatch({ score1: 0, score2: 0 })}
-                    style={{ width: 'auto', padding: '4px 8px', fontSize: '0.72rem' }}
-                    title="Remettre le score à 0 - 0 pour un nouveau match"
-                  >
-                    <RotateCcw size={12} /> 0-0
-                  </button>
-                </div>
-              </div>
-
-              {/* PLAYER 2 + SCORE 2 */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-                background: 'rgba(245, 158, 11, 0.08)',
-                border: '1px solid rgba(245, 158, 11, 0.35)',
-                borderRadius: '10px',
-                padding: '0.5rem 0.65rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => updateRegionalMatch({ score2: Math.max(0, (rm.score2 || 0) - 1) })}
-                    style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center' }}
-                  >
-                    <Minus size={16} />
-                  </button>
-                  <span style={{ fontSize: '1.8rem', fontWeight: 900, minWidth: '34px', textAlign: 'center', color: '#FBBF24' }}>
-                    {rm.score2}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-neon"
-                    onClick={() => updateRegionalMatch({ score2: (rm.score2 || 0) + 1 })}
-                    style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center', color: '#000' }}
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
-                  <input
-                    type="text"
-                    list="mcb-regional-players-list"
-                    className="input-field"
-                    placeholder="Nom Joueur 2"
-                    value={rm.player2Name}
-                    onChange={(e) => autoFillPlayerClub(e.target.value, 2)}
-                    style={{ fontSize: '0.84rem', fontWeight: 800, padding: '4px 8px', textAlign: 'right' }}
-                  />
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="Club Joueur 2 (ex: BC Tours)"
-                    value={rm.player2Club}
-                    onChange={(e) => updateRegionalMatch({ player2Club: e.target.value })}
-                    style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#FBBF24', textAlign: 'right' }}
-                  />
-                </div>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff' }}>
+                💬 Voulez-vous renseigner d'autres informations à afficher sur le live ?
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRegionalMatch({
+                      cueScoreShowCustomPrompt: false,
+                      cueScoreCustomSubtitle: '',
+                      ...(!rm.cueScoreMatchId ? { cueScoreHasActiveMatch: false } : {})
+                    })
+                  }
+                  style={{
+                    background: !rm.cueScoreShowCustomPrompt ? '#10B981' : 'rgba(255,255,255,0.08)',
+                    color: !rm.cueScoreShowCustomPrompt ? '#000' : '#E2E8F0',
+                    border: 'none',
+                    borderRadius: '7px',
+                    padding: '5px 10px',
+                    fontSize: '0.73rem',
+                    fontWeight: 900,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✅ Garder uniquement les infos CueScore
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateRegionalMatch({ cueScoreShowCustomPrompt: true })}
+                  style={{
+                    background: rm.cueScoreShowCustomPrompt ? '#F59E0B' : 'rgba(245, 158, 11, 0.18)',
+                    color: rm.cueScoreShowCustomPrompt ? '#000' : '#FBBF24',
+                    border: '1px solid rgba(245, 158, 11, 0.5)',
+                    borderRadius: '7px',
+                    padding: '5px 10px',
+                    fontSize: '0.73rem',
+                    fontWeight: 900,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✏️ Oui, renseigner d'autres informations
+                </button>
               </div>
             </div>
           )}
+
+          {/* Ligne 4 : Champs optionnels si l'utilisateur a choisi d'ajouter d'autres infos */}
+          {rm.cueScoreShowCustomPrompt && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.65rem',
+              background: 'rgba(245, 158, 11, 0.06)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '10px',
+              padding: '0.7rem 0.8rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#FBBF24', whiteSpace: 'nowrap' }}>
+                  Information / Sous-titre :
+                </span>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Ex: Tournoi dans 1 semaine • Inscriptions ouvertes, Table TV..."
+                  value={rm.cueScoreCustomSubtitle || ''}
+                  onChange={(e) => updateRegionalMatch({ cueScoreCustomSubtitle: e.target.value })}
+                  style={{ flex: '1 1 260px', fontSize: '0.78rem', padding: '5px 9px' }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() =>
+                    updateRegionalMatch({ cueScoreHasActiveMatch: !rm.cueScoreHasActiveMatch })
+                  }
+                  style={{
+                    width: 'auto',
+                    padding: '5px 10px',
+                    fontSize: '0.73rem',
+                    fontWeight: 800,
+                    background: rm.cueScoreHasActiveMatch ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                    borderColor: rm.cueScoreHasActiveMatch ? '#10B981' : 'rgba(255,255,255,0.2)',
+                    color: rm.cueScoreHasActiveMatch ? '#34D399' : '#E2E8F0'
+                  }}
+                >
+                  🎱 Afficher un duel / score de joueurs : {rm.cueScoreHasActiveMatch ? 'OUI' : 'NON'}
+                </button>
+              </div>
+
+              {rm.cueScoreHasActiveMatch && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1.2fr auto 1.2fr',
+                  gap: '0.9rem',
+                  alignItems: 'center'
+                }}>
+                  <datalist id="mcb-cuescore-players-list">
+                    {playerSuggestions.map(p => (
+                      <option key={p.id} value={p.name} />
+                    ))}
+                  </datalist>
+
+                  {/* PLAYER 1 */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    borderRadius: '10px',
+                    padding: '0.5rem 0.65rem'
+                  }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
+                      <input
+                        type="text"
+                        list="mcb-cuescore-players-list"
+                        className="input-field"
+                        placeholder="Nom Joueur 1"
+                        value={rm.cueScoreCustomP1Name || ''}
+                        onChange={(e) => autoFillCueScoreCustomClub(e.target.value, 1)}
+                        style={{ fontSize: '0.84rem', fontWeight: 800, padding: '4px 8px' }}
+                      />
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Club Joueur 1"
+                        value={rm.cueScoreCustomP1Club || ''}
+                        onChange={(e) => updateRegionalMatch({ cueScoreCustomP1Club: e.target.value })}
+                        style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#34D399' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => updateRegionalMatch({ cueScoreCustomScore1: Math.max(0, (rm.cueScoreCustomScore1 || 0) - 1) })}
+                        style={{ width: '32px', height: '32px', padding: 0, justifyContent: 'center' }}
+                      >
+                        <Minus size={15} />
+                      </button>
+                      <span style={{ fontSize: '1.65rem', fontWeight: 900, minWidth: '30px', textAlign: 'center', color: '#FBBF24' }}>
+                        {rm.cueScoreCustomScore1 || 0}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-neon"
+                        onClick={() => updateRegionalMatch({ cueScoreCustomScore1: (rm.cueScoreCustomScore1 || 0) + 1 })}
+                        style={{ width: '32px', height: '32px', padding: 0, justifyContent: 'center', color: '#000' }}
+                      >
+                        <Plus size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TARGET SETS & RESET */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>1er à :</span>
+                      <input
+                        type="number"
+                        className="input-field"
+                        min={0}
+                        max={35}
+                        value={rm.cueScoreCustomTargetSets ?? 5}
+                        onChange={(e) => updateRegionalMatch({ cueScoreCustomTargetSets: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                        style={{ width: '54px', padding: '3px 5px', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center' }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => updateRegionalMatch({ cueScoreCustomScore1: 0, cueScoreCustomScore2: 0 })}
+                      style={{ width: 'auto', padding: '4px 8px', fontSize: '0.72rem' }}
+                    >
+                      <RotateCcw size={12} /> 0-0
+                    </button>
+                  </div>
+
+                  {/* PLAYER 2 */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    background: 'rgba(245, 158, 11, 0.08)',
+                    border: '1px solid rgba(245, 158, 11, 0.35)',
+                    borderRadius: '10px',
+                    padding: '0.5rem 0.65rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => updateRegionalMatch({ cueScoreCustomScore2: Math.max(0, (rm.cueScoreCustomScore2 || 0) - 1) })}
+                        style={{ width: '32px', height: '32px', padding: 0, justifyContent: 'center' }}
+                      >
+                        <Minus size={15} />
+                      </button>
+                      <span style={{ fontSize: '1.65rem', fontWeight: 900, minWidth: '30px', textAlign: 'center', color: '#FBBF24' }}>
+                        {rm.cueScoreCustomScore2 || 0}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-neon"
+                        onClick={() => updateRegionalMatch({ cueScoreCustomScore2: (rm.cueScoreCustomScore2 || 0) + 1 })}
+                        style={{ width: '32px', height: '32px', padding: 0, justifyContent: 'center', color: '#000' }}
+                      >
+                        <Plus size={15} />
+                      </button>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
+                      <input
+                        type="text"
+                        list="mcb-cuescore-players-list"
+                        className="input-field"
+                        placeholder="Nom Joueur 2"
+                        value={rm.cueScoreCustomP2Name || ''}
+                        onChange={(e) => autoFillCueScoreCustomClub(e.target.value, 2)}
+                        style={{ fontSize: '0.84rem', fontWeight: 800, padding: '4px 8px', textAlign: 'right' }}
+                      />
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Club Joueur 2"
+                        value={rm.cueScoreCustomP2Club || ''}
+                        onChange={(e) => updateRegionalMatch({ cueScoreCustomP2Club: e.target.value })}
+                        style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#FBBF24', textAlign: 'right' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 1C. BANDEAU MATCH TOURNOI RÉGIONAL (JOUEURS, CLUBS & SCORE EN DIRECT) */}
+      {directorState.situation === 'regional_match' && (
+        <div style={{
+          background: 'rgba(8, 16, 30, 0.94)',
+          border: '1.5px solid rgba(245, 158, 11, 0.5)',
+          borderRadius: '14px',
+          padding: '0.75rem 0.95rem',
+          display: 'grid',
+          gridTemplateColumns: '1.2fr auto 1.2fr',
+          gap: '0.9rem',
+          alignItems: 'center'
+        }}>
+          <datalist id="mcb-regional-players-list">
+            {playerSuggestions.map(p => (
+              <option key={p.id} value={p.name} />
+            ))}
+          </datalist>
+
+          {/* PLAYER 1 + SCORE 1 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            background: 'rgba(16, 185, 129, 0.08)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            borderRadius: '10px',
+            padding: '0.5rem 0.65rem'
+          }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
+              <input
+                type="text"
+                list="mcb-regional-players-list"
+                className="input-field"
+                placeholder="Nom Joueur 1"
+                value={rm.player1Name}
+                onChange={(e) => autoFillPlayerClub(e.target.value, 1)}
+                style={{ fontSize: '0.84rem', fontWeight: 800, padding: '4px 8px' }}
+              />
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Club Joueur 1 (ex: BC 41)"
+                value={rm.player1Club}
+                onChange={(e) => updateRegionalMatch({ player1Club: e.target.value })}
+                style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#34D399' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => updateRegionalMatch({ score1: Math.max(0, (rm.score1 || 0) - 1) })}
+                style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center' }}
+              >
+                <Minus size={16} />
+              </button>
+              <span style={{ fontSize: '1.8rem', fontWeight: 900, minWidth: '34px', textAlign: 'center', color: '#FBBF24' }}>
+                {rm.score1}
+              </span>
+              <button
+                type="button"
+                className="btn btn-neon"
+                onClick={() => updateRegionalMatch({ score1: (rm.score1 || 0) + 1 })}
+                style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center', color: '#000' }}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* CENTER: EVENT TITLE, FORMAT & RESET */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', minWidth: '210px' }}>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Titre (ex: Tournoi Régional - Finale)"
+              value={rm.eventTitle}
+              onChange={(e) => updateRegionalMatch({ eventTitle: e.target.value })}
+              style={{ fontSize: '0.8rem', fontWeight: 800, padding: '4px 8px', textAlign: 'center', color: '#FBBF24' }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>1er à :</span>
+              <input
+                type="number"
+                className="input-field"
+                min={0}
+                max={35}
+                value={rm.targetSets}
+                onChange={(e) => updateRegionalMatch({ targetSets: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                style={{ width: '54px', padding: '3px 5px', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center' }}
+              />
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => updateRegionalMatch({ score1: 0, score2: 0 })}
+                style={{ width: 'auto', padding: '4px 8px', fontSize: '0.72rem' }}
+                title="Remettre le score à 0 - 0 pour un nouveau match"
+              >
+                <RotateCcw size={12} /> 0-0
+              </button>
+            </div>
+          </div>
+
+          {/* PLAYER 2 + SCORE 2 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            borderRadius: '10px',
+            padding: '0.5rem 0.65rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => updateRegionalMatch({ score2: Math.max(0, (rm.score2 || 0) - 1) })}
+                style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center' }}
+              >
+                <Minus size={16} />
+              </button>
+              <span style={{ fontSize: '1.8rem', fontWeight: 900, minWidth: '34px', textAlign: 'center', color: '#FBBF24' }}>
+                {rm.score2}
+              </span>
+              <button
+                type="button"
+                className="btn btn-neon"
+                onClick={() => updateRegionalMatch({ score2: (rm.score2 || 0) + 1 })}
+                style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center', color: '#000' }}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
+              <input
+                type="text"
+                list="mcb-regional-players-list"
+                className="input-field"
+                placeholder="Nom Joueur 2"
+                value={rm.player2Name}
+                onChange={(e) => autoFillPlayerClub(e.target.value, 2)}
+                style={{ fontSize: '0.84rem', fontWeight: 800, padding: '4px 8px', textAlign: 'right' }}
+              />
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Club Joueur 2 (ex: BC Tours)"
+                value={rm.player2Club}
+                onChange={(e) => updateRegionalMatch({ player2Club: e.target.value })}
+                style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#FBBF24', textAlign: 'right' }}
+              />
+            </div>
+          </div>
         </div>
       )}
 
