@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -389,11 +390,93 @@ export function attachRtmpRelayToHttpServer(httpServer, routePath = '/api/rtmp-r
   });
 }
 
+function fetchHttpsJsonText(targetUrl, redirectsLeft = 2) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(
+      targetUrl,
+      {
+        headers: {
+          'User-Agent': 'MonClubBillard/1.6',
+          Accept: 'application/json'
+        },
+        timeout: 8000
+      },
+      (upstreamRes) => {
+        const status = upstreamRes.statusCode || 200;
+        const loc = upstreamRes.headers?.location;
+        if ([301, 302, 307, 308].includes(status) && loc && redirectsLeft > 0) {
+          upstreamRes.resume();
+          const nextUrl = new URL(loc, targetUrl).toString();
+          fetchHttpsJsonText(nextUrl, redirectsLeft - 1).then(resolve, reject);
+          return;
+        }
+        const chunks = [];
+        upstreamRes.on('data', (c) => chunks.push(c));
+        upstreamRes.on('end', () => {
+          resolve({
+            statusCode: status,
+            body: Buffer.concat(chunks).toString('utf8')
+          });
+        });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy(new Error('Délai dépassé vers api.cuescore.com'));
+    });
+    req.on('error', reject);
+  });
+}
+
+/**
+ * Proxy HTTP côté PC (Vite Dev/Preview & Relais standalone) pour interroger CueScore sans blocage CORS.
+ */
+export async function handleCueScoreProxyRequest(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
+  let tournamentId = '';
+  try {
+    const parsedUrl = new URL(req.url || '/', 'http://127.0.0.1');
+    tournamentId = String(parsedUrl.searchParams.get('id') || '').trim();
+  } catch {}
+
+  if (!/^\d+$/.test(tournamentId)) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Paramètre id tournoi CueScore manquant ou invalide.' }));
+    return;
+  }
+
+  try {
+    const targetUrl = `https://api.cuescore.com/tournament/?id=${encodeURIComponent(tournamentId)}`;
+    const upstream = await fetchHttpsJsonText(targetUrl);
+    res.statusCode = upstream.statusCode;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(upstream.body);
+  } catch (err) {
+    res.statusCode = 502;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: String(err?.message || 'Erreur proxy CueScore') }));
+  }
+}
+
 /**
  * Lance un serveur relais autonome (utile quand l'application est ouverte depuis Vercel).
  */
 export function startStandaloneRelayServer(port = 8765) {
   const server = http.createServer((req, res) => {
+    const reqPath = (req.url || '/').split('?')[0];
+    if (reqPath === '/api/cuescore') {
+      handleCueScoreProxyRequest(req, res);
+      return;
+    }
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
     const ffmpegPath = findFfmpegBinary();
@@ -405,6 +488,7 @@ export function startStandaloneRelayServer(port = 8765) {
   server.listen(port, '127.0.0.1', () => {
     const ffmpegPath = findFfmpegBinary();
     console.log(`\n  📡 Relais Live Facebook/YouTube actif sur ws://127.0.0.1:${port}/api/rtmp-relay`);
+    console.log(`  🎱 Proxy CueScore actif sur http://127.0.0.1:${port}/api/cuescore`);
     console.log(`  🎬 FFmpeg : ${ffmpegPath ? `Détecté (${ffmpegPath})` : 'NON DÉTECTÉ (winget install Gyan.FFmpeg)'}\n`);
   });
 

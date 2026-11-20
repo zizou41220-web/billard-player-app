@@ -32,6 +32,13 @@ export interface RegionalMatchConfig {
   player2Club: string;
   score1: number;
   score2: number;
+  cueScoreInput?: string;
+  cueScoreTournamentId?: string;
+  cueScoreTournamentName?: string;
+  cueScoreMatchId?: string;
+  cueScoreTableFilter?: string;
+  cueScoreAutoSync?: boolean;
+  cueScoreLastSyncAt?: number;
 }
 
 export interface DirectorCameraSlot {
@@ -86,7 +93,14 @@ export const DEFAULT_REGIONAL_MATCH: RegionalMatchConfig = {
   player2Name: 'Joueur 2',
   player2Club: '',
   score1: 0,
-  score2: 0
+  score2: 0,
+  cueScoreInput: '',
+  cueScoreTournamentId: '',
+  cueScoreTournamentName: '',
+  cueScoreMatchId: '',
+  cueScoreTableFilter: '',
+  cueScoreAutoSync: false,
+  cueScoreLastSyncAt: 0
 };
 
 export const CUSTOM_VIEW_PRESETS: string[] = [
