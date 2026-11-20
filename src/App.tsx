@@ -6,7 +6,6 @@ import ProfileView from './components/ProfileView';
 import FeedView from './components/FeedView';
 import AdminView from './components/AdminView';
 import StreamOverlayView from './components/StreamOverlayView';
-import LiveBracketWall from './components/LiveBracketWall';
 import SmartphoneCameraSenderView from './components/SmartphoneCameraSenderView';
 import { NeonBackdrop, NeonToggleButton } from './components/NeonBackdrop';
 import { QrCode, User, Activity, Settings, Sun, Moon } from 'lucide-react';
@@ -20,7 +19,6 @@ function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const cameraParam = urlParams.get('camera');
   const overlayTableParam = urlParams.get('overlay') || urlParams.get('stream');
-  const bracketParam = urlParams.get('bracket');
   const matchParam = urlParams.get('match');
   const tableParam = urlParams.get('table');
   const clubParam = urlParams.get('club');
@@ -95,18 +93,6 @@ function App() {
   // Dedicated Overlay Mode for OBS / Prism Live Studio / Facebook / YouTube streams
   if (overlayTableParam) {
     return <StreamOverlayView tableParam={overlayTableParam} />;
-  }
-
-  // Mur de bracket live plein écran
-  if (bracketParam) {
-    return (
-      <>
-        <NeonBackdrop />
-        <div style={{ width: '100vw', height: '100dvh', padding: '1rem', boxSizing: 'border-box', background: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.25) 0%, #030807 75%)' }}>
-          <LiveBracketWall tournamentId={urlParams.get('tournament')} />
-        </div>
-      </>
-    );
   }
 
   if (appMode === 'admin') {
