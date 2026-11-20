@@ -10,8 +10,10 @@ import {
   Eye,
   EyeOff,
   Facebook,
+  Maximize2,
   Mic,
   MicOff,
+  MonitorPlay,
   Play,
   Plus,
   QrCode,
@@ -21,6 +23,7 @@ import {
   Settings,
   Smartphone,
   Trash2,
+  Trophy,
   Tv,
   Volume2,
   VolumeX,
@@ -41,6 +44,7 @@ import {
   RTC_ICE_CONFIG,
   StreamDestinationsConfig,
   createCameraSignalingChannel,
+  isVirtualScreenSource,
   loadDirectorState,
   loadStreamDestinations,
   saveDirectorState,
@@ -50,6 +54,8 @@ import {
 import {
   BroadcasterStatusSnapshot,
   LiveCompositeBroadcaster,
+  drawVirtualScreenToCanvas,
+  getMosaicGridRects,
   resolveCameraAssignment
 } from '../utils/liveBroadcaster';
 import {
@@ -102,9 +108,11 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
 }) => {
   const { tables, matches, players, tournaments, currentClub } = useStore();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const virtualCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [editingCustomTitle, setEditingCustomTitle] = useState(false);
 
+  const isVirtual = isVirtualScreenSource(slot.sourceType);
   const activeStream =
     slot.sourceType === 'smartphone_webrtc'
       ? remoteStream
@@ -116,13 +124,20 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   const isFocused = isSingleMode && directorState.focusedCameraId === slot.id;
   const isInMosaic = directorState.broadcastMode === 'mosaic' && slot.enabled;
 
+  const focusedCamObj = directorState.focusedCameraId
+    ? directorState.cameras.find(c => c.id === directorState.focusedCameraId)
+    : null;
   const effectiveAudioCamId =
-    isSingleMode && directorState.focusedCameraId
-      ? directorState.focusedCameraId
+    isSingleMode && focusedCamObj && !isVirtualScreenSource(focusedCamObj.sourceType)
+      ? focusedCamObj.id
       : directorState.activeAudioCameraId;
-  const isAudioSelected = effectiveAudioCamId === slot.id && !slot.forceMuted;
+  const isAudioSelected = !isVirtual && effectiveAudioCamId === slot.id && !slot.forceMuted;
 
   useEffect(() => {
+    if (isVirtual) {
+      registerVideoEl(slot.id, null);
+      return;
+    }
     const el = videoRef.current;
     registerVideoEl(slot.id, el);
     if (el) {
@@ -136,13 +151,28 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
     return () => {
       registerVideoEl(slot.id, null);
     };
-  }, [activeStream, slot.id, registerVideoEl]);
+  }, [activeStream, slot.id, isVirtual, registerVideoEl]);
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     el.muted = !(monitorAudioOnPc && isAudioSelected && slot.enabled);
   }, [monitorAudioOnPc, isAudioSelected, slot.enabled]);
+
+  // Render live standings / bracket / scores thumbnail on virtual screen canvas
+  useEffect(() => {
+    if (!isVirtual || !virtualCanvasRef.current) return;
+    const canvas = virtualCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    drawVirtualScreenToCanvas(ctx, 0, 0, canvas.width, canvas.height, slot, {
+      tables,
+      matches,
+      players,
+      tournaments,
+      currentClub
+    });
+  }, [isVirtual, slot, tables, matches, players, tournaments, currentClub]);
 
   const assignment = resolveCameraAssignment(slot, {
     tables,
@@ -192,7 +222,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
       : '1.5px solid rgba(255, 255, 255, 0.14)';
 
   const cardShadow = isFocused
-    ? '0 0 26px rgba(239, 68, 68, 0.5)'
+    ? '0 0 24px rgba(239, 68, 68, 0.5)'
     : isInMosaic
       ? '0 0 12px rgba(245, 158, 11, 0.16)'
       : 'none';
@@ -209,7 +239,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
       opacity: slot.enabled ? 1 : 0.58,
       transition: 'all 0.2s ease'
     }}>
-      {/* Clickable 16:9 Live Video Viewport */}
+      {/* Clickable 16:9 Live Video / Virtual Screen Viewport */}
       <div
         onClick={() => {
           if (!slot.enabled) {
@@ -219,8 +249,10 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
         }}
         title={
           isFocused
-            ? "Caméra diffusée seule — Cliquez pour revenir à l'Écran Multiple"
-            : 'Cliquez pour diffuser cette caméra seule + écouter son son'
+            ? "Diffusée seule — Cliquez pour revenir à l'Écran Multiple"
+            : isVirtual
+              ? 'Cliquez pour afficher cet écran en Plein Écran sur le Live'
+              : 'Cliquez pour diffuser cette caméra seule + écouter son son'
         }
         style={{
           position: 'relative',
@@ -231,7 +263,16 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           cursor: 'pointer'
         }}
       >
-        {(slot.sourceType === 'smartphone_webrtc' || slot.sourceType === 'usb') && (
+        {isVirtual && (
+          <canvas
+            ref={virtualCanvasRef}
+            width={640}
+            height={360}
+            style={{ width: '100%', height: '100%', display: 'block' }}
+          />
+        )}
+
+        {!isVirtual && (slot.sourceType === 'smartphone_webrtc' || slot.sourceType === 'usb') && (
           <video
             ref={videoRef}
             autoPlay
@@ -279,8 +320,8 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           />
         )}
 
-        {/* Waiting placeholder */}
-        {((slot.sourceType === 'smartphone_webrtc' && !remoteStream) ||
+        {/* Waiting placeholder for camera sources */}
+        {!isVirtual && ((slot.sourceType === 'smartphone_webrtc' && !remoteStream) ||
           (slot.sourceType === 'usb' && !usbStream) ||
           (slot.sourceType === 'external' && !slot.externalUrl)) && (
           <div style={{
@@ -290,14 +331,14 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.35rem',
-            padding: '0.6rem',
+            gap: '0.3rem',
+            padding: '0.5rem',
             background: 'radial-gradient(circle at center, rgba(16, 185, 129, 0.08) 0%, rgba(3, 6, 15, 0.92) 75%)',
             textAlign: 'center',
             pointerEvents: 'none'
           }}>
-            <Camera size={24} color="rgba(255,255,255,0.4)" />
-            <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#fff' }}>
+            <Camera size={22} color="rgba(255,255,255,0.4)" />
+            <div style={{ fontSize: '0.73rem', fontWeight: 800, color: '#fff' }}>
               {slot.sourceType === 'smartphone_webrtc'
                 ? connectionState === 'connecting'
                   ? 'Connexion smartphone...'
@@ -312,16 +353,16 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
         {/* Top Overlay: Tally + Assignment + Audio */}
         <div style={{
           position: 'absolute',
-          top: '7px',
-          left: '7px',
-          right: '7px',
+          top: '6px',
+          left: '6px',
+          right: '6px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '0.35rem',
+          gap: '0.3rem',
           pointerEvents: 'none'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
             <span style={{
               background: isFocused
                 ? '#ef4444'
@@ -329,142 +370,147 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                   ? '#f59e0b'
                   : 'rgba(15, 23, 42, 0.86)',
               color: isInMosaic && !isFocused ? '#000' : '#fff',
-              padding: '2px 7px',
+              padding: '2px 6px',
               borderRadius: '5px',
-              fontSize: '0.65rem',
+              fontSize: '0.62rem',
               fontWeight: 900,
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '3px'
             }}>
-              <Radio size={10} />
-              {isFocused ? 'EN DIRECT SEUL' : isInMosaic ? 'LIVE MOSAÏQUE' : 'EN VEILLE'}
+              <Radio size={9} />
+              {isFocused ? 'PLEIN ÉCRAN' : isInMosaic ? 'MOSAÏQUE' : 'VEILLE'}
             </span>
-            <span style={{
-              background: 'rgba(4, 12, 24, 0.88)',
-              border: '1px solid rgba(0, 255, 170, 0.45)',
-              color: '#00ffaa',
-              padding: '2px 7px',
-              borderRadius: '5px',
-              fontSize: '0.68rem',
-              fontWeight: 800
-            }}>
-              {assignment.title}
-            </span>
+            {!isVirtual && (
+              <span style={{
+                background: 'rgba(4, 12, 24, 0.88)',
+                border: '1px solid rgba(0, 255, 170, 0.45)',
+                color: '#00ffaa',
+                padding: '2px 6px',
+                borderRadius: '5px',
+                fontSize: '0.64rem',
+                fontWeight: 800
+              }}>
+                {assignment.title}
+              </span>
+            )}
           </div>
 
-          <span style={{
-            background: isAudioSelected ? 'rgba(16, 185, 129, 0.92)' : 'rgba(15, 23, 42, 0.82)',
-            color: isAudioSelected ? '#000' : 'rgba(255,255,255,0.65)',
-            padding: '2px 7px',
-            borderRadius: '5px',
-            fontSize: '0.65rem',
-            fontWeight: 900,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '3px'
-          }}>
-            {isAudioSelected ? <Volume2 size={11} /> : <VolumeX size={11} />}
-            {isAudioSelected ? 'SON' : 'MUET'}
-          </span>
+          {!isVirtual && (
+            <span style={{
+              background: isAudioSelected ? 'rgba(16, 185, 129, 0.92)' : 'rgba(15, 23, 42, 0.82)',
+              color: isAudioSelected ? '#000' : 'rgba(255,255,255,0.65)',
+              padding: '2px 6px',
+              borderRadius: '5px',
+              fontSize: '0.62rem',
+              fontWeight: 900,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px'
+            }}>
+              {isAudioSelected ? <Volume2 size={10} /> : <VolumeX size={10} />}
+              {isAudioSelected ? 'SON' : 'MUET'}
+            </span>
+          )}
         </div>
 
-        {/* Bottom Overlay: Score / View + Cam Name */}
+        {/* Bottom Overlay */}
         <div style={{
           position: 'absolute',
-          bottom: '7px',
-          left: '7px',
-          right: '7px',
+          bottom: '6px',
+          left: '6px',
+          right: '6px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '0.35rem',
+          gap: '0.3rem',
           pointerEvents: 'none'
         }}>
           <div style={{
             background: 'rgba(5, 10, 22, 0.88)',
             border: '1px solid rgba(255,255,255,0.16)',
-            borderRadius: '6px',
-            padding: '3px 8px',
-            fontSize: '0.7rem',
+            borderRadius: '5px',
+            padding: '2px 7px',
+            fontSize: '0.66rem',
             fontWeight: 800,
             color: '#fff',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            maxWidth: '72%'
+            maxWidth: '70%'
           }}>
             {assignment.match && assignment.p1 && assignment.p2 ? (
               <span>
                 {assignment.p1.name}{' '}
                 <span style={{ color: '#FBBF24', margin: '0 3px' }}>
-                  {assignment.match.score1} - {assignment.match.score2}
+                  {assignment.match.score1}-{assignment.match.score2}
                 </span>{' '}
                 {assignment.p2.name}
               </span>
             ) : (
-              <span>{slot.name} • {assignment.subtitle}</span>
+              <span>{slot.name}</span>
             )}
           </div>
 
           <span style={{
             background: isFocused ? 'rgba(239,68,68,0.92)' : 'rgba(0,0,0,0.75)',
             color: '#fff',
-            padding: '2px 7px',
+            padding: '2px 6px',
             borderRadius: '5px',
-            fontSize: '0.64rem',
+            fontSize: '0.6rem',
             fontWeight: 800
           }}>
-            {isFocused ? 'Revenir Mosaïque' : 'Diffuser seul'}
+            {isFocused ? 'Retour Mosaïque' : 'Diffuser seul'}
           </span>
         </div>
       </div>
 
       {/* Single Compact Control Row Under Video */}
       <div style={{
-        padding: '0.45rem 0.55rem',
+        padding: '0.4rem 0.5rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.4rem',
+        gap: '0.35rem',
         background: 'rgba(4, 8, 18, 0.96)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-          {/* Attitrer à */}
-          <select
-            className="input-field"
-            value={assignmentSelectValue}
-            onChange={(e) => handleAssignmentChange(e.target.value)}
-            title="Attitrer cette caméra à un billard ou une autre vue"
-            style={{
-              flex: '1 1 115px',
-              fontSize: '0.72rem',
-              padding: '4px 6px',
-              background: '#0b1426',
-              color: '#FBBF24',
-              fontWeight: 800
-            }}
-          >
-            <optgroup label="🎱 Billards du Club">
-              {sortedTables.map(t => (
-                <option key={t.id} value={`table:${t.id}`}>
-                  🎱 {t.name || `Billard ${t.number}`}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="🎥 Match Spécial">
-              <option value="live_match">🎥 Match Studio Live</option>
-            </optgroup>
-            <optgroup label="🏟️ Autres Vues">
-              {CUSTOM_VIEW_PRESETS.map(p => (
-                <option key={p} value={`preset:${p}`}>
-                  🏟️ {p}
-                </option>
-              ))}
-              <option value="custom_text">✏️ Titre libre...</option>
-            </optgroup>
-          </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+          {!isVirtual && (
+            <select
+              className="input-field"
+              value={assignmentSelectValue}
+              onChange={(e) => handleAssignmentChange(e.target.value)}
+              title="Attitrer cette caméra à un billard ou une autre vue"
+              style={{
+                flex: '1 1 95px',
+                fontSize: '0.7rem',
+                padding: '3px 5px',
+                background: '#0b1426',
+                color: '#FBBF24',
+                fontWeight: 800
+              }}
+            >
+              <optgroup label="🎱 Billards du Club">
+                {sortedTables.map(t => (
+                  <option key={t.id} value={`table:${t.id}`}>
+                    🎱 {t.name || `Billard ${t.number}`}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="🎥 Match Spécial">
+                <option value="live_match">🎥 Match Studio Live</option>
+              </optgroup>
+              <optgroup label="🏟️ Autres Vues">
+                {CUSTOM_VIEW_PRESETS.map(p => (
+                  <option key={p} value={`preset:${p}`}>
+                    🏟️ {p}
+                  </option>
+                ))}
+                <option value="custom_text">✏️ Titre libre...</option>
+              </optgroup>
+            </select>
+          )}
 
-          {/* Source Caméra */}
+          {/* Source Caméra ou Écran Graphique */}
           <select
             className="input-field"
             value={
@@ -480,32 +526,52 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                   usbDeviceId: v.slice(4)
                 });
               } else {
+                const nextType = v as DirectorCameraSourceType;
+                const autoName =
+                  nextType === 'tournament_standings'
+                    ? 'Classement Tournoi'
+                    : nextType === 'tournament_bracket'
+                      ? 'Tableau Final'
+                      : nextType === 'matches_live_board'
+                        ? 'Scores Billards'
+                        : nextType === 'club_leaderboard'
+                          ? 'Classement Club'
+                          : slot.name;
                 onUpdateSlot(slot.id, {
-                  sourceType: v as DirectorCameraSourceType
+                  sourceType: nextType,
+                  name: autoName
                 });
               }
             }}
-            title="Source vidéo de cette caméra"
+            title="Source vidéo ou écran graphique en direct"
             style={{
               flex: '1 1 115px',
-              fontSize: '0.72rem',
-              padding: '4px 6px',
+              fontSize: '0.7rem',
+              padding: '3px 5px',
               background: '#0b1426',
-              color: '#fff',
+              color: isVirtual ? '#34D399' : '#fff',
               fontWeight: 700
             }}
           >
-            <option value="smartphone_webrtc">📱 Smartphone (QR)</option>
-            {videoDevices.map((d, idx) => (
-              <option key={d.deviceId} value={`usb:${d.deviceId}`}>
-                🎥 {d.label || `Caméra PC #${idx + 1}`}
-              </option>
-            ))}
-            {videoDevices.length === 0 && (
-              <option value="usb">🎥 Caméra USB / PC</option>
-            )}
-            <option value="vdo">📡 VDO.Ninja</option>
-            <option value="external">🌐 Lien Externe</option>
+            <optgroup label="📷 Caméras">
+              <option value="smartphone_webrtc">📱 Smartphone (QR)</option>
+              {videoDevices.map((d, idx) => (
+                <option key={d.deviceId} value={`usb:${d.deviceId}`}>
+                  🎥 {d.label || `Caméra PC #${idx + 1}`}
+                </option>
+              ))}
+              {videoDevices.length === 0 && (
+                <option value="usb">🎥 Caméra USB / PC</option>
+              )}
+              <option value="vdo">📡 VDO.Ninja</option>
+              <option value="external">🌐 Lien Externe</option>
+            </optgroup>
+            <optgroup label="📊 Écrans Live (Sans quitter le direct)">
+              <option value="tournament_standings">🏆 Classement du Tournoi</option>
+              <option value="tournament_bracket">🌳 Tableau Phases Finales</option>
+              <option value="matches_live_board">🎱 Scores de tous les Billards</option>
+              <option value="club_leaderboard">👑 Classement Général Club</option>
+            </optgroup>
           </select>
 
           {slot.sourceType === 'smartphone_webrtc' && (
@@ -513,29 +579,31 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               type="button"
               className="btn btn-neon"
               onClick={() => onOpenQr(slot.id)}
-              style={{ width: 'auto', padding: '4px 7px', fontSize: '0.7rem', fontWeight: 900, color: '#000' }}
-              title="QR Code pour connecter le smartphone"
+              style={{ width: 'auto', padding: '3px 6px', fontSize: '0.68rem', fontWeight: 900, color: '#000' }}
+              title="QR Code smartphone"
             >
-              <QrCode size={13} /> QR
+              <QrCode size={12} /> QR
             </button>
           )}
 
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => onSelectAudio(slot.id)}
-            style={{
-              width: 'auto',
-              padding: '4px 7px',
-              fontSize: '0.7rem',
-              background: isAudioSelected ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-              borderColor: isAudioSelected ? '#10B981' : 'rgba(255,255,255,0.18)',
-              color: isAudioSelected ? '#34D399' : '#fff'
-            }}
-            title="Écouter uniquement le micro de cette caméra"
-          >
-            {isAudioSelected ? <Volume2 size={13} /> : <VolumeX size={13} />}
-          </button>
+          {!isVirtual && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => onSelectAudio(slot.id)}
+              style={{
+                width: 'auto',
+                padding: '3px 6px',
+                fontSize: '0.68rem',
+                background: isAudioSelected ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                borderColor: isAudioSelected ? '#10B981' : 'rgba(255,255,255,0.18)',
+                color: isAudioSelected ? '#34D399' : '#fff'
+              }}
+              title="Écouter uniquement le micro de cette caméra"
+            >
+              {isAudioSelected ? <Volume2 size={12} /> : <VolumeX size={12} />}
+            </button>
+          )}
 
           <button
             type="button"
@@ -543,25 +611,24 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
             onClick={() => setShowAdvanced(v => !v)}
             style={{
               width: 'auto',
-              padding: '4px 7px',
-              fontSize: '0.7rem',
+              padding: '3px 6px',
+              fontSize: '0.68rem',
               background: showAdvanced ? 'rgba(255,255,255,0.15)' : 'transparent'
             }}
-            title="Réglages de la caméra (Nom, Rotation, Zoom, Micro, Masquer)"
+            title="Réglages (Nom, Rotation, Zoom, Masquer, Supprimer)"
           >
-            <Settings size={13} />
+            <Settings size={12} />
           </button>
         </div>
 
-        {/* Custom title input if user chose custom_text */}
-        {(editingCustomTitle || (slot.assignmentType === 'custom_view' && !CUSTOM_VIEW_PRESETS.includes(slot.customViewTitle || ''))) && (
+        {!isVirtual && (editingCustomTitle || (slot.assignmentType === 'custom_view' && !CUSTOM_VIEW_PRESETS.includes(slot.customViewTitle || ''))) && (
           <input
             type="text"
             className="input-field"
             placeholder="Nom de la vue (ex: Table Finale, Podium...)"
             value={slot.customViewTitle || ''}
             onChange={(e) => onUpdateSlot(slot.id, { customViewTitle: e.target.value })}
-            style={{ fontSize: '0.72rem', padding: '3px 7px' }}
+            style={{ fontSize: '0.7rem', padding: '3px 6px' }}
           />
         )}
 
@@ -572,18 +639,17 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
             placeholder="Collez l'URL YouTube / Caméra IP..."
             value={slot.externalUrl || ''}
             onChange={(e) => onUpdateSlot(slot.id, { externalUrl: e.target.value })}
-            style={{ fontSize: '0.72rem', padding: '3px 7px' }}
+            style={{ fontSize: '0.7rem', padding: '3px 6px' }}
           />
         )}
 
-        {/* Expandable Advanced Camera Controls */}
         {showAdvanced && (
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
-            gap: '0.3rem',
-            paddingTop: '0.35rem',
+            gap: '0.28rem',
+            paddingTop: '0.3rem',
             borderTop: '1px solid rgba(255,255,255,0.08)'
           }}>
             <input
@@ -591,78 +657,82 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               className="input-field"
               value={slot.name}
               onChange={(e) => onUpdateSlot(slot.id, { name: e.target.value })}
-              style={{ width: '105px', padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700 }}
-              title="Renommer cette caméra"
+              style={{ width: '100px', padding: '2px 5px', fontSize: '0.7rem', fontWeight: 700 }}
+              title="Renommer"
             />
             {slot.sourceType === 'smartphone_webrtc' && (
               <button
                 type="button"
                 className="btn btn-outline"
                 onClick={() => onReconnectWebRtc(slot.id)}
-                style={{ width: 'auto', padding: '3px 6px', fontSize: '0.68rem' }}
-                title="Reconnecter le smartphone"
+                style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem' }}
+                title="Reconnecter smartphone"
               >
                 <RefreshCw size={11} />
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => onUpdateSlot(slot.id, { rotation: ((slot.rotation || 0) + 90) % 360 })}
-              style={{ width: 'auto', padding: '3px 6px', fontSize: '0.68rem' }}
-              title="Pivoter 90°"
-            >
-              <RotateCcw size={11} /> {slot.rotation || 0}°
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => onUpdateSlot(slot.id, { zoom: Math.max(1, Math.round(((slot.zoom || 1) - 0.2) * 10) / 10) })}
-              style={{ width: 'auto', padding: '3px 6px', fontSize: '0.68rem' }}
-            >
-              <ZoomOut size={11} />
-            </button>
-            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-              {Math.round((slot.zoom || 1) * 100)}%
-            </span>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => onUpdateSlot(slot.id, { zoom: Math.min(3, Math.round(((slot.zoom || 1) + 0.2) * 10) / 10) })}
-              style={{ width: 'auto', padding: '3px 6px', fontSize: '0.68rem' }}
-            >
-              <ZoomIn size={11} />
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => onUpdateSlot(slot.id, { fillMode: slot.fillMode === 'contain' ? 'cover' : 'contain' })}
-              style={{ width: 'auto', padding: '3px 6px', fontSize: '0.68rem' }}
-            >
-              {slot.fillMode === 'contain' ? 'Contain' : 'Cover'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => onUpdateSlot(slot.id, { forceMuted: !slot.forceMuted })}
-              style={{
-                width: 'auto',
-                padding: '3px 6px',
-                fontSize: '0.68rem',
-                color: slot.forceMuted ? '#f87171' : '#fff'
-              }}
-              title={slot.forceMuted ? 'Micro coupé' : 'Couper ce micro'}
-            >
-              {slot.forceMuted ? <MicOff size={11} /> : <Mic size={11} />}
-            </button>
+            {!isVirtual && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => onUpdateSlot(slot.id, { rotation: ((slot.rotation || 0) + 90) % 360 })}
+                  style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem' }}
+                  title="Pivoter 90°"
+                >
+                  <RotateCcw size={11} /> {slot.rotation || 0}°
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => onUpdateSlot(slot.id, { zoom: Math.max(1, Math.round(((slot.zoom || 1) - 0.2) * 10) / 10) })}
+                  style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem' }}
+                >
+                  <ZoomOut size={11} />
+                </button>
+                <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                  {Math.round((slot.zoom || 1) * 100)}%
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => onUpdateSlot(slot.id, { zoom: Math.min(3, Math.round(((slot.zoom || 1) + 0.2) * 10) / 10) })}
+                  style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem' }}
+                >
+                  <ZoomIn size={11} />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => onUpdateSlot(slot.id, { fillMode: slot.fillMode === 'contain' ? 'cover' : 'contain' })}
+                  style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem' }}
+                >
+                  {slot.fillMode === 'contain' ? 'Contain' : 'Cover'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => onUpdateSlot(slot.id, { forceMuted: !slot.forceMuted })}
+                  style={{
+                    width: 'auto',
+                    padding: '2px 5px',
+                    fontSize: '0.66rem',
+                    color: slot.forceMuted ? '#f87171' : '#fff'
+                  }}
+                  title={slot.forceMuted ? 'Micro coupé' : 'Couper ce micro'}
+                >
+                  {slot.forceMuted ? <MicOff size={11} /> : <Mic size={11} />}
+                </button>
+              </>
+            )}
             <button
               type="button"
               className="btn btn-outline"
               onClick={() => onUpdateSlot(slot.id, { enabled: !slot.enabled })}
               style={{
                 width: 'auto',
-                padding: '3px 6px',
-                fontSize: '0.68rem',
+                padding: '2px 5px',
+                fontSize: '0.66rem',
                 color: slot.enabled ? '#34D399' : '#f87171'
               }}
               title={slot.enabled ? 'Masquer de la mosaïque' : 'Afficher dans la mosaïque'}
@@ -674,7 +744,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                 type="button"
                 className="btn btn-outline"
                 onClick={() => onRemoveSlot(slot.id)}
-                style={{ width: 'auto', padding: '3px 6px', fontSize: '0.68rem', color: '#f87171' }}
+                style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem', color: '#f87171' }}
                 title="Supprimer"
               >
                 <Trash2 size={11} />
@@ -720,6 +790,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const videoElementsRef = useRef<Record<string, HTMLVideoElement | null>>({});
   const broadcasterRef = useRef<LiveCompositeBroadcaster | null>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const signalingMapRef = useRef<Record<string, CameraSignalingHandle>>({});
   const peersMapRef = useRef<Record<string, { pc: RTCPeerConnection; sessionId: string }>>({});
   const usbStreamsRef = useRef<Record<string, { deviceId: string; stream: MediaStream }>>({});
@@ -757,6 +829,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   useEffect(() => {
     const b = new LiveCompositeBroadcaster(setBroadcasterStatus);
     broadcasterRef.current = b;
+    if (previewCanvasRef.current) {
+      b.setPreviewCanvas(previewCanvasRef.current);
+    }
     b.startRenderLoop();
     b.checkRelayAvailability(destinations.relayWsUrl);
 
@@ -985,14 +1060,16 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   };
 
   const handleSelectFocus = (cameraId: string) => {
+    const targetSlot = directorState.cameras.find(c => c.id === cameraId);
     if (directorState.broadcastMode === 'single' && directorState.focusedCameraId === cameraId) {
       updateDirector({ ...directorState, broadcastMode: 'mosaic', focusedCameraId: null });
     } else {
+      const keepExistingMic = targetSlot && isVirtualScreenSource(targetSlot.sourceType);
       updateDirector({
         ...directorState,
         broadcastMode: 'single',
         focusedCameraId: cameraId,
-        activeAudioCameraId: cameraId
+        activeAudioCameraId: keepExistingMic ? directorState.activeAudioCameraId : cameraId
       });
     }
   };
@@ -1014,7 +1091,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const handleAddCamera = () => {
     if (directorState.cameras.length >= 8) {
-      alert('Maximum 8 caméras simultanées dans la régie.');
+      alert('Maximum 8 fenêtres simultanées dans la régie.');
       return;
     }
     const nextNum = directorState.cameras.length + 1;
@@ -1034,6 +1111,52 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     updateDirector({ ...directorState, cameras: [...directorState.cameras, newSlot] });
   };
 
+  const handleAddStandingsScreen = () => {
+    const existing = directorState.cameras.find(c => c.sourceType === 'tournament_standings');
+    if (existing) {
+      if (!existing.enabled) {
+        handleUpdateSlot(existing.id, { enabled: true });
+      }
+      return;
+    }
+    const disabledEmpty = directorState.cameras.find(c => !c.enabled);
+    if (disabledEmpty) {
+      updateDirector({
+        ...directorState,
+        cameras: directorState.cameras.map(c =>
+          c.id === disabledEmpty.id
+            ? {
+                ...c,
+                enabled: true,
+                sourceType: 'tournament_standings',
+                name: 'Classement Tournoi',
+                customViewTitle: 'Classement du Tournoi'
+              }
+            : c
+        )
+      });
+      return;
+    }
+    if (directorState.cameras.length >= 8) {
+      alert('Maximum 8 fenêtres simultanées dans la régie.');
+      return;
+    }
+    const standingsSlot: DirectorCameraSlot = {
+      id: `scr_${Date.now().toString(36).slice(-4)}`,
+      name: 'Classement Tournoi',
+      enabled: true,
+      sourceType: 'tournament_standings',
+      assignmentType: 'custom_view',
+      customViewTitle: 'Classement du Tournoi',
+      customViewShowAllScores: false,
+      rotation: 0,
+      zoom: 1,
+      fillMode: 'contain',
+      forceMuted: true
+    };
+    updateDirector({ ...directorState, cameras: [...directorState.cameras, standingsSlot] });
+  };
+
   const handleRemoveSlot = (cameraId: string) => {
     if (directorState.cameras.length <= 2) return;
     const remaining = directorState.cameras.filter(c => c.id !== cameraId);
@@ -1051,7 +1174,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   }).current;
 
   const sortedTables = Object.values(tables).sort((a, b) => a.number - b.number);
-  const enabledCount = directorState.cameras.filter(c => c.enabled).length;
+  const enabledCams = directorState.cameras.filter(c => c.enabled);
+  const enabledCount = enabledCams.length;
   const focusedCam = directorState.focusedCameraId
     ? directorState.cameras.find(c => c.id === directorState.focusedCameraId) || null
     : null;
@@ -1096,6 +1220,27 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     }
   };
 
+  const handlePreviewCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (directorState.broadcastMode === 'single') {
+      handleReturnToMosaic();
+      return;
+    }
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    const cx = ((e.clientX - rect.left) / rect.width) * 1280;
+    const cy = ((e.clientY - rect.top) / rect.height) * 720;
+
+    const list = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
+    const cells = getMosaicGridRects(list.length, directorState.mosaicLayout, 1280, 720);
+    const hit = cells.find(cell => cx >= cell.x && cx <= cell.x + cell.w && cy >= cell.y && cy <= cell.y + cell.h);
+    if (hit && list[hit.index]) {
+      handleSelectFocus(list[hit.index].id);
+    }
+  };
+
   const qrCamObj = qrModalCamId ? directorState.cameras.find(c => c.id === qrModalCamId) : null;
   const qrCamUrl = qrModalCamId
     ? `${getAppBaseUrl()}/?camera=${encodeURIComponent(qrModalCamId)}&club=${encodeURIComponent(currentClub.id)}`
@@ -1127,29 +1272,29 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   return (
     <div style={{
-      maxWidth: '1440px',
+      maxWidth: '1480px',
       width: '100%',
       margin: '0 auto',
       display: 'flex',
       flexDirection: 'column',
-      gap: '0.9rem'
+      gap: '0.85rem'
     }}>
-      {/* 1. BARRE DE RÉGIE COMPACTE (1 SEULE LIGNE) */}
+      {/* 1. BARRE DE RÉGIE COMPACTE */}
       <div style={{
         background: directorState.broadcastMode === 'single'
           ? 'linear-gradient(90deg, rgba(185, 28, 28, 0.25), rgba(8, 14, 28, 0.94))'
           : 'linear-gradient(90deg, rgba(245, 158, 11, 0.16), rgba(8, 14, 28, 0.94))',
         border: `1.5px solid ${directorState.broadcastMode === 'single' ? '#ef4444' : 'rgba(245, 158, 11, 0.6)'}`,
         borderRadius: '14px',
-        padding: '0.7rem 1rem',
+        padding: '0.65rem 0.95rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: '0.65rem'
+        gap: '0.6rem'
       }}>
         {/* Left: Mode Indicator & Return to Mosaic */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
           <span style={{
             background: directorState.broadcastMode === 'single' ? '#ef4444' : '#f59e0b',
             color: directorState.broadcastMode === 'single' ? '#fff' : '#000',
@@ -1162,18 +1307,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             gap: '5px'
           }}>
             <Radio size={13} />
-            {directorState.broadcastMode === 'single' ? 'CAMÉRA SEULE' : 'ÉCRAN MULTIPLE'}
+            {directorState.broadcastMode === 'single' ? 'PLEIN ÉCRAN SEUL' : 'ÉCRAN MULTIPLE'}
           </span>
 
-          <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fff' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>
             {directorState.broadcastMode === 'single' && focusedCam ? (
               <>
                 <span style={{ color: '#fca5a5' }}>{focusedCam.name}</span>{' '}
                 <span style={{ color: '#00ffaa' }}>({focusedAssignment?.title})</span>
               </>
             ) : (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                Cliquez sur une caméra pour l'isoler + écouter son son
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>
+                {enabledCount} fenêtre{enabledCount > 1 ? 's' : ''} en mosaïque
               </span>
             )}
           </span>
@@ -1185,8 +1330,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               onClick={handleReturnToMosaic}
               style={{
                 width: 'auto',
-                padding: '0.45rem 0.9rem',
-                fontSize: '0.78rem',
+                padding: '0.42rem 0.85rem',
+                fontSize: '0.76rem',
                 fontWeight: 900,
                 background: '#f59e0b',
                 borderColor: '#f59e0b',
@@ -1213,8 +1358,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           )}
         </div>
 
-        {/* Right: Audio, Add Cam, Platforms Config, Start Live, TV Out */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+        {/* Right: Audio, Add Cam, Add Standings Screen, Platforms Config, Start Live, TV Out */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.42rem', flexWrap: 'wrap' }}>
           {renderPlatformStatusBadge('facebook')}
           {renderPlatformStatusBadge('youtube')}
 
@@ -1224,15 +1369,15 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             onClick={() => setMonitorAudioOnPc(v => !v)}
             style={{
               width: 'auto',
-              fontSize: '0.74rem',
-              padding: '5px 9px',
+              fontSize: '0.72rem',
+              padding: '5px 8px',
               background: monitorAudioOnPc ? 'rgba(16, 185, 129, 0.16)' : 'rgba(255,255,255,0.05)',
               borderColor: monitorAudioOnPc ? '#10b981' : 'rgba(255,255,255,0.2)',
               color: monitorAudioOnPc ? '#34d399' : '#fff'
             }}
             title="Activer/Couper l'écoute sur le PC"
           >
-            {monitorAudioOnPc ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            {monitorAudioOnPc ? <Volume2 size={13} /> : <VolumeX size={13} />}
             {monitorAudioOnPc ? 'Écoute PC' : 'PC Muet'}
           </button>
 
@@ -1240,9 +1385,27 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             type="button"
             className="btn btn-outline"
             onClick={handleAddCamera}
-            style={{ width: 'auto', fontSize: '0.74rem', padding: '5px 9px', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
+            style={{ width: 'auto', fontSize: '0.72rem', padding: '5px 8px', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
           >
-            <Plus size={14} /> Caméra
+            <Plus size={13} /> Caméra
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleAddStandingsScreen}
+            style={{
+              width: 'auto',
+              fontSize: '0.72rem',
+              padding: '5px 9px',
+              background: 'rgba(245, 158, 11, 0.14)',
+              color: '#FBBF24',
+              borderColor: 'rgba(245, 158, 11, 0.5)',
+              fontWeight: 800
+            }}
+            title="Ajouter l'écran Classement du Tournoi en direct sans quitter le live"
+          >
+            <Trophy size={13} /> + Écran Classement
           </button>
 
           <button
@@ -1251,16 +1414,16 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             onClick={() => setShowPlatformsModal(true)}
             style={{
               width: 'auto',
-              fontSize: '0.74rem',
-              padding: '5px 10px',
+              fontSize: '0.72rem',
+              padding: '5px 9px',
               borderColor: activePlatformsLabel.length > 0 ? 'rgba(59, 130, 246, 0.6)' : 'rgba(245, 158, 11, 0.5)',
               color: activePlatformsLabel.length > 0 ? '#93c5fd' : '#fbbf24'
             }}
           >
-            <Settings size={14} />
+            <Settings size={13} />
             {activePlatformsLabel.length > 0
-              ? `Clés Live (${activePlatformsLabel.join(' + ')})`
-              : 'Configurer Facebook / YouTube'}
+              ? `Clés (${activePlatformsLabel.join(' + ')})`
+              : 'Facebook / YouTube'}
           </button>
 
           <button
@@ -1269,8 +1432,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             onClick={handleToggleLiveStream}
             style={{
               width: 'auto',
-              padding: '0.5rem 1rem',
-              fontSize: '0.8rem',
+              padding: '0.48rem 0.95rem',
+              fontSize: '0.78rem',
               fontWeight: 900,
               background: broadcasterStatus.isStreaming ? '#ef4444' : 'linear-gradient(135deg, #ef4444, #f59e0b)',
               borderColor: 'transparent',
@@ -1282,7 +1445,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               <>⏹ ARRÊTER ({formatDuration(liveElapsedSec)})</>
             ) : (
               <>
-                <Play size={14} />
+                <Play size={13} />
                 {activePlatformsLabel.length > 0
                   ? `🔴 LANCER LIVE (${activePlatformsLabel.join(' + ')})`
                   : '🔴 LANCER LE LIVE'}
@@ -1295,10 +1458,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             target="_blank"
             rel="noreferrer"
             className="btn btn-outline"
-            style={{ width: 'auto', fontSize: '0.74rem', padding: '5px 9px', textDecoration: 'none', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
+            style={{ width: 'auto', fontSize: '0.72rem', padding: '5px 8px', textDecoration: 'none', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
             title="Ouvrir la sortie TV plein écran"
           >
-            <Tv size={14} /> Sortie TV
+            <Tv size={13} /> Sortie TV
           </a>
         </div>
       </div>
@@ -1308,9 +1471,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           background: 'rgba(239, 68, 68, 0.14)',
           border: '1px solid rgba(239, 68, 68, 0.45)',
           color: '#fecaca',
-          padding: '0.5rem 0.85rem',
+          padding: '0.45rem 0.85rem',
           borderRadius: '10px',
-          fontSize: '0.76rem',
+          fontSize: '0.75rem',
           fontWeight: 700,
           display: 'flex',
           alignItems: 'center',
@@ -1329,33 +1492,125 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         </div>
       )}
 
-      {/* 2. GRILLE MULTI-CAMÉRAS (VISIBLE IMMÉDIATEMENT SANS SCROLLER) */}
+      {/* 2. DISPOSITION 2 COLONNES : SOURCES À GAUCHE + APERÇU ÉCRAN MULTIPLE LIVE À DROITE */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-        gap: '0.85rem'
+        gridTemplateColumns: 'minmax(480px, 1.35fr) minmax(360px, 1fr)',
+        gap: '1rem',
+        alignItems: 'start'
       }}>
-        {directorState.cameras.map(slot => (
-          <CameraTileCard
-            key={slot.id}
-            slot={slot}
-            directorState={directorState}
-            sortedTables={sortedTables}
-            videoDevices={videoDevices}
-            remoteStream={remoteStreams[slot.id] || null}
-            usbStream={usbStreams[slot.id] || null}
-            connectionState={rtcStates[slot.id] || 'idle'}
-            monitorAudioOnPc={monitorAudioOnPc}
-            onSelectFocus={handleSelectFocus}
-            onSelectAudio={handleSelectAudio}
-            onUpdateSlot={handleUpdateSlot}
-            onRemoveSlot={handleRemoveSlot}
-            onOpenQr={setQrModalCamId}
-            onReconnectWebRtc={setupWebRtcForCamera}
-            registerVideoEl={registerVideoEl}
-            canDelete={directorState.cameras.length > 2}
+        {/* LEFT COLUMN: SOURCE WINDOWS (CAMERAS + LIVE SCREENS) */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '0.75rem'
+        }}>
+          {directorState.cameras.map(slot => (
+            <CameraTileCard
+              key={slot.id}
+              slot={slot}
+              directorState={directorState}
+              sortedTables={sortedTables}
+              videoDevices={videoDevices}
+              remoteStream={remoteStreams[slot.id] || null}
+              usbStream={usbStreams[slot.id] || null}
+              connectionState={rtcStates[slot.id] || 'idle'}
+              monitorAudioOnPc={monitorAudioOnPc}
+              onSelectFocus={handleSelectFocus}
+              onSelectAudio={handleSelectAudio}
+              onUpdateSlot={handleUpdateSlot}
+              onRemoveSlot={handleRemoveSlot}
+              onOpenQr={setQrModalCamId}
+              onReconnectWebRtc={setupWebRtcForCamera}
+              registerVideoEl={registerVideoEl}
+              canDelete={directorState.cameras.length > 2}
+            />
+          ))}
+        </div>
+
+        {/* RIGHT COLUMN (STICKY): LIVE OUTPUT PREVIEW (ÉCRAN MULTIPLE / PLEIN ÉCRAN) */}
+        <div
+          ref={previewContainerRef}
+          style={{
+            position: 'sticky',
+            top: '0.5rem',
+            background: 'rgba(5, 10, 22, 0.96)',
+            border: `2px solid ${directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.7)' : 'rgba(0, 255, 170, 0.45)'}`,
+            borderRadius: '14px',
+            padding: '0.75rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.55rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.55)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: 900, color: '#00ffaa' }}>
+              <MonitorPlay size={16} />
+              APERÇU DU LIVE ({directorState.broadcastMode === 'single' ? 'Plein Écran' : 'Écran Multiple'})
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              {directorState.broadcastMode === 'single' && (
+                <button
+                  type="button"
+                  onClick={handleReturnToMosaic}
+                  className="btn btn-outline"
+                  style={{ width: 'auto', padding: '3px 8px', fontSize: '0.68rem', fontWeight: 800, color: '#FBBF24', borderColor: '#F59E0B' }}
+                >
+                  ⊞ Mosaïque
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!document.fullscreenElement) {
+                    previewContainerRef.current?.requestFullscreen?.();
+                  } else {
+                    document.exitFullscreen?.();
+                  }
+                }}
+                className="btn btn-outline"
+                style={{ width: 'auto', padding: '3px 8px', fontSize: '0.68rem' }}
+                title="Agrandir l'aperçu en plein écran"
+              >
+                <Maximize2 size={12} /> Plein écran
+              </button>
+            </div>
+          </div>
+
+          <canvas
+            ref={(el) => {
+              previewCanvasRef.current = el;
+              broadcasterRef.current?.setPreviewCanvas(el);
+            }}
+            onClick={handlePreviewCanvasClick}
+            width={960}
+            height={540}
+            title={
+              directorState.broadcastMode === 'mosaic'
+                ? 'Aperçu en direct de l’Écran Multiple — Cliquez sur un cadran pour le diffuser seul'
+                : 'Cliquez sur l’aperçu pour revenir à l’Écran Multiple'
+            }
+            style={{
+              width: '100%',
+              aspectRatio: '16 / 9',
+              borderRadius: '10px',
+              background: '#000',
+              display: 'block',
+              cursor: 'pointer',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
           />
-        ))}
+
+          <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+            <span>
+              {directorState.broadcastMode === 'mosaic'
+                ? '💡 Cliquez directement sur un cadran ici (ou à gauche) pour le passer en plein écran.'
+                : '💡 Cliquez sur l’aperçu (ou sur « ⊞ Mosaïque ») pour revenir à l’Écran Multiple.'}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* 3. MODALE CONFIGURATION FACEBOOK / YOUTUBE & RELAIS PC */}
@@ -1411,7 +1666,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
-              {/* FACEBOOK */}
               <div style={{
                 background: destinations.facebookEnabled ? 'rgba(24, 119, 242, 0.12)' : 'rgba(255,255,255,0.03)',
                 border: `1.5px solid ${destinations.facebookEnabled ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`,
@@ -1447,7 +1701,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 </a>
               </div>
 
-              {/* YOUTUBE */}
               <div style={{
                 background: destinations.youtubeEnabled ? 'rgba(255, 0, 51, 0.1)' : 'rgba(255,255,255,0.03)',
                 border: `1.5px solid ${destinations.youtubeEnabled ? '#ff3344' : 'rgba(255,255,255,0.1)'}`,

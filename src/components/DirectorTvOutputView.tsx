@@ -7,11 +7,12 @@ import {
   MultiCamDirectorState,
   RTC_ICE_CONFIG,
   createCameraSignalingChannel,
+  isVirtualScreenSource,
   loadDirectorState,
   saveDirectorState,
   subscribeToDirectorState
 } from '../utils/multiCamDirector';
-import { resolveCameraAssignment } from '../utils/liveBroadcaster';
+import { drawVirtualScreenToCanvas, resolveCameraAssignment } from '../utils/liveBroadcaster';
 import { LiveOverlayConfig, loadLiveOverlayConfig, subscribeToLiveOverlayConfig } from '../utils/liveOverlay';
 import { LiveCustomOverlayLayer } from './LiveCustomOverlayLayer';
 import { formatEmbedVideoUrl } from '../utils/video';
@@ -28,9 +29,42 @@ interface DirectorOutputTileProps {
   slot: DirectorCameraSlot;
   stream: MediaStream | null;
   isAudioActive: boolean;
-  isSingleFullScreen?: boolean;
   onClickTile?: () => void;
 }
+
+const VirtualScreenCanvas: React.FC<{ slot: DirectorCameraSlot }> = ({ slot }) => {
+  const { tables, matches, players, tournaments, currentClub } = useStore();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    drawVirtualScreenToCanvas(ctx, 0, 0, canvas.width, canvas.height, slot, {
+      tables,
+      matches,
+      players,
+      tournaments,
+      currentClub
+    });
+  }, [slot, tables, matches, players, tournaments, currentClub]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={1280}
+      height={720}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain'
+      }}
+    />
+  );
+};
 
 const DirectorVideoElement: React.FC<{
   slot: DirectorCameraSlot;
@@ -39,8 +73,10 @@ const DirectorVideoElement: React.FC<{
 }> = ({ slot, stream, unmuteAudio }) => {
   const { currentClub } = useStore();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const isVirtual = isVirtualScreenSource(slot.sourceType);
 
   useEffect(() => {
+    if (isVirtual) return;
     const el = videoRef.current;
     if (!el) return;
     if (el.srcObject !== stream) {
@@ -49,14 +85,19 @@ const DirectorVideoElement: React.FC<{
     if (stream) {
       el.play().catch(() => {});
     }
-  }, [stream]);
+  }, [stream, isVirtual]);
 
   useEffect(() => {
+    if (isVirtual) return;
     const el = videoRef.current;
     if (el) {
       el.muted = !unmuteAudio;
     }
-  }, [unmuteAudio]);
+  }, [unmuteAudio, isVirtual]);
+
+  if (isVirtual) {
+    return <VirtualScreenCanvas slot={slot} />;
+  }
 
   if (slot.sourceType === 'vdo') {
     return (
@@ -123,6 +164,7 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
 }) => {
   const { tables, matches, players, tournaments, currentClub } = useStore();
   const activeTournament = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
+  const isVirtual = isVirtualScreenSource(slot.sourceType);
   const assignment = resolveCameraAssignment(slot, {
     tables,
     matches,
@@ -149,82 +191,84 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
         padding: '0.65rem',
         boxSizing: 'border-box'
       }}
-      title="Cliquer pour mettre en surbrillance et diffuser cette caméra en plein écran"
+      title="Cliquer pour mettre en surbrillance et diffuser cette fenêtre en plein écran"
     >
       <DirectorVideoElement slot={slot} stream={stream} unmuteAudio={isAudioActive} />
 
-      {/* Top Overlay Badge */}
-      <div style={{
-        position: 'relative',
-        zIndex: 10,
-        width: '100%',
-        maxWidth: '620px',
-        margin: '0 auto',
-        background: 'rgba(6, 11, 24, 0.88)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255,255,255,0.16)',
-        borderTop: '2px solid #F59E0B',
-        borderRadius: '10px',
-        padding: '0.4rem 0.75rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.25rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <span style={{ background: '#ff2244', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontSize: '0.62rem', fontWeight: 900 }}>
-              LIVE
+      {!isVirtual ? (
+        <div style={{
+          position: 'relative',
+          zIndex: 10,
+          width: '100%',
+          maxWidth: '620px',
+          margin: '0 auto',
+          background: 'rgba(6, 11, 24, 0.88)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.16)',
+          borderTop: '2px solid #F59E0B',
+          borderRadius: '10px',
+          padding: '0.4rem 0.75rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.25rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <span style={{ background: '#ff2244', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontSize: '0.62rem', fontWeight: 900 }}>
+                LIVE
+              </span>
+              <span style={{ color: '#00ffaa', fontWeight: 900 }}>{assignment.title}</span>
+              {assignment.match && (
+                <MatchTimerBadge
+                  startTime={assignment.match.startTime}
+                  durationMinutes={assignment.match.durationMinutes ?? resolveMatchDurationMinutes(assignment.match, activeTournament)}
+                  status={assignment.match.status}
+                  size="sm"
+                />
+              )}
+            </div>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              color: isAudioActive ? '#34d399' : 'rgba(255,255,255,0.55)',
+              fontSize: '0.68rem'
+            }}>
+              {isAudioActive ? <Volume2 size={12} /> : <VolumeX size={12} />}
+              {slot.name}
             </span>
-            <span style={{ color: '#00ffaa', fontWeight: 900 }}>{assignment.title}</span>
-            {assignment.match && (
-              <MatchTimerBadge
-                startTime={assignment.match.startTime}
-                durationMinutes={assignment.match.durationMinutes ?? resolveMatchDurationMinutes(assignment.match, activeTournament)}
-                status={assignment.match.status}
-                size="sm"
-              />
-            )}
           </div>
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            color: isAudioActive ? '#34d399' : 'rgba(255,255,255,0.55)',
-            fontSize: '0.68rem'
-          }}>
-            {isAudioActive ? <Volume2 size={12} /> : <VolumeX size={12} />}
-            {slot.name}
-          </span>
+
+          {assignment.match && assignment.p1 && assignment.p2 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+                <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B' }} />
+                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {assignment.p1.name}
+                </span>
+              </div>
+
+              <div style={{ background: '#F59E0B', color: '#000', fontWeight: 900, fontSize: '1.05rem', padding: '1px 10px', borderRadius: '7px' }}>
+                {assignment.match.score1} - {assignment.match.score2}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', minWidth: 0 }}>
+                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {assignment.p2.name}
+                </span>
+                <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B' }} />
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.75)', textAlign: 'center' }}>
+              {assignment.subtitle}
+            </div>
+          )}
         </div>
+      ) : (
+        <div />
+      )}
 
-        {assignment.match && assignment.p1 && assignment.p2 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-              <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B' }} />
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {assignment.p1.name}
-              </span>
-            </div>
-
-            <div style={{ background: '#F59E0B', color: '#000', fontWeight: 900, fontSize: '1.05rem', padding: '1px 10px', borderRadius: '7px' }}>
-              {assignment.match.score1} - {assignment.match.score2}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', minWidth: 0 }}>
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {assignment.p2.name}
-              </span>
-              <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B' }} />
-            </div>
-          </div>
-        ) : (
-          <div style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.75)', textAlign: 'center' }}>
-            {assignment.subtitle}
-          </div>
-        )}
-      </div>
-
-      {/* Hover Hint */}
       <div style={{
         position: 'relative',
         zIndex: 10,
@@ -273,7 +317,6 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
     };
   }, [currentClub.id]);
 
-  // Connect WebRTC cameras
   const webrtcIds = directorState.cameras
     .filter(c => c.enabled && c.sourceType === 'smartphone_webrtc')
     .map(c => c.id)
@@ -342,7 +385,6 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
     });
   }, [webrtcIds, currentClub.id]);
 
-  // Connect USB cameras
   const usbKey = directorState.cameras
     .filter(c => c.enabled && c.sourceType === 'usb')
     .map(c => `${c.id}:${c.usbDeviceId || 'default'}`)
@@ -407,10 +449,10 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
     ? directorState.cameras.find(c => c.id === directorState.focusedCameraId) || enabledCams[0]
     : null;
 
-  // SINGLE FULLSCREEN MODE
   if (focusedCam) {
+    const isVirtual = isVirtualScreenSource(focusedCam.sourceType);
     const assignment = resolveCameraAssignment(focusedCam, { tables, matches, players, tournaments, currentClub });
-    const unmute = soundAllowed && !focusedCam.forceMuted;
+    const unmute = soundAllowed && !focusedCam.forceMuted && !isVirtual;
 
     return (
       <div style={{
@@ -434,68 +476,68 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
 
         <LiveCustomOverlayLayer config={overlayConfig} interactive={false} previewScale={1} />
 
-        {/* Scoreboard or View Title */}
-        <div style={{
-          position: 'relative',
-          zIndex: 15,
-          width: '100%',
-          maxWidth: '880px',
-          background: 'rgba(8, 13, 28, 0.9)',
-          backdropFilter: 'blur(14px)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          borderTop: '2.5px solid #00ffaa',
-          borderRadius: '14px',
-          padding: '0.6rem 1.2rem',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.75)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: assignment.match ? '0.45rem' : 0, fontSize: '0.82rem', fontWeight: 800 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <span style={{ background: '#ff2244', color: '#fff', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Radio size={11} /> LIVE
+        {!isVirtual && (
+          <div style={{
+            position: 'relative',
+            zIndex: 15,
+            width: '100%',
+            maxWidth: '880px',
+            background: 'rgba(8, 13, 28, 0.9)',
+            backdropFilter: 'blur(14px)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderTop: '2.5px solid #00ffaa',
+            borderRadius: '14px',
+            padding: '0.6rem 1.2rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.75)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: assignment.match ? '0.45rem' : 0, fontSize: '0.82rem', fontWeight: 800 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span style={{ background: '#ff2244', color: '#fff', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Radio size={11} /> LIVE
+                </span>
+                <span style={{ color: '#00ffaa', fontWeight: 900 }}>{assignment.title}</span>
+                {assignment.match && (
+                  <MatchTimerBadge
+                    startTime={assignment.match.startTime}
+                    durationMinutes={assignment.match.durationMinutes ?? resolveMatchDurationMinutes(assignment.match, activeTournament)}
+                    status={assignment.match.status}
+                    size="sm"
+                  />
+                )}
+              </div>
+              <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.76rem' }}>
+                {assignment.rulesLabel || currentClub.name}
               </span>
-              <span style={{ color: '#00ffaa', fontWeight: 900 }}>{assignment.title}</span>
-              {assignment.match && (
-                <MatchTimerBadge
-                  startTime={assignment.match.startTime}
-                  durationMinutes={assignment.match.durationMinutes ?? resolveMatchDurationMinutes(assignment.match, activeTournament)}
-                  status={assignment.match.status}
-                  size="sm"
-                />
-              )}
             </div>
-            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.76rem' }}>
-              {assignment.rulesLabel || currentClub.name}
-            </span>
+
+            {assignment.match && assignment.p1 && assignment.p2 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                  <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00ffaa' }} />
+                  <span style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {assignment.p1.name}
+                  </span>
+                </div>
+
+                <div style={{ background: '#F59E0B', color: '#000', fontWeight: 900, fontSize: '2rem', padding: '2px 18px', borderRadius: '10px' }}>
+                  {assignment.match.score1} - {assignment.match.score2}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', minWidth: 0 }}>
+                  <span style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {assignment.p2.name}
+                  </span>
+                  <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00ffaa' }} />
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.8)', marginTop: '0.2rem' }}>
+                {assignment.subtitle}
+              </div>
+            )}
           </div>
+        )}
 
-          {assignment.match && assignment.p1 && assignment.p2 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-                <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00ffaa' }} />
-                <span style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {assignment.p1.name}
-                </span>
-              </div>
-
-              <div style={{ background: '#F59E0B', color: '#000', fontWeight: 900, fontSize: '2rem', padding: '2px 18px', borderRadius: '10px' }}>
-                {assignment.match.score1} - {assignment.match.score2}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', minWidth: 0 }}>
-                <span style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {assignment.p2.name}
-                </span>
-                <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00ffaa' }} />
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.8)', marginTop: '0.2rem' }}>
-              {assignment.subtitle}
-            </div>
-          )}
-        </div>
-
-        {/* Floating Quick Switch Toolbar */}
         <div style={{
           position: 'absolute',
           bottom: '16px',
@@ -539,7 +581,6 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
     );
   }
 
-  // MOSAIC MODE
   const list = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
   const count = list.length;
   const gridCols = count <= 1
@@ -568,7 +609,6 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
       boxSizing: 'border-box',
       fontFamily: 'Inter, system-ui, sans-serif'
     }}>
-      {/* Top Bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -631,7 +671,6 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
         </div>
       </div>
 
-      {/* Mosaic Grid */}
       <div style={{
         flex: 1,
         minHeight: 0,
@@ -647,13 +686,14 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
             key={slot.id}
             slot={slot}
             stream={getStreamForSlot(slot)}
-            isAudioActive={soundAllowed && !slot.forceMuted && directorState.activeAudioCameraId === slot.id}
+            isAudioActive={soundAllowed && !slot.forceMuted && !isVirtualScreenSource(slot.sourceType) && directorState.activeAudioCameraId === slot.id}
             onClickTile={() => {
+              const keepMic = isVirtualScreenSource(slot.sourceType);
               updateState({
                 ...directorState,
                 broadcastMode: 'single',
                 focusedCameraId: slot.id,
-                activeAudioCameraId: slot.id
+                activeAudioCameraId: keepMic ? directorState.activeAudioCameraId : slot.id
               });
             }}
           />

@@ -2,11 +2,15 @@ import { Club, Match, Player, Table, Tournament } from '../types';
 import { LiveOverlayConfig, DEFAULT_LIVE_OVERLAY_CONFIG } from './liveOverlay';
 import {
   DirectorCameraSlot,
+  DirectorMosaicLayout,
   MultiCamDirectorState,
-  StreamDestinationsConfig
+  StreamDestinationsConfig,
+  isVirtualScreenSource
 } from './multiCamDirector';
 import { getMatchScoringRules } from './rules';
 import { getClubLogoUrl, defaultClubLogo } from './logo';
+import { getTournamentQualificationStatus, PlayerQualifStat } from './qualifiers';
+import { isFinalStageMatch } from './bracket';
 
 export type RelayTargetStatus = 'idle' | 'connecting' | 'live' | 'stopped' | 'error';
 
@@ -43,6 +47,65 @@ export interface ResolvedCameraAssignment {
   isMatchView: boolean;
 }
 
+export interface MosaicCellRect {
+  index: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export function getMosaicGridRects(
+  count: number,
+  mosaicLayout: DirectorMosaicLayout,
+  W: number = 1280,
+  H: number = 720
+): MosaicCellRect[] {
+  const safeCount = Math.max(1, count);
+  const headerH = 44;
+  let cols = 1;
+  let rows = 1;
+  if (safeCount === 2) {
+    if (mosaicLayout === 'stacked') {
+      cols = 1;
+      rows = 2;
+    } else {
+      cols = 2;
+      rows = 1;
+    }
+  } else if (safeCount <= 4) {
+    cols = 2;
+    rows = 2;
+  } else if (safeCount <= 6) {
+    cols = 3;
+    rows = 2;
+  } else {
+    cols = 4;
+    rows = 2;
+  }
+
+  const gap = 8;
+  const areaY = headerH + gap;
+  const areaH = H - areaY - gap;
+  const areaW = W - gap * 2;
+  const cellW = (areaW - gap * (cols - 1)) / cols;
+  const cellH = (areaH - gap * (rows - 1)) / rows;
+
+  const rects: MosaicCellRect[] = [];
+  for (let idx = 0; idx < safeCount; idx++) {
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    rects.push({
+      index: idx,
+      x: gap + col * (cellW + gap),
+      y: areaY + row * (cellH + gap),
+      w: cellW,
+      h: cellH
+    });
+  }
+  return rects;
+}
+
 export function resolveCameraAssignment(
   slot: DirectorCameraSlot,
   data: {
@@ -55,6 +118,39 @@ export function resolveCameraAssignment(
 ): ResolvedCameraAssignment {
   const { tables, matches, players, tournaments, currentClub } = data;
   const activeTournament = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
+
+  if (slot.sourceType === 'tournament_standings') {
+    return {
+      title: '🏆 Classement du Tournoi',
+      subtitle: activeTournament ? activeTournament.name : currentClub.name,
+      rulesLabel: '',
+      isMatchView: false
+    };
+  }
+  if (slot.sourceType === 'tournament_bracket') {
+    return {
+      title: '🌳 Tableau Phases Finales',
+      subtitle: activeTournament ? activeTournament.name : currentClub.name,
+      rulesLabel: '',
+      isMatchView: false
+    };
+  }
+  if (slot.sourceType === 'matches_live_board') {
+    return {
+      title: '🎱 Scores en Direct',
+      subtitle: currentClub.name,
+      rulesLabel: '',
+      isMatchView: false
+    };
+  }
+  if (slot.sourceType === 'club_leaderboard') {
+    return {
+      title: '👑 Classement Club',
+      subtitle: currentClub.name,
+      rulesLabel: '',
+      isMatchView: false
+    };
+  }
 
   if (slot.assignmentType === 'table') {
     const table = slot.tableId ? tables[slot.tableId] : undefined;
@@ -117,6 +213,412 @@ function drawRoundedRect(
   ctx.arcTo(x, y + h, x, y, radius);
   ctx.arcTo(x, y, x + w, y, radius);
   ctx.closePath();
+}
+
+function drawStandingsList(
+  ctx: CanvasRenderingContext2D,
+  list: PlayerQualifStat[],
+  players: Record<string, Player>,
+  qualCount: number,
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number,
+  poolTitle?: string
+) {
+  drawRoundedRect(ctx, boxX, boxY, boxW, boxH, 16);
+  ctx.fillStyle = 'rgba(10, 17, 34, 0.92)';
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(0, 255, 170, 0.35)';
+  ctx.stroke();
+
+  let headerOffset = 14;
+  if (poolTitle) {
+    ctx.fillStyle = '#FBBF24';
+    ctx.font = '900 22px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(poolTitle, boxX + 20, boxY + 26);
+    headerOffset = 48;
+  }
+
+  // Table header
+  const colY = boxY + headerOffset + 12;
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '800 15px Inter, system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillText('#', boxX + 20, colY);
+  ctx.fillText('JOUEUR', boxX + 62, colY);
+  ctx.textAlign = 'center';
+  ctx.fillText('J', boxX + boxW - 230, colY);
+  ctx.fillText('V', boxX + boxW - 175, colY);
+  ctx.fillText('+/-', boxX + boxW - 115, colY);
+  ctx.fillStyle = '#00ffaa';
+  ctx.fillText('PTS', boxX + boxW - 48, colY);
+
+  const startY = colY + 22;
+  const availH = boxH - (startY - boxY) - 14;
+  const maxRows = Math.min(list.length, Math.max(4, Math.floor(availH / 46)));
+  const rowH = Math.min(52, availH / Math.max(1, maxRows));
+
+  for (let i = 0; i < maxRows; i++) {
+    const stat = list[i];
+    const ry = startY + i * rowH;
+    const isQual = stat.isSure || i < qualCount;
+
+    drawRoundedRect(ctx, boxX + 12, ry + 2, boxW - 24, rowH - 6, 10);
+    ctx.fillStyle = isQual ? 'rgba(16, 185, 129, 0.14)' : 'rgba(255,255,255,0.04)';
+    ctx.fill();
+    if (isQual) {
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.45)';
+      ctx.stroke();
+    }
+
+    const midY = ry + rowH / 2 - 1;
+    // Rank badge
+    ctx.fillStyle = i === 0 ? '#FBBF24' : i === 1 ? '#CBD5E1' : i === 2 ? '#D97706' : 'rgba(255,255,255,0.65)';
+    ctx.font = '900 19px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${i + 1}`, boxX + 22, midY);
+
+    // Player Name
+    const pName = players[stat.id]?.name || stat.name || 'Joueur';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 19px Inter, system-ui, sans-serif';
+    const maxNameChars = boxW > 700 ? 28 : 16;
+    ctx.fillText(pName.slice(0, maxNameChars), boxX + 62, midY);
+
+    if (stat.isSure && boxW > 650) {
+      const nameW = ctx.measureText(pName.slice(0, maxNameChars)).width;
+      const badgeX = boxX + 74 + nameW;
+      if (badgeX + 86 < boxX + boxW - 260) {
+        drawRoundedRect(ctx, badgeX, midY - 11, 78, 22, 6);
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = '900 11px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('QUALIFIÉ', badgeX + 39, midY);
+      }
+    }
+
+    // Numbers
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '700 18px Inter, system-ui, sans-serif';
+    ctx.fillText(`${stat.played}`, boxX + boxW - 230, midY);
+    ctx.fillText(`${stat.won}`, boxX + boxW - 175, midY);
+
+    const diff = stat.sf - stat.sa;
+    ctx.fillStyle = diff > 0 ? '#34D399' : diff < 0 ? '#F87171' : 'rgba(255,255,255,0.65)';
+    ctx.fillText(`${diff > 0 ? '+' : ''}${diff}`, boxX + boxW - 115, midY);
+
+    ctx.fillStyle = '#FBBF24';
+    ctx.font = '900 22px Inter, system-ui, sans-serif';
+    ctx.fillText(`${stat.pts}`, boxX + boxW - 48, midY);
+  }
+}
+
+/**
+ * Dessine un écran graphique Live (Classement du Tournoi, Tableau Final, Scores en Direct ou Classement Club)
+ * dans un rectangle arbitraire (plein écran 1280x720 ou tuile mosaïque).
+ */
+export function drawVirtualScreenToCanvas(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  slot: DirectorCameraSlot,
+  data: {
+    tables: Record<string, Table>;
+    matches: Record<string, Match>;
+    players: Record<string, Player>;
+    tournaments: Record<string, Tournament>;
+    currentClub: Club;
+  }
+) {
+  const { tables, matches, players, tournaments, currentClub } = data;
+  const allTours = Object.values(tournaments);
+  const targetTour =
+    allTours.slice().reverse().find(t => t.status === 'ongoing') ||
+    allTours[allTours.length - 1] ||
+    null;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.translate(x, y);
+  ctx.scale(w / 1280, h / 720);
+
+  // Rich broadcast dark emerald background
+  const grad = ctx.createRadialGradient(640, 180, 60, 640, 360, 820);
+  grad.addColorStop(0, '#0a2923');
+  grad.addColorStop(0.6, '#05111e');
+  grad.addColorStop(1, '#02050c');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1280, 720);
+
+  // Header bar
+  ctx.fillStyle = 'rgba(6, 12, 24, 0.9)';
+  ctx.fillRect(0, 0, 1280, 78);
+  ctx.fillStyle = 'rgba(0, 255, 170, 0.5)';
+  ctx.fillRect(0, 76, 1280, 2);
+
+  drawRoundedRect(ctx, 28, 22, 68, 32, 8);
+  ctx.fillStyle = '#ff2244';
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = '900 15px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('LIVE', 62, 38);
+
+  const headerTitle =
+    slot.sourceType === 'tournament_standings'
+      ? `🏆 CLASSEMENT DU TOURNOI${targetTour ? ` — ${targetTour.name}` : ''}`
+      : slot.sourceType === 'tournament_bracket'
+        ? `🌳 TABLEAU DES PHASES FINALES${targetTour ? ` — ${targetTour.name}` : ''}`
+        : slot.sourceType === 'matches_live_board'
+          ? `🎱 SCORES EN DIRECT — ${currentClub.name}`
+          : `👑 CLASSEMENT GÉNÉRAL — ${currentClub.name}`;
+
+  ctx.fillStyle = '#FBBF24';
+  ctx.font = '900 28px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(headerTitle.slice(0, 56), 114, 39);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.font = '700 18px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(currentClub.name, 1250, 39);
+
+  if (slot.sourceType === 'tournament_standings') {
+    if (!targetTour) {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '700 26px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Aucun tournoi actif pour le moment', 640, 360);
+    } else {
+      const status = getTournamentQualificationStatus(targetTour, matches, players);
+      // Progress pill
+      ctx.fillStyle = 'rgba(0,255,170,0.85)';
+      ctx.font = '800 17px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(
+        `Matchs de qualification : ${status.finishedQualifMatches} / ${status.totalQualifMatches} • ${status.numQualifiers} qualifiés`,
+        32,
+        106
+      );
+
+      if (status.isMultiPool && status.poolNames.length > 1) {
+        const pools = status.poolNames.slice(0, 4);
+        const cols = pools.length <= 2 ? pools.length : 2;
+        const rows = pools.length <= 2 ? 1 : 2;
+        const gap = 20;
+        const boxW = (1216 - gap * (cols - 1)) / cols;
+        const boxH = (566 - gap * (rows - 1)) / rows;
+        const qualPerPool = Math.max(1, Math.round(status.numQualifiers / status.poolNames.length));
+        pools.forEach((pName, idx) => {
+          const c = idx % cols;
+          const r = Math.floor(idx / cols);
+          drawStandingsList(
+            ctx,
+            status.rankingsByPool[pName] || [],
+            players,
+            qualPerPool,
+            32 + c * (boxW + gap),
+            126 + r * (boxH + gap),
+            boxW,
+            boxH,
+            pName
+          );
+        });
+      } else {
+        drawStandingsList(ctx, status.ranking, players, status.numQualifiers, 32, 126, 1216, 566);
+      }
+    }
+  } else if (slot.sourceType === 'tournament_bracket') {
+    const tourMatches = targetTour
+      ? targetTour.matches.map(id => matches[id]).filter(Boolean).filter(isFinalStageMatch)
+      : [];
+    if (tourMatches.length === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '700 26px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Les phases finales ne sont pas encore lancées', 640, 360);
+    } else {
+      const stages: Array<{ key: string; label: string }> = [
+        { key: 'quarter', label: 'QUARTS' },
+        { key: 'semi', label: 'DEMI-FINALES' },
+        { key: 'final', label: 'FINALE & 3ÈME PLACE' }
+      ];
+      const colW = 385;
+      const gap = 30;
+      stages.forEach((st, cIdx) => {
+        const cx = 32 + cIdx * (colW + gap);
+        ctx.fillStyle = '#00ffaa';
+        ctx.font = '900 18px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(st.label, cx, 112);
+
+        const list = tourMatches
+          .filter(m =>
+            st.key === 'final'
+              ? m.stage === 'final' || m.stage === 'third_place'
+              : m.stage === st.key
+          )
+          .sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+
+        list.slice(0, 4).forEach((m, mIdx) => {
+          const my = 138 + mIdx * 136;
+          drawRoundedRect(ctx, cx, my, colW, 114, 12);
+          ctx.fillStyle = m.status === 'playing' ? 'rgba(245, 158, 11, 0.16)' : 'rgba(12, 20, 38, 0.9)';
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = m.status === 'playing' ? '#F59E0B' : 'rgba(255,255,255,0.16)';
+          ctx.stroke();
+
+          const p1Name = players[m.player1Id]?.name || 'À déterminer';
+          const p2Name = players[m.player2Id]?.name || 'À déterminer';
+          ctx.fillStyle = m.winnerId && m.winnerId === m.player1Id ? '#34D399' : '#fff';
+          ctx.font = '800 18px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(p1Name.slice(0, 22), cx + 16, my + 34);
+          ctx.textAlign = 'right';
+          ctx.fillStyle = '#FBBF24';
+          ctx.font = '900 22px Inter, system-ui, sans-serif';
+          ctx.fillText(`${m.score1}`, cx + colW - 18, my + 34);
+
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.fillRect(cx + 14, my + 56, colW - 28, 1);
+
+          ctx.fillStyle = m.winnerId && m.winnerId === m.player2Id ? '#34D399' : '#fff';
+          ctx.font = '800 18px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(p2Name.slice(0, 22), cx + 16, my + 84);
+          ctx.textAlign = 'right';
+          ctx.fillStyle = '#FBBF24';
+          ctx.font = '900 22px Inter, system-ui, sans-serif';
+          ctx.fillText(`${m.score2}`, cx + colW - 18, my + 84);
+        });
+      });
+    }
+  } else if (slot.sourceType === 'matches_live_board') {
+    const sortedTables = Object.values(tables).sort((a, b) => a.number - b.number).slice(0, 6);
+    const cols = sortedTables.length <= 2 ? sortedTables.length || 1 : 2;
+    const rows = Math.ceil(sortedTables.length / cols) || 1;
+    const gap = 22;
+    const boxW = (1216 - gap * (cols - 1)) / cols;
+    const boxH = Math.min(250, (570 - gap * (rows - 1)) / rows);
+
+    sortedTables.forEach((tbl, idx) => {
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      const bx = 32 + col * (boxW + gap);
+      const by = 112 + row * (boxH + gap);
+      const m = tbl.currentMatchId ? matches[tbl.currentMatchId] : undefined;
+      const activeM = m && m.status !== 'finished' ? m : undefined;
+      const p1 = activeM ? players[activeM.player1Id] : undefined;
+      const p2 = activeM ? players[activeM.player2Id] : undefined;
+
+      drawRoundedRect(ctx, bx, by, boxW, boxH, 16);
+      ctx.fillStyle = activeM ? 'rgba(10, 22, 40, 0.92)' : 'rgba(10, 16, 28, 0.72)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = activeM ? 'rgba(0, 255, 170, 0.5)' : 'rgba(255,255,255,0.12)';
+      ctx.stroke();
+
+      ctx.fillStyle = '#00ffaa';
+      ctx.font = '900 21px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(tbl.name || `Billard ${tbl.number}`, bx + 22, by + 36);
+
+      if (activeM && p1 && p2) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '800 24px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(p1.name.slice(0, 18), bx + 22, by + boxH / 2 + 12);
+
+        drawRoundedRect(ctx, bx + boxW / 2 - 58, by + boxH / 2 - 10, 116, 46, 10);
+        ctx.fillStyle = '#F59E0B';
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = '900 28px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${activeM.score1} - ${activeM.score2}`, bx + boxW / 2, by + boxH / 2 + 13);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = '800 24px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(p2.name.slice(0, 18), bx + boxW - 22, by + boxH / 2 + 12);
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.font = '700 20px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Billard libre', bx + boxW / 2, by + boxH / 2 + 14);
+      }
+    });
+  } else {
+    // club_leaderboard
+    const topPlayers = Object.values(players)
+      .slice()
+      .sort((a, b) => (b.stats?.points ?? 0) - (a.stats?.points ?? 0) || (b.stats?.wins ?? 0) - (a.stats?.wins ?? 0))
+      .slice(0, 10);
+
+    drawRoundedRect(ctx, 32, 108, 1216, 584, 16);
+    ctx.fillStyle = 'rgba(10, 17, 34, 0.92)';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '800 16px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('RANG', 56, 140);
+    ctx.fillText('JOUEUR', 136, 140);
+    ctx.textAlign = 'center';
+    ctx.fillText('MATCHS', 760, 140);
+    ctx.fillText('VICTOIRES', 900, 140);
+    ctx.fillText('% WIN', 1040, 140);
+    ctx.fillStyle = '#FBBF24';
+    ctx.fillText('POINTS', 1175, 140);
+
+    topPlayers.forEach((p, idx) => {
+      const ry = 162 + idx * 51;
+      drawRoundedRect(ctx, 48, ry, 1184, 44, 9);
+      ctx.fillStyle = idx < 3 ? 'rgba(245, 158, 11, 0.14)' : 'rgba(255,255,255,0.04)';
+      ctx.fill();
+
+      const midY = ry + 22;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = idx === 0 ? '#FBBF24' : idx === 1 ? '#CBD5E1' : idx === 2 ? '#D97706' : 'rgba(255,255,255,0.65)';
+      ctx.font = '900 20px Inter, system-ui, sans-serif';
+      ctx.fillText(`#${idx + 1}`, 62, midY);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 20px Inter, system-ui, sans-serif';
+      ctx.fillText(p.name.slice(0, 30), 136, midY);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = '700 18px Inter, system-ui, sans-serif';
+      ctx.fillText(`${p.stats?.matchesPlayed ?? 0}`, 760, midY);
+      ctx.fillText(`${p.stats?.wins ?? 0}`, 900, midY);
+      ctx.fillText(`${Math.round(p.stats?.winRate ?? 0)}%`, 1040, midY);
+
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = '900 22px Inter, system-ui, sans-serif';
+      ctx.fillText(`${p.stats?.points ?? 0}`, 1175, midY);
+    });
+  }
+
+  ctx.restore();
 }
 
 export class LiveCompositeBroadcaster {
@@ -195,7 +697,6 @@ export class LiveCompositeBroadcaster {
     const ac = new AudioContextCtor();
     const dest = ac.createMediaStreamDestination();
 
-    // Constant silent carrier so RTMP/FLV always receives a valid audio track even if all mics are muted
     const osc = ac.createOscillator();
     const silentGain = ac.createGain();
     silentGain.gain.value = 0;
@@ -211,12 +712,15 @@ export class LiveCompositeBroadcaster {
   private syncAudioRouting() {
     if (!this.audioCtx || !this.audioDest || !this.contextData) return;
     const { directorState, mediaStreams } = this.contextData;
-    const targetCamId =
+    const focusedCam =
       directorState.broadcastMode === 'single' && directorState.focusedCameraId
-        ? directorState.focusedCameraId
+        ? directorState.cameras.find(c => c.id === directorState.focusedCameraId)
+        : null;
+    const targetCamId =
+      focusedCam && !isVirtualScreenSource(focusedCam.sourceType)
+        ? focusedCam.id
         : directorState.activeAudioCameraId;
 
-    // Remove stale streams
     for (const [camId, entry] of this.audioSources.entries()) {
       const currentStream = mediaStreams[camId];
       if (!currentStream || currentStream !== entry.stream || currentStream.getAudioTracks().length === 0) {
@@ -228,7 +732,6 @@ export class LiveCompositeBroadcaster {
       }
     }
 
-    // Add new streams
     for (const cam of directorState.cameras) {
       const stream = mediaStreams[cam.id];
       if (stream && stream.getAudioTracks().length > 0 && !this.audioSources.has(cam.id)) {
@@ -244,7 +747,6 @@ export class LiveCompositeBroadcaster {
       }
     }
 
-    // Apply exclusive audio gain to ONLY the selected camera
     const now = this.audioCtx.currentTime;
     for (const cam of directorState.cameras) {
       const entry = this.audioSources.get(cam.id);
@@ -258,7 +760,7 @@ export class LiveCompositeBroadcaster {
     if (this.rafTimer !== null) return;
     const tick = () => {
       this.drawFrame();
-      this.rafTimer = window.setTimeout(tick, 33); // ~30 FPS reliable even when tab slightly throttled
+      this.rafTimer = window.setTimeout(tick, 33);
     };
     tick();
   }
@@ -276,8 +778,20 @@ export class LiveCompositeBroadcaster {
     y: number,
     w: number,
     h: number,
-    slot: DirectorCameraSlot
+    slot: DirectorCameraSlot,
+    data: LiveCompositeContext
   ) {
+    if (isVirtualScreenSource(slot.sourceType)) {
+      drawVirtualScreenToCanvas(this.ctx, x, y, w, h, slot, {
+        tables: data.tables,
+        matches: data.matches,
+        players: data.players,
+        tournaments: data.tournaments,
+        currentClub: data.currentClub
+      });
+      return;
+    }
+
     const ctx = this.ctx;
     ctx.save();
     ctx.beginPath();
@@ -338,7 +852,6 @@ export class LiveCompositeBroadcaster {
       ctx.strokeStyle = 'rgba(0, 255, 170, 0.7)';
       ctx.stroke();
 
-      // Top mini-header strip
       ctx.fillStyle = 'rgba(255, 34, 68, 0.95)';
       drawRoundedRect(ctx, left + 14, top + 8, 52, 20, 6);
       ctx.fill();
@@ -358,13 +871,11 @@ export class LiveCompositeBroadcaster {
       ctx.textAlign = 'right';
       ctx.fillText(club.name, left + boxW - 16, top + 18);
 
-      // Player 1
       ctx.fillStyle = '#ffffff';
       ctx.font = '800 22px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(assignment.p1.name.slice(0, 22), left + 18, top + 56);
 
-      // Score Badge
       const scoreBoxW = 110;
       const scoreLeft = left + boxW / 2 - scoreBoxW / 2;
       drawRoundedRect(ctx, scoreLeft, top + 34, scoreBoxW, 40, 10);
@@ -375,14 +886,12 @@ export class LiveCompositeBroadcaster {
       ctx.textAlign = 'center';
       ctx.fillText(`${assignment.match.score1} - ${assignment.match.score2}`, left + boxW / 2, top + 55);
 
-      // Player 2
       ctx.fillStyle = '#ffffff';
       ctx.font = '800 22px Inter, system-ui, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(assignment.p2.name.slice(0, 22), left + boxW - 18, top + 56);
       ctx.restore();
     } else {
-      // Custom View / Standby Banner
       const bannerW = 460;
       const bannerH = 52;
       const left = 24;
@@ -503,13 +1012,14 @@ export class LiveCompositeBroadcaster {
     if (directorState.broadcastMode === 'single' && directorState.focusedCameraId) {
       const slot = directorState.cameras.find(c => c.id === directorState.focusedCameraId) || enabledCams[0];
       if (slot) {
-        this.drawVideoInRect(videoElements[slot.id], 0, 0, W, H, slot);
-        const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub });
-        this.drawSingleScoreboard(assignment, slot, overlayCfg, currentClub);
+        this.drawVideoInRect(videoElements[slot.id], 0, 0, W, H, slot, data);
+        if (!isVirtualScreenSource(slot.sourceType)) {
+          const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub });
+          this.drawSingleScoreboard(assignment, slot, overlayCfg, currentClub);
+        }
         this.drawCustomOverlays(overlayCfg);
       }
     } else {
-      // MOSAIC MODE
       const headerH = 44;
       ctx.fillStyle = '#070c1a';
       ctx.fillRect(0, 0, W, headerH);
@@ -533,85 +1043,52 @@ export class LiveCompositeBroadcaster {
       ctx.fillStyle = '#FBBF24';
       ctx.font = '900 16px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`${currentClub.name} • MULTI-CAMÉRAS`, 118, 22);
+      ctx.fillText(`${currentClub.name} • ÉCRAN MULTIPLE`, 118, 22);
 
       const list = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
-      const count = list.length;
-      let cols = 1;
-      let rows = 1;
-      if (count === 2) {
-        if (directorState.mosaicLayout === 'stacked') {
-          cols = 1;
-          rows = 2;
-        } else {
-          cols = 2;
-          rows = 1;
-        }
-      } else if (count <= 4) {
-        cols = 2;
-        rows = 2;
-      } else if (count <= 6) {
-        cols = 3;
-        rows = 2;
-      } else {
-        cols = 4;
-        rows = 2;
-      }
-
-      const gap = 8;
-      const areaY = headerH + gap;
-      const areaH = H - areaY - gap;
-      const areaW = W - gap * 2;
-      const cellW = (areaW - gap * (cols - 1)) / cols;
-      const cellH = (areaH - gap * (rows - 1)) / rows;
+      const rects = getMosaicGridRects(list.length, directorState.mosaicLayout, W, H);
 
       list.forEach((slot, idx) => {
-        const col = idx % cols;
-        const row = Math.floor(idx / cols);
-        const cx = gap + col * (cellW + gap);
-        const cy = areaY + row * (cellH + gap);
+        const rect = rects[idx];
+        if (!rect) return;
+        const { x: cx, y: cy, w: cellW, h: cellH } = rect;
 
-        this.drawVideoInRect(videoElements[slot.id], cx, cy, cellW, cellH, slot);
+        this.drawVideoInRect(videoElements[slot.id], cx, cy, cellW, cellH, slot, data);
 
-        // Tile border
-        const isAudioActive = directorState.activeAudioCameraId === slot.id && !slot.forceMuted;
-        ctx.strokeStyle = isAudioActive ? '#10B981' : 'rgba(255,255,255,0.2)';
+        const isAudioActive = directorState.activeAudioCameraId === slot.id && !slot.forceMuted && !isVirtualScreenSource(slot.sourceType);
+        ctx.strokeStyle = isAudioActive ? '#10B981' : 'rgba(255,255,255,0.22)';
         ctx.lineWidth = isAudioActive ? 3 : 1.5;
         ctx.strokeRect(cx, cy, cellW, cellH);
 
-        // Compact scoreboard/label bar inside each tile
-        const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub });
-        const barH = 44;
-        ctx.fillStyle = 'rgba(6, 10, 22, 0.86)';
-        ctx.fillRect(cx + 8, cy + 8, cellW - 16, barH);
+        if (!isVirtualScreenSource(slot.sourceType)) {
+          const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub });
+          const barH = 44;
+          ctx.fillStyle = 'rgba(6, 10, 22, 0.86)';
+          ctx.fillRect(cx + 8, cy + 8, cellW - 16, barH);
 
-        ctx.fillStyle = '#00ffaa';
-        ctx.font = '800 13px Inter, system-ui, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(
-          `${isAudioActive ? '🔊 ' : ''}${assignment.title}`,
-          cx + 16,
-          cy + 21
-        );
+          ctx.fillStyle = '#00ffaa';
+          ctx.font = '800 13px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${isAudioActive ? '🔊 ' : ''}${assignment.title}`, cx + 16, cy + 21);
 
-        if (assignment.match && assignment.p1 && assignment.p2) {
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '700 13px Inter, system-ui, sans-serif';
-          ctx.fillText(
-            `${assignment.p1.name.slice(0, 14)}  ${assignment.match.score1} - ${assignment.match.score2}  ${assignment.p2.name.slice(0, 14)}`,
-            cx + 16,
-            cy + 39
-          );
-        } else {
-          ctx.fillStyle = 'rgba(255,255,255,0.75)';
-          ctx.font = '600 12px Inter, system-ui, sans-serif';
-          ctx.fillText(assignment.subtitle.slice(0, 34), cx + 16, cy + 39);
+          if (assignment.match && assignment.p1 && assignment.p2) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '700 13px Inter, system-ui, sans-serif';
+            ctx.fillText(
+              `${assignment.p1.name.slice(0, 14)}  ${assignment.match.score1} - ${assignment.match.score2}  ${assignment.p2.name.slice(0, 14)}`,
+              cx + 16,
+              cy + 39
+            );
+          } else {
+            ctx.fillStyle = 'rgba(255,255,255,0.75)';
+            ctx.font = '600 12px Inter, system-ui, sans-serif';
+            ctx.fillText(assignment.subtitle.slice(0, 34), cx + 16, cy + 39);
+          }
         }
       });
     }
 
-    // Mirror onto optional Program Monitor preview canvas
     if (this.previewCanvas) {
       const pCtx = this.previewCanvas.getContext('2d');
       if (pCtx) {

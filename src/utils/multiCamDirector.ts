@@ -1,6 +1,23 @@
 import { supabase } from '../supabase';
 
-export type DirectorCameraSourceType = 'smartphone_webrtc' | 'usb' | 'vdo' | 'external';
+export type DirectorCameraSourceType =
+  | 'smartphone_webrtc'
+  | 'usb'
+  | 'vdo'
+  | 'external'
+  | 'tournament_standings'
+  | 'tournament_bracket'
+  | 'matches_live_board'
+  | 'club_leaderboard';
+
+export function isVirtualScreenSource(sourceType: DirectorCameraSourceType): boolean {
+  return (
+    sourceType === 'tournament_standings' ||
+    sourceType === 'tournament_bracket' ||
+    sourceType === 'matches_live_board' ||
+    sourceType === 'club_leaderboard'
+  );
+}
 export type DirectorAssignmentType = 'table' | 'live_match' | 'custom_view';
 export type DirectorBroadcastMode = 'mosaic' | 'single';
 export type DirectorMosaicLayout = 'auto' | 'side_by_side' | 'stacked' | 'grid_2x2';
