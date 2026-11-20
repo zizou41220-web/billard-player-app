@@ -21,6 +21,18 @@ export function isVirtualScreenSource(sourceType: DirectorCameraSourceType): boo
 export type DirectorAssignmentType = 'table' | 'live_match' | 'custom_view';
 export type DirectorBroadcastMode = 'mosaic' | 'single';
 export type DirectorMosaicLayout = 'auto' | 'side_by_side' | 'stacked' | 'grid_2x2';
+export type DirectorLiveSituation = 'club_tables' | 'regional_match';
+
+export interface RegionalMatchConfig {
+  eventTitle: string;
+  targetSets: number;
+  player1Name: string;
+  player1Club: string;
+  player2Name: string;
+  player2Club: string;
+  score1: number;
+  score2: number;
+}
 
 export interface DirectorCameraSlot {
   id: string;
@@ -54,6 +66,8 @@ export interface StreamDestinationsConfig {
 }
 
 export interface MultiCamDirectorState {
+  situation: DirectorLiveSituation;
+  regionalMatch: RegionalMatchConfig;
   cameras: DirectorCameraSlot[];
   broadcastMode: DirectorBroadcastMode;
   focusedCameraId: string | null;
@@ -63,6 +77,17 @@ export interface MultiCamDirectorState {
   liveStartedAt: number | null;
   updatedAt: number;
 }
+
+export const DEFAULT_REGIONAL_MATCH: RegionalMatchConfig = {
+  eventTitle: 'Tournoi Régional',
+  targetSets: 5,
+  player1Name: 'Joueur 1',
+  player1Club: '',
+  player2Name: 'Joueur 2',
+  player2Club: '',
+  score1: 0,
+  score2: 0
+};
 
 export const CUSTOM_VIEW_PRESETS: string[] = [
   "Vue d'ensemble Salle",
@@ -130,6 +155,8 @@ export const DEFAULT_CAMERAS: DirectorCameraSlot[] = [
 ];
 
 export const DEFAULT_DIRECTOR_STATE: MultiCamDirectorState = {
+  situation: 'club_tables',
+  regionalMatch: DEFAULT_REGIONAL_MATCH,
   cameras: DEFAULT_CAMERAS,
   broadcastMode: 'mosaic',
   focusedCameraId: null,
@@ -178,6 +205,11 @@ export const loadDirectorState = (clubId: string): MultiCamDirectorState => {
     return {
       ...DEFAULT_DIRECTOR_STATE,
       ...parsed,
+      situation: parsed.situation === 'regional_match' ? 'regional_match' : 'club_tables',
+      regionalMatch: {
+        ...DEFAULT_REGIONAL_MATCH,
+        ...(parsed.regionalMatch || {})
+      },
       cameras: Array.isArray(parsed.cameras) && parsed.cameras.length > 0
         ? parsed.cameras
         : DEFAULT_CAMERAS
@@ -238,6 +270,11 @@ export const subscribeToDirectorState = (
   const normalize = (parsed: any): MultiCamDirectorState => ({
     ...DEFAULT_DIRECTOR_STATE,
     ...parsed,
+    situation: parsed?.situation === 'regional_match' ? 'regional_match' : 'club_tables',
+    regionalMatch: {
+      ...DEFAULT_REGIONAL_MATCH,
+      ...(parsed?.regionalMatch || {})
+    },
     cameras: Array.isArray(parsed?.cameras) && parsed.cameras.length > 0
       ? parsed.cameras
       : DEFAULT_CAMERAS

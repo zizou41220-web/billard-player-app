@@ -43,6 +43,12 @@ export interface ResolvedCameraAssignment {
   match?: Match;
   p1?: Player;
   p2?: Player;
+  p1Name?: string;
+  p1Club?: string;
+  p2Name?: string;
+  p2Club?: string;
+  score1?: number;
+  score2?: number;
   rulesLabel: string;
   isMatchView: boolean;
 }
@@ -114,7 +120,8 @@ export function resolveCameraAssignment(
     players: Record<string, Player>;
     tournaments: Record<string, Tournament>;
     currentClub: Club;
-  }
+  },
+  directorState?: MultiCamDirectorState
 ): ResolvedCameraAssignment {
   const { tables, matches, players, tournaments, currentClub } = data;
   const activeTournament = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
@@ -152,6 +159,24 @@ export function resolveCameraAssignment(
     };
   }
 
+  if (directorState?.situation === 'regional_match') {
+    const rm = directorState.regionalMatch;
+    const p1Name = rm.player1Name.trim() || 'Joueur 1';
+    const p2Name = rm.player2Name.trim() || 'Joueur 2';
+    return {
+      title: rm.eventTitle.trim() || 'Tournoi Régional',
+      subtitle: `${p1Name} vs ${p2Name}`,
+      p1Name,
+      p1Club: rm.player1Club.trim() || undefined,
+      p2Name,
+      p2Club: rm.player2Club.trim() || undefined,
+      score1: rm.score1 ?? 0,
+      score2: rm.score2 ?? 0,
+      rulesLabel: rm.targetSets > 0 ? `1er à ${rm.targetSets}` : '',
+      isMatchView: true
+    };
+  }
+
   if (slot.assignmentType === 'table') {
     const table = slot.tableId ? tables[slot.tableId] : undefined;
     const match = table?.currentMatchId
@@ -168,6 +193,12 @@ export function resolveCameraAssignment(
       match: validMatch,
       p1,
       p2,
+      p1Name: p1?.name,
+      p1Club: p1?.clubName || p1?.stats?.clubName,
+      p2Name: p2?.name,
+      p2Club: p2?.clubName || p2?.stats?.clubName,
+      score1: validMatch?.score1,
+      score2: validMatch?.score2,
       rulesLabel,
       isMatchView: true
     };
@@ -184,6 +215,12 @@ export function resolveCameraAssignment(
       match: liveMatch,
       p1,
       p2,
+      p1Name: p1?.name,
+      p1Club: p1?.clubName || p1?.stats?.clubName,
+      p2Name: p2?.name,
+      p2Club: p2?.clubName || p2?.stats?.clubName,
+      score1: liveMatch?.score1,
+      score2: liveMatch?.score2,
       rulesLabel,
       isMatchView: true
     };
@@ -836,20 +873,22 @@ export class LiveCompositeBroadcaster {
     const W = this.canvas.width;
     const H = this.canvas.height;
 
-    if (assignment.match && assignment.p1 && assignment.p2) {
-      const boxW = Math.min(820, W - 80);
+    const hasScoreBoard = assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined;
+    if (hasScoreBoard) {
+      const boxW = Math.min(860, W - 80);
+      const hasClubs = Boolean(assignment.p1Club || assignment.p2Club);
       const cx = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardX ?? 50) / 100) * W : W / 2;
       const cy = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardY ?? 12) / 100) * H : 72;
-      const boxH = 82;
+      const boxH = hasClubs ? 94 : 82;
       const left = Math.max(20, Math.min(W - boxW - 20, cx - boxW / 2));
       const top = Math.max(16, Math.min(H - boxH - 16, cy - boxH / 2));
 
       ctx.save();
       drawRoundedRect(ctx, left, top, boxW, boxH, 14);
-      ctx.fillStyle = 'rgba(6, 12, 24, 0.9)';
+      ctx.fillStyle = 'rgba(6, 12, 24, 0.92)';
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = 'rgba(0, 255, 170, 0.7)';
+      ctx.strokeStyle = 'rgba(0, 255, 170, 0.75)';
       ctx.stroke();
 
       ctx.fillStyle = 'rgba(255, 34, 68, 0.95)';
@@ -871,25 +910,38 @@ export class LiveCompositeBroadcaster {
       ctx.textAlign = 'right';
       ctx.fillText(club.name, left + boxW - 16, top + 18);
 
+      // Player 1 Name & Club
       ctx.fillStyle = '#ffffff';
       ctx.font = '800 22px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(assignment.p1.name.slice(0, 22), left + 18, top + 56);
+      ctx.fillText((assignment.p1Name || 'Joueur 1').slice(0, 22), left + 18, top + (hasClubs ? 52 : 56));
+      if (assignment.p1Club) {
+        ctx.fillStyle = '#34D399';
+        ctx.font = '700 13px Inter, system-ui, sans-serif';
+        ctx.fillText(assignment.p1Club.slice(0, 26), left + 18, top + 76);
+      }
 
-      const scoreBoxW = 110;
+      // Score Box
+      const scoreBoxW = 114;
       const scoreLeft = left + boxW / 2 - scoreBoxW / 2;
-      drawRoundedRect(ctx, scoreLeft, top + 34, scoreBoxW, 40, 10);
+      drawRoundedRect(ctx, scoreLeft, top + (hasClubs ? 38 : 34), scoreBoxW, 42, 10);
       ctx.fillStyle = '#F59E0B';
       ctx.fill();
       ctx.fillStyle = '#000000';
-      ctx.font = '900 24px Inter, system-ui, sans-serif';
+      ctx.font = '900 25px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${assignment.match.score1} - ${assignment.match.score2}`, left + boxW / 2, top + 55);
+      ctx.fillText(`${assignment.score1} - ${assignment.score2}`, left + boxW / 2, top + (hasClubs ? 60 : 55));
 
+      // Player 2 Name & Club
       ctx.fillStyle = '#ffffff';
       ctx.font = '800 22px Inter, system-ui, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(assignment.p2.name.slice(0, 22), left + boxW - 18, top + 56);
+      ctx.fillText((assignment.p2Name || 'Joueur 2').slice(0, 22), left + boxW - 18, top + (hasClubs ? 52 : 56));
+      if (assignment.p2Club) {
+        ctx.fillStyle = '#FBBF24';
+        ctx.font = '700 13px Inter, system-ui, sans-serif';
+        ctx.fillText(assignment.p2Club.slice(0, 26), left + boxW - 18, top + 76);
+      }
       ctx.restore();
     } else {
       const bannerW = 460;
@@ -1014,7 +1066,7 @@ export class LiveCompositeBroadcaster {
       if (slot) {
         this.drawVideoInRect(videoElements[slot.id], 0, 0, W, H, slot, data);
         if (!isVirtualScreenSource(slot.sourceType)) {
-          const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub });
+          const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub }, directorState);
           this.drawSingleScoreboard(assignment, slot, overlayCfg, currentClub);
         }
         this.drawCustomOverlays(overlayCfg);
@@ -1061,7 +1113,7 @@ export class LiveCompositeBroadcaster {
         ctx.strokeRect(cx, cy, cellW, cellH);
 
         if (!isVirtualScreenSource(slot.sourceType)) {
-          const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub });
+          const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub }, directorState);
           const barH = 44;
           ctx.fillStyle = 'rgba(6, 10, 22, 0.86)';
           ctx.fillRect(cx + 8, cy + 8, cellW - 16, barH);
@@ -1072,11 +1124,11 @@ export class LiveCompositeBroadcaster {
           ctx.textBaseline = 'middle';
           ctx.fillText(`${isAudioActive ? '🔊 ' : ''}${assignment.title}`, cx + 16, cy + 21);
 
-          if (assignment.match && assignment.p1 && assignment.p2) {
+          if (assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined) {
             ctx.fillStyle = '#ffffff';
             ctx.font = '700 13px Inter, system-ui, sans-serif';
             ctx.fillText(
-              `${assignment.p1.name.slice(0, 14)}  ${assignment.match.score1} - ${assignment.match.score2}  ${assignment.p2.name.slice(0, 14)}`,
+              `${assignment.p1Name.slice(0, 14)}  ${assignment.score1} - ${assignment.score2}  ${assignment.p2Name.slice(0, 14)}`,
               cx + 16,
               cy + 39
             );

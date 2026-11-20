@@ -27,6 +27,7 @@ interface DirectorTvOutputViewProps {
 
 interface DirectorOutputTileProps {
   slot: DirectorCameraSlot;
+  directorState: MultiCamDirectorState;
   stream: MediaStream | null;
   isAudioActive: boolean;
   onClickTile?: () => void;
@@ -158,6 +159,7 @@ const DirectorVideoElement: React.FC<{
 
 const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
   slot,
+  directorState,
   stream,
   isAudioActive,
   onClickTile
@@ -165,13 +167,17 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
   const { tables, matches, players, tournaments, currentClub } = useStore();
   const activeTournament = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
   const isVirtual = isVirtualScreenSource(slot.sourceType);
-  const assignment = resolveCameraAssignment(slot, {
-    tables,
-    matches,
-    players,
-    tournaments,
-    currentClub
-  });
+  const assignment = resolveCameraAssignment(
+    slot,
+    { tables, matches, players, tournaments, currentClub },
+    directorState
+  );
+  const hasMatchBanner =
+    assignment.isMatchView &&
+    assignment.p1Name &&
+    assignment.p2Name &&
+    assignment.score1 !== undefined &&
+    assignment.score2 !== undefined;
 
   return (
     <div
@@ -239,24 +245,42 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
             </span>
           </div>
 
-          {assignment.match && assignment.p1 && assignment.p2 ? (
+          {hasMatchBanner ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-                <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B' }} />
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {assignment.p1.name}
-                </span>
+                {assignment.p1 && (
+                  <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B' }} />
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {assignment.p1Name}
+                  </span>
+                  {assignment.p1Club && (
+                    <span style={{ color: '#34D399', fontWeight: 700, fontSize: '0.65rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {assignment.p1Club}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div style={{ background: '#F59E0B', color: '#000', fontWeight: 900, fontSize: '1.05rem', padding: '1px 10px', borderRadius: '7px' }}>
-                {assignment.match.score1} - {assignment.match.score2}
+                {assignment.score1} - {assignment.score2}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', minWidth: 0 }}>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {assignment.p2.name}
-                </span>
-                <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0 }}>
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {assignment.p2Name}
+                  </span>
+                  {assignment.p2Club && (
+                    <span style={{ color: '#FBBF24', fontWeight: 700, fontSize: '0.65rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {assignment.p2Club}
+                    </span>
+                  )}
+                </div>
+                {assignment.p2 && (
+                  <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B' }} />
+                )}
               </div>
             </div>
           ) : (
@@ -451,8 +475,18 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
 
   if (focusedCam) {
     const isVirtual = isVirtualScreenSource(focusedCam.sourceType);
-    const assignment = resolveCameraAssignment(focusedCam, { tables, matches, players, tournaments, currentClub });
+    const assignment = resolveCameraAssignment(
+      focusedCam,
+      { tables, matches, players, tournaments, currentClub },
+      directorState
+    );
     const unmute = soundAllowed && !focusedCam.forceMuted && !isVirtual;
+    const hasMatchBanner =
+      assignment.isMatchView &&
+      assignment.p1Name &&
+      assignment.p2Name &&
+      assignment.score1 !== undefined &&
+      assignment.score2 !== undefined;
 
     return (
       <div style={{
@@ -481,7 +515,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
             position: 'relative',
             zIndex: 15,
             width: '100%',
-            maxWidth: '880px',
+            maxWidth: '900px',
             background: 'rgba(8, 13, 28, 0.9)',
             backdropFilter: 'blur(14px)',
             border: '1px solid rgba(255,255,255,0.18)',
@@ -490,7 +524,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
             padding: '0.6rem 1.2rem',
             boxShadow: '0 10px 30px rgba(0,0,0,0.75)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: assignment.match ? '0.45rem' : 0, fontSize: '0.82rem', fontWeight: 800 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasMatchBanner ? '0.45rem' : 0, fontSize: '0.82rem', fontWeight: 800 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <span style={{ background: '#ff2244', color: '#fff', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <Radio size={11} /> LIVE
@@ -510,24 +544,42 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
               </span>
             </div>
 
-            {assignment.match && assignment.p1 && assignment.p2 ? (
+            {hasMatchBanner ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-                  <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00ffaa' }} />
-                  <span style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {assignment.p1.name}
-                  </span>
+                  {assignment.p1 && (
+                    <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00ffaa' }} />
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {assignment.p1Name}
+                    </span>
+                    {assignment.p1Club && (
+                      <span style={{ color: '#34D399', fontSize: '0.78rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {assignment.p1Club}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ background: '#F59E0B', color: '#000', fontWeight: 900, fontSize: '2rem', padding: '2px 18px', borderRadius: '10px' }}>
-                  {assignment.match.score1} - {assignment.match.score2}
+                  {assignment.score1} - {assignment.score2}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', minWidth: 0 }}>
-                  <span style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {assignment.p2.name}
-                  </span>
-                  <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00ffaa' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0 }}>
+                    <span style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {assignment.p2Name}
+                    </span>
+                    {assignment.p2Club && (
+                      <span style={{ color: '#FBBF24', fontSize: '0.78rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {assignment.p2Club}
+                      </span>
+                    )}
+                  </div>
+                  {assignment.p2 && (
+                    <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00ffaa' }} />
+                  )}
                 </div>
               </div>
             ) : (
@@ -632,9 +684,9 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
             />
           </div>
           <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#F59E0B' }}>
-            📺 ÉCRAN MULTIPLE LIVE • {currentClub.name}
+            📺 ÉCRAN MULTIPLE LIVE • {directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
           </span>
-          {activeTournament && (
+          {directorState.situation === 'club_tables' && activeTournament && (
             <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
               🏆 {activeTournament.name}
             </span>
@@ -685,6 +737,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
           <DirectorOutputTile
             key={slot.id}
             slot={slot}
+            directorState={directorState}
             stream={getStreamForSlot(slot)}
             isAudioActive={soundAllowed && !slot.forceMuted && !isVirtualScreenSource(slot.sourceType) && directorState.activeAudioCameraId === slot.id}
             onClickTile={() => {

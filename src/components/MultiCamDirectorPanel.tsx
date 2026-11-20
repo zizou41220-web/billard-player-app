@@ -13,6 +13,7 @@ import {
   Maximize2,
   Mic,
   MicOff,
+  Minus,
   MonitorPlay,
   Play,
   Plus,
@@ -36,12 +37,15 @@ import { Table } from '../types';
 import {
   CUSTOM_VIEW_PRESETS,
   CameraSignalingHandle,
+  DEFAULT_REGIONAL_MATCH,
   DirectorAssignmentType,
   DirectorCameraSlot,
   DirectorCameraSourceType,
+  DirectorLiveSituation,
   DirectorMosaicLayout,
   MultiCamDirectorState,
   RTC_ICE_CONFIG,
+  RegionalMatchConfig,
   StreamDestinationsConfig,
   createCameraSignalingChannel,
   isVirtualScreenSource,
@@ -84,6 +88,7 @@ interface CameraTileCardProps {
   onRemoveSlot: (cameraId: string) => void;
   onOpenQr: (cameraId: string) => void;
   onReconnectWebRtc: (cameraId: string) => void;
+  onScoreClubMatch: (matchId: string, score1: number, score2: number) => void;
   registerVideoEl: (cameraId: string, el: HTMLVideoElement | null) => void;
   canDelete: boolean;
 }
@@ -103,6 +108,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   onRemoveSlot,
   onOpenQr,
   onReconnectWebRtc,
+  onScoreClubMatch,
   registerVideoEl,
   canDelete
 }) => {
@@ -113,6 +119,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   const [editingCustomTitle, setEditingCustomTitle] = useState(false);
 
   const isVirtual = isVirtualScreenSource(slot.sourceType);
+  const isRegional = directorState.situation === 'regional_match';
   const activeStream =
     slot.sourceType === 'smartphone_webrtc'
       ? remoteStream
@@ -159,7 +166,6 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
     el.muted = !(monitorAudioOnPc && isAudioSelected && slot.enabled);
   }, [monitorAudioOnPc, isAudioSelected, slot.enabled]);
 
-  // Render live standings / bracket / scores thumbnail on virtual screen canvas
   useEffect(() => {
     if (!isVirtual || !virtualCanvasRef.current) return;
     const canvas = virtualCanvasRef.current;
@@ -174,13 +180,11 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
     });
   }, [isVirtual, slot, tables, matches, players, tournaments, currentClub]);
 
-  const assignment = resolveCameraAssignment(slot, {
-    tables,
-    matches,
-    players,
-    tournaments,
-    currentClub
-  });
+  const assignment = resolveCameraAssignment(
+    slot,
+    { tables, matches, players, tournaments, currentClub },
+    directorState
+  );
 
   const assignmentSelectValue = (() => {
     if (slot.assignmentType === 'table') return `table:${slot.tableId || ''}`;
@@ -320,7 +324,6 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           />
         )}
 
-        {/* Waiting placeholder for camera sources */}
         {!isVirtual && ((slot.sourceType === 'smartphone_webrtc' && !remoteStream) ||
           (slot.sourceType === 'usb' && !usbStream) ||
           (slot.sourceType === 'external' && !slot.externalUrl)) && (
@@ -391,7 +394,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                 fontSize: '0.64rem',
                 fontWeight: 800
               }}>
-                {assignment.title}
+                {isRegional ? slot.name : assignment.title}
               </span>
             )}
           </div>
@@ -439,13 +442,13 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
             whiteSpace: 'nowrap',
             maxWidth: '70%'
           }}>
-            {assignment.match && assignment.p1 && assignment.p2 ? (
+            {assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined ? (
               <span>
-                {assignment.p1.name}{' '}
+                {assignment.p1Name}{' '}
                 <span style={{ color: '#FBBF24', margin: '0 3px' }}>
-                  {assignment.match.score1}-{assignment.match.score2}
+                  {assignment.score1}-{assignment.score2}
                 </span>{' '}
-                {assignment.p2.name}
+                {assignment.p2Name}
               </span>
             ) : (
               <span>{slot.name}</span>
@@ -465,7 +468,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
         </div>
       </div>
 
-      {/* Single Compact Control Row Under Video */}
+      {/* Controls Under Video */}
       <div style={{
         padding: '0.4rem 0.5rem',
         display: 'flex',
@@ -473,8 +476,69 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
         gap: '0.35rem',
         background: 'rgba(4, 8, 18, 0.96)'
       }}>
+        {/* Club Mode Quick Live Score Row when table has an active match */}
+        {!isRegional && !isVirtual && assignment.match && assignment.p1Name && assignment.p2Name && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.35rem',
+            background: 'rgba(0, 255, 170, 0.08)',
+            border: '1px solid rgba(0, 255, 170, 0.28)',
+            borderRadius: '7px',
+            padding: '3px 6px',
+            fontSize: '0.7rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => onScoreClubMatch(assignment.match!.id, Math.max(0, assignment.match!.score1 - 1), assignment.match!.score2)}
+                style={{ width: '22px', height: '22px', padding: 0, justifyContent: 'center' }}
+              >
+                <Minus size={11} />
+              </button>
+              <span style={{ fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '68px' }}>
+                {assignment.p1Name}
+              </span>
+              <span style={{ fontWeight: 900, color: '#FBBF24' }}>{assignment.match.score1}</span>
+              <button
+                type="button"
+                className="btn btn-neon"
+                onClick={() => onScoreClubMatch(assignment.match!.id, assignment.match!.score1 + 1, assignment.match!.score2)}
+                style={{ width: '22px', height: '22px', padding: 0, justifyContent: 'center', color: '#000' }}
+              >
+                <Plus size={11} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => onScoreClubMatch(assignment.match!.id, assignment.match!.score1, Math.max(0, assignment.match!.score2 - 1))}
+                style={{ width: '22px', height: '22px', padding: 0, justifyContent: 'center' }}
+              >
+                <Minus size={11} />
+              </button>
+              <span style={{ fontWeight: 900, color: '#FBBF24' }}>{assignment.match.score2}</span>
+              <span style={{ fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '68px' }}>
+                {assignment.p2Name}
+              </span>
+              <button
+                type="button"
+                className="btn btn-neon"
+                onClick={() => onScoreClubMatch(assignment.match!.id, assignment.match!.score1, assignment.match!.score2 + 1)}
+                style={{ width: '22px', height: '22px', padding: 0, justifyContent: 'center', color: '#000' }}
+              >
+                <Plus size={11} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
-          {!isVirtual && (
+          {!isVirtual && !isRegional && (
             <select
               className="input-field"
               value={assignmentSelectValue}
@@ -621,7 +685,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           </button>
         </div>
 
-        {!isVirtual && (editingCustomTitle || (slot.assignmentType === 'custom_view' && !CUSTOM_VIEW_PRESETS.includes(slot.customViewTitle || ''))) && (
+        {!isVirtual && !isRegional && (editingCustomTitle || (slot.assignmentType === 'custom_view' && !CUSTOM_VIEW_PRESETS.includes(slot.customViewTitle || ''))) && (
           <input
             type="text"
             className="input-field"
@@ -758,7 +822,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
 };
 
 export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ getAppBaseUrl }) => {
-  const { tables, matches, players, tournaments, currentClub } = useStore();
+  const { tables, matches, players, tournaments, currentClub, updateMatchScore } = useStore();
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
     loadDirectorState(currentClub.id)
   );
@@ -1053,6 +1117,23 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     saveDirectorState(currentClub.id, next, true);
   };
 
+  const updateRegionalMatch = (patch: Partial<RegionalMatchConfig>) => {
+    updateDirector({
+      ...directorState,
+      regionalMatch: {
+        ...directorState.regionalMatch,
+        ...patch
+      }
+    });
+  };
+
+  const handleSetSituation = (situation: DirectorLiveSituation) => {
+    updateDirector({
+      ...directorState,
+      situation
+    });
+  };
+
   const updateDestinations = (patch: Partial<StreamDestinationsConfig>) => {
     const next = { ...destinations, ...patch };
     setDestinations(next);
@@ -1174,6 +1255,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   }).current;
 
   const sortedTables = Object.values(tables).sort((a, b) => a.number - b.number);
+  const sortedPlayers = Object.values(players).slice().sort((a, b) => a.name.localeCompare(b.name));
   const enabledCams = directorState.cameras.filter(c => c.enabled);
   const enabledCount = enabledCams.length;
   const focusedCam = directorState.focusedCameraId
@@ -1181,7 +1263,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     : null;
 
   const focusedAssignment = focusedCam
-    ? resolveCameraAssignment(focusedCam, { tables, matches, players, tournaments, currentClub })
+    ? resolveCameraAssignment(focusedCam, { tables, matches, players, tournaments, currentClub }, directorState)
     : null;
 
   const formatDuration = (sec: number) => {
@@ -1270,6 +1352,25 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     );
   };
 
+  const rm = directorState.regionalMatch || DEFAULT_REGIONAL_MATCH;
+
+  const autoFillPlayerClub = (typedName: string, side: 1 | 2) => {
+    const found = sortedPlayers.find(p => p.name.toLowerCase() === typedName.trim().toLowerCase());
+    if (side === 1) {
+      const club = found?.clubName || found?.stats?.clubName;
+      updateRegionalMatch({
+        player1Name: typedName,
+        ...(club ? { player1Club: club } : {})
+      });
+    } else {
+      const club = found?.clubName || found?.stats?.clubName;
+      updateRegionalMatch({
+        player2Name: typedName,
+        ...(club ? { player2Club: club } : {})
+      });
+    }
+  };
+
   return (
     <div style={{
       maxWidth: '1480px',
@@ -1277,50 +1378,81 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       margin: '0 auto',
       display: 'flex',
       flexDirection: 'column',
-      gap: '0.85rem'
+      gap: '0.75rem'
     }}>
-      {/* 1. BARRE DE RÉGIE COMPACTE */}
+      {/* 1. SÉLECTEUR DE SITUATION + BARRE DE RÉGIE COMPACTE */}
       <div style={{
         background: directorState.broadcastMode === 'single'
           ? 'linear-gradient(90deg, rgba(185, 28, 28, 0.25), rgba(8, 14, 28, 0.94))'
           : 'linear-gradient(90deg, rgba(245, 158, 11, 0.16), rgba(8, 14, 28, 0.94))',
         border: `1.5px solid ${directorState.broadcastMode === 'single' ? '#ef4444' : 'rgba(245, 158, 11, 0.6)'}`,
         borderRadius: '14px',
-        padding: '0.65rem 0.95rem',
+        padding: '0.6rem 0.9rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '0.6rem'
       }}>
-        {/* Left: Mode Indicator & Return to Mosaic */}
+        {/* Left: Situation Switcher + Mode Indicator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'inline-flex',
+            background: 'rgba(0,0,0,0.45)',
+            padding: '3px',
+            borderRadius: '9px',
+            border: '1px solid rgba(255,255,255,0.12)',
+            gap: '3px'
+          }}>
+            <button
+              type="button"
+              onClick={() => handleSetSituation('club_tables')}
+              style={{
+                background: directorState.situation === 'club_tables' ? '#10B981' : 'transparent',
+                color: directorState.situation === 'club_tables' ? '#000' : 'rgba(255,255,255,0.75)',
+                border: 'none',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                fontSize: '0.74rem',
+                fontWeight: 900,
+                cursor: 'pointer'
+              }}
+            >
+              🏠 Live au Club (Billards)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetSituation('regional_match')}
+              style={{
+                background: directorState.situation === 'regional_match' ? '#F59E0B' : 'transparent',
+                color: directorState.situation === 'regional_match' ? '#000' : 'rgba(255,255,255,0.75)',
+                border: 'none',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                fontSize: '0.74rem',
+                fontWeight: 900,
+                cursor: 'pointer'
+              }}
+            >
+              🏆 Live Tournoi Régional / Match
+            </button>
+          </div>
+
           <span style={{
             background: directorState.broadcastMode === 'single' ? '#ef4444' : '#f59e0b',
             color: directorState.broadcastMode === 'single' ? '#fff' : '#000',
-            padding: '4px 10px',
-            borderRadius: '8px',
-            fontSize: '0.74rem',
+            padding: '4px 9px',
+            borderRadius: '7px',
+            fontSize: '0.72rem',
             fontWeight: 900,
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '5px'
+            gap: '4px'
           }}>
-            <Radio size={13} />
-            {directorState.broadcastMode === 'single' ? 'PLEIN ÉCRAN SEUL' : 'ÉCRAN MULTIPLE'}
-          </span>
-
-          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>
-            {directorState.broadcastMode === 'single' && focusedCam ? (
-              <>
-                <span style={{ color: '#fca5a5' }}>{focusedCam.name}</span>{' '}
-                <span style={{ color: '#00ffaa' }}>({focusedAssignment?.title})</span>
-              </>
-            ) : (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>
-                {enabledCount} fenêtre{enabledCount > 1 ? 's' : ''} en mosaïque
-              </span>
-            )}
+            <Radio size={12} />
+            {directorState.broadcastMode === 'single'
+              ? `PLEIN ÉCRAN : ${focusedCam?.name || ''} (${focusedAssignment?.title || ''})`
+              : `ÉCRAN MULTIPLE (${enabledCount})`}
           </span>
 
           {directorState.broadcastMode === 'single' && (
@@ -1330,15 +1462,15 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               onClick={handleReturnToMosaic}
               style={{
                 width: 'auto',
-                padding: '0.42rem 0.85rem',
-                fontSize: '0.76rem',
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.74rem',
                 fontWeight: 900,
                 background: '#f59e0b',
                 borderColor: '#f59e0b',
                 color: '#000'
               }}
             >
-              ⊞ Revenir à l'Écran Multiple
+              ⊞ Revenir Écran Multiple
             </button>
           )}
 
@@ -1351,15 +1483,15 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   directorState.mosaicLayout === 'stacked' ? 'side_by_side' : 'stacked';
                 updateDirector({ ...directorState, mosaicLayout: nextLayout });
               }}
-              style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px' }}
+              style={{ width: 'auto', fontSize: '0.7rem', padding: '4px 8px' }}
             >
               {directorState.mosaicLayout === 'stacked' ? '◫ Côte à côte' : '⊟ Haut / Bas'}
             </button>
           )}
         </div>
 
-        {/* Right: Audio, Add Cam, Add Standings Screen, Platforms Config, Start Live, TV Out */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.42rem', flexWrap: 'wrap' }}>
+        {/* Right: Audio, Add Cam, Add Standings, Platforms Config, Start Live, TV Out */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           {renderPlatformStatusBadge('facebook')}
           {renderPlatformStatusBadge('youtube')}
 
@@ -1370,7 +1502,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             style={{
               width: 'auto',
               fontSize: '0.72rem',
-              padding: '5px 8px',
+              padding: '4px 8px',
               background: monitorAudioOnPc ? 'rgba(16, 185, 129, 0.16)' : 'rgba(255,255,255,0.05)',
               borderColor: monitorAudioOnPc ? '#10b981' : 'rgba(255,255,255,0.2)',
               color: monitorAudioOnPc ? '#34d399' : '#fff'
@@ -1385,28 +1517,30 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             type="button"
             className="btn btn-outline"
             onClick={handleAddCamera}
-            style={{ width: 'auto', fontSize: '0.72rem', padding: '5px 8px', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
+            style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
           >
             <Plus size={13} /> Caméra
           </button>
 
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={handleAddStandingsScreen}
-            style={{
-              width: 'auto',
-              fontSize: '0.72rem',
-              padding: '5px 9px',
-              background: 'rgba(245, 158, 11, 0.14)',
-              color: '#FBBF24',
-              borderColor: 'rgba(245, 158, 11, 0.5)',
-              fontWeight: 800
-            }}
-            title="Ajouter l'écran Classement du Tournoi en direct sans quitter le live"
-          >
-            <Trophy size={13} /> + Écran Classement
-          </button>
+          {directorState.situation === 'club_tables' && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={handleAddStandingsScreen}
+              style={{
+                width: 'auto',
+                fontSize: '0.72rem',
+                padding: '4px 8px',
+                background: 'rgba(245, 158, 11, 0.14)',
+                color: '#FBBF24',
+                borderColor: 'rgba(245, 158, 11, 0.5)',
+                fontWeight: 800
+              }}
+              title="Ajouter l'écran Classement du Tournoi en direct sans quitter le live"
+            >
+              <Trophy size={13} /> + Classement
+            </button>
+          )}
 
           <button
             type="button"
@@ -1415,14 +1549,14 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             style={{
               width: 'auto',
               fontSize: '0.72rem',
-              padding: '5px 9px',
+              padding: '4px 8px',
               borderColor: activePlatformsLabel.length > 0 ? 'rgba(59, 130, 246, 0.6)' : 'rgba(245, 158, 11, 0.5)',
               color: activePlatformsLabel.length > 0 ? '#93c5fd' : '#fbbf24'
             }}
           >
             <Settings size={13} />
             {activePlatformsLabel.length > 0
-              ? `Clés (${activePlatformsLabel.join(' + ')})`
+              ? `Clés (${activePlatformsLabel.join('+')})`
               : 'Facebook / YouTube'}
           </button>
 
@@ -1432,8 +1566,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             onClick={handleToggleLiveStream}
             style={{
               width: 'auto',
-              padding: '0.48rem 0.95rem',
-              fontSize: '0.78rem',
+              padding: '0.45rem 0.9rem',
+              fontSize: '0.76rem',
               fontWeight: 900,
               background: broadcasterStatus.isStreaming ? '#ef4444' : 'linear-gradient(135deg, #ef4444, #f59e0b)',
               borderColor: 'transparent',
@@ -1447,7 +1581,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               <>
                 <Play size={13} />
                 {activePlatformsLabel.length > 0
-                  ? `🔴 LANCER LIVE (${activePlatformsLabel.join(' + ')})`
+                  ? `🔴 LANCER LIVE (${activePlatformsLabel.join('+')})`
                   : '🔴 LANCER LE LIVE'}
               </>
             )}
@@ -1458,13 +1592,172 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             target="_blank"
             rel="noreferrer"
             className="btn btn-outline"
-            style={{ width: 'auto', fontSize: '0.72rem', padding: '5px 8px', textDecoration: 'none', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
+            style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px', textDecoration: 'none', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
             title="Ouvrir la sortie TV plein écran"
           >
             <Tv size={13} /> Sortie TV
           </a>
         </div>
       </div>
+
+      {/* 1B. BANDEAU MATCH TOURNOI RÉGIONAL (JOUEURS, CLUBS & SCORE EN DIRECT) */}
+      {directorState.situation === 'regional_match' && (
+        <div style={{
+          background: 'rgba(8, 16, 30, 0.94)',
+          border: '1.5px solid rgba(245, 158, 11, 0.5)',
+          borderRadius: '14px',
+          padding: '0.75rem 0.95rem',
+          display: 'grid',
+          gridTemplateColumns: '1.2fr auto 1.2fr',
+          gap: '0.9rem',
+          alignItems: 'center'
+        }}>
+          <datalist id="mcb-regional-players-list">
+            {sortedPlayers.map(p => (
+              <option key={p.id} value={p.name} />
+            ))}
+          </datalist>
+
+          {/* PLAYER 1 + SCORE 1 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            background: 'rgba(16, 185, 129, 0.08)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            borderRadius: '10px',
+            padding: '0.5rem 0.65rem'
+          }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
+              <input
+                type="text"
+                list="mcb-regional-players-list"
+                className="input-field"
+                placeholder="Nom Joueur 1"
+                value={rm.player1Name}
+                onChange={(e) => autoFillPlayerClub(e.target.value, 1)}
+                style={{ fontSize: '0.84rem', fontWeight: 800, padding: '4px 8px' }}
+              />
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Club Joueur 1 (ex: BC 41)"
+                value={rm.player1Club}
+                onChange={(e) => updateRegionalMatch({ player1Club: e.target.value })}
+                style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#34D399' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => updateRegionalMatch({ score1: Math.max(0, (rm.score1 || 0) - 1) })}
+                style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center' }}
+              >
+                <Minus size={16} />
+              </button>
+              <span style={{ fontSize: '1.8rem', fontWeight: 900, minWidth: '34px', textAlign: 'center', color: '#FBBF24' }}>
+                {rm.score1}
+              </span>
+              <button
+                type="button"
+                className="btn btn-neon"
+                onClick={() => updateRegionalMatch({ score1: (rm.score1 || 0) + 1 })}
+                style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center', color: '#000' }}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* CENTER: EVENT TITLE, FORMAT & RESET */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', minWidth: '210px' }}>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Titre (ex: Tournoi Régional - Finale)"
+              value={rm.eventTitle}
+              onChange={(e) => updateRegionalMatch({ eventTitle: e.target.value })}
+              style={{ fontSize: '0.8rem', fontWeight: 800, padding: '4px 8px', textAlign: 'center', color: '#FBBF24' }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>1er à :</span>
+              <input
+                type="number"
+                className="input-field"
+                min={0}
+                max={35}
+                value={rm.targetSets}
+                onChange={(e) => updateRegionalMatch({ targetSets: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                style={{ width: '54px', padding: '3px 5px', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center' }}
+              />
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => updateRegionalMatch({ score1: 0, score2: 0 })}
+                style={{ width: 'auto', padding: '4px 8px', fontSize: '0.72rem' }}
+                title="Remettre le score à 0 - 0 pour un nouveau match"
+              >
+                <RotateCcw size={12} /> 0-0
+              </button>
+            </div>
+          </div>
+
+          {/* PLAYER 2 + SCORE 2 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            borderRadius: '10px',
+            padding: '0.5rem 0.65rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => updateRegionalMatch({ score2: Math.max(0, (rm.score2 || 0) - 1) })}
+                style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center' }}
+              >
+                <Minus size={16} />
+              </button>
+              <span style={{ fontSize: '1.8rem', fontWeight: 900, minWidth: '34px', textAlign: 'center', color: '#FBBF24' }}>
+                {rm.score2}
+              </span>
+              <button
+                type="button"
+                className="btn btn-neon"
+                onClick={() => updateRegionalMatch({ score2: (rm.score2 || 0) + 1 })}
+                style={{ width: '34px', height: '34px', padding: 0, justifyContent: 'center', color: '#000' }}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
+              <input
+                type="text"
+                list="mcb-regional-players-list"
+                className="input-field"
+                placeholder="Nom Joueur 2"
+                value={rm.player2Name}
+                onChange={(e) => autoFillPlayerClub(e.target.value, 2)}
+                style={{ fontSize: '0.84rem', fontWeight: 800, padding: '4px 8px', textAlign: 'right' }}
+              />
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Club Joueur 2 (ex: BC Tours)"
+                value={rm.player2Club}
+                onChange={(e) => updateRegionalMatch({ player2Club: e.target.value })}
+                style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#FBBF24', textAlign: 'right' }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {broadcasterStatus.lastError && (
         <div style={{
@@ -1522,6 +1815,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               onRemoveSlot={handleRemoveSlot}
               onOpenQr={setQrModalCamId}
               onReconnectWebRtc={setupWebRtcForCamera}
+              onScoreClubMatch={updateMatchScore}
               registerVideoEl={registerVideoEl}
               canDelete={directorState.cameras.length > 2}
             />
