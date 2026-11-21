@@ -13,6 +13,14 @@ interface StreamOverlayViewProps {
 import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl, extractWebRtcCamFromStreamUrl } from '../utils/video';
 import WebRtcCameraPlayer from './WebRtcCameraPlayer';
 import {
+  DirectorCameraSlot,
+  MultiCamDirectorState,
+  isVirtualScreenSource,
+  loadDirectorState,
+  subscribeToDirectorState
+} from '../utils/multiCamDirector';
+import { isActiveLiveMatch } from '../utils/liveBroadcaster';
+import {
   LiveOverlayConfig,
   loadLiveOverlayConfig,
   saveLiveOverlayConfig,
@@ -30,6 +38,7 @@ interface MultiTableTileProps {
   players: Record<string, Player>;
   currentClub: Club;
   videoDevices: MediaDeviceInfo[];
+  directorCam?: DirectorCameraSlot;
   onFocusTable: (tableId: string) => void;
 }
 
@@ -44,40 +53,78 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
   players,
   currentClub,
   videoDevices,
+  directorCam,
   onFocusTable
 }) => {
-  const defaultVdoRoom = `MCB_${currentClub.id}_${table.id}`;
-  const tableExtVideo = extractExternalVideoFromStreamUrl(table.liveStreamUrl || match?.liveStreamUrl);
-  const tableWebRtcCam = extractWebRtcCamFromStreamUrl(table.liveStreamUrl || match?.liveStreamUrl);
+  const defaultVdoRoom = directorCam?.vdoRoom || `MCB_${currentClub.id}_${table.id}`;
+  const tableExtVideo =
+    extractExternalVideoFromStreamUrl(table.liveStreamUrl || match?.liveStreamUrl) ||
+    (directorCam?.sourceType === 'external' ? (directorCam.externalUrl || '') : '');
+  const tableWebRtcCam =
+    extractWebRtcCamFromStreamUrl(table.liveStreamUrl || match?.liveStreamUrl) ||
+    (directorCam?.sourceType === 'smartphone_webrtc' ? directorCam.id : '');
   const [customYtUrl, setCustomYtUrl] = useState<string>(tableExtVideo);
   const activeExtVideo = customYtUrl || tableExtVideo;
-  const [sourceMode, setSourceMode] = useState<string>(() => (activeExtVideo ? 'ext' : tableWebRtcCam ? 'webrtc' : 'vdo'));
-  const [tileZoom, setTileZoom] = useState<number>(1);
-  const [tileRotation, setTileRotation] = useState<number>(0);
-  const [fillTile, setFillTile] = useState<boolean>(true);
+  const resolvePreferredMode = () => {
+    if (activeExtVideo) return 'ext';
+    if (tableWebRtcCam) return 'webrtc';
+    if (directorCam?.sourceType === 'usb') return `usb:${directorCam.usbDeviceId || 'default'}`;
+    return 'vdo';
+  };
+  const [sourceMode, setSourceMode] = useState<string>(resolvePreferredMode);
+  const [tileZoom, setTileZoom] = useState<number>(directorCam?.zoom || 1);
+  const [tileRotation, setTileRotation] = useState<number>(directorCam?.rotation || 0);
+  const [fillTile, setFillTile] = useState<boolean>(directorCam ? directorCam.fillMode !== 'contain' : true);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     if (tableExtVideo) {
       setCustomYtUrl(tableExtVideo);
       if (sourceMode === 'vdo') setSourceMode('ext');
+    } else if (tableWebRtcCam && sourceMode === 'vdo') {
+      setSourceMode('webrtc');
+    } else if (directorCam?.sourceType === 'usb' && sourceMode === 'vdo') {
+      setSourceMode(`usb:${directorCam.usbDeviceId || 'default'}`);
     }
-  }, [tableExtVideo]);
+  }, [tableExtVideo, tableWebRtcCam, directorCam?.sourceType, directorCam?.usbDeviceId]);
 
   useEffect(() => {
     if (!sourceMode.startsWith('usb:')) return;
     const deviceId = sourceMode.replace('usb:', '');
     let activeStream: MediaStream | null = null;
+    let cancelled = false;
 
-    navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-      audio: false
-    }).then(stream => {
-      activeStream = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    }).catch(() => {});
+    const startUsb = async () => {
+      try {
+        const videoConstraint: MediaTrackConstraints =
+          deviceId && deviceId !== 'default'
+            ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { width: { ideal: 1280 }, height: { ideal: 720 } };
+        const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: false });
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        activeStream = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      } catch {
+        if (deviceId && deviceId !== 'default') {
+          try {
+            const fallback = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            if (cancelled) {
+              fallback.getTracks().forEach(t => t.stop());
+              return;
+            }
+            activeStream = fallback;
+            if (videoRef.current) videoRef.current.srcObject = fallback;
+          } catch {}
+        }
+      }
+    };
+    startUsb();
 
     return () => {
+      cancelled = true;
       if (activeStream) activeStream.getTracks().forEach(t => t.stop());
     };
   }, [sourceMode]);
@@ -94,12 +141,12 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
       backgroundColor: '#050814',
       overflow: 'hidden',
       border: '1px solid rgba(255, 255, 255, 0.14)',
-      borderRadius: '12px',
+      borderRadius: '10px',
       display: 'flex',
       flexDirection: 'column',
-      justifyContent: 'flex-start',
+      justifyContent: 'flex-end',
       alignItems: 'center',
-      padding: '0.8rem',
+      padding: '0.6rem',
       boxSizing: 'border-box'
     }}>
       {/* Video Layer */}
@@ -180,31 +227,31 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
         />
       )}
 
-      {/* Compact Scoreboard Overlay */}
+      {/* Compact Scoreboard Overlay (Matchroom Lower-Third Style) */}
       <div style={{
         position: 'relative',
         zIndex: 10,
         width: '96%',
         maxWidth: '640px',
-        background: 'rgba(8, 12, 26, 0.9)',
+        background: 'rgba(10, 14, 22, 0.94)',
         backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.18)',
-        borderTop: '2px solid var(--accent-primary, #F59E0B)',
-        borderRadius: '12px',
-        padding: '0.45rem 0.9rem',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.75)',
+        border: '1px solid rgba(255,255,255,0.14)',
+        borderTop: '2.5px solid #D4AF37',
+        borderRadius: '6px',
+        padding: '0.35rem 0.75rem',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.65)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.35rem'
+        gap: '0.25rem'
       }}>
         {/* Header row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', fontWeight: 800 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ background: '#ff2244', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fff' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <span style={{ color: '#F8FAFC', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#EF4444' }} />
               LIVE
             </span>
-            <span style={{ color: 'var(--accent-primary, #F59E0B)', fontWeight: 900, fontSize: '0.82rem' }}>
+            <span style={{ color: '#D4AF37', fontWeight: 800 }}>
               {table.name || `BILLARD ${table.number}`}
             </span>
             {match && (
@@ -216,91 +263,90 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
               />
             )}
           </div>
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>
+          <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.65rem' }}>
             {rulesText || activeTournament?.name || currentClub.name}
           </span>
         </div>
 
         {/* Players & Score row */}
         {match && p1 && p2 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-              <img
-                src={getPlayerAvatar(p1)}
-                alt={p1.name}
-                style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B', flexShrink: 0 }}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.45rem', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', overflow: 'hidden' }}>
+                <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p1.name}
                 </span>
-                {(p1.clubName || p1.stats?.clubName || p1.clubLogoUrl || p1.stats?.clubLogoUrl) && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.66rem', color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
-                    {(p1.clubLogoUrl || p1.stats?.clubLogoUrl) && (
-                      <img src={p1.clubLogoUrl || p1.stats?.clubLogoUrl} alt="" style={{ width: '13px', height: '13px', objectFit: 'contain', borderRadius: '2px', background: '#fff', padding: '1px' }} />
-                    )}
+                {(p1.clubName || p1.stats?.clubName) && (
+                  <span style={{ fontSize: '0.62rem', color: '#94A3B8', fontWeight: 600 }}>
                     {p1.clubName || p1.stats?.clubName}
                   </span>
                 )}
               </div>
             </div>
 
-            <div style={{
-              background: 'var(--accent-primary, #F59E0B)',
-              color: '#000',
-              fontWeight: 900,
-              fontSize: '1.25rem',
-              padding: '2px 12px',
-              borderRadius: '8px',
-              letterSpacing: '1px',
-              boxShadow: '0 0 14px rgba(245, 158, 11, 0.45)'
-            }}>
-              {match.score1} - {match.score2}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{
+                minWidth: '28px',
+                textAlign: 'center',
+                background: match.score1 > match.score2 ? '#D4AF37' : '#1E293B',
+                color: match.score1 > match.score2 ? '#090D16' : '#F8FAFC',
+                fontWeight: 900,
+                fontSize: '1rem',
+                padding: '1px 7px',
+                borderRadius: '4px'
+              }}>
+                {match.score1}
+              </span>
+              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.64rem', fontWeight: 800 }}>VS</span>
+              <span style={{
+                minWidth: '28px',
+                textAlign: 'center',
+                background: match.score2 > match.score1 ? '#D4AF37' : '#1E293B',
+                color: match.score2 > match.score1 ? '#090D16' : '#F8FAFC',
+                fontWeight: 900,
+                fontSize: '1rem',
+                padding: '1px 7px',
+                borderRadius: '4px'
+              }}>
+                {match.score2}
+              </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', overflow: 'hidden' }}>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '0.45rem', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'hidden' }}>
+                <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p2.name}
                 </span>
-                {(p2.clubName || p2.stats?.clubName || p2.clubLogoUrl || p2.stats?.clubLogoUrl) && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.66rem', color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
+                {(p2.clubName || p2.stats?.clubName) && (
+                  <span style={{ fontSize: '0.62rem', color: '#94A3B8', fontWeight: 600 }}>
                     {p2.clubName || p2.stats?.clubName}
-                    {(p2.clubLogoUrl || p2.stats?.clubLogoUrl) && (
-                      <img src={p2.clubLogoUrl || p2.stats?.clubLogoUrl} alt="" style={{ width: '13px', height: '13px', objectFit: 'contain', borderRadius: '2px', background: '#fff', padding: '1px' }} />
-                    )}
                   </span>
                 )}
               </div>
-              <img
-                src={getPlayerAvatar(p2)}
-                alt={p2.name}
-                style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #F59E0B', flexShrink: 0 }}
-              />
             </div>
           </div>
         ) : (
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.78rem', textAlign: 'center', padding: '2px 0' }}>
-            En attente du prochain match sur ce billard...
+          <div style={{ color: '#94A3B8', fontSize: '0.74rem', textAlign: 'center', padding: '2px 0' }}>
+            En attente de match
           </div>
         )}
       </div>
 
-      {/* Tile bottom-right mini toolbar */}
+      {/* Tile top-right mini toolbar */}
       <div style={{
         position: 'absolute',
-        bottom: '10px',
-        right: '10px',
+        top: '8px',
+        right: '8px',
         zIndex: 15,
         display: 'flex',
         alignItems: 'center',
         gap: '4px',
-        background: 'rgba(5, 8, 22, 0.82)',
+        background: 'rgba(10, 14, 22, 0.85)',
         backdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.15)',
-        padding: '4px 8px',
-        borderRadius: '8px',
-        fontSize: '0.68rem',
+        border: '1px solid rgba(255,255,255,0.14)',
+        padding: '3px 7px',
+        borderRadius: '6px',
+        fontSize: '0.66rem',
         color: '#fff'
       }}>
         <select
@@ -310,20 +356,24 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
             background: '#0d1527',
             color: '#fff',
             border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: '5px',
+            borderRadius: '4px',
             padding: '2px 5px',
-            fontSize: '0.68rem',
+            fontSize: '0.66rem',
             fontWeight: 700,
             cursor: 'pointer',
-            maxWidth: '140px'
+            maxWidth: '150px'
           }}
           title="Choisir la caméra de ce billard"
         >
-          {activeExtVideo && <option value="ext">🌐 YouTube / Lien Externe</option>}
-          <option value="vdo">📱 Sans-fil ({table.name || `T${table.number}`})</option>
+          {activeExtVideo && <option value="ext">Lien Externe / YouTube</option>}
+          {tableWebRtcCam && <option value="webrtc">Smartphone Régie ({tableWebRtcCam})</option>}
+          <option value="vdo">VDO.Ninja ({table.name || `T${table.number}`})</option>
+          {directorCam?.sourceType === 'usb' && !videoDevices.some(d => d.deviceId === directorCam.usbDeviceId) && (
+            <option value={`usb:${directorCam.usbDeviceId || 'default'}`}>Caméra PC / USB</option>
+          )}
           {videoDevices.map((d, idx) => (
             <option key={d.deviceId} value={`usb:${d.deviceId}`}>
-              🎥 {d.label || `Caméra USB #${idx + 1}`}
+              {d.label || `Caméra USB #${idx + 1}`}
             </option>
           ))}
         </select>
@@ -406,6 +456,9 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const [overlayConfig, setOverlayConfig] = useState<LiveOverlayConfig>(() =>
     loadLiveOverlayConfig(currentClub.id, 'live')
   );
+  const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
+    loadDirectorState(currentClub.id)
+  );
   const [interactiveOverlayEdit, setInteractiveOverlayEdit] = useState<boolean>(false);
   const [selectedOverlayItemId, setSelectedOverlayItemId] = useState<string | null>(null);
   const [draggingScoreboard, setDraggingScoreboard] = useState<{
@@ -419,9 +472,17 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
 
   useEffect(() => {
     setOverlayConfig(loadLiveOverlayConfig(currentClub.id, 'live'));
-    return subscribeToLiveOverlayConfig(currentClub.id, 'live', (updated) => {
+    setDirectorState(loadDirectorState(currentClub.id));
+    const u1 = subscribeToLiveOverlayConfig(currentClub.id, 'live', (updated) => {
       setOverlayConfig(updated);
     });
+    const u2 = subscribeToDirectorState(currentClub.id, (updated) => {
+      setDirectorState(updated);
+    });
+    return () => {
+      u1();
+      u2();
+    };
   }, [currentClub.id]);
 
   const handleUpdateOverlayConfig = (next: LiveOverlayConfig) => {
@@ -661,9 +722,13 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
           height: '100%'
         }}>
           {finalTables.map(t => {
-            const m = t.currentMatchId ? matches[t.currentMatchId] : undefined;
+            const rawM = t.currentMatchId ? matches[t.currentMatchId] : undefined;
+            const m = isActiveLiveMatch(rawM, tournaments) ? rawM : undefined;
             const player1 = m ? players[m.player1Id] : undefined;
             const player2 = m ? players[m.player2Id] : undefined;
+            const assignedCam = directorState.cameras.find(
+              c => !isVirtualScreenSource(c.sourceType) && c.assignmentType === 'table' && c.tableId === t.id
+            );
             return (
               <MultiTableVideoTile
                 key={t.id}
@@ -675,14 +740,34 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 players={players}
                 currentClub={currentClub}
                 videoDevices={videoDevices}
+                directorCam={assignedCam}
                 onFocusTable={(tId) => {
-                  const extVid = extractExternalVideoFromStreamUrl(t.liveStreamUrl || m?.liveStreamUrl);
+                  const extVid = extractExternalVideoFromStreamUrl(t.liveStreamUrl || m?.liveStreamUrl)
+                    || (assignedCam?.sourceType === 'external' ? (assignedCam.externalUrl || '') : '');
+                  const camId = extractWebRtcCamFromStreamUrl(t.liveStreamUrl || m?.liveStreamUrl)
+                    || (assignedCam?.sourceType === 'smartphone_webrtc' ? assignedCam.id : '');
                   setActiveTableParam(tId);
                   if (extVid) {
                     setExternalVideoUrl(extVid);
+                    setWebrtcCamParam(null);
+                    setVdoRoom(null);
+                    setIsLocalBroadcast(false);
+                  } else if (camId) {
+                    setWebrtcCamParam(camId);
+                    setExternalVideoUrl(null);
+                    setVdoRoom(null);
+                    setIsLocalBroadcast(false);
+                  } else if (assignedCam?.sourceType === 'usb') {
+                    setIsLocalBroadcast(true);
+                    setSelectedDeviceId(assignedCam.usbDeviceId || '');
+                    setWebrtcCamParam(null);
+                    setExternalVideoUrl(null);
                     setVdoRoom(null);
                   } else {
-                    setVdoRoom(`MCB_${currentClub.id}_${tId}`);
+                    setVdoRoom(assignedCam?.vdoRoom || `MCB_${currentClub.id}_${tId}`);
+                    setWebrtcCamParam(null);
+                    setExternalVideoUrl(null);
+                    setIsLocalBroadcast(false);
                   }
                 }}
               />
@@ -703,11 +788,15 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       );
 
   // Find the match running on this table or standalone live channel
-  const match: Match | undefined = activeTableParam === 'live'
+  const rawMatch: Match | undefined = activeTableParam === 'live'
     ? Object.values(matches).find(m => m.tableId === 'live' && m.status !== 'finished')
     : (table?.currentMatchId
         ? matches[table.currentMatchId]
-        : Object.values(matches).find(m => m.tableId === table?.id && m.status !== 'finished'));
+        : Object.values(matches).find(m => m.tableId === table?.id && isActiveLiveMatch(m, tournaments)));
+  const match: Match | undefined = isActiveLiveMatch(rawMatch, tournaments) ? rawMatch : undefined;
+  const assignedTableDirectorCam = table
+    ? directorState.cameras.find(c => !isVirtualScreenSource(c.sourceType) && c.assignmentType === 'table' && c.tableId === table.id)
+    : undefined;
   const isStandaloneLive = activeTableParam === 'live' || Boolean(match && !match.tournamentId);
   const p1 = match ? players[match.player1Id] : undefined;
   const p2 = match ? players[match.player2Id] : undefined;
@@ -722,9 +811,21 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             : `${tournamentSettings.qualifNbSets} manches`)
         : '');
 
-  const effectiveExternalVideo = externalVideoUrl || extractExternalVideoFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl);
-  const effectiveWebRtcCam = webrtcCamParam || (!effectiveExternalVideo && !vdoRoom ? extractWebRtcCamFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl) : '');
-  const effectiveVdoRoom = vdoRoom || (!effectiveExternalVideo && !effectiveWebRtcCam ? extractVdoRoomFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl) : '');
+  const effectiveExternalVideo =
+    externalVideoUrl ||
+    extractExternalVideoFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl) ||
+    (assignedTableDirectorCam?.sourceType === 'external' ? (assignedTableDirectorCam.externalUrl || '') : '');
+  const effectiveWebRtcCam =
+    webrtcCamParam ||
+    (!effectiveExternalVideo && !vdoRoom
+      ? (extractWebRtcCamFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl) ||
+         (assignedTableDirectorCam?.sourceType === 'smartphone_webrtc' ? assignedTableDirectorCam.id : ''))
+      : '');
+  const effectiveVdoRoom =
+    vdoRoom ||
+    (!effectiveExternalVideo && !effectiveWebRtcCam
+      ? extractVdoRoomFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl)
+      : '');
   const hasVideoLayer = Boolean(effectiveWebRtcCam || effectiveVdoRoom || isLocalBroadcast || effectiveExternalVideo);
 
   return (
