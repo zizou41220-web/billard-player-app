@@ -412,31 +412,42 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
             <span style={{
               background: isFocused
-                ? '#ef4444'
+                ? 'rgba(239, 68, 68, 0.92)'
                 : isInMosaic
-                  ? '#f59e0b'
-                  : 'rgba(15, 23, 42, 0.86)',
-              color: isInMosaic && !isFocused ? '#000' : '#fff',
-              padding: '2px 6px',
-              borderRadius: '5px',
-              fontSize: '0.62rem',
-              fontWeight: 900,
+                  ? 'rgba(10, 14, 22, 0.88)'
+                  : 'rgba(10, 14, 22, 0.78)',
+              border: isFocused
+                ? '1px solid #ef4444'
+                : isInMosaic
+                  ? '1px solid rgba(212, 175, 55, 0.7)'
+                  : '1px solid rgba(255,255,255,0.14)',
+              color: isFocused ? '#fff' : isInMosaic ? '#FDE68A' : 'rgba(255,255,255,0.6)',
+              padding: '2px 7px',
+              borderRadius: '4px',
+              fontSize: '0.6rem',
+              fontWeight: 800,
+              letterSpacing: '0.4px',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '3px'
+              gap: '4px'
             }}>
-              <Radio size={9} />
-              {isFocused ? 'PLEIN ÉCRAN' : isInMosaic ? 'MOSAÏQUE' : 'VEILLE'}
+              <span style={{
+                width: '5px',
+                height: '5px',
+                borderRadius: '50%',
+                background: isFocused ? '#fff' : isInMosaic ? '#D4AF37' : '#64748B'
+              }} />
+              {isFocused ? 'PGM' : isInMosaic ? 'MOSAÏQUE' : 'VEILLE'}
             </span>
             {!isVirtual && (
               <span style={{
-                background: 'rgba(4, 12, 24, 0.88)',
-                border: '1px solid rgba(0, 255, 170, 0.45)',
-                color: '#00ffaa',
-                padding: '2px 6px',
-                borderRadius: '5px',
-                fontSize: '0.64rem',
-                fontWeight: 800
+                background: 'rgba(10, 14, 22, 0.86)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                color: '#E2E8F0',
+                padding: '2px 7px',
+                borderRadius: '4px',
+                fontSize: '0.62rem',
+                fontWeight: 700
               }}>
                 {isExternalLive ? slot.name : assignment.title}
               </span>
@@ -445,18 +456,19 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
 
           {!isVirtual && (
             <span style={{
-              background: isAudioSelected ? 'rgba(16, 185, 129, 0.92)' : 'rgba(15, 23, 42, 0.82)',
-              color: isAudioSelected ? '#000' : 'rgba(255,255,255,0.65)',
+              background: isAudioSelected ? 'rgba(16, 185, 129, 0.22)' : 'rgba(10, 14, 22, 0.78)',
+              border: `1px solid ${isAudioSelected ? 'rgba(16, 185, 129, 0.65)' : 'rgba(255,255,255,0.12)'}`,
+              color: isAudioSelected ? '#6EE7B7' : 'rgba(255,255,255,0.55)',
               padding: '2px 6px',
-              borderRadius: '5px',
-              fontSize: '0.62rem',
-              fontWeight: 900,
+              borderRadius: '4px',
+              fontSize: '0.6rem',
+              fontWeight: 700,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '3px'
             }}>
               {isAudioSelected ? <Volume2 size={10} /> : <VolumeX size={10} />}
-              {isAudioSelected ? 'SON' : 'MUET'}
+              {isAudioSelected ? 'AUDIO' : 'MUET'}
             </span>
           )}
         </div>
@@ -732,10 +744,18 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           {slot.sourceType === 'smartphone_webrtc' && (
             <button
               type="button"
-              className="btn btn-neon"
+              className="btn btn-outline"
               onClick={() => onOpenQr(slot.id)}
-              style={{ width: 'auto', padding: '3px 6px', fontSize: '0.68rem', fontWeight: 900, color: '#000' }}
-              title="QR Code smartphone"
+              style={{
+                width: 'auto',
+                padding: '3px 7px',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                background: '#1E293B',
+                borderColor: 'rgba(212, 175, 55, 0.55)',
+                color: '#FDE68A'
+              }}
+              title="Afficher le QR Code caméra smartphone"
             >
               <QrCode size={12} /> QR
             </button>
@@ -1961,7 +1981,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             type="button"
             className="btn btn-outline"
             onClick={handleAddCamera}
-            style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
+            style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', background: '#111827', color: '#E2E8F0', borderColor: 'rgba(255,255,255,0.18)', fontWeight: 700 }}
           >
             <Plus size={13} /> Caméra
           </button>
@@ -1974,15 +1994,15 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               style={{
                 width: 'auto',
                 fontSize: '0.72rem',
-                padding: '4px 8px',
-                background: 'rgba(245, 158, 11, 0.14)',
-                color: '#FBBF24',
-                borderColor: 'rgba(245, 158, 11, 0.5)',
-                fontWeight: 800
+                padding: '4px 9px',
+                background: '#111827',
+                color: '#FDE68A',
+                borderColor: 'rgba(212, 175, 55, 0.4)',
+                fontWeight: 700
               }}
               title="Ajouter l'écran Classement du Tournoi en direct sans quitter le live"
             >
-              <Trophy size={13} /> + Classement
+              <Trophy size={13} /> Classement
             </button>
           )}
 
@@ -1993,40 +2013,46 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             style={{
               width: 'auto',
               fontSize: '0.72rem',
-              padding: '4px 8px',
-              borderColor: activePlatformsLabel.length > 0 ? 'rgba(59, 130, 246, 0.6)' : 'rgba(245, 158, 11, 0.5)',
-              color: activePlatformsLabel.length > 0 ? '#93c5fd' : '#fbbf24'
+              padding: '4px 9px',
+              background: '#111827',
+              borderColor: activePlatformsLabel.length > 0 ? 'rgba(59, 130, 246, 0.55)' : 'rgba(255,255,255,0.18)',
+              color: activePlatformsLabel.length > 0 ? '#93C5FD' : '#E2E8F0',
+              fontWeight: 700
             }}
           >
             <Settings size={13} />
             {activePlatformsLabel.length > 0
-              ? `Clés (${activePlatformsLabel.join('+')})`
-              : 'Facebook / YouTube'}
+              ? `Destinations (${activePlatformsLabel.join('+')})`
+              : 'Destinations'}
           </button>
 
           <button
             type="button"
-            className="btn btn-neon"
+            className="btn"
             onClick={handleToggleLiveStream}
             style={{
               width: 'auto',
-              padding: '0.45rem 0.9rem',
-              fontSize: '0.76rem',
-              fontWeight: 900,
-              background: broadcasterStatus.isStreaming ? '#ef4444' : 'linear-gradient(135deg, #ef4444, #f59e0b)',
-              borderColor: 'transparent',
+              padding: '5px 12px',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              borderRadius: '7px',
+              background: broadcasterStatus.isStreaming ? '#DC2626' : '#B91C1C',
+              border: '1px solid rgba(255,255,255,0.15)',
               color: '#fff',
-              boxShadow: broadcasterStatus.isStreaming ? '0 0 18px rgba(239,68,68,0.65)' : 'none'
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              boxShadow: broadcasterStatus.isStreaming ? '0 0 14px rgba(220, 38, 38, 0.55)' : 'none'
             }}
           >
             {broadcasterStatus.isStreaming ? (
-              <>⏹ ARRÊTER ({formatDuration(liveElapsedSec)})</>
+              <>ARRÊTER ({formatDuration(liveElapsedSec)})</>
             ) : (
               <>
                 <Play size={13} />
                 {activePlatformsLabel.length > 0
-                  ? `🔴 LANCER LIVE (${activePlatformsLabel.join('+')})`
-                  : '🔴 LANCER LE LIVE'}
+                  ? `DÉMARRER LIVE (${activePlatformsLabel.join('+')})`
+                  : 'DÉMARRER LE LIVE'}
               </>
             )}
           </button>
@@ -2036,7 +2062,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             target="_blank"
             rel="noreferrer"
             className="btn btn-outline"
-            style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px', textDecoration: 'none', color: '#00ffaa', borderColor: 'rgba(0,255,170,0.4)' }}
+            style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', textDecoration: 'none', background: '#111827', color: '#E2E8F0', borderColor: 'rgba(255,255,255,0.18)', fontWeight: 700 }}
             title="Ouvrir la sortie TV plein écran"
           >
             <Tv size={13} /> Sortie TV
@@ -2052,21 +2078,23 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '0.5rem',
-          background: 'rgba(15, 23, 42, 0.85)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: '10px',
-          padding: '0.45rem 0.85rem',
-          fontSize: '0.74rem'
+          background: '#0B0F17',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '8px',
+          padding: '0.4rem 0.8rem',
+          fontSize: '0.73rem'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>🔗 Liens Directs :</span>
+            <span style={{ color: '#94A3B8', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Link2 size={12} /> Liens Directs :
+            </span>
             {destinations.youtubeLiveUrl?.trim() && (() => {
               const ytPublic = normalizePublicLiveUrl(destinations.youtubeLiveUrl);
               return (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 0, 51, 0.14)', border: '1px solid rgba(255, 51, 68, 0.45)', borderRadius: '8px', padding: '2px 8px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 51, 68, 0.35)', borderRadius: '6px', padding: '2px 8px' }}>
                   <Youtube size={13} color="#ff6b81" />
-                  <a href={ytPublic} target="_blank" rel="noreferrer" style={{ color: '#fda4af', fontWeight: 800, textDecoration: 'none' }}>
-                    Live YouTube <ExternalLink size={10} />
+                  <a href={ytPublic} target="_blank" rel="noreferrer" style={{ color: '#fda4af', fontWeight: 700, textDecoration: 'none' }}>
+                    YouTube <ExternalLink size={10} />
                   </a>
                   <button
                     type="button"
@@ -2075,7 +2103,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                       setCopiedLinkId('yt');
                       setTimeout(() => setCopiedLinkId(null), 1800);
                     }}
-                    style={{ background: 'transparent', border: 'none', color: copiedLinkId === 'yt' ? '#34d399' : '#fff', cursor: 'pointer', padding: '0 2px', fontSize: '0.7rem' }}
+                    style={{ background: 'transparent', border: 'none', color: copiedLinkId === 'yt' ? '#34d399' : '#cbd5e1', cursor: 'pointer', padding: '0 2px', fontSize: '0.7rem' }}
                     title="Copier le lien public YouTube"
                   >
                     {copiedLinkId === 'yt' ? <Check size={12} /> : <Copy size={12} />}
@@ -2084,10 +2112,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               );
             })()}
             {destinations.facebookLiveUrl?.trim() && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(24, 119, 242, 0.16)', border: '1px solid rgba(59, 130, 246, 0.45)', borderRadius: '8px', padding: '2px 8px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(24, 119, 242, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: '6px', padding: '2px 8px' }}>
                 <Facebook size={13} color="#60a5fa" />
-                <a href={destinations.facebookLiveUrl.trim()} target="_blank" rel="noreferrer" style={{ color: '#93c5fd', fontWeight: 800, textDecoration: 'none' }}>
-                  Live Facebook <ExternalLink size={10} />
+                <a href={destinations.facebookLiveUrl.trim()} target="_blank" rel="noreferrer" style={{ color: '#93c5fd', fontWeight: 700, textDecoration: 'none' }}>
+                  Facebook <ExternalLink size={10} />
                 </a>
                 <button
                   type="button"
@@ -2096,7 +2124,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                     setCopiedLinkId('fb');
                     setTimeout(() => setCopiedLinkId(null), 1800);
                   }}
-                  style={{ background: 'transparent', border: 'none', color: copiedLinkId === 'fb' ? '#34d399' : '#fff', cursor: 'pointer', padding: '0 2px', fontSize: '0.7rem' }}
+                  style={{ background: 'transparent', border: 'none', color: copiedLinkId === 'fb' ? '#34d399' : '#cbd5e1', cursor: 'pointer', padding: '0 2px', fontSize: '0.7rem' }}
                   title="Copier le lien public Facebook"
                 >
                   {copiedLinkId === 'fb' ? <Check size={12} /> : <Copy size={12} />}
@@ -2107,25 +2135,35 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <span style={{
               fontSize: '0.7rem',
-              fontWeight: 800,
+              fontWeight: 700,
               padding: '2px 8px',
-              borderRadius: '999px',
+              borderRadius: '5px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
               background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                ? 'rgba(16, 185, 129, 0.16)'
-                : 'rgba(245, 158, 11, 0.15)',
-              color: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#34d399' : '#fbbf24'
+                ? 'rgba(16, 185, 129, 0.12)'
+                : 'rgba(245, 158, 11, 0.12)',
+              border: `1px solid ${broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
+              color: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#6EE7B7' : '#FCD34D'
             }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#10B981' : '#F59E0B'
+              }} />
               {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                ? '🟢 Relais OBS Prêt'
-                : '🟠 Relais PC requis pour diffuser'}
+                ? 'Relais PC prêt'
+                : 'Relais PC hors ligne'}
             </span>
             <button
               type="button"
               className="btn btn-outline"
               onClick={() => setShowPlatformsModal(true)}
-              style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 8px' }}
+              style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 8px', borderColor: 'rgba(255,255,255,0.15)', color: '#CBD5E1' }}
             >
-              ⚙️ Modifier URLs / Clés
+              <Settings size={11} /> Configurer
             </button>
           </div>
         </div>

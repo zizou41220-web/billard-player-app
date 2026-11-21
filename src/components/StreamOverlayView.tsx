@@ -10,7 +10,8 @@ interface StreamOverlayViewProps {
   tableParam: string;
 }
 
-import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl } from '../utils/video';
+import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl, extractWebRtcCamFromStreamUrl } from '../utils/video';
+import WebRtcCameraPlayer from './WebRtcCameraPlayer';
 import {
   LiveOverlayConfig,
   loadLiveOverlayConfig,
@@ -47,9 +48,10 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
 }) => {
   const defaultVdoRoom = `MCB_${currentClub.id}_${table.id}`;
   const tableExtVideo = extractExternalVideoFromStreamUrl(table.liveStreamUrl || match?.liveStreamUrl);
+  const tableWebRtcCam = extractWebRtcCamFromStreamUrl(table.liveStreamUrl || match?.liveStreamUrl);
   const [customYtUrl, setCustomYtUrl] = useState<string>(tableExtVideo);
   const activeExtVideo = customYtUrl || tableExtVideo;
-  const [sourceMode, setSourceMode] = useState<string>(() => (activeExtVideo ? 'ext' : 'vdo'));
+  const [sourceMode, setSourceMode] = useState<string>(() => (activeExtVideo ? 'ext' : tableWebRtcCam ? 'webrtc' : 'vdo'));
   const [tileZoom, setTileZoom] = useState<number>(1);
   const [tileRotation, setTileRotation] = useState<number>(0);
   const [fillTile, setFillTile] = useState<boolean>(true);
@@ -120,6 +122,18 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
           }}
           title={`YouTube ${table.name || table.number}`}
         />
+      ) : sourceMode === 'webrtc' && tableWebRtcCam ? (
+        <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0 }}>
+          <WebRtcCameraPlayer
+            clubId={currentClub.id}
+            cameraId={tableWebRtcCam}
+            muted={true}
+            fill={fillTile}
+            rotation={tileRotation}
+            zoom={tileZoom}
+            title={`Caméra ${table.name || table.number}`}
+          />
+        </div>
       ) : sourceMode === 'vdo' ? (
         <div style={{
           position: 'absolute',
@@ -380,6 +394,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const [twoTablesStacked, setTwoTablesStacked] = useState<boolean>(false);
   const [position, setPosition] = useState<'top' | 'bottom'>('bottom');
   const [vdoRoom, setVdoRoom] = useState<string | null>(null);
+  const [webrtcCamParam, setWebrtcCamParam] = useState<string | null>(null);
   const [isLocalBroadcast, setIsLocalBroadcast] = useState(false);
   const [externalVideoUrl, setExternalVideoUrl] = useState<string | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -419,6 +434,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
     if (params.get('pos') === 'top') setPosition('top');
     else if (params.get('pos') === 'bottom') setPosition('bottom');
     if (params.get('vdo')) setVdoRoom(params.get('vdo'));
+    if (params.get('cam')) setWebrtcCamParam(params.get('cam'));
     if (params.get('broadcast') === '1') setIsLocalBroadcast(true);
     if (params.get('video')) setExternalVideoUrl(params.get('video'));
 
@@ -707,8 +723,9 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
         : '');
 
   const effectiveExternalVideo = externalVideoUrl || extractExternalVideoFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl);
-  const effectiveVdoRoom = vdoRoom || (!effectiveExternalVideo ? extractVdoRoomFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl) : '');
-  const hasVideoLayer = Boolean(effectiveVdoRoom || isLocalBroadcast || effectiveExternalVideo);
+  const effectiveWebRtcCam = webrtcCamParam || (!effectiveExternalVideo && !vdoRoom ? extractWebRtcCamFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl) : '');
+  const effectiveVdoRoom = vdoRoom || (!effectiveExternalVideo && !effectiveWebRtcCam ? extractVdoRoomFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl) : '');
+  const hasVideoLayer = Boolean(effectiveWebRtcCam || effectiveVdoRoom || isLocalBroadcast || effectiveExternalVideo);
 
   return (
     <div
@@ -745,8 +762,23 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
         fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
       }}
     >
+      {/* 0. Native Unified Smartphone WebRTC Camera Background */}
+      {effectiveWebRtcCam && (
+        <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0 }}>
+          <WebRtcCameraPlayer
+            clubId={currentClub.id}
+            cameraId={effectiveWebRtcCam}
+            muted={true}
+            fill={fillScreen}
+            rotation={videoRotation}
+            zoom={videoZoom}
+            title="Flux Caméra Smartphone Live"
+          />
+        </div>
+      )}
+
       {/* 1. VDO.Ninja Wireless Camera Background (Smartphone or PC WebRTC) */}
-      {effectiveVdoRoom && (
+      {effectiveVdoRoom && !effectiveWebRtcCam && (
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -821,7 +853,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       )}
 
       {/* 3. External IP Camera / YouTube / Facebook Embed Background */}
-      {effectiveExternalVideo && !effectiveVdoRoom && !isLocalBroadcast && (
+      {effectiveExternalVideo && !effectiveWebRtcCam && !effectiveVdoRoom && !isLocalBroadcast && (
         <iframe
           src={formatEmbedVideoUrl(effectiveExternalVideo)}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

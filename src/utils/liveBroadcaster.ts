@@ -531,39 +531,40 @@ export function drawVirtualScreenToCanvas(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 1280, 720);
 
-  // Header bar
-  ctx.fillStyle = 'rgba(6, 12, 24, 0.9)';
-  ctx.fillRect(0, 0, 1280, 78);
-  ctx.fillStyle = 'rgba(0, 255, 170, 0.5)';
-  ctx.fillRect(0, 76, 1280, 2);
+  // Header bar (Broadcast Pro matte dark)
+  ctx.fillStyle = '#0A0E16';
+  ctx.fillRect(0, 0, 1280, 74);
+  ctx.fillStyle = '#D4AF37';
+  ctx.fillRect(0, 72, 1280, 2);
 
-  drawRoundedRect(ctx, 28, 22, 68, 32, 8);
-  ctx.fillStyle = '#ff2244';
+  ctx.beginPath();
+  ctx.arc(42, 37, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#EF4444';
   ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = '900 15px Inter, system-ui, sans-serif';
-  ctx.textAlign = 'center';
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = '800 13px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('LIVE', 62, 38);
+  ctx.fillText('LIVE', 56, 37);
 
   const headerTitle =
     slot.sourceType === 'tournament_standings'
-      ? `🏆 CLASSEMENT DU TOURNOI${targetTour ? ` — ${targetTour.name}` : ''}`
+      ? `CLASSEMENT DU TOURNOI${targetTour ? ` — ${targetTour.name}` : ''}`
       : slot.sourceType === 'tournament_bracket'
-        ? `🌳 TABLEAU DES PHASES FINALES${targetTour ? ` — ${targetTour.name}` : ''}`
+        ? `TABLEAU DES PHASES FINALES${targetTour ? ` — ${targetTour.name}` : ''}`
         : slot.sourceType === 'matches_live_board'
-          ? `🎱 SCORES EN DIRECT — ${currentClub.name}`
-          : `👑 CLASSEMENT GÉNÉRAL — ${currentClub.name}`;
+          ? `SCORES EN DIRECT — ${currentClub.name}`
+          : `CLASSEMENT GÉNÉRAL — ${currentClub.name}`;
 
-  ctx.fillStyle = '#FBBF24';
-  ctx.font = '900 28px Inter, system-ui, sans-serif';
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = '800 24px Inter, system-ui, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(headerTitle.slice(0, 56), 114, 39);
+  ctx.fillText(headerTitle.toUpperCase().slice(0, 56), 110, 37);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  ctx.font = '700 18px Inter, system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '600 15px Inter, system-ui, sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(currentClub.name, 1250, 39);
+  ctx.fillText(currentClub.name.toUpperCase(), 1250, 37);
 
   if (slot.sourceType === 'tournament_standings') {
     if (!targetTour) {
@@ -1258,9 +1259,9 @@ export class LiveCompositeBroadcaster {
       }
     } else {
       const headerH = 44;
-      ctx.fillStyle = '#070c1a';
+      ctx.fillStyle = '#0A0E16';
       ctx.fillRect(0, 0, W, headerH);
-      ctx.fillStyle = 'rgba(0, 255, 170, 0.35)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
       ctx.fillRect(0, headerH - 1, W, 1);
 
       const clubLogo = this.getCachedImage(getClubLogoUrl(currentClub.logoUrl) || defaultClubLogo);
@@ -1268,17 +1269,18 @@ export class LiveCompositeBroadcaster {
         ctx.drawImage(clubLogo, 14, 7, 30, 30);
       }
 
-      ctx.fillStyle = '#ff2244';
-      drawRoundedRect(ctx, 54, 11, 52, 22, 6);
+      ctx.beginPath();
+      ctx.arc(60, 22, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#EF4444';
       ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.font = '900 11px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '800 11px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText('LIVE', 80, 22);
+      ctx.fillText('LIVE', 70, 22);
 
-      ctx.fillStyle = '#FBBF24';
-      ctx.font = '900 16px Inter, system-ui, sans-serif';
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '800 14px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
       const mosaicHeaderTitle =
         directorState.situation === 'cuescore_live'
@@ -1288,7 +1290,7 @@ export class LiveCompositeBroadcaster {
           : directorState.situation === 'regional_match'
             ? (directorState.regionalMatch.eventTitle?.trim() || 'TOURNOI RÉGIONAL')
             : currentClub.name;
-      ctx.fillText(`${mosaicHeaderTitle} • ÉCRAN MULTIPLE`, 118, 22);
+      ctx.fillText(`${mosaicHeaderTitle.toUpperCase()}  •  MULTI-CAMÉRAS`, 112, 22);
 
       const list = enabledCams.length > 0
         ? enabledCams
@@ -1303,35 +1305,80 @@ export class LiveCompositeBroadcaster {
         this.drawVideoInRect(videoElements[slot.id], cx, cy, cellW, cellH, slot, data);
 
         const isAudioActive = directorState.activeAudioCameraId === slot.id && !slot.forceMuted && !isVirtualScreenSource(slot.sourceType);
-        ctx.strokeStyle = isAudioActive ? '#10B981' : 'rgba(255,255,255,0.22)';
-        ctx.lineWidth = isAudioActive ? 3 : 1.5;
+        ctx.strokeStyle = isAudioActive ? '#D4AF37' : 'rgba(255,255,255,0.16)';
+        ctx.lineWidth = isAudioActive ? 2 : 1;
         ctx.strokeRect(cx, cy, cellW, cellH);
 
         if (!isVirtualScreenSource(slot.sourceType)) {
           const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub }, directorState);
           const barH = 44;
-          ctx.fillStyle = 'rgba(6, 10, 22, 0.86)';
-          ctx.fillRect(cx + 8, cy + 8, cellW - 16, barH);
+          const barX = cx + 8;
+          const barY = cy + cellH - barH - 8;
+          const barW = cellW - 16;
 
-          ctx.fillStyle = '#00ffaa';
-          ctx.font = '800 13px Inter, system-ui, sans-serif';
+          ctx.save();
+          drawRoundedRect(ctx, barX, barY, barW, barH, 4);
+          ctx.fillStyle = 'rgba(10, 14, 22, 0.92)';
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.stroke();
+          ctx.fillStyle = '#D4AF37';
+          ctx.fillRect(barX + 1, barY, barW - 2, 2);
+
+          ctx.fillStyle = 'rgba(255,255,255,0.65)';
+          ctx.font = '700 10px Inter, system-ui, sans-serif';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(`${isAudioActive ? '🔊 ' : ''}${assignment.title}`, cx + 16, cy + 21);
+          ctx.fillText(assignment.title.toUpperCase().slice(0, 38), barX + 10, barY + 13);
+
+          if (isAudioActive) {
+            ctx.fillStyle = '#D4AF37';
+            ctx.textAlign = 'right';
+            ctx.fillText('AUDIO', barX + barW - 10, barY + 13);
+          }
 
           if (assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '700 13px Inter, system-ui, sans-serif';
-            ctx.fillText(
-              `${assignment.p1Name.slice(0, 14)}  ${assignment.score1} - ${assignment.score2}  ${assignment.p2Name.slice(0, 14)}`,
-              cx + 16,
-              cy + 39
-            );
+            const midX = barX + barW / 2;
+            const rowY = barY + 31;
+            const sbW = 24;
+            const sbH = 19;
+            const gapC = 14;
+            const s1X = midX - gapC / 2 - sbW;
+            const s2X = midX + gapC / 2;
+
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            ctx.font = '700 9px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('-', midX, rowY);
+
+            drawRoundedRect(ctx, s1X, rowY - sbH / 2, sbW, sbH, 3);
+            ctx.fillStyle = assignment.score1 > assignment.score2 ? '#D4AF37' : '#1E293B';
+            ctx.fill();
+            ctx.fillStyle = assignment.score1 > assignment.score2 ? '#090D16' : '#F8FAFC';
+            ctx.font = '800 13px Inter, system-ui, sans-serif';
+            ctx.fillText(`${assignment.score1}`, s1X + sbW / 2, rowY + 0.5);
+
+            drawRoundedRect(ctx, s2X, rowY - sbH / 2, sbW, sbH, 3);
+            ctx.fillStyle = assignment.score2 > assignment.score1 ? '#D4AF37' : '#1E293B';
+            ctx.fill();
+            ctx.fillStyle = assignment.score2 > assignment.score1 ? '#090D16' : '#F8FAFC';
+            ctx.font = '800 13px Inter, system-ui, sans-serif';
+            ctx.fillText(`${assignment.score2}`, s2X + sbW / 2, rowY + 0.5);
+
+            ctx.fillStyle = '#F8FAFC';
+            ctx.font = '700 12px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(assignment.p1Name.slice(0, 14), s1X - 8, rowY);
+            ctx.textAlign = 'left';
+            ctx.fillText(assignment.p2Name.slice(0, 14), s2X + sbW + 8, rowY);
           } else {
-            ctx.fillStyle = 'rgba(255,255,255,0.75)';
-            ctx.font = '600 12px Inter, system-ui, sans-serif';
-            ctx.fillText(assignment.subtitle.slice(0, 34), cx + 16, cy + 39);
+            ctx.fillStyle = '#CBD5E1';
+            ctx.font = '600 11px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(assignment.subtitle.slice(0, 38), barX + 10, barY + 31);
           }
+          ctx.restore();
         }
       });
     }

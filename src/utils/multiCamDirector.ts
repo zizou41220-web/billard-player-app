@@ -314,6 +314,67 @@ export const saveDirectorState = (
   return stamped;
 };
 
+/**
+ * Resolves (or creates/assigns) a unified native WebRTC camera slot for a club table,
+ * so scanning a table's QR code immediately feeds both the Match view and the Multi-Cam Director.
+ */
+export const resolveTableWebRtcCameraId = (
+  clubId: string,
+  tableId: string,
+  tableNumber?: number
+): string => {
+  const state = loadDirectorState(clubId);
+  const existingByTable = state.cameras.find(
+    c => !isVirtualScreenSource(c.sourceType) && c.assignmentType === 'table' && c.tableId === tableId
+  );
+  if (existingByTable) return existingByTable.id;
+  if (tableNumber && tableNumber >= 1 && tableNumber <= 4) {
+    const byIndex = state.cameras.find(c => c.id === `cam_${tableNumber}`);
+    if (byIndex && !isVirtualScreenSource(byIndex.sourceType)) return byIndex.id;
+  }
+  return `cam_${tableId}`;
+};
+
+export const ensureTableWebRtcCameraSlot = (
+  clubId: string,
+  tableId: string,
+  tableLabel: string,
+  tableNumber?: number
+): string => {
+  const state = loadDirectorState(clubId);
+  const camId = resolveTableWebRtcCameraId(clubId, tableId, tableNumber);
+  const exists = state.cameras.some(c => c.id === camId);
+  const nextCameras: DirectorCameraSlot[] = exists
+    ? state.cameras.map(c =>
+        c.id === camId
+          ? {
+              ...c,
+              enabled: true,
+              sourceType: 'smartphone_webrtc',
+              assignmentType: 'table',
+              tableId
+            }
+          : c
+      )
+    : [
+        ...state.cameras,
+        {
+          id: camId,
+          name: `Caméra ${tableLabel}`,
+          enabled: true,
+          sourceType: 'smartphone_webrtc',
+          assignmentType: 'table',
+          tableId,
+          rotation: 0,
+          zoom: 1,
+          fillMode: 'cover',
+          forceMuted: false
+        }
+      ];
+  saveDirectorState(clubId, { ...state, cameras: nextCameras }, true);
+  return camId;
+};
+
 export const subscribeToDirectorState = (
   clubId: string,
   onUpdate: (state: MultiCamDirectorState) => void

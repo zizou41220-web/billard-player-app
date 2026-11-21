@@ -3,11 +3,12 @@ import { useStore } from '../store';
 import { Flag, Minus, Plus, Radio } from 'lucide-react';
 import { getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import MatchTimerBadge from './MatchTimerBadge';
-import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl } from '../utils/video';
+import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl, extractWebRtcCamFromStreamUrl } from '../utils/video';
 import BilliardBreakCelebration from './BilliardBreakCelebration';
+import WebRtcCameraPlayer from './WebRtcCameraPlayer';
 
 const MatchView: React.FC = () => {
-  const { players, matches, activeMatchId, updateScore, finishMatch, tables, tournaments } = useStore();
+  const { players, matches, activeMatchId, updateScore, finishMatch, tables, tournaments, currentClub } = useStore();
 
   if (!activeMatchId) return null;
 
@@ -16,8 +17,9 @@ const MatchView: React.FC = () => {
   const table = match.tableId ? tables[match.tableId] : null;
   const rawStreamUrl = match.liveStreamUrl || table?.liveStreamUrl;
   const extVideo = extractExternalVideoFromStreamUrl(rawStreamUrl);
+  const webrtcCam = extractWebRtcCamFromStreamUrl(rawStreamUrl);
   const vdoRoom = extractVdoRoomFromStreamUrl(rawStreamUrl);
-  const hasLiveVideo = Boolean(extVideo || vdoRoom);
+  const hasLiveVideo = Boolean(extVideo || webrtcCam || vdoRoom);
   const [showVideo, setShowVideo] = useState(true);
 
   const streamUrl = (() => {
@@ -254,6 +256,14 @@ const MatchView: React.FC = () => {
                     border: 'none'
                   }}
                   title="Direct Vidéo du Match"
+                />
+              ) : webrtcCam ? (
+                <WebRtcCameraPlayer
+                  clubId={currentClub.id}
+                  cameraId={webrtcCam}
+                  muted={true}
+                  fill={true}
+                  title="Direct Vidéo Smartphone"
                 />
               ) : vdoRoom ? (
                 <iframe

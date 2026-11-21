@@ -30,6 +30,18 @@ export const extractVdoRoomFromStreamUrl = (streamUrl?: string): string => {
   return '';
 };
 
+export const extractWebRtcCamFromStreamUrl = (streamUrl?: string): string => {
+  if (!streamUrl) return '';
+  try {
+    const qIdx = streamUrl.indexOf('?');
+    if (qIdx !== -1 && streamUrl.includes('cam=')) {
+      const params = new URLSearchParams(streamUrl.slice(qIdx));
+      return params.get('cam') || '';
+    }
+  } catch {}
+  return '';
+};
+
 /**
  * Transforms any YouTube, Facebook, Twitch or direct URL into an embeddable iframe URL.
  * Supports:

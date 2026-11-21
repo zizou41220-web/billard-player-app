@@ -37,14 +37,13 @@ interface LiveOverlayEditorPanelProps {
 }
 
 const QUICK_POSITIONS: { label: string; x: number; y: number }[] = [
-  { label: '↖ Haut-Gauche', x: 12, y: 12 },
-  { label: '⬆ Haut-Centre', x: 50, y: 8 },
-  { label: '↗ Haut-Droite', x: 88, y: 12 },
-  { label: '⬇ Sous Score', x: 50, y: 27 },
-  { label: '⏺ Centre', x: 50, y: 50 },
-  { label: '↙ Bas-Gauche', x: 12, y: 86 },
-  { label: '⬇ Bas-Centre', x: 50, y: 88 },
-  { label: '↘ Bas-Droite', x: 88, y: 86 }
+  { label: 'Haut-Gauche', x: 12, y: 12 },
+  { label: 'Haut-Centre', x: 50, y: 8 },
+  { label: 'Haut-Droite', x: 88, y: 12 },
+  { label: 'Centre', x: 50, y: 50 },
+  { label: 'Bas-Gauche', x: 12, y: 82 },
+  { label: 'Bas-Centre', x: 50, y: 88 },
+  { label: 'Bas-Droite', x: 88, y: 82 }
 ];
 
 export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
@@ -54,7 +53,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
   player2Name = 'Joueur 2',
   score1 = 0,
   score2 = 0,
-  overlayPos = 'top',
+  overlayPos = 'bottom',
   onChangeOverlayPos
 }) => {
   const [config, setConfig] = useState<LiveOverlayConfig>(() =>
@@ -179,25 +178,25 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
 
   const sbX = config.scoreboardCustomPos ? (config.scoreboardX ?? 50) : 50;
   const sbY = config.scoreboardCustomPos
-    ? (config.scoreboardY ?? 13)
-    : (overlayPos === 'bottom' ? 86 : 13);
+    ? (config.scoreboardY ?? 90)
+    : (overlayPos === 'top' ? 12 : 90);
 
   return (
     <div style={{
-      background: 'rgba(4, 20, 18, 0.92)',
-      border: '1px solid rgba(245, 158, 11, 0.38)',
-      borderRadius: '16px',
+      background: '#0B0F17',
+      border: '1px solid rgba(255, 255, 255, 0.12)',
+      borderRadius: '12px',
       padding: '1.25rem',
       display: 'flex',
       flexDirection: 'column',
       gap: '1.1rem',
-      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.55)'
+      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'
     }}>
       {/* HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontWeight: 900, fontSize: '1.05rem', color: '#FBBF24' }}>
-            <Move size={19} /> Habillage Écran Live — Images, Logos & Informations
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontWeight: 800, fontSize: '1.02rem', color: '#F8FAFC' }}>
+            <Move size={18} color="#D4AF37" /> Habillage TV — Logos, Sponsors & Textes
           </div>
           <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
             Ajoutez des images (format libre, carré, affiche, rond...) et des textes (ex: « Finale du tournoi régional ») puis glissez-les où vous voulez sur l'écran.

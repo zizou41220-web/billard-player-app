@@ -33,6 +33,7 @@ import { useTheme } from '../utils/theme';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
+import { ensureTableWebRtcCameraSlot, resolveTableWebRtcCameraId } from '../utils/multiCamDirector';
 import { getPlayerAvatar } from '../utils/avatar';
 
 const AdminView: React.FC = () => {
@@ -68,7 +69,7 @@ const AdminView: React.FC = () => {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [selectedTableForQR, setSelectedTableForQR] = useState<string | null>(null);
   const [justScannedMatchId, setJustScannedMatchId] = useState<string | null>(null);
-  const [overlayPos, setOverlayPos] = useState<'top' | 'bottom'>('top');
+  const [overlayPos, setOverlayPos] = useState<'top' | 'bottom'>('bottom');
   const [dismissedQualifAlertTourId, setDismissedQualifAlertTourId] = useState<string | null>(null);
   const [playerSearchQuery, setPlayerSearchQuery] = useState('');
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => isVoiceAnnouncerEnabled());
@@ -5100,49 +5101,51 @@ const AdminView: React.FC = () => {
               justifyContent: 'space-between',
               flexWrap: 'wrap',
               gap: '0.6rem',
-              background: 'rgba(0,0,0,0.35)',
-              padding: '0.45rem 0.65rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.08)'
+              background: '#0B0F17',
+              padding: '0.4rem 0.6rem',
+              borderRadius: '10px',
+              border: '1px solid rgba(255,255,255,0.1)'
             }}>
-              <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => setLiveStudioSubTab('cameras')}
                   style={{
-                    background: liveStudioSubTab === 'cameras' ? 'var(--accent-primary)' : 'transparent',
-                    color: liveStudioSubTab === 'cameras' ? '#000' : 'var(--text-muted)',
-                    fontWeight: 800,
-                    border: 'none',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '8px',
+                    background: liveStudioSubTab === 'cameras' ? '#1E293B' : 'transparent',
+                    color: liveStudioSubTab === 'cameras' ? '#F8FAFC' : 'rgba(255,255,255,0.6)',
+                    fontWeight: 700,
+                    border: liveStudioSubTab === 'cameras' ? '1px solid rgba(212, 175, 55, 0.65)' : '1px solid transparent',
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '7px',
                     cursor: 'pointer',
-                    fontSize: '0.84rem',
+                    fontSize: '0.8rem',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.45rem'
                   }}
                 >
-                  🎥 Régie Live (Club & Tournoi Régional)
+                  <MonitorPlay size={15} color={liveStudioSubTab === 'cameras' ? '#D4AF37' : 'currentColor'} />
+                  Régie Live Multi-Caméras
                 </button>
                 <button
                   type="button"
                   onClick={() => setLiveStudioSubTab('overlay')}
                   style={{
-                    background: liveStudioSubTab === 'overlay' ? 'var(--accent-primary)' : 'transparent',
-                    color: liveStudioSubTab === 'overlay' ? '#000' : 'var(--text-muted)',
-                    fontWeight: 800,
-                    border: 'none',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '8px',
+                    background: liveStudioSubTab === 'overlay' ? '#1E293B' : 'transparent',
+                    color: liveStudioSubTab === 'overlay' ? '#F8FAFC' : 'rgba(255,255,255,0.6)',
+                    fontWeight: 700,
+                    border: liveStudioSubTab === 'overlay' ? '1px solid rgba(212, 175, 55, 0.65)' : '1px solid transparent',
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '7px',
                     cursor: 'pointer',
-                    fontSize: '0.84rem',
+                    fontSize: '0.8rem',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.45rem'
                   }}
                 >
-                  🎨 Habillage TV (Logos, Sponsors & Textes)
+                  <Edit2 size={14} color={liveStudioSubTab === 'overlay' ? '#D4AF37' : 'currentColor'} />
+                  Habillage TV (Logos, Sponsors & Textes)
                 </button>
               </div>
             </div>
@@ -5905,31 +5908,39 @@ const AdminView: React.FC = () => {
                   </div>
                 )}
 
-                {/* DIFFUSION DU MATCH : QR CODE SMARTPHONE + URL DIRECT FACEBOOK */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'center', textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.45', textAlign: 'left', width: '100%', background: 'rgba(0, 255, 170, 0.05)', padding: '0.7rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(0, 255, 170, 0.2)' }}>
-                    <div><b style={{ color: 'var(--accent-primary)' }}>Étape 1 :</b> Posez un smartphone face au billard et flashez ce QR Code (il ouvre la caméra sans rien installer).</div>
-                    <div style={{ marginTop: '5px' }}><b style={{ color: 'var(--accent-primary)' }}>Étape 2 :</b> Activez le direct smartphone ci-dessous <b>ou</b> collez l'URL de votre direct Facebook.</div>
-                  </div>
+                {/* DIFFUSION DU MATCH : QR CODE SMARTPHONE NATIF (UNIFIÉ RÉGIE) + URL DIRECT FACEBOOK */}
+                {(() => {
+                  const tableLabel = table.name || `Billard ${table.number}`;
+                  const unifiedCamId = resolveTableWebRtcCameraId(currentClub.id, table.id, table.number);
+                  const nativeCamQrUrl = `${getAppBaseUrl()}/?camera=${encodeURIComponent(unifiedCamId)}&club=${encodeURIComponent(currentClub.id)}`;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'center', textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.45', textAlign: 'left', width: '100%', background: 'rgba(15, 23, 42, 0.7)', padding: '0.7rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                        <div><b style={{ color: '#F8FAFC' }}>Étape 1 :</b> Posez un smartphone face au billard et flashez ce QR Code (caméra native unifiée avec la Régie YouTube/Facebook).</div>
+                        <div style={{ marginTop: '5px' }}><b style={{ color: '#F8FAFC' }}>Étape 2 :</b> Activez le direct smartphone ci-dessous <b>ou</b> collez l'URL de votre direct Facebook.</div>
+                      </div>
 
-                  <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'inline-block' }}>
-                    <QRCode value={`https://vdo.ninja/?push=MCB_${currentClub.id}_${table.id}&webcam&facingmode=environment`} size={135} />
-                  </div>
+                      <div style={{ background: '#fff', padding: '10px', borderRadius: '10px', display: 'inline-block' }}>
+                        <QRCode value={nativeCamQrUrl} size={135} />
+                      </div>
 
-                  <button
-                    type="button"
-                    className="btn btn-neon"
-                    style={{ width: '100%', fontSize: '0.84rem', padding: '0.65rem', justifyContent: 'center', fontWeight: 800 }}
-                    onClick={() => {
-                      const baseUrl = getAppBaseUrl();
-                      const liveViewerUrl = `${baseUrl}/?overlay=${table.id}&vdo=MCB_${currentClub.id}_${table.id}&pos=${overlayPos}&club=${currentClub.id}`;
-                      setTableLiveStream(table.id, liveViewerUrl);
-                      if (match) setMatchLiveStream(match.id, liveViewerUrl);
-                    }}
-                  >
-                    🔴 Activer le Direct Smartphone (Vidéo + Score TV)
-                  </button>
-                </div>
+                      <button
+                        type="button"
+                        className="btn btn-neon"
+                        style={{ width: '100%', fontSize: '0.82rem', padding: '0.65rem', justifyContent: 'center', fontWeight: 800 }}
+                        onClick={() => {
+                          const baseUrl = getAppBaseUrl();
+                          const camId = ensureTableWebRtcCameraSlot(currentClub.id, table.id, tableLabel, table.number);
+                          const liveViewerUrl = `${baseUrl}/?overlay=${table.id}&cam=${encodeURIComponent(camId)}&pos=${overlayPos}&club=${currentClub.id}`;
+                          setTableLiveStream(table.id, liveViewerUrl);
+                          if (match) setMatchLiveStream(match.id, liveViewerUrl);
+                        }}
+                      >
+                        <Radio size={15} /> Activer le Direct Smartphone (Vidéo + Score TV)
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* URL DU DIRECT FACEBOOK */}
                 <div style={{ background: 'rgba(24, 119, 242, 0.08)', border: '1px solid rgba(24, 119, 242, 0.35)', borderRadius: '12px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
@@ -5951,7 +5962,7 @@ const AdminView: React.FC = () => {
                           const v = new URLSearchParams(raw.slice(qIdx)).get('video');
                           return v || '';
                         }
-                        return raw.includes('vdo=') ? '' : raw;
+                        return raw.includes('vdo=') || raw.includes('cam=') ? '' : raw;
                       })()}
                       id={`stream-input-${table.id}-fb`}
                       style={{

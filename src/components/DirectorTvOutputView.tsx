@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Maximize2, Radio, Volume2, VolumeX } from 'lucide-react';
+import { Maximize2, Volume2, VolumeX } from 'lucide-react';
 import { useStore } from '../store';
 import {
   CameraSignalingHandle,
@@ -218,18 +218,18 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
         border: isFocusedFullscreen
           ? 'none'
           : isAudioActive
-            ? '2.5px solid #10b981'
-            : '1.5px solid rgba(255,255,255,0.16)',
+            ? '2px solid #D4AF37'
+            : '1px solid rgba(255,255,255,0.14)',
         opacity: isHiddenByOtherFullscreen ? 0 : 1,
         pointerEvents: isHiddenByOtherFullscreen ? 'none' : 'auto',
         cursor: !isFocusedFullscreen && onClickTile ? 'pointer' : 'default',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
-        padding: isFocusedFullscreen ? '1.5rem' : '0.65rem',
+        justifyContent: 'flex-end',
+        padding: isFocusedFullscreen ? '1.4rem' : '0.55rem',
         boxSizing: 'border-box'
       }}
-      title={isFocusedFullscreen ? undefined : 'Cliquer pour mettre en surbrillance et diffuser cette fenêtre en plein écran'}
+      title={isFocusedFullscreen ? undefined : 'Cliquer pour diffuser cette fenêtre en plein écran'}
     >
       <DirectorVideoElement slot={slot} stream={stream} unmuteAudio={isAudioActive} />
 
@@ -242,25 +242,26 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
           position: 'relative',
           zIndex: 15,
           width: '100%',
-          maxWidth: isFocusedFullscreen ? '900px' : '620px',
+          maxWidth: isFocusedFullscreen ? '980px' : '640px',
           margin: '0 auto',
-          background: isFocusedFullscreen ? 'rgba(8, 13, 28, 0.9)' : 'rgba(6, 11, 24, 0.88)',
+          background: 'rgba(10, 14, 22, 0.94)',
           backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          borderTop: isFocusedFullscreen ? '2.5px solid #00ffaa' : '2px solid #F59E0B',
-          borderRadius: isFocusedFullscreen ? '14px' : '10px',
-          padding: isFocusedFullscreen ? '0.6rem 1.2rem' : '0.4rem 0.75rem',
+          border: '1px solid rgba(255,255,255,0.14)',
+          borderTop: '2.5px solid #D4AF37',
+          borderRadius: '6px',
+          padding: isFocusedFullscreen ? '0.45rem 1.1rem' : '0.32rem 0.65rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.25rem',
-          boxShadow: isFocusedFullscreen ? '0 10px 30px rgba(0,0,0,0.75)' : 'none'
+          gap: '0.22rem',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.65)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: isFocusedFullscreen ? '0.82rem' : '0.72rem', fontWeight: 800 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: isFocusedFullscreen ? '0.6rem' : '0.45rem' }}>
-              <span style={{ background: '#ff2244', color: '#fff', padding: isFocusedFullscreen ? '2px 8px' : '1px 6px', borderRadius: isFocusedFullscreen ? '6px' : '4px', fontSize: isFocusedFullscreen ? '0.7rem' : '0.62rem', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                {isFocusedFullscreen ? <Radio size={11} /> : null} LIVE
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: isFocusedFullscreen ? '0.72rem' : '0.64rem', fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isFocusedFullscreen ? '0.55rem' : '0.4rem' }}>
+              <span style={{ color: '#F8FAFC', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#EF4444' }} />
+                LIVE
               </span>
-              <span style={{ color: '#00ffaa', fontWeight: 900 }}>{assignment.title}</span>
+              <span style={{ color: '#D4AF37', fontWeight: 800 }}>{assignment.title}</span>
               {assignment.match && (
                 <MatchTimerBadge
                   startTime={assignment.match.startTime}
@@ -274,14 +275,14 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
-              color: isFocusedFullscreen ? 'rgba(255,255,255,0.75)' : (isAudioActive ? '#34d399' : 'rgba(255,255,255,0.55)'),
-              fontSize: isFocusedFullscreen ? '0.76rem' : '0.68rem'
+              color: isFocusedFullscreen ? 'rgba(255,255,255,0.65)' : (isAudioActive ? '#D4AF37' : 'rgba(255,255,255,0.5)'),
+              fontSize: isFocusedFullscreen ? '0.7rem' : '0.62rem'
             }}>
               {isFocusedFullscreen ? (
                 assignment.rulesLabel || currentClub.name
               ) : (
                 <>
-                  {isAudioActive ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                  {isAudioActive ? <Volume2 size={11} /> : <VolumeX size={11} />}
                   {slot.name}
                 </>
               )}
@@ -289,69 +290,93 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
           </div>
 
           {hasMatchBanner ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: isFocusedFullscreen ? '1rem' : '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: isFocusedFullscreen ? '0.75rem' : '0.4rem', minWidth: 0 }}>
-                {assignment.p1 && (
-                  <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: isFocusedFullscreen ? '44px' : '26px', height: isFocusedFullscreen ? '44px' : '26px', borderRadius: '50%', objectFit: 'cover', border: isFocusedFullscreen ? '2px solid #00ffaa' : '1.5px solid #F59E0B' }} />
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  <span style={{ color: '#fff', fontWeight: 800, fontSize: isFocusedFullscreen ? '1.25rem' : '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: isFocusedFullscreen ? '0.9rem' : '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: isFocusedFullscreen ? '0.65rem' : '0.35rem', minWidth: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0 }}>
+                  <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: isFocusedFullscreen ? '1.15rem' : '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {assignment.p1Name}
                   </span>
                   {assignment.p1Club && (
-                    <span style={{ color: '#34D399', fontWeight: 700, fontSize: isFocusedFullscreen ? '0.78rem' : '0.65rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: '#94A3B8', fontWeight: 600, fontSize: isFocusedFullscreen ? '0.7rem' : '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {assignment.p1Club}
                     </span>
                   )}
                 </div>
+                {assignment.p1 && isFocusedFullscreen && (
+                  <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.22)' }} />
+                )}
               </div>
 
-              <div style={{ background: '#F59E0B', color: '#000', fontWeight: 900, fontSize: isFocusedFullscreen ? '2rem' : '1.05rem', padding: isFocusedFullscreen ? '2px 18px' : '1px 10px', borderRadius: isFocusedFullscreen ? '10px' : '7px' }}>
-                {assignment.score1} - {assignment.score2}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: isFocusedFullscreen ? '0.5rem' : '0.3rem' }}>
+                <span style={{
+                  minWidth: isFocusedFullscreen ? '42px' : '26px',
+                  textAlign: 'center',
+                  background: (assignment.score1 ?? 0) > (assignment.score2 ?? 0) ? '#D4AF37' : '#1E293B',
+                  color: (assignment.score1 ?? 0) > (assignment.score2 ?? 0) ? '#090D16' : '#F8FAFC',
+                  fontWeight: 900,
+                  fontSize: isFocusedFullscreen ? '1.45rem' : '0.95rem',
+                  padding: isFocusedFullscreen ? '2px 10px' : '1px 6px',
+                  borderRadius: '4px'
+                }}>
+                  {assignment.score1}
+                </span>
+                <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: isFocusedFullscreen ? '0.72rem' : '0.62rem', fontWeight: 800 }}>VS</span>
+                <span style={{
+                  minWidth: isFocusedFullscreen ? '42px' : '26px',
+                  textAlign: 'center',
+                  background: (assignment.score2 ?? 0) > (assignment.score1 ?? 0) ? '#D4AF37' : '#1E293B',
+                  color: (assignment.score2 ?? 0) > (assignment.score1 ?? 0) ? '#090D16' : '#F8FAFC',
+                  fontWeight: 900,
+                  fontSize: isFocusedFullscreen ? '1.45rem' : '0.95rem',
+                  padding: isFocusedFullscreen ? '2px 10px' : '1px 6px',
+                  borderRadius: '4px'
+                }}>
+                  {assignment.score2}
+                </span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: isFocusedFullscreen ? '0.75rem' : '0.4rem', minWidth: 0 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0 }}>
-                  <span style={{ color: '#fff', fontWeight: 800, fontSize: isFocusedFullscreen ? '1.25rem' : '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: isFocusedFullscreen ? '0.65rem' : '0.35rem', minWidth: 0 }}>
+                {assignment.p2 && isFocusedFullscreen && (
+                  <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.22)' }} />
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+                  <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: isFocusedFullscreen ? '1.15rem' : '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {assignment.p2Name}
                   </span>
                   {assignment.p2Club && (
-                    <span style={{ color: '#FBBF24', fontWeight: 700, fontSize: isFocusedFullscreen ? '0.78rem' : '0.65rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: '#94A3B8', fontWeight: 600, fontSize: isFocusedFullscreen ? '0.7rem' : '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {assignment.p2Club}
                     </span>
                   )}
                 </div>
-                {assignment.p2 && (
-                  <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: isFocusedFullscreen ? '44px' : '26px', height: isFocusedFullscreen ? '44px' : '26px', borderRadius: '50%', objectFit: 'cover', border: isFocusedFullscreen ? '2px solid #00ffaa' : '1.5px solid #F59E0B' }} />
-                )}
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: isFocusedFullscreen ? '0.88rem' : '0.74rem', color: 'rgba(255,255,255,0.78)', textAlign: 'center' }}>
+            <div style={{ fontSize: isFocusedFullscreen ? '0.84rem' : '0.72rem', color: '#CBD5E1', textAlign: 'center' }}>
               {assignment.subtitle}
             </div>
           )}
         </div>
-      ) : (
-        <div />
-      )}
+      ) : null}
 
       {!isFocusedFullscreen && (
         <div style={{
-          position: 'relative',
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
           zIndex: 10,
-          alignSelf: 'flex-end',
-          background: 'rgba(0,0,0,0.65)',
-          color: 'rgba(255,255,255,0.8)',
-          fontSize: '0.66rem',
+          background: 'rgba(10, 14, 22, 0.78)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: 'rgba(255,255,255,0.75)',
+          fontSize: '0.62rem',
           fontWeight: 700,
           padding: '2px 7px',
-          borderRadius: '5px',
+          borderRadius: '4px',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px'
         }}>
-          <Maximize2 size={10} /> Cliquer pour diffuser seul
+          <Maximize2 size={10} /> Plein écran
         </div>
       )}
     </div>
@@ -580,12 +605,13 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
               onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
             />
           </div>
-          <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#F59E0B' }}>
-            📺 ÉCRAN MULTIPLE LIVE • {directorState.situation === 'cuescore_live' ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim()) ? directorState.regionalMatch.cueScoreTournamentName : 'Live CueScore') : directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
+          <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#F8FAFC', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#EF4444' }} />
+            MULTI-CAMÉRAS • {directorState.situation === 'cuescore_live' ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim()) ? directorState.regionalMatch.cueScoreTournamentName : 'Live CueScore') : directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
           </span>
           {directorState.situation === 'club_tables' && activeTournament && (
-            <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-              🏆 {activeTournament.name}
+            <span style={{ fontSize: '0.74rem', color: '#D4AF37', background: 'rgba(212, 175, 55, 0.12)', border: '1px solid rgba(212, 175, 55, 0.3)', padding: '2px 8px', borderRadius: '5px', fontWeight: 700 }}>
+              {activeTournament.name}
             </span>
           )}
         </div>

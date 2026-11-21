@@ -8,7 +8,8 @@ import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { isRealFinishedMatch } from '../utils/bracket';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
-import { extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl, formatEmbedVideoUrl } from '../utils/video';
+import { extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl, extractWebRtcCamFromStreamUrl, formatEmbedVideoUrl } from '../utils/video';
+import WebRtcCameraPlayer from './WebRtcCameraPlayer';
 
 const resolveOverlayHref = (rawStreamUrl?: string): string | undefined => {
   if (!rawStreamUrl) return undefined;
@@ -193,8 +194,9 @@ const FeedView: React.FC = () => {
               const { formatLabel } = getMatchScoringRules(m, matchTour, players);
               const rawStreamUrl = m.liveStreamUrl || tableObj?.liveStreamUrl;
               const extVideo = extractExternalVideoFromStreamUrl(rawStreamUrl);
+              const webrtcCam = extractWebRtcCamFromStreamUrl(rawStreamUrl);
               const vdoRoom = extractVdoRoomFromStreamUrl(rawStreamUrl);
-              const hasLiveVideo = Boolean(extVideo || vdoRoom);
+              const hasLiveVideo = Boolean(extVideo || webrtcCam || vdoRoom);
               const overlayHref = resolveOverlayHref(rawStreamUrl);
 
               return (
@@ -277,6 +279,14 @@ const FeedView: React.FC = () => {
                           referrerPolicy="strict-origin-when-cross-origin"
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
                           title={`Live ${players[m.player1Id]?.name} vs ${players[m.player2Id]?.name}`}
+                        />
+                      ) : webrtcCam ? (
+                        <WebRtcCameraPlayer
+                          clubId={currentClub.id}
+                          cameraId={webrtcCam}
+                          muted={true}
+                          fill={true}
+                          title={`Caméra ${tableObj ? (tableObj.name || `Table ${tableObj.number}`) : 'Live'}`}
                         />
                       ) : vdoRoom ? (
                         <iframe
