@@ -1242,6 +1242,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   };
 
   const handleSetSituation = (situation: DirectorLiveSituation) => {
+    if ((broadcasterStatus.isStreaming || directorState.isLiveStreaming) && situation !== directorState.situation) {
+      alert("Un direct est actuellement en cours. Arrêtez d'abord le live (⏹ ARRÊTER) avant de changer de menu.");
+      return;
+    }
     updateDirector({
       ...directorState,
       situation
@@ -1760,64 +1764,79 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       }}>
         {/* Left: Situation Switcher + Mode Indicator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-          <div style={{
-            display: 'inline-flex',
-            background: 'rgba(0,0,0,0.45)',
-            padding: '3px',
-            borderRadius: '9px',
-            border: '1px solid rgba(255,255,255,0.12)',
-            gap: '3px',
-            flexWrap: 'wrap'
-          }}>
-            <button
-              type="button"
-              onClick={() => handleSetSituation('club_tables')}
-              style={{
-                background: directorState.situation === 'club_tables' ? '#10B981' : 'transparent',
-                color: directorState.situation === 'club_tables' ? '#000' : 'rgba(255,255,255,0.75)',
-                border: 'none',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                fontSize: '0.74rem',
-                fontWeight: 900,
-                cursor: 'pointer'
-              }}
-            >
-              🏠🎱 Live Club & Tournoi Appli
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetSituation('regional_match')}
-              style={{
-                background: directorState.situation === 'regional_match' ? '#F59E0B' : 'transparent',
-                color: directorState.situation === 'regional_match' ? '#000' : 'rgba(255,255,255,0.75)',
-                border: 'none',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                fontSize: '0.74rem',
-                fontWeight: 900,
-                cursor: 'pointer'
-              }}
-            >
-              🏆 Live Tournoi Régional / Match
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetSituation('cuescore_live')}
-              style={{
-                background: directorState.situation === 'cuescore_live' ? '#38BDF8' : 'transparent',
-                color: directorState.situation === 'cuescore_live' ? '#000' : 'rgba(255,255,255,0.75)',
-                border: 'none',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                fontSize: '0.74rem',
-                fontWeight: 900,
-                cursor: 'pointer'
-              }}
-            >
-              🔗 Live CueScore{rm.cueScoreAutoSync ? ' ⚡' : ''}
-            </button>
-          </div>
+          {(() => {
+            const isLiveLocked = broadcasterStatus.isStreaming || directorState.isLiveStreaming;
+            const lockedTitle = "Arrêtez d'abord le live en cours avant de changer de menu";
+            return (
+              <div style={{
+                display: 'inline-flex',
+                background: 'rgba(0,0,0,0.45)',
+                padding: '3px',
+                borderRadius: '9px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                gap: '3px',
+                flexWrap: 'wrap'
+              }}>
+                <button
+                  type="button"
+                  disabled={isLiveLocked && directorState.situation !== 'club_tables'}
+                  onClick={() => handleSetSituation('club_tables')}
+                  title={isLiveLocked && directorState.situation !== 'club_tables' ? lockedTitle : undefined}
+                  style={{
+                    background: directorState.situation === 'club_tables' ? '#10B981' : 'transparent',
+                    color: directorState.situation === 'club_tables' ? '#000' : 'rgba(255,255,255,0.75)',
+                    border: 'none',
+                    borderRadius: '7px',
+                    padding: '4px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 900,
+                    cursor: isLiveLocked && directorState.situation !== 'club_tables' ? 'not-allowed' : 'pointer',
+                    opacity: isLiveLocked && directorState.situation !== 'club_tables' ? 0.4 : 1
+                  }}
+                >
+                  🏠🎱 Live Club & Tournoi Appli
+                </button>
+                <button
+                  type="button"
+                  disabled={isLiveLocked && directorState.situation !== 'regional_match'}
+                  onClick={() => handleSetSituation('regional_match')}
+                  title={isLiveLocked && directorState.situation !== 'regional_match' ? lockedTitle : undefined}
+                  style={{
+                    background: directorState.situation === 'regional_match' ? '#F59E0B' : 'transparent',
+                    color: directorState.situation === 'regional_match' ? '#000' : 'rgba(255,255,255,0.75)',
+                    border: 'none',
+                    borderRadius: '7px',
+                    padding: '4px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 900,
+                    cursor: isLiveLocked && directorState.situation !== 'regional_match' ? 'not-allowed' : 'pointer',
+                    opacity: isLiveLocked && directorState.situation !== 'regional_match' ? 0.4 : 1
+                  }}
+                >
+                  🏆 Live Tournoi Régional / Match
+                </button>
+                <button
+                  type="button"
+                  disabled={isLiveLocked && directorState.situation !== 'cuescore_live'}
+                  onClick={() => handleSetSituation('cuescore_live')}
+                  title={isLiveLocked && directorState.situation !== 'cuescore_live' ? lockedTitle : undefined}
+                  style={{
+                    background: directorState.situation === 'cuescore_live' ? '#38BDF8' : 'transparent',
+                    color: directorState.situation === 'cuescore_live' ? '#000' : 'rgba(255,255,255,0.75)',
+                    border: 'none',
+                    borderRadius: '7px',
+                    padding: '4px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 900,
+                    cursor: isLiveLocked && directorState.situation !== 'cuescore_live' ? 'not-allowed' : 'pointer',
+                    opacity: isLiveLocked && directorState.situation !== 'cuescore_live' ? 0.4 : 1
+                  }}
+                >
+                  🔗 Live CueScore{rm.cueScoreAutoSync ? ' ⚡' : ''}
+                </button>
+              </div>
+            );
+          })()}
 
           <span style={{
             background: directorState.broadcastMode === 'single' ? '#ef4444' : '#f59e0b',
