@@ -74,6 +74,8 @@ export interface DirectorCameraSlot {
   forceMuted: boolean;
 }
 
+export type StreamQualityPreset = '480p' | '720p' | '1080p';
+
 export interface StreamDestinationsConfig {
   facebookEnabled: boolean;
   facebookRtmpUrl: string;
@@ -88,6 +90,7 @@ export interface StreamDestinationsConfig {
   customStreamKey: string;
   customLiveUrl?: string;
   relayWsUrl: string;
+  qualityPreset?: StreamQualityPreset;
 }
 
 export interface MultiCamDirectorState {
@@ -98,6 +101,9 @@ export interface MultiCamDirectorState {
   focusedCameraId: string | null;
   activeAudioCameraId: string | null;
   mosaicLayout: DirectorMosaicLayout;
+  isIntermission?: boolean;
+  intermissionTitle?: string;
+  intermissionSubtitle?: string;
   isLiveStreaming: boolean;
   liveStartedAt: number | null;
   updatedAt: number;
@@ -208,6 +214,9 @@ export const DEFAULT_DIRECTOR_STATE: MultiCamDirectorState = {
   focusedCameraId: null,
   activeAudioCameraId: 'cam_1',
   mosaicLayout: 'auto',
+  isIntermission: false,
+  intermissionTitle: 'PAUSE — REPRISE DANS QUELQUES INSTANTS',
+  intermissionSubtitle: '',
   isLiveStreaming: false,
   liveStartedAt: null,
   updatedAt: 0
@@ -226,7 +235,8 @@ export const DEFAULT_DESTINATIONS_CONFIG: StreamDestinationsConfig = {
   customRtmpUrl: '',
   customStreamKey: '',
   customLiveUrl: '',
-  relayWsUrl: ''
+  relayWsUrl: '',
+  qualityPreset: '720p'
 };
 
 const getDirectorStorageKey = (clubId: string) =>

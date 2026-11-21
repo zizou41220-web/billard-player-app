@@ -183,12 +183,12 @@ function handleRelayWebSocketConnection(socket) {
   let fragmentedChunks = [];
   let fragmentedOpcode = null;
 
-  /** @type {Map<string, { proc: import('node:child_process').ChildProcess, label: string, id: string, bytesSent: number }>} */
+  /** @type {Map<string, { proc: import('node:child_process').ChildProcess, label: string, id: string, targetIds: string[], bytesSent: number, announcedLive: boolean }>} */
   const activeProcesses = new Map();
   let bytesReceived = 0;
 
   const stopAllTargets = (notify = true) => {
-    for (const [id, item] of activeProcesses.entries()) {
+    for (const [, item] of activeProcesses.entries()) {
       try {
         if (item.proc.stdin && !item.proc.stdin.destroyed) {
           item.proc.stdin.end();
@@ -198,7 +198,9 @@ function handleRelayWebSocketConnection(socket) {
         item.proc.kill('SIGTERM');
       } catch {}
       if (notify) {
-        sendWsJson(socket, { type: 'target_status', id, status: 'stopped' });
+        for (const tid of item.targetIds) {
+          sendWsJson(socket, { type: 'target_status', id: tid, status: 'stopped' });
+        }
       }
     }
     activeProcesses.clear();
@@ -207,9 +209,14 @@ function handleRelayWebSocketConnection(socket) {
     }
   };
 
-  const startTargets = async (targets) => {
+  const startTargets = async (targets, quality = {}) => {
     stopAllTargets(false);
     bytesReceived = 0;
+
+    const bitrateKbps = Math.max(800, Math.min(8000, Number(quality?.bitrateKbps) || 2500));
+    const fps = Math.max(15, Math.min(60, Number(quality?.fps) || 30));
+    const bufsizeKbps = bitrateKbps * 2;
+    const gopSize = fps * 2;
 
     let ffmpegBin = findFfmpegBinary();
     if (!ffmpegBin) {
@@ -225,7 +232,9 @@ function handleRelayWebSocketConnection(socket) {
       return;
     }
 
-    const validTargets = (Array.isArray(targets) ? targets : []).filter(t => t && t.rtmpUrl && t.streamKey);
+    const validTargets = (Array.isArray(targets) ? targets : [])
+      .map(t => ({ ...t, fullUrl: normalizeRtmpUrl(t?.rtmpUrl, t?.streamKey) }))
+      .filter(t => t && t.fullUrl);
     if (validTargets.length === 0) {
       sendWsJson(socket, {
         type: 'error',
@@ -236,78 +245,96 @@ function handleRelayWebSocketConnection(socket) {
     }
 
     for (const target of validTargets) {
-      const fullUrl = normalizeRtmpUrl(target.rtmpUrl, target.streamKey);
-      if (!fullUrl) continue;
-
       sendWsJson(socket, { type: 'target_status', id: target.id, status: 'connecting', label: target.label || target.id });
-
-      const args = [
-        '-hide_banner',
-        '-loglevel', 'warning',
-        '-fflags', '+genpts',
-        '-i', 'pipe:0',
-        '-map', '0:v:0',
-        '-map', '0:a:0?',
-        '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-tune', 'zerolatency',
-        '-b:v', '2500k',
-        '-maxrate', '2500k',
-        '-bufsize', '5000k',
-        '-pix_fmt', 'yuv420p',
-        '-r', '30',
-        '-g', '60',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-ar', '44100',
-        '-ac', '2',
-        '-f', 'flv',
-        fullUrl
-      ];
-
-      const proc = spawn(ffmpegBin, args, { stdio: ['pipe', 'ignore', 'pipe'] });
-      const entry = { proc, label: target.label || target.id, id: target.id, bytesSent: 0, announcedLive: false };
-      activeProcesses.set(target.id, entry);
-
-      proc.stdin.on('error', () => {});
-
-      let stderrTail = '';
-      proc.stderr.on('data', (chunk) => {
-        const text = chunk.toString('utf8');
-        stderrTail = (stderrTail + text).slice(-800);
-        if (!entry.announcedLive && (text.includes('frame=') || text.includes('Output #0'))) {
-          entry.announcedLive = true;
-          sendWsJson(socket, { type: 'target_status', id: target.id, status: 'live' });
-        }
-      });
-
-      // Fallback: mark live after 2.5s if process stays alive and receives data
-      setTimeout(() => {
-        const cur = activeProcesses.get(target.id);
-        if (cur && cur.proc === proc && !proc.killed && proc.exitCode === null && !cur.announcedLive && bytesReceived > 0) {
-          cur.announcedLive = true;
-          sendWsJson(socket, { type: 'target_status', id: target.id, status: 'live' });
-        }
-      }, 2500);
-
-      proc.on('close', (code) => {
-        if (activeProcesses.get(target.id)?.proc === proc) {
-          activeProcesses.delete(target.id);
-          if (code !== 0 && code !== null) {
-            sendWsJson(socket, {
-              type: 'target_status',
-              id: target.id,
-              status: 'error',
-              message: stderrTail.trim() || `FFmpeg arrêté (code ${code}). Vérifiez votre clé de stream.`
-            });
-          } else {
-            sendWsJson(socket, { type: 'target_status', id: target.id, status: 'stopped' });
-          }
-        }
-      });
     }
 
-    sendWsJson(socket, { type: 'relay_started', targetCount: activeProcesses.size });
+    // Single H.264 encode: use -f tee when streaming to 2+ platforms simultaneously (cuts CPU in half)
+    const useTee = validTargets.length > 1;
+    const baseArgs = [
+      '-hide_banner',
+      '-loglevel', 'warning',
+      '-fflags', '+genpts',
+      '-i', 'pipe:0',
+      '-map', '0:v:0',
+      '-map', '0:a:0?',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-tune', 'zerolatency',
+      '-b:v', `${bitrateKbps}k`,
+      '-maxrate', `${bitrateKbps}k`,
+      '-bufsize', `${bufsizeKbps}k`,
+      '-pix_fmt', 'yuv420p',
+      '-r', `${fps}`,
+      '-g', `${gopSize}`,
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-ar', '44100',
+      '-ac', '2'
+    ];
+
+    const outputArgs = useTee
+      ? [
+          '-flags', '+global_header',
+          '-f', 'tee',
+          validTargets.map(t => `[f=flv:onfail=ignore]${t.fullUrl}`).join('|')
+        ]
+      : ['-f', 'flv', validTargets[0].fullUrl];
+
+    const procKey = useTee ? 'tee_multi' : validTargets[0].id;
+    const targetIds = validTargets.map(t => t.id);
+    const proc = spawn(ffmpegBin, [...baseArgs, ...outputArgs], { stdio: ['pipe', 'ignore', 'pipe'] });
+    const entry = {
+      proc,
+      label: validTargets.map(t => t.label || t.id).join(' + '),
+      id: procKey,
+      targetIds,
+      bytesSent: 0,
+      announcedLive: false
+    };
+    activeProcesses.set(procKey, entry);
+
+    proc.stdin.on('error', () => {});
+
+    let stderrTail = '';
+    proc.stderr.on('data', (chunk) => {
+      const text = chunk.toString('utf8');
+      stderrTail = (stderrTail + text).slice(-800);
+      if (!entry.announcedLive && (text.includes('frame=') || text.includes('Output #0'))) {
+        entry.announcedLive = true;
+        for (const tid of targetIds) {
+          sendWsJson(socket, { type: 'target_status', id: tid, status: 'live' });
+        }
+      }
+    });
+
+    // Fallback: mark live after 2.5s if process stays alive and receives data
+    setTimeout(() => {
+      const cur = activeProcesses.get(procKey);
+      if (cur && cur.proc === proc && !proc.killed && proc.exitCode === null && !cur.announcedLive && bytesReceived > 0) {
+        cur.announcedLive = true;
+        for (const tid of targetIds) {
+          sendWsJson(socket, { type: 'target_status', id: tid, status: 'live' });
+        }
+      }
+    }, 2500);
+
+    proc.on('close', (code) => {
+      if (activeProcesses.get(procKey)?.proc === proc) {
+        activeProcesses.delete(procKey);
+        if (code !== 0 && code !== null) {
+          const msg = stderrTail.trim() || `FFmpeg arrêté (code ${code}). Vérifiez votre clé de stream.`;
+          for (const tid of targetIds) {
+            sendWsJson(socket, { type: 'target_status', id: tid, status: 'error', message: msg });
+          }
+        } else {
+          for (const tid of targetIds) {
+            sendWsJson(socket, { type: 'target_status', id: tid, status: 'stopped' });
+          }
+        }
+      }
+    });
+
+    sendWsJson(socket, { type: 'relay_started', targetCount: validTargets.length, teeMode: useTee, bitrateKbps, fps });
   };
 
   const handleMessage = (opcode, payload) => {
@@ -319,7 +346,7 @@ function handleRelayWebSocketConnection(socket) {
           const ffmpegPath = findFfmpegBinary();
           sendWsJson(socket, { type: 'pong', ffmpegAvailable: Boolean(ffmpegPath), ffmpegPath });
         } else if (msg.type === 'start') {
-          startTargets(msg.targets);
+          startTargets(msg.targets, msg.quality);
         } else if (msg.type === 'stop') {
           stopAllTargets(true);
         }

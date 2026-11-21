@@ -5,6 +5,7 @@ import {
   DirectorMosaicLayout,
   MultiCamDirectorState,
   StreamDestinationsConfig,
+  StreamQualityPreset,
   isVirtualScreenSource
 } from './multiCamDirector';
 import { getMatchScoringRules } from './rules';
@@ -14,12 +15,28 @@ import { isFinalStageMatch } from './bracket';
 
 export type RelayTargetStatus = 'idle' | 'connecting' | 'live' | 'stopped' | 'error';
 
+export const STREAM_QUALITY_PROFILES: Record<
+  StreamQualityPreset,
+  { width: number; height: number; bitrateKbps: number; videoBitsPerSecond: number; fps: number; label: string }
+> = {
+  '480p': { width: 854, height: 480, bitrateKbps: 1200, videoBitsPerSecond: 1_200_000, fps: 30, label: '480p Éco (1.2 Mbps)' },
+  '720p': { width: 1280, height: 720, bitrateKbps: 2500, videoBitsPerSecond: 2_800_000, fps: 30, label: '720p HD (2.5 Mbps)' },
+  '1080p': { width: 1920, height: 1080, bitrateKbps: 4500, videoBitsPerSecond: 4_800_000, fps: 30, label: '1080p Full HD (4.5 Mbps)' }
+};
+
 export interface BroadcasterStatusSnapshot {
   connectedToRelay: boolean;
   ffmpegAvailable: boolean | null;
   ffmpegPath?: string | null;
   isStreaming: boolean;
   bytesSent: number;
+  currentFps?: number;
+  bitrateKbps?: number;
+  audioLevel?: number;
+  isRecordingLocal?: boolean;
+  localRecordingSec?: number;
+  commentatorMicActive?: boolean;
+  qualityPreset?: StreamQualityPreset;
   targetStatuses: Record<string, { status: RelayTargetStatus; message?: string; label?: string }>;
   lastError: string | null;
 }
@@ -813,7 +830,33 @@ export class LiveCompositeBroadcaster {
   private audioCtx: AudioContext | null = null;
   private audioDest: MediaStreamAudioDestinationNode | null = null;
   private silentOsc: OscillatorNode | null = null;
+  private analyser: AnalyserNode | null = null;
+  private masterGain: GainNode | null = null;
   private audioSources = new Map<string, { stream: MediaStream; source: MediaStreamAudioSourceNode; gain: GainNode }>();
+  private commentatorStream: MediaStream | null = null;
+  private commentatorSource: MediaStreamAudioSourceNode | null = null;
+  private commentatorGainNode: GainNode | null = null;
+  private cameraMasterVolume = 1.0;
+  private commentatorMasterVolume = 1.1;
+
+  // Web Worker 30 FPS anti-throttle ticker
+  private tickWorker: Worker | null = null;
+
+  // Crossfade transition buffer
+  private prevFrameCanvas: HTMLCanvasElement;
+  private prevFrameCtx: CanvasRenderingContext2D | null;
+  private lastSceneKey = '';
+  private transitionStartAt = 0;
+  private readonly transitionDurationMs = 320;
+
+  // Telemetry & Local Backup Recording
+  private frameTimestamps: number[] = [];
+  private lastTelemetryAt = 0;
+  private recentBytesWindow: { at: number; bytes: number }[] = [];
+  private localRecorder: MediaRecorder | null = null;
+  private localChunks: Blob[] = [];
+  private localRecStartedAt = 0;
+  private localRecTimer: number | null = null;
 
   // WebSocket + MediaRecorder
   private ws: WebSocket | null = null;
@@ -825,6 +868,13 @@ export class LiveCompositeBroadcaster {
     ffmpegPath: null,
     isStreaming: false,
     bytesSent: 0,
+    currentFps: 30,
+    bitrateKbps: 0,
+    audioLevel: 0,
+    isRecordingLocal: false,
+    localRecordingSec: 0,
+    commentatorMicActive: false,
+    qualityPreset: '720p',
     targetStatuses: {},
     lastError: null
   };
@@ -836,6 +886,12 @@ export class LiveCompositeBroadcaster {
     const c = this.canvas.getContext('2d');
     if (!c) throw new Error('Canvas 2D non supporté');
     this.ctx = c;
+
+    this.prevFrameCanvas = document.createElement('canvas');
+    this.prevFrameCanvas.width = 1280;
+    this.prevFrameCanvas.height = 720;
+    this.prevFrameCtx = this.prevFrameCanvas.getContext('2d');
+
     this.onStatusChange = onStatusChange;
   }
 
@@ -870,27 +926,104 @@ export class LiveCompositeBroadcaster {
     this.syncAudioRouting();
   }
 
+  public setAudioGains(opts: { cameraVolume?: number; commentatorVolume?: number }) {
+    if (opts.cameraVolume !== undefined) {
+      this.cameraMasterVolume = Math.max(0, Math.min(1.5, opts.cameraVolume));
+    }
+    if (opts.commentatorVolume !== undefined) {
+      this.commentatorMasterVolume = Math.max(0, Math.min(1.5, opts.commentatorVolume));
+      if (this.commentatorGainNode && this.audioCtx) {
+        this.commentatorGainNode.gain.setTargetAtTime(this.commentatorMasterVolume, this.audioCtx.currentTime, 0.03);
+      }
+    }
+    this.syncAudioRouting();
+  }
+
+  public async setCommentatorMicEnabled(enabled: boolean): Promise<boolean> {
+    if (!enabled) {
+      try {
+        this.commentatorSource?.disconnect();
+        this.commentatorGainNode?.disconnect();
+      } catch {}
+      if (this.commentatorStream) {
+        this.commentatorStream.getTracks().forEach(t => t.stop());
+      }
+      this.commentatorStream = null;
+      this.commentatorSource = null;
+      this.commentatorGainNode = null;
+      this.emitStatus({ commentatorMicActive: false });
+      return false;
+    }
+
+    try {
+      this.ensureAudioMixer();
+      if (this.audioCtx?.state === 'suspended') {
+        await this.audioCtx.resume().catch(() => {});
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
+        video: false
+      });
+      if (!this.audioCtx || !this.masterGain) {
+        stream.getTracks().forEach(t => t.stop());
+        return false;
+      }
+      const src = this.audioCtx.createMediaStreamSource(stream);
+      const gain = this.audioCtx.createGain();
+      gain.gain.value = this.commentatorMasterVolume;
+      src.connect(gain);
+      gain.connect(this.masterGain);
+
+      this.commentatorStream = stream;
+      this.commentatorSource = src;
+      this.commentatorGainNode = gain;
+      this.emitStatus({ commentatorMicActive: true });
+      return true;
+    } catch (err: any) {
+      this.emitStatus({
+        commentatorMicActive: false,
+        lastError: err?.message || "Impossible d'accéder au microphone du PC."
+      });
+      return false;
+    }
+  }
+
   private ensureAudioMixer() {
-    if (this.audioCtx && this.audioDest) return;
+    if (this.audioCtx && this.audioDest && this.masterGain) return;
     const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextCtor) return;
     const ac = new AudioContextCtor();
     const dest = ac.createMediaStreamDestination();
+    const master = ac.createGain();
+    master.gain.value = 1.0;
+
+    const analyser = ac.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.7;
+
+    master.connect(analyser);
+    analyser.connect(dest);
 
     const osc = ac.createOscillator();
     const silentGain = ac.createGain();
     silentGain.gain.value = 0;
     osc.connect(silentGain);
-    silentGain.connect(dest);
+    silentGain.connect(master);
     osc.start();
 
     this.audioCtx = ac;
     this.audioDest = dest;
+    this.masterGain = master;
+    this.analyser = analyser;
     this.silentOsc = osc;
   }
 
   private syncAudioRouting() {
-    if (!this.audioCtx || !this.audioDest || !this.contextData) return;
+    if (!this.audioCtx || !this.masterGain || !this.contextData) return;
     const { directorState, mediaStreams } = this.contextData;
     const focusedCam =
       directorState.broadcastMode === 'single' && directorState.focusedCameraId
@@ -921,23 +1054,41 @@ export class LiveCompositeBroadcaster {
           const gain = this.audioCtx.createGain();
           gain.gain.value = 0;
           source.connect(gain);
-          gain.connect(this.audioDest);
+          gain.connect(this.masterGain);
           this.audioSources.set(cam.id, { stream, source, gain });
         } catch {}
       }
     }
 
     const now = this.audioCtx.currentTime;
+    const muteCamsForPause = Boolean(directorState.isIntermission);
     for (const cam of directorState.cameras) {
       const entry = this.audioSources.get(cam.id);
       if (!entry) continue;
-      const shouldBeActive = cam.enabled && !cam.forceMuted && cam.id === targetCamId;
-      entry.gain.gain.setTargetAtTime(shouldBeActive ? 1.0 : 0.0, now, 0.03);
+      const shouldBeActive = !muteCamsForPause && cam.enabled && !cam.forceMuted && cam.id === targetCamId;
+      entry.gain.gain.setTargetAtTime(shouldBeActive ? this.cameraMasterVolume : 0.0, now, 0.03);
     }
   }
 
   public startRenderLoop() {
-    if (this.rafTimer !== null) return;
+    if (this.rafTimer !== null || this.tickWorker !== null) return;
+
+    // Web Worker timer avoids browser background-tab 1 FPS throttling during live streaming
+    if (typeof Worker !== 'undefined' && typeof Blob !== 'undefined') {
+      try {
+        const blob = new Blob(
+          ['let t = setInterval(() => postMessage(1), 33); onmessage = () => { clearInterval(t); close(); };'],
+          { type: 'application/javascript' }
+        );
+        const url = URL.createObjectURL(blob);
+        const worker = new Worker(url);
+        URL.revokeObjectURL(url);
+        worker.onmessage = () => this.drawFrame();
+        this.tickWorker = worker;
+        return;
+      } catch {}
+    }
+
     const tick = () => {
       this.drawFrame();
       this.rafTimer = window.setTimeout(tick, 33);
@@ -946,6 +1097,13 @@ export class LiveCompositeBroadcaster {
   }
 
   public stopRenderLoop() {
+    if (this.tickWorker) {
+      try {
+        this.tickWorker.postMessage('stop');
+        this.tickWorker.terminate();
+      } catch {}
+      this.tickWorker = null;
+    }
     if (this.rafTimer !== null) {
       window.clearTimeout(this.rafTimer);
       this.rafTimer = null;
@@ -1071,8 +1229,15 @@ export class LiveCompositeBroadcaster {
       ctx.font = '700 10px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      const metaText = [assignment.title, assignment.rulesLabel].filter(Boolean).join('  •  ').toUpperCase();
-      ctx.fillText(metaText.slice(0, 72), left + 26, metaY);
+      let timerPart = '';
+      if (assignment.match?.startTime && assignment.match.status === 'playing') {
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - assignment.match.startTime) / 1000));
+        const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+        const ss = String(elapsedSec % 60).padStart(2, '0');
+        timerPart = `${mm}:${ss}`;
+      }
+      const metaText = [assignment.title, assignment.rulesLabel, timerPart].filter(Boolean).join('  •  ').toUpperCase();
+      ctx.fillText(metaText.slice(0, 76), left + 26, metaY);
 
       ctx.fillStyle = 'rgba(255, 255, 255, 0.48)';
       ctx.font = '600 10px Inter, system-ui, sans-serif';
@@ -1225,16 +1390,89 @@ export class LiveCompositeBroadcaster {
     }
   }
 
+  private drawIntermissionScreen(data: LiveCompositeContext) {
+    const ctx = this.ctx;
+    const W = 1280;
+    const H = 720;
+    const { directorState, currentClub, tournaments, matches, players } = data;
+    const ongoingTour = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
+
+    // Deep broadcast slate gradient
+    const grad = ctx.createRadialGradient(W / 2, H * 0.35, 60, W / 2, H / 2, 820);
+    grad.addColorStop(0, '#0f2027');
+    grad.addColorStop(0.55, '#0a0e16');
+    grad.addColorStop(1, '#04060a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Top & bottom subtle gold accents
+    ctx.fillStyle = '#D4AF37';
+    ctx.fillRect(0, 0, W, 4);
+    ctx.fillRect(0, H - 4, W, 4);
+
+    // Club Logo card
+    const clubLogo = this.getCachedImage(getClubLogoUrl(currentClub.logoUrl) || defaultClubLogo);
+    if (clubLogo) {
+      drawRoundedRect(ctx, W / 2 - 64, 118, 128, 128, 16);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.drawImage(clubLogo, W / 2 - 50, 132, 100, 100);
+    }
+
+    // LIVE + Club Name pill
+    ctx.fillStyle = '#D4AF37';
+    ctx.font = '800 15px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const topLabel = ongoingTour ? `${currentClub.name}  •  ${ongoingTour.name}` : currentClub.name;
+    ctx.fillText(topLabel.toUpperCase(), W / 2, 290);
+
+    // Main Intermission Title
+    const mainTitle = (directorState.intermissionTitle?.trim() || 'PAUSE — REPRISE DANS QUELQUES INSTANTS').toUpperCase();
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = '900 38px Inter, system-ui, sans-serif';
+    ctx.fillText(mainTitle.slice(0, 46), W / 2, 360);
+
+    // Gold divider
+    ctx.fillStyle = 'rgba(212, 175, 55, 0.7)';
+    ctx.fillRect(W / 2 - 120, 404, 240, 2);
+
+    // Subtitle or next pending match
+    let subText = directorState.intermissionSubtitle?.trim() || '';
+    if (!subText && ongoingTour) {
+      const nextPending = Object.values(matches).find(
+        m => m.tournamentId === ongoingTour.id && m.status === 'pending' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id]
+      );
+      if (nextPending) {
+        subText = `PROCHAIN MATCH : ${players[nextPending.player1Id].name}  VS  ${players[nextPending.player2Id].name}`;
+      }
+    }
+    if (subText) {
+      ctx.fillStyle = '#CBD5E1';
+      ctx.font = '700 20px Inter, system-ui, sans-serif';
+      ctx.fillText(subText.slice(0, 64), W / 2, 452);
+    }
+
+    // Live clock at bottom
+    const timeStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '700 16px Inter, system-ui, sans-serif';
+    ctx.fillText(`DIRECT EN COURS  •  ${timeStr}`, W / 2, H - 56);
+  }
+
   public drawFrame() {
     const data = this.contextData;
     const ctx = this.ctx;
-    const W = this.canvas.width;
-    const H = this.canvas.height;
+    const realW = this.canvas.width;
+    const realH = this.canvas.height;
+    const W = 1280;
+    const H = 720;
 
-    ctx.fillStyle = '#02040a';
-    ctx.fillRect(0, 0, W, H);
-
-    if (!data) return;
+    if (!data) {
+      ctx.fillStyle = '#02040a';
+      ctx.fillRect(0, 0, realW, realH);
+      return;
+    }
 
     const { directorState, videoElements, tables, matches, players, tournaments, currentClub } = data;
     const overlayCfg = data.overlayConfig || DEFAULT_LIVE_OVERLAY_CONFIG;
@@ -1243,7 +1481,26 @@ export class LiveCompositeBroadcaster {
       c => c.enabled && (isClubSituation || !isVirtualScreenSource(c.sourceType))
     );
 
-    if ((directorState.broadcastMode === 'single' && directorState.focusedCameraId) || enabledCams.length <= 1) {
+    // Detect scene switches for smooth 320ms crossfade
+    const sceneKey = `${directorState.isIntermission ? 'pause' : 'live'}:${directorState.broadcastMode}:${directorState.focusedCameraId || ''}:${enabledCams.map(c => c.id).join(',')}`;
+    const nowPerf = performance.now();
+    if (this.lastSceneKey && this.lastSceneKey !== sceneKey && this.prevFrameCtx) {
+      this.prevFrameCanvas.width = realW;
+      this.prevFrameCanvas.height = realH;
+      this.prevFrameCtx.drawImage(this.canvas, 0, 0, realW, realH);
+      this.transitionStartAt = nowPerf;
+    }
+    this.lastSceneKey = sceneKey;
+
+    ctx.save();
+    ctx.scale(realW / W, realH / H);
+    ctx.fillStyle = '#02040a';
+    ctx.fillRect(0, 0, W, H);
+
+    if (directorState.isIntermission) {
+      this.drawIntermissionScreen(data);
+      this.drawCustomOverlays(overlayCfg);
+    } else if ((directorState.broadcastMode === 'single' && directorState.focusedCameraId) || enabledCams.length <= 1) {
       const focusedCandidate = directorState.focusedCameraId
         ? directorState.cameras.find(c => c.id === directorState.focusedCameraId)
         : null;
@@ -1382,12 +1639,56 @@ export class LiveCompositeBroadcaster {
         }
       });
     }
+    ctx.restore();
+
+    // Smooth crossfade blend during scene transition
+    if (this.transitionStartAt > 0) {
+      const elapsed = nowPerf - this.transitionStartAt;
+      if (elapsed < this.transitionDurationMs) {
+        const alpha = 1 - elapsed / this.transitionDurationMs;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+        ctx.drawImage(this.prevFrameCanvas, 0, 0, realW, realH);
+        ctx.restore();
+      } else {
+        this.transitionStartAt = 0;
+      }
+    }
 
     if (this.previewCanvas) {
       const pCtx = this.previewCanvas.getContext('2d');
       if (pCtx) {
         pCtx.drawImage(this.canvas, 0, 0, this.previewCanvas.width, this.previewCanvas.height);
       }
+    }
+
+    // Telemetry sampling (FPS + VU-Meter Audio Level + Bitrate) ~5x/sec
+    this.frameTimestamps.push(nowPerf);
+    while (this.frameTimestamps.length > 0 && nowPerf - this.frameTimestamps[0] > 1000) {
+      this.frameTimestamps.shift();
+    }
+    if (nowPerf - this.lastTelemetryAt >= 200) {
+      this.lastTelemetryAt = nowPerf;
+      let audioLevel = 0;
+      if (this.analyser) {
+        const samples = new Uint8Array(this.analyser.frequencyBinCount);
+        this.analyser.getByteTimeDomainData(samples);
+        let peak = 0;
+        for (let i = 0; i < samples.length; i++) {
+          const v = Math.abs(samples[i] - 128) / 128;
+          if (v > peak) peak = v;
+        }
+        audioLevel = Math.min(100, Math.round(peak * 160));
+      }
+      const cutoff = Date.now() - 2000;
+      this.recentBytesWindow = this.recentBytesWindow.filter(e => e.at >= cutoff);
+      const windowBytes = this.recentBytesWindow.reduce((sum, e) => sum + e.bytes, 0);
+      const bitrateKbps = this.status.isStreaming ? Math.round((windowBytes * 8) / 2000) : 0;
+      this.emitStatus({
+        currentFps: this.frameTimestamps.length,
+        audioLevel,
+        bitrateKbps
+      });
     }
   }
 
@@ -1396,11 +1697,27 @@ export class LiveCompositeBroadcaster {
     if (customRelayUrl && customRelayUrl.trim()) {
       urls.push(customRelayUrl.trim());
     }
+    const localDefault = 'ws://127.0.0.1:8765/api/rtmp-relay';
     if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      const isLocalOrLan =
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        /^192\.168\./.test(host) ||
+        /^10\./.test(host) ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      urls.push(`${proto}//${window.location.host}/api/rtmp-relay`);
+      if (isLocalOrLan) {
+        urls.push(`${proto}//${window.location.host}/api/rtmp-relay`);
+        urls.push(localDefault);
+      } else {
+        // Hosted on GitHub Pages / static CDN: check local PC relay FIRST (instant)
+        urls.push(localDefault);
+        urls.push(`${proto}//${window.location.host}/api/rtmp-relay`);
+      }
+    } else {
+      urls.push(localDefault);
     }
-    urls.push('ws://127.0.0.1:8765/api/rtmp-relay');
     return Array.from(new Set(urls));
   }
 
@@ -1527,6 +1844,13 @@ export class LiveCompositeBroadcaster {
       throw new Error('Activez au moins une plateforme (Facebook ou YouTube) et saisissez sa clé de stream.');
     }
 
+    const preset: StreamQualityPreset = destinations.qualityPreset || '720p';
+    const profile = STREAM_QUALITY_PROFILES[preset] || STREAM_QUALITY_PROFILES['720p'];
+    if (this.canvas.width !== profile.width || this.canvas.height !== profile.height) {
+      this.canvas.width = profile.width;
+      this.canvas.height = profile.height;
+    }
+
     this.ensureAudioMixer();
     if (this.audioCtx?.state === 'suspended') {
       await this.audioCtx.resume().catch(() => {});
@@ -1540,9 +1864,12 @@ export class LiveCompositeBroadcaster {
       initialStatuses[t.id] = { status: 'connecting', label: t.label };
     });
 
+    this.recentBytesWindow = [];
     this.emitStatus({
       lastError: null,
       bytesSent: 0,
+      bitrateKbps: 0,
+      qualityPreset: preset,
       targetStatuses: initialStatuses
     });
 
@@ -1583,13 +1910,22 @@ export class LiveCompositeBroadcaster {
     ws.onclose = () => {
       if (this.ws === ws) {
         this.ws = null;
-        this.emitStatus({ connectedToRelay: false, isStreaming: false });
+        this.emitStatus({ connectedToRelay: false, isStreaming: false, bitrateKbps: 0 });
       }
     };
 
-    ws.send(JSON.stringify({ type: 'start', targets }));
+    ws.send(JSON.stringify({
+      type: 'start',
+      targets,
+      quality: {
+        width: profile.width,
+        height: profile.height,
+        bitrateKbps: profile.bitrateKbps,
+        fps: profile.fps
+      }
+    }));
 
-    const canvasStream = this.canvas.captureStream(30);
+    const canvasStream = this.canvas.captureStream(profile.fps);
     const tracks: MediaStreamTrack[] = [...canvasStream.getVideoTracks()];
     if (this.audioDest) {
       tracks.push(...this.audioDest.stream.getAudioTracks());
@@ -1606,7 +1942,7 @@ export class LiveCompositeBroadcaster {
 
     const recorder = new MediaRecorder(combinedStream, {
       ...(mimeType ? { mimeType } : {}),
-      videoBitsPerSecond: 2_800_000,
+      videoBitsPerSecond: profile.videoBitsPerSecond,
       audioBitsPerSecond: 128_000
     });
     this.recorder = recorder;
@@ -1614,8 +1950,9 @@ export class LiveCompositeBroadcaster {
     recorder.ondataavailable = async (ev) => {
       if (ev.data && ev.data.size > 0 && this.ws && this.ws.readyState === WebSocket.OPEN) {
         const buf = await ev.data.arrayBuffer();
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN && this.ws.bufferedAmount < 4_000_000) {
           this.ws.send(buf);
+          this.recentBytesWindow.push({ at: Date.now(), bytes: buf.byteLength });
           this.emitStatus({ bytesSent: this.status.bytesSent + buf.byteLength });
         }
       }
@@ -1623,6 +1960,92 @@ export class LiveCompositeBroadcaster {
 
     recorder.start(250);
     this.emitStatus({ isStreaming: true, connectedToRelay: true });
+  }
+
+  public async startLocalRecording(qualityPreset: StreamQualityPreset = '720p'): Promise<void> {
+    if (this.localRecorder && this.localRecorder.state !== 'inactive') return;
+    const profile = STREAM_QUALITY_PROFILES[qualityPreset] || STREAM_QUALITY_PROFILES['720p'];
+    if (!this.status.isStreaming && (this.canvas.width !== profile.width || this.canvas.height !== profile.height)) {
+      this.canvas.width = profile.width;
+      this.canvas.height = profile.height;
+    }
+
+    this.ensureAudioMixer();
+    if (this.audioCtx?.state === 'suspended') {
+      await this.audioCtx.resume().catch(() => {});
+    }
+    this.syncAudioRouting();
+    this.startRenderLoop();
+    this.drawFrame();
+
+    const canvasStream = this.canvas.captureStream(profile.fps);
+    const tracks: MediaStreamTrack[] = [...canvasStream.getVideoTracks()];
+    if (this.audioDest) {
+      tracks.push(...this.audioDest.stream.getAudioTracks());
+    }
+    const combinedStream = new MediaStream(tracks);
+    const mimeCandidates = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=h264,opus',
+      'video/webm'
+    ];
+    const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || '';
+
+    this.localChunks = [];
+    const rec = new MediaRecorder(combinedStream, {
+      ...(mimeType ? { mimeType } : {}),
+      videoBitsPerSecond: profile.videoBitsPerSecond,
+      audioBitsPerSecond: 128_000
+    });
+    rec.ondataavailable = (ev) => {
+      if (ev.data && ev.data.size > 0) {
+        this.localChunks.push(ev.data);
+      }
+    };
+    rec.onstop = () => {
+      const chunks = this.localChunks;
+      this.localChunks = [];
+      if (chunks.length > 0) {
+        const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const now = new Date();
+        const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `MonClubBillard_Live_${stamp}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+    };
+
+    this.localRecorder = rec;
+    this.localRecStartedAt = Date.now();
+    rec.start(1000);
+    this.emitStatus({ isRecordingLocal: true, localRecordingSec: 0 });
+    this.localRecTimer = window.setInterval(() => {
+      this.emitStatus({
+        localRecordingSec: Math.max(0, Math.floor((Date.now() - this.localRecStartedAt) / 1000))
+      });
+    }, 1000);
+  }
+
+  public stopLocalRecording() {
+    if (this.localRecTimer !== null) {
+      window.clearInterval(this.localRecTimer);
+      this.localRecTimer = null;
+    }
+    if (this.localRecorder) {
+      try {
+        if (this.localRecorder.state !== 'inactive') {
+          this.localRecorder.stop();
+        }
+      } catch {}
+      this.localRecorder = null;
+    }
+    this.emitStatus({ isRecordingLocal: false, localRecordingSec: 0 });
   }
 
   public stopLiveStream() {
@@ -1650,6 +2073,8 @@ export class LiveCompositeBroadcaster {
 
   public destroy() {
     this.stopLiveStream();
+    this.stopLocalRecording();
+    this.setCommentatorMicEnabled(false);
     this.stopRenderLoop();
     for (const entry of this.audioSources.values()) {
       try {

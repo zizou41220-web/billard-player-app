@@ -25,11 +25,80 @@ const SmartphoneCameraSenderView: React.FC<SmartphoneCameraSenderViewProps> = ({
   const [status, setStatus] = useState<'starting' | 'waiting_pc' | 'connecting' | 'connected' | 'error'>('starting');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
+  const [wakeLockActive, setWakeLockActive] = useState<boolean>(false);
+  const [batteryPct, setBatteryPct] = useState<number | null>(null);
+  const [isPortrait, setIsPortrait] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false
+  );
+  const [dismissPortraitTip, setDismissPortraitTip] = useState<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, { pc: RTCPeerConnection; sessionId: string; pendingIce: RTCIceCandidateInit[] }>>(new Map());
   const signalingRef = useRef<CameraSignalingHandle | null>(null);
+
+  // Keep smartphone screen awake while streaming on a tripod (Screen Wake Lock API)
+  useEffect(() => {
+    let sentinel: any = null;
+    let released = false;
+
+    const requestLock = async () => {
+      try {
+        const wl = (navigator as any).wakeLock;
+        if (!wl?.request) return;
+        sentinel = await wl.request('screen');
+        if (!released) setWakeLockActive(true);
+        sentinel.addEventListener?.('release', () => {
+          if (!released) setWakeLockActive(false);
+        });
+      } catch {
+        if (!released) setWakeLockActive(false);
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        requestLock();
+      }
+    };
+
+    requestLock();
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      released = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      try {
+        sentinel?.release?.();
+      } catch {}
+    };
+  }, []);
+
+  // Battery level & orientation monitor
+  useEffect(() => {
+    const onResize = () => setIsPortrait(window.innerHeight > window.innerWidth);
+    window.addEventListener('resize', onResize);
+
+    let batteryObj: any = null;
+    const onBatteryChange = () => {
+      if (batteryObj && typeof batteryObj.level === 'number') {
+        setBatteryPct(Math.round(batteryObj.level * 100));
+      }
+    };
+    const navAny = navigator as any;
+    if (navAny.getBattery) {
+      navAny.getBattery().then((b: any) => {
+        batteryObj = b;
+        onBatteryChange();
+        b.addEventListener?.('levelchange', onBatteryChange);
+      }).catch(() => {});
+    }
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      batteryObj?.removeEventListener?.('levelchange', onBatteryChange);
+    };
+  }, []);
 
   // Subscribe to director state for real-time Tally lamp (ON AIR status & assignment)
   useEffect(() => {
@@ -393,14 +462,42 @@ const SmartphoneCameraSenderView: React.FC<SmartphoneCameraSenderViewProps> = ({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-          <span style={{ fontWeight: 900, color: '#fff' }}>
-            📱 {cameraSlot?.name || cameraId.toUpperCase()} • <span style={{ color: '#00ffaa' }}>{assignmentLabel}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+          <span style={{ fontWeight: 800, color: '#fff' }}>
+            {cameraSlot?.name || cameraId.toUpperCase()} • <span style={{ color: '#D4AF37' }}>{assignmentLabel}</span>
           </span>
-          <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)' }}>
-            {currentClub.name}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.75)' }}>
+            {wakeLockActive && (
+              <span style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.45)', color: '#6EE7B7', padding: '1px 7px', borderRadius: '4px', fontWeight: 700 }}>
+                Veille bloquée
+              </span>
+            )}
+            {batteryPct !== null && (
+              <span style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 7px', borderRadius: '4px', fontWeight: 700, color: batteryPct <= 20 ? '#FCA5A5' : '#E2E8F0' }}>
+                Batterie {batteryPct}%
+              </span>
+            )}
+            <span>{currentClub.name}</span>
+          </div>
         </div>
+        {isPortrait && !dismissPortraitTip && !batterySaver && (
+          <div
+            onClick={() => setDismissPortraitTip(true)}
+            style={{
+              background: 'rgba(212, 175, 55, 0.16)',
+              border: '1px solid rgba(212, 175, 55, 0.5)',
+              color: '#FDE68A',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              textAlign: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            Conseil : tournez le smartphone en mode Paysage (16:9) pour un meilleur cadrage — toucher pour masquer
+          </div>
+        )}
       </div>
 
       {/* Battery Saver Center Indicator */}

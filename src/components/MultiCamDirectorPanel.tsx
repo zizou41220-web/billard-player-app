@@ -54,6 +54,7 @@ import {
   RTC_ICE_CONFIG,
   RegionalMatchConfig,
   StreamDestinationsConfig,
+  StreamQualityPreset,
   createCameraSignalingChannel,
   isVirtualScreenSource,
   loadDirectorState,
@@ -65,6 +66,7 @@ import {
 import {
   BroadcasterStatusSnapshot,
   LiveCompositeBroadcaster,
+  STREAM_QUALITY_PROFILES,
   drawVirtualScreenToCanvas,
   formatTournamentStageLabel,
   getMosaicGridRects,
@@ -1513,6 +1515,84 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     destinations.customEnabled && destinations.customStreamKey.trim() ? 'RTMP' : null
   ].filter(Boolean);
 
+  const handleToggleIntermission = () => {
+    updateDirector({
+      ...directorState,
+      isIntermission: !directorState.isIntermission
+    });
+  };
+
+  const handleToggleLocalRecording = async () => {
+    if (broadcasterStatus.isRecordingLocal) {
+      broadcasterRef.current?.stopLocalRecording();
+    } else {
+      await broadcasterRef.current?.startLocalRecording(destinations.qualityPreset || '720p');
+    }
+  };
+
+  const handleToggleCommentatorMic = async () => {
+    await broadcasterRef.current?.setCommentatorMicEnabled(!broadcasterStatus.commentatorMicActive);
+  };
+
+  // Broadcast keyboard shortcuts: 1-4 cameras, M mosaic, P pause/intermission, C standings
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement | null)?.isContentEditable) {
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const cur = directorStateRef.current;
+      const isClub = cur.situation === 'club_tables';
+      const activeList = cur.cameras.filter(c => c.enabled && (isClub || !isVirtualScreenSource(c.sourceType)));
+      const key = e.key.toLowerCase();
+
+      if (key >= '1' && key <= '4') {
+        const idx = Number(key) - 1;
+        const target = activeList[idx];
+        if (target) {
+          e.preventDefault();
+          const keepMic = isVirtualScreenSource(target.sourceType);
+          const next: MultiCamDirectorState = {
+            ...cur,
+            isIntermission: false,
+            broadcastMode: 'single',
+            focusedCameraId: target.id,
+            activeAudioCameraId: keepMic ? cur.activeAudioCameraId : target.id
+          };
+          setDirectorState(next);
+          saveDirectorState(currentClub.id, next, true);
+        }
+      } else if (key === 'm') {
+        e.preventDefault();
+        const next: MultiCamDirectorState = { ...cur, isIntermission: false, broadcastMode: 'mosaic', focusedCameraId: null };
+        setDirectorState(next);
+        saveDirectorState(currentClub.id, next, true);
+      } else if (key === 'p') {
+        e.preventDefault();
+        const next: MultiCamDirectorState = { ...cur, isIntermission: !cur.isIntermission };
+        setDirectorState(next);
+        saveDirectorState(currentClub.id, next, true);
+      } else if (key === 'c' && isClub) {
+        const standingsSlot = cur.cameras.find(c => c.sourceType === 'tournament_standings');
+        if (standingsSlot) {
+          e.preventDefault();
+          const next: MultiCamDirectorState = {
+            ...cur,
+            isIntermission: false,
+            broadcastMode: 'single',
+            focusedCameraId: standingsSlot.id
+          };
+          setDirectorState(next);
+          saveDirectorState(currentClub.id, next, true);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [currentClub.id]);
+
   const handleToggleLiveStream = async () => {
     if (broadcasterStatus.isStreaming) {
       broadcasterRef.current?.stopLiveStream();
@@ -2067,6 +2147,178 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           >
             <Tv size={13} /> Sortie TV
           </a>
+        </div>
+      </div>
+
+      {/* 1.2 BARRE PRODUCTION STUDIO : PAUSE, REC LOCAL, MICRO COMMENTATEUR, VU-MÈTRE & SANTÉ FLUX */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.55rem',
+        background: '#080B11',
+        border: '1px solid rgba(255,255,255,0.09)',
+        borderRadius: '9px',
+        padding: '0.45rem 0.8rem',
+        fontSize: '0.72rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleToggleIntermission}
+            style={{
+              width: 'auto',
+              padding: '4px 10px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              background: directorState.isIntermission ? 'rgba(212, 175, 55, 0.2)' : '#111827',
+              borderColor: directorState.isIntermission ? '#D4AF37' : 'rgba(255,255,255,0.16)',
+              color: directorState.isIntermission ? '#FDE68A' : '#E2E8F0'
+            }}
+            title="Afficher l'écran Pause (logo club + prochain match) sans couper le direct — Raccourci [P]"
+          >
+            {directorState.isIntermission ? 'Reprendre Direct (P)' : 'Pause / Intermission (P)'}
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleToggleLocalRecording}
+            style={{
+              width: 'auto',
+              padding: '4px 10px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              background: broadcasterStatus.isRecordingLocal ? 'rgba(220, 38, 38, 0.22)' : '#111827',
+              borderColor: broadcasterStatus.isRecordingLocal ? '#EF4444' : 'rgba(255,255,255,0.16)',
+              color: broadcasterStatus.isRecordingLocal ? '#FCA5A5' : '#E2E8F0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+            title="Enregistrer une copie vidéo locale (.webm) sur ce PC"
+          >
+            <span style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              background: broadcasterStatus.isRecordingLocal ? '#EF4444' : '#64748B'
+            }} />
+            {broadcasterStatus.isRecordingLocal
+              ? `REC ${formatDuration(broadcasterStatus.localRecordingSec || 0)}`
+              : 'Enregistrer (.webm)'}
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleToggleCommentatorMic}
+            style={{
+              width: 'auto',
+              padding: '4px 10px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              background: broadcasterStatus.commentatorMicActive ? 'rgba(16, 185, 129, 0.18)' : '#111827',
+              borderColor: broadcasterStatus.commentatorMicActive ? '#10B981' : 'rgba(255,255,255,0.16)',
+              color: broadcasterStatus.commentatorMicActive ? '#6EE7B7' : '#E2E8F0'
+            }}
+            title="Activer le microphone du PC (commentateur) dans le mix audio du live"
+          >
+            {broadcasterStatus.commentatorMicActive ? <Mic size={12} /> : <MicOff size={12} />}
+            {broadcasterStatus.commentatorMicActive ? 'Micro Commentateur ON' : 'Micro PC OFF'}
+          </button>
+
+          {/* Real-time Audio VU-Meter */}
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              background: '#05070B',
+              border: '1px solid rgba(255,255,255,0.1)',
+              padding: '4px 8px',
+              borderRadius: '6px'
+            }}
+            title="Niveau audio diffusé (VU-mètre temps réel)"
+          >
+            <span style={{ fontSize: '0.62rem', color: '#94A3B8', fontWeight: 700, marginRight: '3px' }}>VU</span>
+            {Array.from({ length: 10 }).map((_, idx) => {
+              const threshold = (idx + 1) * 10;
+              const active = (broadcasterStatus.audioLevel || 0) >= threshold;
+              const color = idx >= 8 ? '#EF4444' : idx >= 6 ? '#F59E0B' : '#10B981';
+              return (
+                <span
+                  key={idx}
+                  style={{
+                    width: '4px',
+                    height: '11px',
+                    borderRadius: '1px',
+                    background: active ? color : 'rgba(255,255,255,0.12)',
+                    transition: 'background 0.08s linear'
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: Quality Profile + Real-time Stream Health Telemetry */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <select
+            className="input-field"
+            disabled={broadcasterStatus.isStreaming}
+            value={destinations.qualityPreset || '720p'}
+            onChange={(e) => updateDestinations({ qualityPreset: e.target.value as StreamQualityPreset })}
+            style={{
+              width: 'auto',
+              fontSize: '0.7rem',
+              padding: '3px 7px',
+              background: '#111827',
+              borderColor: 'rgba(255,255,255,0.16)',
+              color: '#E2E8F0',
+              fontWeight: 700
+            }}
+            title="Profil de qualité vidéo du direct (modifiable hors antenne)"
+          >
+            {(Object.keys(STREAM_QUALITY_PROFILES) as StreamQualityPreset[]).map(k => (
+              <option key={k} value={k}>
+                {STREAM_QUALITY_PROFILES[k].label}
+              </option>
+            ))}
+          </select>
+
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: '#05070B',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '6px',
+            padding: '3px 8px',
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            color: broadcasterStatus.isStreaming ? '#6EE7B7' : '#94A3B8'
+          }}>
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: !broadcasterStatus.isStreaming
+                ? '#475569'
+                : (broadcasterStatus.currentFps || 0) >= 24
+                  ? '#10B981'
+                  : '#F59E0B'
+            }} />
+            {broadcasterStatus.currentFps || 0} FPS
+            {broadcasterStatus.isStreaming && (
+              <>
+                <span style={{ color: 'rgba(255,255,255,0.25)' }}>|</span>
+                {((broadcasterStatus.bitrateKbps || 0) / 1000).toFixed(1)} Mbps
+              </>
+            )}
+          </span>
         </div>
       </div>
 
@@ -3207,20 +3459,20 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             position: isCompactPanel ? 'relative' : 'sticky',
             top: isCompactPanel ? undefined : '0.5rem',
             minWidth: 0,
-            background: 'rgba(5, 10, 22, 0.96)',
-            border: `2px solid ${directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.7)' : 'rgba(0, 255, 170, 0.45)'}`,
-            borderRadius: '14px',
-            padding: '0.75rem',
+            background: '#0B0F17',
+            border: `1px solid ${directorState.isIntermission ? '#D4AF37' : directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.55)' : 'rgba(255, 255, 255, 0.14)'}`,
+            borderRadius: '10px',
+            padding: '0.7rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.55rem',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.55)'
+            gap: '0.5rem',
+            boxShadow: '0 10px 28px rgba(0,0,0,0.5)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: 900, color: '#00ffaa' }}>
-              <MonitorPlay size={16} />
-              APERÇU DU LIVE ({directorState.broadcastMode === 'single' ? 'Plein Écran' : 'Écran Multiple'})
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', fontWeight: 800, color: '#F8FAFC', letterSpacing: '0.4px' }}>
+              <MonitorPlay size={15} color="#D4AF37" />
+              PROGRAMME LIVE ({directorState.isIntermission ? 'Pause' : directorState.broadcastMode === 'single' ? 'Plein Écran' : 'Mosaïque'})
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -3304,7 +3556,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 if (!isIframeSlot) return null;
 
                 const isFocusedInSingle = isSingle && singleTargetId === slot.id;
-                const isHiddenInSingle = isSingle && singleTargetId !== slot.id;
+                const isHiddenInSingle = (isSingle && singleTargetId !== slot.id) || Boolean(directorState.isIntermission);
                 const rect = previewRects[idx];
                 if (!rect && !isSingle) return null;
 
@@ -3455,11 +3707,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             })()}
           </div>
 
-          <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ fontSize: '0.68rem', color: '#94A3B8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
             <span>
-              {directorState.broadcastMode === 'mosaic'
-                ? '💡 Cliquez directement sur un cadran ici (ou à gauche) pour le passer en plein écran.'
-                : '💡 Cliquez sur l’aperçu (ou sur « ⊞ Mosaïque ») pour revenir à l’Écran Multiple.'}
+              Raccourcis clavier : <b>[1–4]</b> Caméras • <b>[M]</b> Mosaïque • <b>[P]</b> Pause{isClubSituation ? ' • [C] Classement' : ''}
             </span>
           </div>
         </div>

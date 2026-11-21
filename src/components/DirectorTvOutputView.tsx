@@ -583,6 +583,45 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
       boxSizing: 'border-box',
       fontFamily: 'Inter, system-ui, sans-serif'
     }}>
+      {directorState.isIntermission && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 50,
+          background: 'radial-gradient(circle at 50% 35%, #0f2027 0%, #0a0e16 55%, #04060a 100%)',
+          borderTop: '4px solid #D4AF37',
+          borderBottom: '4px solid #D4AF37',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1.2rem',
+          textAlign: 'center',
+          padding: '2rem',
+          color: '#F8FAFC'
+        }}>
+          <div style={{ background: '#fff', padding: '14px', borderRadius: '16px', boxShadow: '0 10px 35px rgba(0,0,0,0.55)' }}>
+            <img
+              src={getClubLogoUrl(currentClub.logoUrl)}
+              alt={currentClub.name}
+              style={{ height: '92px', objectFit: 'contain' }}
+              onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
+            />
+          </div>
+          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#D4AF37', letterSpacing: '2px', textTransform: 'uppercase' }}>
+            {activeTournament ? `${currentClub.name} • ${activeTournament.name}` : currentClub.name}
+          </div>
+          <div style={{ fontSize: '2.2rem', fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', maxWidth: '880px' }}>
+            {directorState.intermissionTitle || 'PAUSE — REPRISE DANS QUELQUES INSTANTS'}
+          </div>
+          <div style={{ width: '180px', height: '2px', background: 'rgba(212, 175, 55, 0.7)' }} />
+          {directorState.intermissionSubtitle && (
+            <div style={{ fontSize: '1.15rem', color: '#CBD5E1', fontWeight: 700 }}>
+              {directorState.intermissionSubtitle}
+            </div>
+          )}
+        </div>
+      )}
       <div style={{
         display: 'flex',
         alignItems: 'center',
