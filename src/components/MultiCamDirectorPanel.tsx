@@ -200,18 +200,20 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
 
   const activeTournament =
     Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
-  const activeTournamentMatches = Object.values(matches)
-    .filter(
-      m =>
-        m.status !== 'finished' &&
-        Boolean(m.player1Id && m.player2Id) &&
-        (activeTournament ? m.tournamentId === activeTournament.id : Boolean(m.tournamentId))
-    )
-    .sort((a, b) => {
-      if (a.status === 'playing' && b.status !== 'playing') return -1;
-      if (a.status !== 'playing' && b.status === 'playing') return 1;
-      return (a.tableId ? 0 : 1) - (b.tableId ? 0 : 1);
-    });
+  const activeTournamentMatches = activeTournament
+    ? Object.values(matches)
+        .filter(
+          m =>
+            m.status !== 'finished' &&
+            Boolean(m.player1Id && m.player2Id) &&
+            m.tournamentId === activeTournament.id
+        )
+        .sort((a, b) => {
+          if (a.status === 'playing' && b.status !== 'playing') return -1;
+          if (a.status !== 'playing' && b.status === 'playing') return 1;
+          return (a.tableId ? 0 : 1) - (b.tableId ? 0 : 1);
+        })
+    : [];
 
   const assignmentSelectValue = (() => {
     if (slot.assignmentType === 'table') return `table:${slot.tableId || ''}`;
