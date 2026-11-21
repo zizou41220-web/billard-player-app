@@ -704,25 +704,25 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               fontWeight: 700
             }}
           >
-            <optgroup label="📷 Caméras">
-              <option value="smartphone_webrtc">📱 Smartphone (QR)</option>
+            <optgroup label="Caméras">
+              <option value="smartphone_webrtc">Smartphone (QR Code)</option>
               {videoDevices.map((d, idx) => (
                 <option key={d.deviceId} value={`usb:${d.deviceId}`}>
-                  🎥 {d.label || `Caméra PC #${idx + 1}`}
+                  {d.label || `Caméra PC #${idx + 1}`}
                 </option>
               ))}
               {videoDevices.length === 0 && (
-                <option value="usb">🎥 Caméra USB / PC</option>
+                <option value="usb">Caméra USB / PC</option>
               )}
-              <option value="vdo">📡 VDO.Ninja</option>
-              <option value="external">🌐 Lien Externe</option>
+              <option value="vdo">VDO.Ninja</option>
+              <option value="external">Lien Externe</option>
             </optgroup>
             {!isExternalLive && (
-              <optgroup label="📊 Écrans Live (Sans quitter le direct)">
-                <option value="tournament_standings">🏆 Classement du Tournoi</option>
-                <option value="tournament_bracket">🌳 Tableau Phases Finales</option>
-                <option value="matches_live_board">🎱 Scores de tous les Billards</option>
-                <option value="club_leaderboard">👑 Classement Général Club</option>
+              <optgroup label="Écrans Live (Régie)">
+                <option value="tournament_standings">Classement du Tournoi</option>
+                <option value="tournament_bracket">Tableau Phases Finales</option>
+                <option value="matches_live_board">Scores des Billards</option>
+                <option value="club_leaderboard">Classement Club</option>
               </optgroup>
             )}
           </select>
@@ -1780,16 +1780,12 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         gap: '0.75rem'
       }}
     >
-      {/* 1. SÉLECTEUR DE SITUATION + BARRE DE RÉGIE COMPACTE */}
+      {/* 1. SÉLECTEUR DE SITUATION + BARRE DE RÉGIE BROADCAST */}
       <div style={{
-        background: directorState.broadcastMode === 'single'
-          ? 'linear-gradient(90deg, rgba(185, 28, 28, 0.25), rgba(8, 14, 28, 0.94))'
-          : directorState.situation === 'cuescore_live'
-            ? 'linear-gradient(90deg, rgba(56, 189, 248, 0.16), rgba(8, 14, 28, 0.94))'
-            : 'linear-gradient(90deg, rgba(245, 158, 11, 0.16), rgba(8, 14, 28, 0.94))',
-        border: `1.5px solid ${directorState.broadcastMode === 'single' ? '#ef4444' : directorState.situation === 'cuescore_live' ? 'rgba(56, 189, 248, 0.6)' : 'rgba(245, 158, 11, 0.6)'}`,
-        borderRadius: '14px',
-        padding: '0.6rem 0.9rem',
+        background: '#0B0F17',
+        border: `1px solid ${directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.55)' : 'rgba(255, 255, 255, 0.12)'}`,
+        borderRadius: '10px',
+        padding: '0.55rem 0.85rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -1804,10 +1800,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             return (
               <div style={{
                 display: 'inline-flex',
-                background: 'rgba(0,0,0,0.45)',
+                background: '#05070B',
                 padding: '3px',
-                borderRadius: '9px',
-                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.1)',
                 gap: '3px',
                 flexWrap: 'wrap'
               }}>
@@ -1817,18 +1813,22 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   onClick={() => handleSetSituation('club_tables')}
                   title={isLiveLocked && directorState.situation !== 'club_tables' ? lockedTitle : undefined}
                   style={{
-                    background: directorState.situation === 'club_tables' ? '#10B981' : 'transparent',
-                    color: directorState.situation === 'club_tables' ? '#000' : 'rgba(255,255,255,0.75)',
-                    border: 'none',
-                    borderRadius: '7px',
+                    background: directorState.situation === 'club_tables' ? '#1E293B' : 'transparent',
+                    color: directorState.situation === 'club_tables' ? '#F8FAFC' : 'rgba(255,255,255,0.6)',
+                    border: directorState.situation === 'club_tables' ? '1px solid rgba(16, 185, 129, 0.6)' : '1px solid transparent',
+                    borderRadius: '6px',
                     padding: '4px 10px',
                     fontSize: '0.74rem',
-                    fontWeight: 900,
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
                     cursor: isLiveLocked && directorState.situation !== 'club_tables' ? 'not-allowed' : 'pointer',
                     opacity: isLiveLocked && directorState.situation !== 'club_tables' ? 0.4 : 1
                   }}
                 >
-                  🏠🎱 Live Club & Tournoi Appli
+                  <Tv size={13} color={directorState.situation === 'club_tables' ? '#10B981' : 'currentColor'} />
+                  Club & Tournoi
                 </button>
                 <button
                   type="button"
@@ -1836,18 +1836,22 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   onClick={() => handleSetSituation('regional_match')}
                   title={isLiveLocked && directorState.situation !== 'regional_match' ? lockedTitle : undefined}
                   style={{
-                    background: directorState.situation === 'regional_match' ? '#F59E0B' : 'transparent',
-                    color: directorState.situation === 'regional_match' ? '#000' : 'rgba(255,255,255,0.75)',
-                    border: 'none',
-                    borderRadius: '7px',
+                    background: directorState.situation === 'regional_match' ? '#1E293B' : 'transparent',
+                    color: directorState.situation === 'regional_match' ? '#F8FAFC' : 'rgba(255,255,255,0.6)',
+                    border: directorState.situation === 'regional_match' ? '1px solid rgba(212, 175, 55, 0.7)' : '1px solid transparent',
+                    borderRadius: '6px',
                     padding: '4px 10px',
                     fontSize: '0.74rem',
-                    fontWeight: 900,
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
                     cursor: isLiveLocked && directorState.situation !== 'regional_match' ? 'not-allowed' : 'pointer',
                     opacity: isLiveLocked && directorState.situation !== 'regional_match' ? 0.4 : 1
                   }}
                 >
-                  🏆 Live Tournoi Régional / Match
+                  <Trophy size={13} color={directorState.situation === 'regional_match' ? '#D4AF37' : 'currentColor'} />
+                  Tournoi Régional / Match
                 </button>
                 <button
                   type="button"
@@ -1855,56 +1859,60 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   onClick={() => handleSetSituation('cuescore_live')}
                   title={isLiveLocked && directorState.situation !== 'cuescore_live' ? lockedTitle : undefined}
                   style={{
-                    background: directorState.situation === 'cuescore_live' ? '#38BDF8' : 'transparent',
-                    color: directorState.situation === 'cuescore_live' ? '#000' : 'rgba(255,255,255,0.75)',
-                    border: 'none',
-                    borderRadius: '7px',
+                    background: directorState.situation === 'cuescore_live' ? '#1E293B' : 'transparent',
+                    color: directorState.situation === 'cuescore_live' ? '#F8FAFC' : 'rgba(255,255,255,0.6)',
+                    border: directorState.situation === 'cuescore_live' ? '1px solid rgba(56, 189, 248, 0.65)' : '1px solid transparent',
+                    borderRadius: '6px',
                     padding: '4px 10px',
                     fontSize: '0.74rem',
-                    fontWeight: 900,
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
                     cursor: isLiveLocked && directorState.situation !== 'cuescore_live' ? 'not-allowed' : 'pointer',
                     opacity: isLiveLocked && directorState.situation !== 'cuescore_live' ? 0.4 : 1
                   }}
                 >
-                  🔗 Live CueScore{rm.cueScoreAutoSync ? ' ⚡' : ''}
+                  <Link2 size={13} color={directorState.situation === 'cuescore_live' ? '#38BDF8' : 'currentColor'} />
+                  CueScore{rm.cueScoreAutoSync ? ' (Auto)' : ''}
                 </button>
               </div>
             );
           })()}
 
           <span style={{
-            background: directorState.broadcastMode === 'single' ? '#ef4444' : '#f59e0b',
-            color: directorState.broadcastMode === 'single' ? '#fff' : '#000',
+            background: directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(255, 255, 255, 0.06)',
+            color: directorState.broadcastMode === 'single' ? '#FCA5A5' : '#CBD5E1',
+            border: `1px solid ${directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.45)' : 'rgba(255, 255, 255, 0.12)'}`,
             padding: '4px 9px',
-            borderRadius: '7px',
+            borderRadius: '6px',
             fontSize: '0.72rem',
-            fontWeight: 900,
+            fontWeight: 700,
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: '5px'
           }}>
-            <Radio size={12} />
+            <Radio size={12} color={directorState.broadcastMode === 'single' ? '#EF4444' : '#94A3B8'} />
             {directorState.broadcastMode === 'single'
-              ? `PLEIN ÉCRAN : ${focusedCam?.name || ''} (${focusedAssignment?.title || ''})`
-              : `ÉCRAN MULTIPLE (${enabledCount})`}
+              ? `PGM : ${focusedCam?.name || ''}`
+              : `MOSAÏQUE (${enabledCount})`}
           </span>
 
           {directorState.broadcastMode === 'single' && (
             <button
               type="button"
-              className="btn btn-neon"
+              className="btn btn-outline"
               onClick={handleReturnToMosaic}
               style={{
                 width: 'auto',
-                padding: '0.4rem 0.8rem',
-                fontSize: '0.74rem',
-                fontWeight: 900,
-                background: '#f59e0b',
-                borderColor: '#f59e0b',
-                color: '#000'
+                padding: '4px 9px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                borderColor: 'rgba(212, 175, 55, 0.5)',
+                color: '#FDE68A'
               }}
             >
-              ⊞ Revenir Écran Multiple
+              Retour Mosaïque
             </button>
           )}
 
@@ -1919,7 +1927,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               }}
               style={{ width: 'auto', fontSize: '0.7rem', padding: '4px 8px' }}
             >
-              {directorState.mosaicLayout === 'stacked' ? '◫ Côte à côte' : '⊟ Haut / Bas'}
+              {directorState.mosaicLayout === 'stacked' ? 'Côte à côte' : 'Haut / Bas'}
             </button>
           )}
         </div>

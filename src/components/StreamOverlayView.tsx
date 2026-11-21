@@ -378,7 +378,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const [activeTableParam, setActiveTableParam] = useState<string>(tableParam);
   const [onlyLiveTables, setOnlyLiveTables] = useState<boolean>(false);
   const [twoTablesStacked, setTwoTablesStacked] = useState<boolean>(false);
-  const [position, setPosition] = useState<'top' | 'bottom'>('top');
+  const [position, setPosition] = useState<'top' | 'bottom'>('bottom');
   const [vdoRoom, setVdoRoom] = useState<string | null>(null);
   const [isLocalBroadcast, setIsLocalBroadcast] = useState(false);
   const [externalVideoUrl, setExternalVideoUrl] = useState<string | null>(null);
@@ -416,7 +416,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('pos') === 'bottom') setPosition('bottom');
+    if (params.get('pos') === 'top') setPosition('top');
+    else if (params.get('pos') === 'bottom') setPosition('bottom');
     if (params.get('vdo')) setVdoRoom(params.get('vdo'));
     if (params.get('broadcast') === '1') setIsLocalBroadcast(true);
     if (params.get('video')) setExternalVideoUrl(params.get('video'));
@@ -1099,38 +1100,38 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
           }}
         >
           
-          {/* Top Bar: Tournament & Table Header */}
+          {/* Top Meta Strip: Tournament & Table Header (Matchroom / WNT Pro Style) */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(90deg, #050816, #0d1527, #050816)',
-            borderTop: '2px solid rgba(0, 255, 170, 0.8)',
-            borderLeft: '1px solid rgba(255,255,255,0.1)',
-            borderRight: '1px solid rgba(255,255,255,0.1)',
-            padding: '0.4rem 1.4rem',
-            borderRadius: '12px 12px 0 0',
-            width: '94%',
+            background: 'rgba(10, 14, 22, 0.95)',
+            borderTop: '2.5px solid #D4AF37',
+            borderLeft: '1px solid rgba(255,255,255,0.12)',
+            borderRight: '1px solid rgba(255,255,255,0.12)',
+            padding: '0.28rem 1rem',
+            borderRadius: '6px 6px 0 0',
+            width: '100%',
             boxSizing: 'border-box',
-            fontSize: '0.85rem',
-            color: '#fff',
+            fontSize: '0.72rem',
+            color: 'rgba(255,255,255,0.78)',
             fontWeight: 700,
-            letterSpacing: '0.5px'
+            letterSpacing: '0.7px',
+            textTransform: 'uppercase'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
               {!isStandaloneLive && (
                 <div style={{
                   background: '#ffffff',
-                  padding: '2px 6px',
-                  borderRadius: '6px',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
                   display: 'inline-flex',
-                  alignItems: 'center',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                  alignItems: 'center'
                 }}>
                   <img 
                     src={getClubLogoUrl(currentClub.logoUrl)} 
                     alt={currentClub.name} 
-                    style={{ height: '22px', objectFit: 'contain' }} 
+                    style={{ height: '18px', objectFit: 'contain' }} 
                     onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
                   />
                 </div>
@@ -1139,53 +1140,51 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
                 display: 'inline-flex', 
                 alignItems: 'center', 
                 gap: '5px', 
-                background: '#ff2244', 
-                color: '#fff', 
-                padding: '2px 8px', 
-                borderRadius: '6px', 
-                fontSize: '0.7rem', 
-                fontWeight: 900,
+                color: '#F8FAFC', 
+                fontSize: '0.68rem', 
+                fontWeight: 800,
                 letterSpacing: '1px'
               }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#EF4444' }} />
                 LIVE
               </span>
               {!isStandaloneLive && table && (
-                <span style={{ color: 'var(--accent-primary, #00ffcc)', fontWeight: 800 }}>
+                <span style={{ color: '#D4AF37', fontWeight: 800 }}>
                   {table.name || `BILLARD ${table.number}`}
                 </span>
               )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>
               <MatchTimerBadge
                 startTime={match.startTime}
                 durationMinutes={match.durationMinutes ?? resolveMatchDurationMinutes(match, matchTournament)}
                 status={match.status}
-                size="md"
+                size="sm"
                 showElapsedWhenUnlimited={true}
               />
               {!isStandaloneLive && matchTournament && <span>{matchTournament.name}</span>}
               {rulesText && (
-                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px', color: '#fff' }}>
+                <span style={{ color: '#F8FAFC', fontWeight: 800 }}>
                   {rulesText}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Main Scoreboard: Player 1 vs Player 2 */}
+          {/* Main Lower-Third Scoreboard: Player 1 vs Player 2 */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr auto 1fr',
             alignItems: 'stretch',
-            background: 'rgba(10, 15, 30, 0.92)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: '0 0 16px 16px',
+            background: 'rgba(10, 14, 22, 0.94)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '0 0 6px 6px',
             overflow: 'hidden',
             width: '100%',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)'
+            boxShadow: '0 10px 28px rgba(0, 0, 0, 0.65)'
           }}>
 
             {/* PLAYER 1 BLOCK */}

@@ -1005,29 +1005,29 @@ export class LiveCompositeBroadcaster {
       ctx.fillRect(x, y, w, h);
 
       ctx.fillStyle = '#38BDF8';
-      ctx.font = '800 18px Inter, system-ui, sans-serif';
+      ctx.font = '700 15px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(
         slot.sourceType === 'vdo'
-          ? `📡 VDO.Ninja actif — ${slot.name}`
-          : `🌐 Lien Externe actif — ${slot.name}`,
+          ? `VDO.NINJA — ${slot.name.toUpperCase()}`
+          : `FLUX EXTERNE — ${slot.name.toUpperCase()}`,
         x + w / 2,
         y + h / 2 - 10
       );
       if (slot.externalUrl && slot.sourceType === 'external') {
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = '600 13px Inter, system-ui, sans-serif';
-        ctx.fillText(slot.externalUrl.slice(0, 48), x + w / 2, y + h / 2 + 16);
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.font = '500 12px Inter, system-ui, sans-serif';
+        ctx.fillText(slot.externalUrl.slice(0, 48), x + w / 2, y + h / 2 + 14);
       }
     } else {
-      ctx.fillStyle = '#0b1224';
+      ctx.fillStyle = '#090D16';
       ctx.fillRect(x, y, w, h);
-      ctx.fillStyle = 'rgba(255,255,255,0.45)';
-      ctx.font = 'bold 18px Inter, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.38)';
+      ctx.font = '600 14px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`📷 ${slot.name} — En attente vidéo...`, x + w / 2, y + h / 2);
+      ctx.fillText(`${slot.name.toUpperCase()} — EN ATTENTE DE SIGNAL`, x + w / 2, y + h / 2);
     }
 
     ctx.restore();
@@ -1040,104 +1040,117 @@ export class LiveCompositeBroadcaster {
 
     const hasScoreBoard = assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined;
     if (hasScoreBoard) {
-      const boxW = Math.min(860, W - 80);
+      // Matchroom / WNT sleek lower-third TV broadcast bar
+      const boxW = Math.min(980, W - 80);
       const hasClubs = Boolean(assignment.p1Club || assignment.p2Club);
+      const boxH = hasClubs ? 64 : 56;
       const cx = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardX ?? 50) / 100) * W : W / 2;
-      const cy = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardY ?? 12) / 100) * H : 72;
-      const boxH = hasClubs ? 94 : 82;
+      const cy = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardY ?? 91) / 100) * H : (H - boxH / 2 - 22);
       const left = Math.max(20, Math.min(W - boxW - 20, cx - boxW / 2));
       const top = Math.max(16, Math.min(H - boxH - 16, cy - boxH / 2));
 
       ctx.save();
-      drawRoundedRect(ctx, left, top, boxW, boxH, 14);
-      ctx.fillStyle = 'rgba(6, 12, 24, 0.92)';
+      drawRoundedRect(ctx, left, top, boxW, boxH, 5);
+      ctx.fillStyle = 'rgba(10, 14, 22, 0.94)';
       ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = 'rgba(0, 255, 170, 0.75)';
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
       ctx.stroke();
 
-      ctx.fillStyle = 'rgba(255, 34, 68, 0.95)';
-      drawRoundedRect(ctx, left + 14, top + 8, 52, 20, 6);
+      ctx.fillStyle = '#D4AF37';
+      ctx.fillRect(left + 1, top, boxW - 2, 2.5);
+
+      const metaY = top + 12;
+      ctx.beginPath();
+      ctx.arc(left + 16, metaY, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#EF4444';
       ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 11px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
+      ctx.font = '700 10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText('LIVE', left + 40, top + 18);
+      const metaText = [assignment.title, assignment.rulesLabel].filter(Boolean).join('  •  ').toUpperCase();
+      ctx.fillText(metaText.slice(0, 72), left + 26, metaY);
 
-      ctx.fillStyle = '#00ffaa';
-      ctx.font = '800 13px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(`${assignment.title}${assignment.rulesLabel ? ` • ${assignment.rulesLabel}` : ''}`, left + 76, top + 18);
-
-      ctx.fillStyle = 'rgba(255,255,255,0.65)';
-      ctx.font = '700 12px Inter, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.48)';
+      ctx.font = '600 10px Inter, system-ui, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(club.name, left + boxW - 16, top + 18);
+      ctx.fillText(club.name.toUpperCase(), left + boxW - 14, metaY);
 
-      // Player 1 Name & Club
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '800 22px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText((assignment.p1Name || 'Joueur 1').slice(0, 22), left + 18, top + (hasClubs ? 52 : 56));
+      const centerX = left + boxW / 2;
+      const rowY = top + (hasClubs ? 38 : 37);
+      const scoreBoxW = 46;
+      const scoreBoxH = 34;
+      const gapCenter = 36;
+      const s1X = centerX - gapCenter / 2 - scoreBoxW;
+      const s2X = centerX + gapCenter / 2;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.font = '800 11px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('VS', centerX, rowY);
+
+      drawRoundedRect(ctx, s1X, rowY - scoreBoxH / 2, scoreBoxW, scoreBoxH, 4);
+      ctx.fillStyle = assignment.score1! > assignment.score2! ? '#D4AF37' : '#1E293B';
+      ctx.fill();
+      ctx.fillStyle = assignment.score1! > assignment.score2! ? '#090D16' : '#F8FAFC';
+      ctx.font = '900 22px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${assignment.score1}`, s1X + scoreBoxW / 2, rowY + 1);
+
+      drawRoundedRect(ctx, s2X, rowY - scoreBoxH / 2, scoreBoxW, scoreBoxH, 4);
+      ctx.fillStyle = assignment.score2! > assignment.score1! ? '#D4AF37' : '#1E293B';
+      ctx.fill();
+      ctx.fillStyle = assignment.score2! > assignment.score1! ? '#090D16' : '#F8FAFC';
+      ctx.font = '900 22px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${assignment.score2}`, s2X + scoreBoxW / 2, rowY + 1);
+
+      const p1Right = s1X - 16;
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '800 19px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText((assignment.p1Name || 'Joueur 1').slice(0, 24), p1Right, hasClubs ? rowY - 4 : rowY);
       if (assignment.p1Club) {
-        ctx.fillStyle = '#34D399';
-        ctx.font = '700 13px Inter, system-ui, sans-serif';
-        ctx.fillText(assignment.p1Club.slice(0, 26), left + 18, top + 76);
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '600 11px Inter, system-ui, sans-serif';
+        ctx.fillText(assignment.p1Club.slice(0, 28), p1Right, rowY + 14);
       }
 
-      // Score Box
-      const scoreBoxW = 114;
-      const scoreLeft = left + boxW / 2 - scoreBoxW / 2;
-      drawRoundedRect(ctx, scoreLeft, top + (hasClubs ? 38 : 34), scoreBoxW, 42, 10);
-      ctx.fillStyle = '#F59E0B';
-      ctx.fill();
-      ctx.fillStyle = '#000000';
-      ctx.font = '900 25px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${assignment.score1} - ${assignment.score2}`, left + boxW / 2, top + (hasClubs ? 60 : 55));
-
-      // Player 2 Name & Club
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '800 22px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText((assignment.p2Name || 'Joueur 2').slice(0, 22), left + boxW - 18, top + (hasClubs ? 52 : 56));
+      const p2Left = s2X + scoreBoxW + 16;
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '800 19px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText((assignment.p2Name || 'Joueur 2').slice(0, 24), p2Left, hasClubs ? rowY - 4 : rowY);
       if (assignment.p2Club) {
-        ctx.fillStyle = '#FBBF24';
-        ctx.font = '700 13px Inter, system-ui, sans-serif';
-        ctx.fillText(assignment.p2Club.slice(0, 26), left + boxW - 18, top + 76);
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '600 11px Inter, system-ui, sans-serif';
+        ctx.fillText(assignment.p2Club.slice(0, 28), p2Left, rowY + 14);
       }
       ctx.restore();
     } else {
-      const bannerW = 460;
-      const bannerH = 52;
+      const bannerW = 420;
+      const bannerH = 48;
       const left = 24;
-      const top = 22;
+      const top = H - bannerH - 22;
       ctx.save();
-      drawRoundedRect(ctx, left, top, bannerW, bannerH, 12);
-      ctx.fillStyle = 'rgba(6, 12, 24, 0.88)';
+      drawRoundedRect(ctx, left, top, bannerW, bannerH, 5);
+      ctx.fillStyle = 'rgba(10, 14, 22, 0.92)';
       ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.7)';
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
       ctx.stroke();
-
-      ctx.fillStyle = '#ff2244';
-      drawRoundedRect(ctx, left + 12, top + 14, 52, 22, 6);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.font = '900 11px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('LIVE', left + 38, top + 25);
-
-      ctx.fillStyle = '#FBBF24';
-      ctx.font = '900 17px Inter, system-ui, sans-serif';
+      ctx.fillStyle = '#D4AF37';
+      ctx.fillRect(left, top + 1, 3, bannerH - 2);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '800 14px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(assignment.title || slot.name, left + 76, top + 20);
-
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.font = '600 12px Inter, system-ui, sans-serif';
-      ctx.fillText(assignment.subtitle || club.name, left + 76, top + 38);
+      ctx.textBaseline = 'middle';
+      ctx.fillText((assignment.title || slot.name).toUpperCase(), left + 16, top + 17);
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '600 11px Inter, system-ui, sans-serif';
+      ctx.fillText(assignment.subtitle || club.name, left + 16, top + 34);
       ctx.restore();
     }
   }
