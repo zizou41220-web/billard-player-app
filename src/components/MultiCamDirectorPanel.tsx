@@ -946,6 +946,29 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const [assignLiveTableId, setAssignLiveTableId] = useState<string>('');
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
+  const [panelWidth, setPanelWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
+  const panelRootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = panelRootRef.current;
+    if (!el) return;
+    const updateWidth = () => {
+      if (el.clientWidth > 0) setPanelWidth(el.clientWidth);
+    };
+    updateWidth();
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(updateWidth);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  const isCompactPanel = panelWidth > 0 && panelWidth < 940;
+  const isNarrowPanel = panelWidth > 0 && panelWidth < 720;
 
   const [pendingLaunchMatchId, setPendingLaunchMatchId] = useState<string>('');
   const [pendingLaunchTableId, setPendingLaunchTableId] = useState<string>('');
@@ -1738,14 +1761,19 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     : (firstFreeTable?.id || sortedTables[0]?.id || '');
 
   return (
-    <div style={{
-      maxWidth: '1480px',
-      width: '100%',
-      margin: '0 auto',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '0.75rem'
-    }}>
+    <div
+      ref={panelRootRef}
+      style={{
+        maxWidth: '1480px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        margin: '0 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem'
+      }}
+    >
       {/* 1. SÉLECTEUR DE SITUATION + BARRE DE RÉGIE COMPACTE */}
       <div style={{
         background: directorState.broadcastMode === 'single'
@@ -2746,7 +2774,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               {rm.cueScoreHasActiveMatch && (
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1.2fr auto 1.2fr',
+                  gridTemplateColumns: isNarrowPanel ? '1fr' : '1.2fr auto 1.2fr',
                   gap: '0.9rem',
                   alignItems: 'center'
                 }}>
@@ -2898,7 +2926,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           borderRadius: '14px',
           padding: '0.75rem 0.95rem',
           display: 'grid',
-          gridTemplateColumns: '1.2fr auto 1.2fr',
+          gridTemplateColumns: isNarrowPanel ? '1fr' : '1.2fr auto 1.2fr',
           gap: '0.9rem',
           alignItems: 'center'
         }}>
@@ -3078,15 +3106,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       {/* 2. DISPOSITION 2 COLONNES : SOURCES À GAUCHE + APERÇU ÉCRAN MULTIPLE LIVE À DROITE */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(480px, 1.35fr) minmax(360px, 1fr)',
+        gridTemplateColumns: isCompactPanel ? '1fr' : 'minmax(0, 1.35fr) minmax(0, 1fr)',
         gap: '1rem',
-        alignItems: 'start'
+        alignItems: 'start',
+        width: '100%',
+        minWidth: 0
       }}>
         {/* LEFT COLUMN: SOURCE WINDOWS (CAMERAS + LIVE SCREENS) */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '0.75rem'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '0.75rem',
+          minWidth: 0
         }}>
           {directorState.cameras
             .filter(slot => isClubSituation || !isVirtualScreenSource(slot.sourceType))
@@ -3119,8 +3150,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         <div
           ref={previewContainerRef}
           style={{
-            position: 'sticky',
-            top: '0.5rem',
+            position: isCompactPanel ? 'relative' : 'sticky',
+            top: isCompactPanel ? undefined : '0.5rem',
+            minWidth: 0,
             background: 'rgba(5, 10, 22, 0.96)',
             border: `2px solid ${directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.7)' : 'rgba(0, 255, 170, 0.45)'}`,
             borderRadius: '14px',
