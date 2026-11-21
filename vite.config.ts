@@ -2,12 +2,18 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import os from 'node:os'
-import { attachRtmpRelayToHttpServer, findFfmpegBinary, handleCueScoreProxyRequest } from './server/rtmp-relay.mjs'
+import { attachRtmpRelayToHttpServer, findFfmpegBinary, handleCueScoreProxyRequest, startStandaloneRelayServer } from './server/rtmp-relay.mjs'
+
+let standaloneRelayStarted = false
 
 function rtmpRelayPlugin(): Plugin {
   const attach = (server: any) => {
     if (server.httpServer) {
       attachRtmpRelayToHttpServer(server.httpServer, '/api/rtmp-relay')
+    }
+    if (!standaloneRelayStarted) {
+      standaloneRelayStarted = true
+      startStandaloneRelayServer(8765)
     }
     server.middlewares.use('/api/rtmp-relay/health', (_req: any, res: any) => {
       const ffmpegPath = findFfmpegBinary()

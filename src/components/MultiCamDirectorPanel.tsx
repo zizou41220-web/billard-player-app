@@ -3412,8 +3412,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             }}>
               <b>Prérequis sur le PC du club :</b>
               <ul style={{ margin: '3px 0 0 1.1rem', padding: 0 }}>
-                <li>Installer FFmpeg si absent (1 fois) : <code>winget install Gyan.FFmpeg</code></li>
-                <li>Si l'appli est ouverte via Vercel/GitHub Pages, lancez <code>npm run relay</code> sur le PC pour relayer le flux.</li>
+                <li>Double-cliquez sur <b>« Lancer le Relais Live.bat »</b> (ou <b>« Lancer le tournoi.bat »</b>) dans le dossier de l'application sur le PC.</li>
+                <li>FFmpeg est installé automatiquement sur le PC au 1er lancement si absent.</li>
               </ul>
             </div>
 

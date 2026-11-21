@@ -1354,7 +1354,7 @@ export class LiveCompositeBroadcaster {
       let idx = 0;
       const tryNext = () => {
         if (idx >= endpoints.length) {
-          reject(new Error('Relais de diffusion local introuvable. Lancez l\'application sur le PC avec "npm run dev" ou "npm run relay".'));
+          reject(new Error('Relais de diffusion local non démarré sur ce PC. Double-cliquez sur "Lancer le Relais Live.bat" (ou "Lancer le tournoi.bat") dans le dossier de l\'application sur le PC.'));
           return;
         }
         const url = endpoints[idx++];

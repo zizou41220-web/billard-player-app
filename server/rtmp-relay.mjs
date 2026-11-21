@@ -17,7 +17,10 @@ export function findFfmpegBinary() {
   if (process.platform === 'win32') {
     const localAppData = process.env.LOCALAPPDATA || '';
     const userProfile = process.env.USERPROFILE || os.homedir();
+    const relayDir = path.dirname(fileURLToPath(import.meta.url));
     candidates.push(
+      path.join(userProfile, '.local', 'ffmpeg', 'ffmpeg.exe'),
+      path.join(relayDir, 'ffmpeg.exe'),
       'C:\\ffmpeg\\bin\\ffmpeg.exe',
       'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
       path.join(localAppData, 'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe'),
@@ -51,6 +54,90 @@ export function findFfmpegBinary() {
     } catch {}
   }
   return null;
+}
+
+let ffmpegDownloadPromise = null;
+
+function downloadFileFollowingRedirects(url, destTmpPath, redirectsLeft = 6) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(
+      url,
+      { headers: { 'User-Agent': 'MonClubBillard/1.6.6' }, timeout: 30000 },
+      (res) => {
+        const status = res.statusCode || 200;
+        const loc = res.headers?.location;
+        if ([301, 302, 303, 307, 308].includes(status) && loc && redirectsLeft > 0) {
+          res.resume();
+          const nextUrl = new URL(loc, url).toString();
+          downloadFileFollowingRedirects(nextUrl, destTmpPath, redirectsLeft - 1).then(resolve, reject);
+          return;
+        }
+        if (status < 200 || status >= 300) {
+          res.resume();
+          reject(new Error(`Téléchargement FFmpeg échoué (HTTP ${status})`));
+          return;
+        }
+        const fileStream = fs.createWriteStream(destTmpPath);
+        res.pipe(fileStream);
+        fileStream.on('finish', () => {
+          fileStream.close(() => resolve());
+        });
+        fileStream.on('error', (err) => {
+          try { fs.unlinkSync(destTmpPath); } catch {}
+          reject(err);
+        });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy(new Error('Timeout téléchargement FFmpeg'));
+    });
+    req.on('error', (err) => {
+      try { fs.unlinkSync(destTmpPath); } catch {}
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Télécharge automatiquement ffmpeg.exe sous ~/.local/ffmpeg/ffmpeg.exe sous Windows s'il est absent.
+ */
+export async function ensureFfmpegBinary() {
+  const existing = findFfmpegBinary();
+  if (existing) return existing;
+  if (process.platform !== 'win32') return null;
+
+  if (!ffmpegDownloadPromise) {
+    ffmpegDownloadPromise = (async () => {
+      const targetDir = path.join(os.homedir(), '.local', 'ffmpeg');
+      const targetExe = path.join(targetDir, 'ffmpeg.exe');
+      const tmpExe = `${targetExe}.tmp`;
+      const downloadUrl = 'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-win32-x64';
+
+      try {
+        fs.mkdirSync(targetDir, { recursive: true });
+        if (fs.existsSync(tmpExe)) {
+          try { fs.unlinkSync(tmpExe); } catch {}
+        }
+        console.log('  ⏳ Téléchargement automatique de FFmpeg en cours...');
+        await downloadFileFollowingRedirects(downloadUrl, tmpExe);
+        if (fs.existsSync(targetExe)) {
+          try { fs.unlinkSync(targetExe); } catch {}
+        }
+        fs.renameSync(tmpExe, targetExe);
+        const verified = findFfmpegBinary();
+        if (verified) {
+          console.log(`  ✅ FFmpeg installé automatiquement : ${verified}\n`);
+        }
+        return verified;
+      } catch (err) {
+        console.warn('  ⚠️ Échec installation automatique FFmpeg :', err?.message || err);
+        return null;
+      } finally {
+        ffmpegDownloadPromise = null;
+      }
+    })();
+  }
+  return ffmpegDownloadPromise;
 }
 
 function encodeWsFrame(opcode, payloadBuf) {
@@ -120,11 +207,15 @@ function handleRelayWebSocketConnection(socket) {
     }
   };
 
-  const startTargets = (targets) => {
+  const startTargets = async (targets) => {
     stopAllTargets(false);
     bytesReceived = 0;
 
-    const ffmpegBin = findFfmpegBinary();
+    let ffmpegBin = findFfmpegBinary();
+    if (!ffmpegBin) {
+      sendWsJson(socket, { type: 'target_status', id: 'ffmpeg', status: 'connecting', label: 'Installation FFmpeg...' });
+      ffmpegBin = await ensureFfmpegBinary();
+    }
     if (!ffmpegBin) {
       sendWsJson(socket, {
         type: 'error',
@@ -485,11 +576,24 @@ export function startStandaloneRelayServer(port = 8765) {
 
   attachRtmpRelayToHttpServer(server, '/api/rtmp-relay');
 
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.log(`  📡 Relais Live (port ${port}) déjà actif sur ws://127.0.0.1:${port}/api/rtmp-relay\n`);
+    } else {
+      console.error('Relay server error:', err);
+    }
+  });
+
   server.listen(port, '127.0.0.1', () => {
     const ffmpegPath = findFfmpegBinary();
     console.log(`\n  📡 Relais Live Facebook/YouTube actif sur ws://127.0.0.1:${port}/api/rtmp-relay`);
     console.log(`  🎱 Proxy CueScore actif sur http://127.0.0.1:${port}/api/cuescore`);
-    console.log(`  🎬 FFmpeg : ${ffmpegPath ? `Détecté (${ffmpegPath})` : 'NON DÉTECTÉ (winget install Gyan.FFmpeg)'}\n`);
+    if (ffmpegPath) {
+      console.log(`  🎬 FFmpeg : Détecté (${ffmpegPath})\n`);
+    } else {
+      console.log('  🎬 FFmpeg : absent, installation automatique en cours...');
+      ensureFfmpegBinary();
+    }
   });
 
   return server;
