@@ -3530,6 +3530,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   </label>
                   <input
                     type={showStreamKeys ? 'text' : 'password'}
+                    name="mcb-facebook-stream-key"
+                    autoComplete="new-password"
+                    data-lpignore="true"
                     className="input-field"
                     placeholder="Collez la clé ou l'URL rtmps:// complète..."
                     value={destinations.facebookStreamKey}
@@ -3604,6 +3607,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   </label>
                   <input
                     type={showStreamKeys ? 'text' : 'password'}
+                    name="mcb-youtube-stream-key"
+                    autoComplete="new-password"
+                    data-lpignore="true"
                     className="input-field"
                     placeholder="Collez la clé ou l'URL rtmp:// complète..."
                     value={destinations.youtubeStreamKey}
