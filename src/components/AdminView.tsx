@@ -89,6 +89,18 @@ const AdminView: React.FC = () => {
   const [clubLogoInput, setClubLogoInput] = useState(currentClub.logoUrl || defaultClubLogo);
   const [clubSavedFeedback, setClubSavedFeedback] = useState(false);
   const [copiedClubUrl, setCopiedClubUrl] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1440
+  );
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const isSmallDesktop = viewportWidth < 1280;
+  const isNarrowScreen = viewportWidth < 960;
 
   const getAppBaseUrl = () => {
     if (typeof window === 'undefined') return '';
@@ -1318,7 +1330,7 @@ const AdminView: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <main key={activeTab} className="page-transition" style={{ flex: 1, padding: (activeTab === 'dashboard' || activeTab === 'live_studio') ? '1rem 1.8rem' : '2.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <main key={activeTab} className="page-transition" style={{ flex: 1, minWidth: 0, padding: (activeTab === 'dashboard' || activeTab === 'live_studio' || isSmallDesktop) ? '0.9rem 1.2rem' : '2.2rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
         {/* ========================================================================= */}
         {/* 1. TOURNAMENT LAUNCHER TAB                                                */}
@@ -1725,8 +1737,8 @@ const AdminView: React.FC = () => {
 
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)',
-                  gap: '2rem',
+                  gridTemplateColumns: isNarrowScreen ? '1fr' : 'minmax(0, 1.25fr) minmax(0, 1fr)',
+                  gap: isSmallDesktop ? '1.25rem' : '2rem',
                   alignItems: 'start'
                 }}>
 
@@ -3564,7 +3576,18 @@ const AdminView: React.FC = () => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(285px, 310px) 1fr minmax(430px, 470px)', gap: '1.2rem', flex: 1, minHeight: 0 }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isNarrowScreen
+                  ? '1fr'
+                  : isSmallDesktop
+                    ? 'minmax(220px, 260px) minmax(0, 1fr) minmax(310px, 370px)'
+                    : 'minmax(285px, 310px) minmax(0, 1fr) minmax(430px, 470px)',
+                gap: isSmallDesktop ? '0.85rem' : '1.2rem',
+                flex: isNarrowScreen ? undefined : 1,
+                minHeight: isNarrowScreen ? undefined : 0,
+                minWidth: 0
+              }}>
 
                 {/* LEFT: FILE D'ATTENTE PLEINE HAUTEUR (100% DE LA COLONNE) */}
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -4592,7 +4615,7 @@ const AdminView: React.FC = () => {
 
             {/* Sub-menu 2: Joueurs */}
             {adminSubTab === 'players' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 340px)', gap: '2rem', height: '100%', maxWidth: '1280px', width: '100%', margin: '0 auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isNarrowScreen ? '1fr' : 'minmax(0, 1fr) minmax(260px, 340px)', gap: isSmallDesktop ? '1.25rem' : '2rem', height: isNarrowScreen ? 'auto' : '100%', maxWidth: '1280px', width: '100%', margin: '0 auto' }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
@@ -4911,7 +4934,7 @@ const AdminView: React.FC = () => {
 
             {/* Sub-menu 3: Configuration Club & Multi-Club */}
             {adminSubTab === 'club' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto', overflowY: 'auto', paddingBottom: '2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isNarrowScreen ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)', gap: isSmallDesktop ? '1.25rem' : '2.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto', overflowY: 'auto', paddingBottom: '2rem' }}>
 
                 {/* LEFT: Club Identity Settings */}
                 <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
