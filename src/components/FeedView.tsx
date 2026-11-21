@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Activity, Clock, Trophy, Lock, Award } from 'lucide-react';
+import { Activity, Clock, Trophy, Lock, Award, Radio, ExternalLink } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
+import MatchTimerBadge from './MatchTimerBadge';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { isRealFinishedMatch } from '../utils/bracket';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
+import { getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
+import { extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl, formatEmbedVideoUrl } from '../utils/video';
+
+const resolveOverlayHref = (rawStreamUrl?: string): string | undefined => {
+  if (!rawStreamUrl) return undefined;
+  const idx = rawStreamUrl.indexOf('?overlay=');
+  if (idx !== -1 && typeof window !== 'undefined') {
+    const cleanPath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/+$/, '');
+    const base = window.location.hostname === 'localhost' ? __LAN_URL__.replace(/\/+$/, '') : `${window.location.origin}${cleanPath}`;
+    return `${base}/${rawStreamUrl.slice(idx)}`;
+  }
+  return rawStreamUrl;
+};
 
 const FeedView: React.FC = () => {
   const { matches, players, tables, tournaments, currentClub } = useStore();
@@ -168,27 +182,111 @@ const FeedView: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {liveMatches.map(m => (
-              <div key={m.id} className="glass-card" style={{ position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--accent-primary)', boxShadow: 'var(--shadow-neon)' }} />
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  <span>Table {m.tableId && tables[m.tableId]?.number}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 2s infinite' }} />
-                    En direct
-                  </span>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ flex: 1, textAlign: 'right', fontWeight: 600 }}>{players[m.player1Id]?.name}</div>
-                  <div style={{ padding: '0 1rem', fontSize: '1.5rem', fontWeight: 800 }} className="text-gradient">
-                    {m.score1} - {m.score2}
+            {liveMatches.map(m => {
+              const tableObj = m.tableId ? tables[m.tableId] : undefined;
+              const matchTour = m.tournamentId ? tournaments[m.tournamentId] : activeTournament;
+              const { formatLabel } = getMatchScoringRules(m, matchTour, players);
+              const rawStreamUrl = m.liveStreamUrl || tableObj?.liveStreamUrl;
+              const extVideo = extractExternalVideoFromStreamUrl(rawStreamUrl);
+              const vdoRoom = extractVdoRoomFromStreamUrl(rawStreamUrl);
+              const hasLiveVideo = Boolean(extVideo || vdoRoom);
+              const overlayHref = resolveOverlayHref(rawStreamUrl);
+
+              return (
+                <div key={m.id} className="glass-card" style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--accent-primary)', boxShadow: 'var(--shadow-neon)' }} />
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, color: '#fff' }}>
+                        {tableObj ? (tableObj.name || `Table ${tableObj.number}`) : 'Live'}
+                      </span>
+                      {formatLabel && (
+                        <span style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 7px', borderRadius: '6px', fontSize: '0.72rem' }}>
+                          {formatLabel}
+                        </span>
+                      )}
+                      <MatchTimerBadge
+                        startTime={m.startTime}
+                        durationMinutes={m.durationMinutes ?? resolveMatchDurationMinutes(m, matchTour)}
+                        status={m.status}
+                        size="sm"
+                        showElapsedWhenUnlimited={true}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      {overlayHref && (
+                        <a
+                          href={overlayHref}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: 'rgba(255, 34, 68, 0.2)',
+                            border: '1px solid rgba(255, 34, 68, 0.5)',
+                            color: '#ff8a96',
+                            padding: '2px 8px',
+                            borderRadius: '8px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            textDecoration: 'none'
+                          }}
+                        >
+                          <Radio size={12} /> Plein écran TV <ExternalLink size={11} />
+                        </a>
+                      )}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', fontWeight: 700 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 2s infinite' }} />
+                        En direct
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>{players[m.player2Id]?.name}</div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ flex: 1, textAlign: 'right', fontWeight: 700, fontSize: '1rem' }}>
+                      {players[m.player1Id]?.name}
+                      {Boolean(m.handicapP1 && m.handicapP1 > 0) && (
+                        <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: 'var(--accent-primary)' }}>+{m.handicapP1}</span>
+                      )}
+                    </div>
+                    <div style={{ padding: '0 1rem', fontSize: '1.6rem', fontWeight: 900 }} className="text-gradient">
+                      {m.score1} - {m.score2}
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'left', fontWeight: 700, fontSize: '1rem' }}>
+                      {players[m.player2Id]?.name}
+                      {Boolean(m.handicapP2 && m.handicapP2 > 0) && (
+                        <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: 'var(--accent-primary)' }}>+{m.handicapP2}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {hasLiveVideo && (
+                    <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)' }}>
+                      {extVideo ? (
+                        <iframe
+                          src={formatEmbedVideoUrl(extVideo)}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                          referrerPolicy="strict-origin-when-cross-origin"
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+                          title={`Live ${players[m.player1Id]?.name} vs ${players[m.player2Id]?.name}`}
+                        />
+                      ) : vdoRoom ? (
+                        <iframe
+                          src={`https://vdo.ninja/?view=${encodeURIComponent(vdoRoom)}&cleanoutput&autoplay&muted`}
+                          allow="autoplay; camera; microphone; fullscreen; picture-in-picture"
+                          allowFullScreen
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+                          title={`Caméra ${tableObj ? (tableObj.name || `Table ${tableObj.number}`) : 'Live'}`}
+                        />
+                      ) : null}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

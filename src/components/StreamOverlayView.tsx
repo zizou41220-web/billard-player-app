@@ -10,7 +10,7 @@ interface StreamOverlayViewProps {
   tableParam: string;
 }
 
-import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl } from '../utils/video';
+import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl } from '../utils/video';
 import {
   LiveOverlayConfig,
   loadLiveOverlayConfig,
@@ -695,9 +695,10 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const p1 = match ? players[match.player1Id] : undefined;
   const p2 = match ? players[match.player2Id] : undefined;
 
-  const tournamentSettings = activeTournament?.settings;
+  const matchTournament: Tournament | null = match?.tournamentId ? (tournaments[match.tournamentId] || activeTournament) : activeTournament;
+  const tournamentSettings = matchTournament?.settings;
   const rulesText = match
-    ? (getMatchScoringRules(match, activeTournament, players).formatLabel || '')
+    ? (getMatchScoringRules(match, matchTournament, players).formatLabel || '')
     : (tournamentSettings
         ? (tournamentSettings.qualifIsWinningSets
             ? `1er à ${tournamentSettings.qualifNbSets}`
@@ -705,7 +706,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
         : '');
 
   const effectiveExternalVideo = externalVideoUrl || extractExternalVideoFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl);
-  const hasVideoLayer = Boolean(vdoRoom || isLocalBroadcast || effectiveExternalVideo);
+  const effectiveVdoRoom = vdoRoom || (!effectiveExternalVideo ? extractVdoRoomFromStreamUrl(table?.liveStreamUrl || match?.liveStreamUrl) : '');
+  const hasVideoLayer = Boolean(effectiveVdoRoom || isLocalBroadcast || effectiveExternalVideo);
 
   return (
     <div
@@ -743,7 +745,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
       }}
     >
       {/* 1. VDO.Ninja Wireless Camera Background (Smartphone or PC WebRTC) */}
-      {vdoRoom && (
+      {effectiveVdoRoom && (
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -757,7 +759,7 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
           justifyContent: 'center'
         }}>
           <iframe
-            src={`https://vdo.ninja/?view=${encodeURIComponent(vdoRoom)}&cleanoutput&autoplay&muted${fillScreen ? '&cover' : ''}`}
+            src={`https://vdo.ninja/?view=${encodeURIComponent(effectiveVdoRoom)}&cleanoutput&autoplay&muted${fillScreen ? '&cover' : ''}`}
             allow="autoplay; camera; microphone; fullscreen; picture-in-picture"
             style={{
               width: (videoRotation === 90 || videoRotation === 270) ? '100vh' : '100vw',
@@ -817,8 +819,8 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
         </>
       )}
 
-      {/* 3. External IP Camera / YouTube Embed Background */}
-      {effectiveExternalVideo && !vdoRoom && !isLocalBroadcast && (
+      {/* 3. External IP Camera / YouTube / Facebook Embed Background */}
+      {effectiveExternalVideo && !effectiveVdoRoom && !isLocalBroadcast && (
         <iframe
           src={formatEmbedVideoUrl(effectiveExternalVideo)}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -1158,12 +1160,12 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
               <MatchTimerBadge
                 startTime={match.startTime}
-                durationMinutes={match.durationMinutes ?? resolveMatchDurationMinutes(match, activeTournament)}
+                durationMinutes={match.durationMinutes ?? resolveMatchDurationMinutes(match, matchTournament)}
                 status={match.status}
                 size="md"
                 showElapsedWhenUnlimited={true}
               />
-              {!isStandaloneLive && activeTournament && <span>{activeTournament.name}</span>}
+              {!isStandaloneLive && matchTournament && <span>{matchTournament.name}</span>}
               {rulesText && (
                 <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px', color: '#fff' }}>
                   {rulesText}
