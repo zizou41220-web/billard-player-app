@@ -66,8 +66,8 @@ export const formatEmbedVideoUrl = (rawUrl: string): string => {
       return `https://www.youtube-nocookie.com/embed/${vMatch[1]}?autoplay=1&mute=1&playsinline=1&rel=0&enablejsapi=1`;
     }
 
-    // 2. Check for youtu.be/ID, youtube.com/live/ID, youtube.com/embed/ID, youtube.com/shorts/ID
-    const pathMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:live|embed|shorts)\/)([a-zA-Z0-9_-]{11})/);
+    // 2. Check for youtu.be/ID, youtube.com/live/ID, youtube.com/embed/ID, youtube.com/shorts/ID, studio.youtube.com/video/ID
+    const pathMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:live|embed|shorts|video|v)\/)([a-zA-Z0-9_-]{11})/);
     if (pathMatch && pathMatch[1]) {
       return `https://www.youtube-nocookie.com/embed/${pathMatch[1]}?autoplay=1&mute=1&playsinline=1&rel=0&enablejsapi=1`;
     }
