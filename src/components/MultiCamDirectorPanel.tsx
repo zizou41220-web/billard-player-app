@@ -68,6 +68,7 @@ import {
   drawVirtualScreenToCanvas,
   formatTournamentStageLabel,
   getMosaicGridRects,
+  isActiveLiveMatch,
   resolveCameraAssignment
 } from '../utils/liveBroadcaster';
 import {
@@ -616,8 +617,8 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                 {sortedTables.map(t => {
                   const tblMatch = t.currentMatchId
                     ? matches[t.currentMatchId]
-                    : Object.values(matches).find(m => m.tableId === t.id && m.status !== 'finished');
-                  const validTblMatch = tblMatch && tblMatch.status !== 'finished' ? tblMatch : undefined;
+                    : Object.values(matches).find(m => m.tableId === t.id && isActiveLiveMatch(m, tournaments));
+                  const validTblMatch = isActiveLiveMatch(tblMatch, tournaments) ? tblMatch : undefined;
                   const tp1 = validTblMatch ? players[validTblMatch.player1Id]?.name : undefined;
                   const tp2 = validTblMatch ? players[validTblMatch.player2Id]?.name : undefined;
                   const duelLabel = validTblMatch && tp1 && tp2 ? ` • ${tp1} ${validTblMatch.score1}-${validTblMatch.score2} ${tp2}` : '';

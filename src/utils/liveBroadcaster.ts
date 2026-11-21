@@ -127,6 +127,18 @@ export function formatTournamentStageLabel(match?: Match, tournament?: Tournamen
   return '';
 }
 
+export function isActiveLiveMatch(
+  m: Match | undefined,
+  tournaments: Record<string, Tournament>
+): boolean {
+  if (!m || m.status === 'finished') return false;
+  if (m.tournamentId) {
+    const t = tournaments[m.tournamentId];
+    return Boolean(t && t.status === 'ongoing');
+  }
+  return true;
+}
+
 export function resolveCameraAssignment(
   slot: DirectorCameraSlot,
   data: {
@@ -253,11 +265,14 @@ export function resolveCameraAssignment(
     let tMatch = slot.tournamentMatchId ? matches[slot.tournamentMatchId] : undefined;
     if (tMatch && tMatch.status === 'finished' && tMatch.tableId) {
       const nextOnSameTable = Object.values(matches).find(
-        m => m.tableId === tMatch!.tableId && m.status !== 'finished'
+        m => m.tableId === tMatch!.tableId && isActiveLiveMatch(m, tournaments)
       );
       if (nextOnSameTable) {
         tMatch = nextOnSameTable;
       }
+    }
+    if (!isActiveLiveMatch(tMatch, tournaments)) {
+      tMatch = undefined;
     }
     const matchTour = (tMatch?.tournamentId ? tournaments[tMatch.tournamentId] : null) || activeTournament;
     const table = tMatch?.tableId ? tables[tMatch.tableId] : undefined;
@@ -289,8 +304,8 @@ export function resolveCameraAssignment(
     const table = slot.tableId ? tables[slot.tableId] : undefined;
     const match = table?.currentMatchId
       ? matches[table.currentMatchId]
-      : Object.values(matches).find(m => m.tableId === table?.id && m.status !== 'finished');
-    const validMatch = match && match.status !== 'finished' ? match : undefined;
+      : Object.values(matches).find(m => m.tableId === table?.id && isActiveLiveMatch(m, tournaments));
+    const validMatch = isActiveLiveMatch(match, tournaments) ? match : undefined;
     const matchTour = (validMatch?.tournamentId ? tournaments[validMatch.tournamentId] : null) || activeTournament;
     const stageLabel = validMatch ? formatTournamentStageLabel(validMatch, matchTour) : '';
     const tableTitle = table ? (table.name || `Billard ${table.number}`) : 'Billard non assigné';
@@ -662,7 +677,7 @@ export function drawVirtualScreenToCanvas(
     const sortedTables = Object.values(tables).sort((a, b) => a.number - b.number).slice(0, 6);
     const hasAnyActiveTableMatch = sortedTables.some(t => {
       const m = t.currentMatchId ? matches[t.currentMatchId] : undefined;
-      return Boolean(m && m.status !== 'finished');
+      return isActiveLiveMatch(m, tournaments);
     });
     if (!targetTour && !hasAnyActiveTableMatch) {
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
@@ -682,7 +697,7 @@ export function drawVirtualScreenToCanvas(
       const bx = 32 + col * (boxW + gap);
       const by = 112 + row * (boxH + gap);
       const m = tbl.currentMatchId ? matches[tbl.currentMatchId] : undefined;
-      const activeM = m && m.status !== 'finished' ? m : undefined;
+      const activeM = isActiveLiveMatch(m, tournaments) ? m : undefined;
       const p1 = activeM ? players[activeM.player1Id] : undefined;
       const p2 = activeM ? players[activeM.player2Id] : undefined;
 

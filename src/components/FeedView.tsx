@@ -31,7 +31,12 @@ const FeedView: React.FC = () => {
   const { hasSureQualifiers } = getTournamentQualificationStatus(activeTournament, matches, players);
 
   const allMatches = Object.values(matches).sort((a, b) => b.startTime - a.startTime);
-  const liveMatches = allMatches.filter(m => m.status === 'playing' && Boolean(m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id]));
+  const liveMatches = allMatches.filter(
+    m =>
+      m.status === 'playing' &&
+      (!m.tournamentId || tournaments[m.tournamentId]?.status === 'ongoing') &&
+      Boolean(m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
+  );
   const finishedMatches = allMatches.filter(m => isRealFinishedMatch(m, players)).slice(0, 5);
 
   return (
