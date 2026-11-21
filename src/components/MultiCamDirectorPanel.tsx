@@ -1036,6 +1036,12 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     b.startRenderLoop();
     b.checkRelayAvailability(destinations.relayWsUrl);
 
+    if (directorStateRef.current.isLiveStreaming) {
+      const cleaned = { ...directorStateRef.current, isLiveStreaming: false, liveStartedAt: null };
+      setDirectorState(cleaned);
+      saveDirectorState(currentClub.id, cleaned, true);
+    }
+
     return () => {
       b.destroy();
       broadcasterRef.current = null;
@@ -1265,7 +1271,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   };
 
   const handleSetSituation = (situation: DirectorLiveSituation) => {
-    if ((broadcasterStatus.isStreaming || directorState.isLiveStreaming) && situation !== directorState.situation) {
+    if (broadcasterStatus.isStreaming && situation !== directorState.situation) {
       alert("Un direct est actuellement en cours. Arrêtez d'abord le live (⏹ ARRÊTER) avant de changer de menu.");
       return;
     }
@@ -1793,7 +1799,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         {/* Left: Situation Switcher + Mode Indicator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
           {(() => {
-            const isLiveLocked = broadcasterStatus.isStreaming || directorState.isLiveStreaming;
+            const isLiveLocked = broadcasterStatus.isStreaming;
             const lockedTitle = "Arrêtez d'abord le live en cours avant de changer de menu";
             return (
               <div style={{
