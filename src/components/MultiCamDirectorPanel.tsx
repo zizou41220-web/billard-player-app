@@ -3181,7 +3181,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
             {/* Superposition des sources Iframe (Lien Externe / VDO.Ninja) avec DOM persistant Mosaïque ↔ Plein Écran */}
             {(() => {
-              const isSingle = directorState.broadcastMode === 'single';
+              const isSingle = directorState.broadcastMode === 'single' || enabledCams.length <= 1;
               const singleTargetId = isSingle ? (focusedCam?.id || enabledCams[0]?.id || null) : null;
               const basePreviewList = enabledCams.length > 0
                 ? enabledCams

@@ -71,7 +71,10 @@ export function getMosaicGridRects(
   const headerH = 44;
   let cols = 1;
   let rows = 1;
-  if (safeCount === 2) {
+  if (safeCount === 1) {
+    cols = 1;
+    rows = 1;
+  } else if (safeCount === 2) {
     if (mosaicLayout === 'stacked') {
       cols = 1;
       rows = 2;
@@ -1226,9 +1229,12 @@ export class LiveCompositeBroadcaster {
       c => c.enabled && (isClubSituation || !isVirtualScreenSource(c.sourceType))
     );
 
-    if (directorState.broadcastMode === 'single' && directorState.focusedCameraId) {
-      const focusedCandidate = directorState.cameras.find(c => c.id === directorState.focusedCameraId);
-      const slot = (focusedCandidate && (isClubSituation || !isVirtualScreenSource(focusedCandidate.sourceType)) ? focusedCandidate : null) || enabledCams[0];
+    if ((directorState.broadcastMode === 'single' && directorState.focusedCameraId) || enabledCams.length <= 1) {
+      const focusedCandidate = directorState.focusedCameraId
+        ? directorState.cameras.find(c => c.id === directorState.focusedCameraId)
+        : null;
+      const fallbackCam = directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType))[0];
+      const slot = (focusedCandidate && (isClubSituation || !isVirtualScreenSource(focusedCandidate.sourceType)) ? focusedCandidate : null) || enabledCams[0] || fallbackCam;
       if (slot) {
         this.drawVideoInRect(videoElements[slot.id], 0, 0, W, H, slot, data);
         if (!isVirtualScreenSource(slot.sourceType)) {
