@@ -716,12 +716,14 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               <option value="vdo">📡 VDO.Ninja</option>
               <option value="external">🌐 Lien Externe</option>
             </optgroup>
-            <optgroup label="📊 Écrans Live (Sans quitter le direct)">
-              <option value="tournament_standings">🏆 Classement du Tournoi</option>
-              <option value="tournament_bracket">🌳 Tableau Phases Finales</option>
-              <option value="matches_live_board">🎱 Scores de tous les Billards</option>
-              <option value="club_leaderboard">👑 Classement Général Club</option>
-            </optgroup>
+            {!isExternalLive && (
+              <optgroup label="📊 Écrans Live (Sans quitter le direct)">
+                <option value="tournament_standings">🏆 Classement du Tournoi</option>
+                <option value="tournament_bracket">🌳 Tableau Phases Finales</option>
+                <option value="matches_live_board">🎱 Scores de tous les Billards</option>
+                <option value="club_leaderboard">👑 Classement Général Club</option>
+              </optgroup>
+            )}
           </select>
 
           {slot.sourceType === 'smartphone_webrtc' && (
@@ -1427,7 +1429,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const sortedTables = Object.values(tables).sort((a, b) => a.number - b.number);
   const sortedPlayers = Object.values(players).slice().sort((a, b) => a.name.localeCompare(b.name));
-  const enabledCams = directorState.cameras.filter(c => c.enabled);
+  const isClubSituation = directorState.situation === 'club_tables';
+  const enabledCams = directorState.cameras.filter(
+    c => c.enabled && (isClubSituation || !isVirtualScreenSource(c.sourceType))
+  );
   const enabledCount = enabledCams.length;
   const focusedCam = directorState.focusedCameraId
     ? directorState.cameras.find(c => c.id === directorState.focusedCameraId) || null
@@ -1684,16 +1689,16 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     return `${tbl}${m.player1Name} ${m.score1}-${m.score2} ${m.player2Name}${rnd}`;
   };
 
-  const cueScoreTitleDisplay = rm.cueScoreTournamentName?.trim() || cueScoreData?.name || '';
-  const cueScoreVenueDisplay = rm.cueScoreVenueName?.trim() || cueScoreData?.venueName || '';
-  const cueScorePlayersTotal = rm.cueScorePlayersCount ?? cueScoreData?.players.length ?? 0;
-  const cueScoreMatchesTotal = rm.cueScoreMatchesCount ?? cueScoreData?.matches.length ?? 0;
-  const cueScorePlayingTotal = rm.cueScorePlayingCount ?? csPlayingMatches.length;
+  const hasCueScoreLoaded = Boolean(rm.cueScoreInput?.trim() && rm.cueScoreTournamentId?.trim());
+  const cueScoreTitleDisplay = hasCueScoreLoaded ? (rm.cueScoreTournamentName?.trim() || cueScoreData?.name || '') : '';
+  const cueScoreVenueDisplay = hasCueScoreLoaded ? (rm.cueScoreVenueName?.trim() || cueScoreData?.venueName || '') : '';
+  const cueScorePlayersTotal = hasCueScoreLoaded ? (rm.cueScorePlayersCount ?? cueScoreData?.players.length ?? 0) : 0;
+  const cueScoreMatchesTotal = hasCueScoreLoaded ? (rm.cueScoreMatchesCount ?? cueScoreData?.matches.length ?? 0) : 0;
+  const cueScorePlayingTotal = hasCueScoreLoaded ? (rm.cueScorePlayingCount ?? csPlayingMatches.length) : 0;
 
   const ongoingTournament =
     Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
-  const latestTournament = Object.values(tournaments).slice().reverse()[0] || null;
-  const appTournament = ongoingTournament || latestTournament;
+  const appTournament = ongoingTournament;
 
   const appTourMatches = appTournament
     ? Object.values(matches).filter(m => m.tournamentId === appTournament.id)
@@ -2389,7 +2394,26 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               className="input-field"
               placeholder="Collez le lien ou l'ID CueScore (ex: https://cuescore.com/tournament/.../12345678)"
               value={rm.cueScoreInput || ''}
-              onChange={(e) => updateRegionalMatch({ cueScoreInput: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val.trim()) {
+                  setCueScoreData(null);
+                  setCueScoreError(null);
+                  updateRegionalMatch({
+                    cueScoreInput: '',
+                    cueScoreTournamentId: '',
+                    cueScoreTournamentName: '',
+                    cueScoreVenueName: '',
+                    cueScorePlayersCount: 0,
+                    cueScoreMatchesCount: 0,
+                    cueScorePlayingCount: 0,
+                    cueScoreMatchId: '',
+                    cueScoreHasActiveMatch: false
+                  });
+                } else {
+                  updateRegionalMatch({ cueScoreInput: val });
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -3044,7 +3068,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
           gap: '0.75rem'
         }}>
-          {directorState.cameras.map(slot => (
+          {directorState.cameras
+            .filter(slot => isClubSituation || !isVirtualScreenSource(slot.sourceType))
+            .map(slot => (
             <CameraTileCard
               key={slot.id}
               slot={slot}
@@ -3156,7 +3182,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             {(() => {
               const isSingle = directorState.broadcastMode === 'single';
               const singleTargetId = isSingle ? (focusedCam?.id || enabledCams[0]?.id || null) : null;
-              const basePreviewList = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
+              const basePreviewList = enabledCams.length > 0
+                ? enabledCams
+                : directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType)).slice(0, 1);
               const previewList =
                 focusedCam && !basePreviewList.some(c => c.id === focusedCam.id)
                   ? [...basePreviewList, focusedCam]

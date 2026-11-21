@@ -513,12 +513,19 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
   };
 
   const activeTournament = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
-  const enabledCams = directorState.cameras.filter(c => c.enabled);
-  const focusedCam = directorState.broadcastMode === 'single' && directorState.focusedCameraId
-    ? directorState.cameras.find(c => c.id === directorState.focusedCameraId) || enabledCams[0]
+  const isClubSituation = directorState.situation === 'club_tables';
+  const enabledCams = directorState.cameras.filter(
+    c => c.enabled && (isClubSituation || !isVirtualScreenSource(c.sourceType))
+  );
+  const focusedCandidate = directorState.broadcastMode === 'single' && directorState.focusedCameraId
+    ? directorState.cameras.find(c => c.id === directorState.focusedCameraId)
     : null;
+  const focusedCam = (focusedCandidate && (isClubSituation || !isVirtualScreenSource(focusedCandidate.sourceType)) ? focusedCandidate : null)
+    || (directorState.broadcastMode === 'single' ? enabledCams[0] : null);
 
-  const baseList = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
+  const baseList = enabledCams.length > 0
+    ? enabledCams
+    : directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType)).slice(0, 1);
   const list =
     focusedCam && !baseList.some(c => c.id === focusedCam.id)
       ? [...baseList, focusedCam]
@@ -574,7 +581,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
             />
           </div>
           <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#F59E0B' }}>
-            📺 ÉCRAN MULTIPLE LIVE • {directorState.situation === 'cuescore_live' ? (directorState.regionalMatch.cueScoreTournamentName || 'Live CueScore') : directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
+            📺 ÉCRAN MULTIPLE LIVE • {directorState.situation === 'cuescore_live' ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim()) ? directorState.regionalMatch.cueScoreTournamentName : 'Live CueScore') : directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
           </span>
           {directorState.situation === 'club_tables' && activeTournament && (
             <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>

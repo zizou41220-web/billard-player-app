@@ -176,6 +176,15 @@ export function resolveCameraAssignment(
 
   if (directorState?.situation === 'cuescore_live') {
     const rm = directorState.regionalMatch;
+    const hasLoadedCueScore = Boolean(rm.cueScoreInput?.trim() && rm.cueScoreTournamentId?.trim());
+    if (!hasLoadedCueScore) {
+      return {
+        title: 'Live CueScore',
+        subtitle: 'En attente d’un lien CueScore...',
+        rulesLabel: '',
+        isMatchView: false
+      };
+    }
     const baseTitle = rm.cueScoreTournamentName?.trim() || 'Live CueScore';
     const customSub = rm.cueScoreCustomSubtitle?.trim() || '';
     if (
@@ -487,7 +496,6 @@ export function drawVirtualScreenToCanvas(
   const allTours = Object.values(tournaments);
   const targetTour =
     allTours.slice().reverse().find(t => t.status === 'ongoing') ||
-    allTours[allTours.length - 1] ||
     null;
 
   ctx.save();
@@ -652,6 +660,16 @@ export function drawVirtualScreenToCanvas(
     }
   } else if (slot.sourceType === 'matches_live_board') {
     const sortedTables = Object.values(tables).sort((a, b) => a.number - b.number).slice(0, 6);
+    const hasAnyActiveTableMatch = sortedTables.some(t => {
+      const m = t.currentMatchId ? matches[t.currentMatchId] : undefined;
+      return Boolean(m && m.status !== 'finished');
+    });
+    if (!targetTour && !hasAnyActiveTableMatch) {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '700 26px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Aucun tournoi ni match en cours', 640, 360);
+    } else {
     const cols = sortedTables.length <= 2 ? sortedTables.length || 1 : 2;
     const rows = Math.ceil(sortedTables.length / cols) || 1;
     const gap = 22;
@@ -705,6 +723,7 @@ export function drawVirtualScreenToCanvas(
         ctx.fillText('Billard libre', bx + boxW / 2, by + boxH / 2 + 14);
       }
     });
+    }
   } else {
     // club_leaderboard
     const topPlayers = Object.values(players)
@@ -1187,10 +1206,14 @@ export class LiveCompositeBroadcaster {
 
     const { directorState, videoElements, tables, matches, players, tournaments, currentClub } = data;
     const overlayCfg = data.overlayConfig || DEFAULT_LIVE_OVERLAY_CONFIG;
-    const enabledCams = directorState.cameras.filter(c => c.enabled);
+    const isClubSituation = directorState.situation === 'club_tables';
+    const enabledCams = directorState.cameras.filter(
+      c => c.enabled && (isClubSituation || !isVirtualScreenSource(c.sourceType))
+    );
 
     if (directorState.broadcastMode === 'single' && directorState.focusedCameraId) {
-      const slot = directorState.cameras.find(c => c.id === directorState.focusedCameraId) || enabledCams[0];
+      const focusedCandidate = directorState.cameras.find(c => c.id === directorState.focusedCameraId);
+      const slot = (focusedCandidate && (isClubSituation || !isVirtualScreenSource(focusedCandidate.sourceType)) ? focusedCandidate : null) || enabledCams[0];
       if (slot) {
         this.drawVideoInRect(videoElements[slot.id], 0, 0, W, H, slot, data);
         if (!isVirtualScreenSource(slot.sourceType)) {
@@ -1225,13 +1248,17 @@ export class LiveCompositeBroadcaster {
       ctx.textAlign = 'left';
       const mosaicHeaderTitle =
         directorState.situation === 'cuescore_live'
-          ? (directorState.regionalMatch.cueScoreTournamentName?.trim() || 'LIVE CUESCORE')
+          ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim())
+              ? directorState.regionalMatch.cueScoreTournamentName.trim()
+              : 'LIVE CUESCORE')
           : directorState.situation === 'regional_match'
             ? (directorState.regionalMatch.eventTitle?.trim() || 'TOURNOI RÉGIONAL')
             : currentClub.name;
       ctx.fillText(`${mosaicHeaderTitle} • ÉCRAN MULTIPLE`, 118, 22);
 
-      const list = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
+      const list = enabledCams.length > 0
+        ? enabledCams
+        : directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType)).slice(0, 1);
       const rects = getMosaicGridRects(list.length, directorState.mosaicLayout, W, H);
 
       list.forEach((slot, idx) => {
