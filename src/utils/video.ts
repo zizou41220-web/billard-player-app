@@ -102,3 +102,53 @@ export const formatEmbedVideoUrl = (rawUrl: string): string => {
   return url;
 };
 
+/**
+ * Normalizes a pasted live URL into a clean, shareable public viewer URL.
+ * Notably converts YouTube Studio links (studio.youtube.com/video/ID/livestreaming)
+ * into public watch URLs (https://www.youtube.com/watch?v=ID).
+ */
+export const normalizePublicLiveUrl = (rawUrl: string): string => {
+  if (!rawUrl) return '';
+  let url = rawUrl.trim();
+  if (url.includes('<iframe') && url.includes('src=')) {
+    const srcMatch = url.match(/src=["']([^"']+)["']/i);
+    if (srcMatch && srcMatch[1]) url = srcMatch[1];
+  }
+  url = url.replace(/&amp;/g, '&');
+
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    const vMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (vMatch && vMatch[1]) {
+      return `https://www.youtube.com/watch?v=${vMatch[1]}`;
+    }
+    const pathMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:live|embed|shorts|video|v)\/)([a-zA-Z0-9_-]{11})/);
+    if (pathMatch && pathMatch[1]) {
+      return `https://www.youtube.com/watch?v=${pathMatch[1]}`;
+    }
+  }
+  return url;
+};
+
+/**
+ * Splits a pasted RTMP(S) URL + stream key (e.g. "rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx")
+ * or keeps a raw stream key intact.
+ */
+export const parseRtmpStreamInput = (
+  rawInput: string,
+  defaultRtmpUrl: string
+): { rtmpUrl: string; streamKey: string } => {
+  const trimmed = (rawInput || '').trim();
+  if (/^rtmps?:\/\//i.test(trimmed)) {
+    const clean = trimmed.replace(/\/+$/, '');
+    const lastSlash = clean.lastIndexOf('/');
+    if (lastSlash > 8) {
+      return {
+        rtmpUrl: clean.slice(0, lastSlash + 1),
+        streamKey: clean.slice(lastSlash + 1)
+      };
+    }
+    return { rtmpUrl: clean, streamKey: '' };
+  }
+  return { rtmpUrl: defaultRtmpUrl, streamKey: trimmed };
+};
+

@@ -75,7 +75,7 @@ import {
   loadLiveOverlayConfig,
   subscribeToLiveOverlayConfig
 } from '../utils/liveOverlay';
-import { formatEmbedVideoUrl } from '../utils/video';
+import { formatEmbedVideoUrl, normalizePublicLiveUrl, parseRtmpStreamInput } from '../utils/video';
 
 interface MultiCamDirectorPanelProps {
   getAppBaseUrl: () => string;
@@ -917,7 +917,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     updateMatchScore,
     startTournamentMatch,
     finishMatch,
-    launchMatchOnTable
+    launchMatchOnTable,
+    setTableLiveStream,
+    setMatchLiveStream
   } = useStore();
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
     loadDirectorState(currentClub.id)
@@ -937,6 +939,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [showPlatformsModal, setShowPlatformsModal] = useState<boolean>(false);
   const [copiedCamUrl, setCopiedCamUrl] = useState<boolean>(false);
   const [showCustomRtmp, setShowCustomRtmp] = useState<boolean>(false);
+  const [showStreamKeys, setShowStreamKeys] = useState<boolean>(false);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+  const [assignLiveTableId, setAssignLiveTableId] = useState<string>('');
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
 
   const [pendingLaunchMatchId, setPendingLaunchMatchId] = useState<string>('');
@@ -1969,6 +1974,93 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           </a>
         </div>
       </div>
+
+      {/* BARRE RAPIDE LIENS LIVES YOUTUBE / FACEBOOK & STATUT RELAIS */}
+      {(destinations.youtubeLiveUrl?.trim() || destinations.facebookLiveUrl?.trim() || activePlatformsLabel.length > 0) && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          background: 'rgba(15, 23, 42, 0.85)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '10px',
+          padding: '0.45rem 0.85rem',
+          fontSize: '0.74rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>🔗 Liens Directs :</span>
+            {destinations.youtubeLiveUrl?.trim() && (() => {
+              const ytPublic = normalizePublicLiveUrl(destinations.youtubeLiveUrl);
+              return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 0, 51, 0.14)', border: '1px solid rgba(255, 51, 68, 0.45)', borderRadius: '8px', padding: '2px 8px' }}>
+                  <Youtube size={13} color="#ff6b81" />
+                  <a href={ytPublic} target="_blank" rel="noreferrer" style={{ color: '#fda4af', fontWeight: 800, textDecoration: 'none' }}>
+                    Live YouTube <ExternalLink size={10} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(ytPublic);
+                      setCopiedLinkId('yt');
+                      setTimeout(() => setCopiedLinkId(null), 1800);
+                    }}
+                    style={{ background: 'transparent', border: 'none', color: copiedLinkId === 'yt' ? '#34d399' : '#fff', cursor: 'pointer', padding: '0 2px', fontSize: '0.7rem' }}
+                    title="Copier le lien public YouTube"
+                  >
+                    {copiedLinkId === 'yt' ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                </span>
+              );
+            })()}
+            {destinations.facebookLiveUrl?.trim() && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(24, 119, 242, 0.16)', border: '1px solid rgba(59, 130, 246, 0.45)', borderRadius: '8px', padding: '2px 8px' }}>
+                <Facebook size={13} color="#60a5fa" />
+                <a href={destinations.facebookLiveUrl.trim()} target="_blank" rel="noreferrer" style={{ color: '#93c5fd', fontWeight: 800, textDecoration: 'none' }}>
+                  Live Facebook <ExternalLink size={10} />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(destinations.facebookLiveUrl?.trim() || '');
+                    setCopiedLinkId('fb');
+                    setTimeout(() => setCopiedLinkId(null), 1800);
+                  }}
+                  style={{ background: 'transparent', border: 'none', color: copiedLinkId === 'fb' ? '#34d399' : '#fff', cursor: 'pointer', padding: '0 2px', fontSize: '0.7rem' }}
+                  title="Copier le lien public Facebook"
+                >
+                  {copiedLinkId === 'fb' ? <Check size={12} /> : <Copy size={12} />}
+                </button>
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <span style={{
+              fontSize: '0.7rem',
+              fontWeight: 800,
+              padding: '2px 8px',
+              borderRadius: '999px',
+              background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+                ? 'rgba(16, 185, 129, 0.16)'
+                : 'rgba(245, 158, 11, 0.15)',
+              color: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#34d399' : '#fbbf24'
+            }}>
+              {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+                ? '🟢 Relais OBS Prêt'
+                : '🟠 Relais PC requis pour diffuser'}
+            </span>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setShowPlatformsModal(true)}
+              style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 8px' }}
+            >
+              ⚙️ Modifier URLs / Clés
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 1A. 🏆 TOURNOI DE L'APPLI EN DIRECT (PILOTAGE & DIFFUSION SANS QUITTER LE LIVE) */}
       {directorState.situation === 'club_tables' && appTournament && (
@@ -3239,7 +3331,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         </div>
       </div>
 
-      {/* 3. MODALE CONFIGURATION FACEBOOK / YOUTUBE & RELAIS PC */}
+      {/* 3. MODALE CONFIGURATION FACEBOOK / YOUTUBE & RELAIS PC (REMPLAÇANT OBS) */}
       {showPlatformsModal && (
         <div
           onClick={() => setShowPlatformsModal(false)}
@@ -3258,9 +3350,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             className="glass-card"
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: '720px',
+              maxWidth: '780px',
               width: '100%',
-              maxHeight: '90vh',
+              maxHeight: '92vh',
               overflowY: 'auto',
               padding: '1.5rem',
               borderRadius: '18px',
@@ -3270,98 +3362,261 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               gap: '1rem'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
-              <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Radio size={20} color="#ef4444" /> Diffusion Directe Facebook & YouTube
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: '1.12rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Radio size={20} color="#ef4444" /> Studio Diffusion YouTube & Facebook (Sans OBS)
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Collez simplement les liens de vos lives et/ou vos clés de stream pour diffuser la régie multi-caméras + scores TV en direct.
+                </div>
               </div>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => broadcasterRef.current?.checkRelayAvailability(destinations.relayWsUrl)}
-                style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px' }}
-              >
-                {broadcasterStatus.connectedToRelay ? (
-                  broadcasterStatus.ffmpegAvailable ? <CheckCircle2 size={14} color="#34d399" /> : <AlertTriangle size={14} color="#fbbf24" />
-                ) : (
-                  <RefreshCw size={14} />
-                )}
-                {broadcasterStatus.connectedToRelay
-                  ? broadcasterStatus.ffmpegAvailable ? 'Relais + FFmpeg OK' : 'FFmpeg manquant'
-                  : 'Tester Relais PC'}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowStreamKeys(v => !v)}
+                  style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px' }}
+                  title="Afficher ou masquer les clés de stream"
+                >
+                  {showStreamKeys ? <EyeOff size={13} /> : <Eye size={13} />}
+                  {showStreamKeys ? 'Masquer clés' : 'Voir clés'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => broadcasterRef.current?.checkRelayAvailability(destinations.relayWsUrl)}
+                  style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px' }}
+                >
+                  {broadcasterStatus.connectedToRelay ? (
+                    broadcasterStatus.ffmpegAvailable ? <CheckCircle2 size={14} color="#34d399" /> : <AlertTriangle size={14} color="#fbbf24" />
+                  ) : (
+                    <RefreshCw size={14} />
+                  )}
+                  {broadcasterStatus.connectedToRelay
+                    ? broadcasterStatus.ffmpegAvailable ? 'Relais + FFmpeg OK' : 'FFmpeg manquant'
+                    : 'Tester Relais PC'}
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.9rem' }}>
+              {/* FACEBOOK LIVE */}
               <div style={{
                 background: destinations.facebookEnabled ? 'rgba(24, 119, 242, 0.12)' : 'rgba(255,255,255,0.03)',
                 border: `1.5px solid ${destinations.facebookEnabled ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: '12px',
-                padding: '0.9rem',
+                padding: '0.95rem',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.55rem'
+                gap: '0.6rem'
               }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontWeight: 900, fontSize: '0.9rem', color: '#60a5fa' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontWeight: 900, fontSize: '0.92rem', color: '#60a5fa' }}>
+                    <input
+                      type="checkbox"
+                      checked={destinations.facebookEnabled}
+                      onChange={(e) => updateDestinations({ facebookEnabled: e.target.checked })}
+                    />
+                    <Facebook size={17} /> Facebook Live
+                  </label>
+                  <a
+                    href="https://www.facebook.com/live/producer"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: '0.71rem', color: '#93c5fd', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    Live Producer <ExternalLink size={11} />
+                  </a>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <label style={{ fontSize: '0.72rem', color: '#bfdbfe', fontWeight: 700 }}>
+                    1. Lien public du Live Facebook (URL spectateurs)
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={destinations.facebookEnabled}
-                    onChange={(e) => updateDestinations({ facebookEnabled: e.target.checked })}
+                    type="url"
+                    className="input-field"
+                    placeholder="https://www.facebook.com/.../videos/... ou fb.watch/..."
+                    value={destinations.facebookLiveUrl || ''}
+                    onChange={(e) => updateDestinations({ facebookLiveUrl: e.target.value })}
+                    style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
                   />
-                  <Facebook size={17} /> Facebook Live
-                </label>
-                <input
-                  type="password"
-                  className="input-field"
-                  placeholder="Collez votre clé de stream Facebook..."
-                  value={destinations.facebookStreamKey}
-                  onChange={(e) => updateDestinations({ facebookStreamKey: e.target.value })}
-                  style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
-                />
-                <a
-                  href="https://www.facebook.com/live/producer"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ fontSize: '0.72rem', color: '#93c5fd', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                >
-                  Ouvrir Facebook Live Producer <ExternalLink size={11} />
-                </a>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <label style={{ fontSize: '0.72rem', color: '#bfdbfe', fontWeight: 700 }}>
+                    2. Clé de stream Facebook (pour diffuser sans OBS)
+                  </label>
+                  <input
+                    type={showStreamKeys ? 'text' : 'password'}
+                    className="input-field"
+                    placeholder="Collez la clé ou l'URL rtmps:// complète..."
+                    value={destinations.facebookStreamKey}
+                    onChange={(e) => {
+                      const parsed = parseRtmpStreamInput(
+                        e.target.value,
+                        destinations.facebookRtmpUrl || 'rtmps://live-api-s.facebook.com:443/rtmp/'
+                      );
+                      updateDestinations({
+                        facebookRtmpUrl: parsed.rtmpUrl,
+                        facebookStreamKey: parsed.streamKey,
+                        facebookEnabled: parsed.streamKey ? true : destinations.facebookEnabled
+                      });
+                    }}
+                    style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
+                  />
+                </div>
               </div>
 
+              {/* YOUTUBE LIVE */}
               <div style={{
                 background: destinations.youtubeEnabled ? 'rgba(255, 0, 51, 0.1)' : 'rgba(255,255,255,0.03)',
                 border: `1.5px solid ${destinations.youtubeEnabled ? '#ff3344' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: '12px',
-                padding: '0.9rem',
+                padding: '0.95rem',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.55rem'
+                gap: '0.6rem'
               }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontWeight: 900, fontSize: '0.9rem', color: '#ff6b81' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontWeight: 900, fontSize: '0.92rem', color: '#ff6b81' }}>
+                    <input
+                      type="checkbox"
+                      checked={destinations.youtubeEnabled}
+                      onChange={(e) => updateDestinations({ youtubeEnabled: e.target.checked })}
+                    />
+                    <Youtube size={17} /> YouTube Live
+                  </label>
+                  <a
+                    href="https://studio.youtube.com/channel/UC/livestreaming"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: '0.71rem', color: '#fda4af', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    YouTube Studio <ExternalLink size={11} />
+                  </a>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <label style={{ fontSize: '0.72rem', color: '#fecdd3', fontWeight: 700 }}>
+                    1. Lien du Live YouTube (Watch, Live ou Studio)
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={destinations.youtubeEnabled}
-                    onChange={(e) => updateDestinations({ youtubeEnabled: e.target.checked })}
+                    type="url"
+                    className="input-field"
+                    placeholder="https://youtube.com/live/... ou studio.youtube.com/video/..."
+                    value={destinations.youtubeLiveUrl || ''}
+                    onChange={(e) => updateDestinations({ youtubeLiveUrl: e.target.value })}
+                    onBlur={(e) => {
+                      const norm = normalizePublicLiveUrl(e.target.value);
+                      if (norm && norm !== e.target.value) {
+                        updateDestinations({ youtubeLiveUrl: norm });
+                      }
+                    }}
+                    style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
                   />
-                  <Youtube size={17} /> YouTube Live
-                </label>
-                <input
-                  type="password"
-                  className="input-field"
-                  placeholder="Collez votre clé de stream YouTube..."
-                  value={destinations.youtubeStreamKey}
-                  onChange={(e) => updateDestinations({ youtubeStreamKey: e.target.value })}
-                  style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
-                />
-                <a
-                  href="https://studio.youtube.com/channel/UC/livestreaming"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ fontSize: '0.72rem', color: '#fda4af', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                >
-                  Ouvrir YouTube Studio Live <ExternalLink size={11} />
-                </a>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <label style={{ fontSize: '0.72rem', color: '#fecdd3', fontWeight: 700 }}>
+                    2. Clé de stream YouTube (pour diffuser sans OBS)
+                  </label>
+                  <input
+                    type={showStreamKeys ? 'text' : 'password'}
+                    className="input-field"
+                    placeholder="Collez la clé ou l'URL rtmp:// complète..."
+                    value={destinations.youtubeStreamKey}
+                    onChange={(e) => {
+                      const parsed = parseRtmpStreamInput(
+                        e.target.value,
+                        destinations.youtubeRtmpUrl || 'rtmp://a.rtmp.youtube.com/live2/'
+                      );
+                      updateDestinations({
+                        youtubeRtmpUrl: parsed.rtmpUrl,
+                        youtubeStreamKey: parsed.streamKey,
+                        youtubeEnabled: parsed.streamKey ? true : destinations.youtubeEnabled
+                      });
+                    }}
+                    style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Associer rapidement un lien Live à une table du club */}
+            {(destinations.youtubeLiveUrl?.trim() || destinations.facebookLiveUrl?.trim()) && sortedTables.length > 0 && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                borderRadius: '10px',
+                padding: '0.65rem 0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                fontSize: '0.76rem'
+              }}>
+                <span style={{ color: '#6ee7b7', fontWeight: 800 }}>
+                  📺 Afficher ce Live dans l'appli joueurs (avec scores en direct) :
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <select
+                    className="input-field"
+                    value={assignLiveTableId || sortedTables[0]?.id || ''}
+                    onChange={(e) => setAssignLiveTableId(e.target.value)}
+                    style={{ width: 'auto', fontSize: '0.74rem', padding: '0.35rem 0.6rem' }}
+                  >
+                    {sortedTables.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name || `Billard ${t.number}`}
+                      </option>
+                    ))}
+                  </select>
+                  {destinations.youtubeLiveUrl?.trim() && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => {
+                        const tId = assignLiveTableId || sortedTables[0]?.id;
+                        if (!tId) return;
+                        const pubUrl = normalizePublicLiveUrl(destinations.youtubeLiveUrl || '');
+                        const wrapped = `${getAppBaseUrl()}/?overlay=${tId}&video=${encodeURIComponent(pubUrl)}&club=${encodeURIComponent(currentClub.id)}`;
+                        setTableLiveStream(tId, wrapped);
+                        const activeM = tables[tId]?.currentMatchId ? matches[tables[tId].currentMatchId!] : undefined;
+                        if (activeM) setMatchLiveStream(activeM.id, wrapped);
+                        setCopiedLinkId('pub_yt');
+                        setTimeout(() => setCopiedLinkId(null), 2000);
+                      }}
+                      style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', borderColor: '#ff3344', color: '#fda4af' }}
+                    >
+                      {copiedLinkId === 'pub_yt' ? '✅ YouTube lié !' : '▶ Lier YouTube'}
+                    </button>
+                  )}
+                  {destinations.facebookLiveUrl?.trim() && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => {
+                        const tId = assignLiveTableId || sortedTables[0]?.id;
+                        if (!tId) return;
+                        const pubUrl = (destinations.facebookLiveUrl || '').trim();
+                        const wrapped = `${getAppBaseUrl()}/?overlay=${tId}&video=${encodeURIComponent(pubUrl)}&club=${encodeURIComponent(currentClub.id)}`;
+                        setTableLiveStream(tId, wrapped);
+                        const activeM = tables[tId]?.currentMatchId ? matches[tables[tId].currentMatchId!] : undefined;
+                        if (activeM) setMatchLiveStream(activeM.id, wrapped);
+                        setCopiedLinkId('pub_fb');
+                        setTimeout(() => setCopiedLinkId(null), 2000);
+                      }}
+                      style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', borderColor: '#3b82f6', color: '#93c5fd' }}
+                    >
+                      {copiedLinkId === 'pub_fb' ? '✅ Facebook lié !' : '📘 Lier Facebook'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <button
               type="button"
@@ -3391,7 +3646,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   style={{ fontSize: '0.75rem', padding: '0.45rem' }}
                 />
                 <input
-                  type="password"
+                  type={showStreamKeys ? 'text' : 'password'}
                   className="input-field"
                   placeholder="Clé de stream"
                   value={destinations.customStreamKey}
@@ -3402,22 +3657,47 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             )}
 
             <div style={{
-              background: 'rgba(245, 158, 11, 0.08)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
+              background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+                ? 'rgba(16, 185, 129, 0.08)'
+                : 'rgba(245, 158, 11, 0.08)',
+              border: `1px solid ${broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
               borderRadius: '10px',
               padding: '0.7rem 0.9rem',
               fontSize: '0.74rem',
-              color: '#fef3c7',
-              lineHeight: '1.45'
+              color: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#d1fae5' : '#fef3c7',
+              lineHeight: '1.45',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
             }}>
-              <b>Prérequis sur le PC du club :</b>
-              <ul style={{ margin: '3px 0 0 1.1rem', padding: 0 }}>
-                <li>Double-cliquez sur <b>« Lancer le Relais Live.bat »</b> (ou <b>« Lancer le tournoi.bat »</b>) dans le dossier de l'application sur le PC.</li>
-                <li>FFmpeg est installé automatiquement sur le PC au 1er lancement si absent.</li>
-              </ul>
+              <div>
+                {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? (
+                  <span><b>🟢 Relais OBS intégré prêt :</b> vous pouvez cliquer sur « Enregistrer & Lancer le Live » pour diffuser directement sur YouTube & Facebook sans OBS.</span>
+                ) : (
+                  <>
+                    <b>Pour diffuser sans OBS depuis le PC du club :</b> lancez <b>« Lancer le Relais Live.bat »</b> (ou <code>npm run relay</code> dans le dossier de l'appli). FFmpeg s'installe automatiquement au 1er lancement.
+                  </>
+                )}
+              </div>
+              {!(broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable) && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    navigator.clipboard?.writeText('npm run relay');
+                    setCopiedLinkId('relay_cmd');
+                    setTimeout(() => setCopiedLinkId(null), 1800);
+                  }}
+                  style={{ width: 'auto', fontSize: '0.7rem', padding: '3px 8px' }}
+                >
+                  {copiedLinkId === 'relay_cmd' ? '✅ Copié !' : '📋 Copier "npm run relay"'}
+                </button>
+              )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="btn btn-outline"
@@ -3428,17 +3708,25 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               </button>
               <button
                 type="button"
-                className="btn btn-neon"
-                onClick={() => {
-                  setShowPlatformsModal(false);
-                  if (!broadcasterStatus.isStreaming && activePlatformsLabel.length > 0) {
-                    handleToggleLiveStream();
-                  }
-                }}
-                style={{ width: 'auto', padding: '0.55rem 1.2rem', fontWeight: 900, color: '#000' }}
+                className="btn btn-outline"
+                onClick={() => setShowPlatformsModal(false)}
+                style={{ width: 'auto', padding: '0.55rem 1.1rem', borderColor: '#00ffaa', color: '#00ffaa', fontWeight: 800 }}
               >
-                Enregistrer {activePlatformsLabel.length > 0 && !broadcasterStatus.isStreaming ? '& Lancer le Live' : ''}
+                💾 Enregistrer les liens
               </button>
+              {activePlatformsLabel.length > 0 && !broadcasterStatus.isStreaming && (
+                <button
+                  type="button"
+                  className="btn btn-neon"
+                  onClick={() => {
+                    setShowPlatformsModal(false);
+                    handleToggleLiveStream();
+                  }}
+                  style={{ width: 'auto', padding: '0.55rem 1.2rem', fontWeight: 900, color: '#000' }}
+                >
+                  🔴 Enregistrer & Lancer le Live ({activePlatformsLabel.join('+')})
+                </button>
+              )}
             </div>
           </div>
         </div>

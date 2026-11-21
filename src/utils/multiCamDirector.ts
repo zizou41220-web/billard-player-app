@@ -78,12 +78,15 @@ export interface StreamDestinationsConfig {
   facebookEnabled: boolean;
   facebookRtmpUrl: string;
   facebookStreamKey: string;
+  facebookLiveUrl?: string;
   youtubeEnabled: boolean;
   youtubeRtmpUrl: string;
   youtubeStreamKey: string;
+  youtubeLiveUrl?: string;
   customEnabled: boolean;
   customRtmpUrl: string;
   customStreamKey: string;
+  customLiveUrl?: string;
   relayWsUrl: string;
 }
 
@@ -214,12 +217,15 @@ export const DEFAULT_DESTINATIONS_CONFIG: StreamDestinationsConfig = {
   facebookEnabled: true,
   facebookRtmpUrl: 'rtmps://live-api-s.facebook.com:443/rtmp/',
   facebookStreamKey: '',
+  facebookLiveUrl: '',
   youtubeEnabled: true,
   youtubeRtmpUrl: 'rtmp://a.rtmp.youtube.com/live2/',
   youtubeStreamKey: '',
+  youtubeLiveUrl: '',
   customEnabled: false,
   customRtmpUrl: '',
   customStreamKey: '',
+  customLiveUrl: '',
   relayWsUrl: ''
 };
 
