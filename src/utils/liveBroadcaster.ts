@@ -6,6 +6,7 @@ import {
   MultiCamDirectorState,
   StreamDestinationsConfig,
   StreamQualityPreset,
+  getShotClockRemainingMs,
   isVirtualScreenSource
 } from './multiCamDirector';
 import { getMatchScoringRules } from './rules';
@@ -37,6 +38,11 @@ export interface BroadcasterStatusSnapshot {
   localRecordingSec?: number;
   commentatorMicActive?: boolean;
   qualityPreset?: StreamQualityPreset;
+  replayArmed?: boolean;
+  replayReadySec?: number;
+  isReplaying?: boolean;
+  replaySpeed?: number;
+  replayProgress?: number; // 0..1
   targetStatuses: Record<string, { status: RelayTargetStatus; message?: string; label?: string }>;
   lastError: string | null;
 }
@@ -849,6 +855,29 @@ export class LiveCompositeBroadcaster {
   private transitionStartAt = 0;
   private readonly transitionDurationMs = 320;
 
+  // Shot Clock audio beep state
+  private lastShotClockBeepSec = -1;
+
+  // Instant Replay staggered dual-recorder ring buffer (10s stagger / 20s cycle)
+  private replayArmed = false;
+  private replayStream: MediaStream | null = null;
+  private replaySlots: [
+    { rec: MediaRecorder | null; chunks: Blob[]; startedAt: number; mimeType: string },
+    { rec: MediaRecorder | null; chunks: Blob[]; startedAt: number; mimeType: string }
+  ] = [
+    { rec: null, chunks: [], startedAt: 0, mimeType: 'video/webm' },
+    { rec: null, chunks: [], startedAt: 0, mimeType: 'video/webm' }
+  ];
+  private replayCycleTimer: number | null = null;
+  private replayNextSlot: 0 | 1 = 0;
+  private replayVideo: HTMLVideoElement | null = null;
+  private replayObjectUrl: string | null = null;
+  private isReplaying = false;
+  private replayStartSec = 0;
+  private replayEndSec = 0;
+  private replaySpeed = 0.6;
+  private replaySafetyTimer: number | null = null;
+
   // Telemetry & Local Backup Recording
   private frameTimestamps: number[] = [];
   private lastTelemetryAt = 0;
@@ -875,6 +904,11 @@ export class LiveCompositeBroadcaster {
     localRecordingSec: 0,
     commentatorMicActive: false,
     qualityPreset: '720p',
+    replayArmed: false,
+    replayReadySec: 0,
+    isReplaying: false,
+    replaySpeed: 0.6,
+    replayProgress: 0,
     targetStatuses: {},
     lastError: null
   };
@@ -1467,6 +1501,484 @@ export class LiveCompositeBroadcaster {
     }
   }
 
+  private playShotClockTone(freqHz: number, durationSec: number, volume: number) {
+    try {
+      this.ensureAudioMixer();
+      if (!this.audioCtx) return;
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+      const now = this.audioCtx.currentTime;
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = freqHz < 450 ? 'sawtooth' : 'sine';
+      osc.frequency.setValueAtTime(freqHz, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec);
+      osc.connect(gain);
+      if (this.masterGain) {
+        gain.connect(this.masterGain);
+      }
+      gain.connect(this.audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + durationSec + 0.02);
+    } catch {}
+  }
+
+  private drawShotClockOverlay(data: LiveCompositeContext) {
+    const sc = data.directorState.shotClock;
+    if (!sc || !sc.enabled) return;
+
+    const ctx = this.ctx;
+    const W = 1280;
+    const remMs = getShotClockRemainingMs(sc, Date.now());
+    const secLeft = Math.ceil(remMs / 1000);
+    const maxSec = Math.max(1, sc.durationSec + (sc.extensionUsed ? sc.extensionSec : 0));
+    const ratio = Math.max(0, Math.min(1, remMs / (maxSec * 1000)));
+
+    // Audio countdown beeps (5..1s) & buzzer (0s)
+    if (sc.running && sc.soundEnabled) {
+      if (secLeft <= 5 && secLeft >= 1 && secLeft !== this.lastShotClockBeepSec) {
+        this.lastShotClockBeepSec = secLeft;
+        this.playShotClockTone(880, 0.075, 0.14);
+      } else if (secLeft === 0 && this.lastShotClockBeepSec !== 0) {
+        this.lastShotClockBeepSec = 0;
+        this.playShotClockTone(310, 0.4, 0.22);
+      } else if (secLeft > 5) {
+        this.lastShotClockBeepSec = -1;
+      }
+    } else if (!sc.running) {
+      this.lastShotClockBeepSec = -1;
+    }
+
+    const isCritical = secLeft <= 5;
+    const isWarn = secLeft > 5 && secLeft <= 10;
+    const isZero = secLeft === 0;
+    const pulseOn = Math.floor(Date.now() / 260) % 2 === 0;
+
+    const boxW = 148;
+    const boxH = 58;
+    const x = W - boxW - 18;
+    const y = 54;
+
+    ctx.save();
+    drawRoundedRect(ctx, x, y, boxW, boxH, 7);
+    ctx.fillStyle = isZero
+      ? (pulseOn ? 'rgba(185, 28, 28, 0.96)' : 'rgba(127, 29, 29, 0.95)')
+      : isCritical
+        ? (pulseOn ? 'rgba(185, 28, 28, 0.93)' : 'rgba(12, 16, 26, 0.94)')
+        : 'rgba(10, 14, 22, 0.94)';
+    ctx.fill();
+
+    ctx.lineWidth = isCritical ? 2 : 1.5;
+    ctx.strokeStyle = isCritical ? '#EF4444' : isWarn ? '#F59E0B' : 'rgba(212, 175, 55, 0.75)';
+    ctx.stroke();
+
+    // Top micro label
+    ctx.fillStyle = isCritical ? '#FECACA' : 'rgba(255,255,255,0.68)';
+    ctx.font = '800 9px Outfit, Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isZero ? 'TEMPS ÉCOULÉ' : 'SHOT CLOCK', x + 10, y + 12);
+
+    if (sc.extensionUsed) {
+      drawRoundedRect(ctx, x + boxW - 42, y + 5, 34, 14, 3);
+      ctx.fillStyle = '#D4AF37';
+      ctx.fill();
+      ctx.fillStyle = '#090D16';
+      ctx.font = '900 8px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`+${sc.extensionSec}S`, x + boxW - 25, y + 12.5);
+    }
+
+    // Countdown digits
+    ctx.fillStyle = isCritical ? '#FFFFFF' : isWarn ? '#FDE68A' : '#F8FAFC';
+    ctx.font = '900 28px Outfit, Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(secLeft).padStart(2, '0'), x + boxW / 2, y + 34);
+
+    // Animated bottom progress bar
+    const barX = x + 8;
+    const barY = y + boxH - 8;
+    const barW = boxW - 16;
+    drawRoundedRect(ctx, barX, barY, barW, 4, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fill();
+    if (ratio > 0) {
+      drawRoundedRect(ctx, barX, barY, Math.max(4, barW * ratio), 4, 2);
+      ctx.fillStyle = isCritical ? '#EF4444' : isWarn ? '#F59E0B' : '#D4AF37';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawSponsorCarousel(data: LiveCompositeContext, overlayCfg: LiveOverlayConfig) {
+    const car = overlayCfg.sponsorCarousel;
+    if (!car || !car.enabled || !car.logos || car.logos.length === 0) return;
+
+    const intervalMs = Math.max(4, car.intervalSec || 10) * 1000;
+    const now = Date.now();
+    const totalCycle = Math.floor(now / intervalMs);
+    const activeIdx = totalCycle % car.logos.length;
+    const posInSlot = now % intervalMs;
+    const fadeMs = 550;
+    let alpha = 1;
+    if (car.logos.length > 1) {
+      if (posInSlot < fadeMs) alpha = posInSlot / fadeMs;
+      else if (posInSlot > intervalMs - fadeMs) alpha = (intervalMs - posInSlot) / fadeMs;
+    }
+
+    const logo = car.logos[activeIdx];
+    const img = this.getCachedImage(logo?.url);
+    if (!img) return;
+
+    const ctx = this.ctx;
+    const W = 1280;
+    const H = 720;
+    const cardW = Math.round(((car.widthPct || 13) / 100) * W);
+    const labelH = car.showLabel ? 16 : 0;
+    const cardH = Math.round(cardW * 0.56) + labelH;
+    const tickerOffset = overlayCfg.ticker?.enabled ? 34 : 0;
+    const shotClockOffset = data.directorState.shotClock?.enabled && car.position === 'top_right' ? 164 : 0;
+
+    let x = W - cardW - 18 - shotClockOffset;
+    let y = 54;
+    if (car.position === 'top_left') {
+      x = 18;
+      y = 54;
+    } else if (car.position === 'bottom_left') {
+      x = 18;
+      y = H - cardH - 18 - tickerOffset;
+    } else if (car.position === 'bottom_right') {
+      x = W - cardW - 18;
+      y = H - cardH - 18 - tickerOffset;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    drawRoundedRect(ctx, x, y, cardW, cardH, 8);
+    ctx.fillStyle = 'rgba(10, 14, 22, 0.9)';
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.stroke();
+    ctx.fillStyle = '#D4AF37';
+    ctx.fillRect(x + 1, y, cardW - 2, 2);
+
+    if (car.showLabel) {
+      ctx.fillStyle = 'rgba(212, 175, 55, 0.85)';
+      ctx.font = '800 8.5px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PARTENAIRE', x + cardW / 2, y + 10);
+    }
+
+    const pad = 8;
+    const boxX = x + pad;
+    const boxY = y + labelH + 4;
+    const boxW = cardW - pad * 2;
+    const boxH = cardH - labelH - 10;
+    const scale = Math.min(boxW / Math.max(1, img.naturalWidth), boxH / Math.max(1, img.naturalHeight));
+    const dw = img.naturalWidth * scale;
+    const dh = img.naturalHeight * scale;
+    ctx.drawImage(img, boxX + (boxW - dw) / 2, boxY + (boxH - dh) / 2, dw, dh);
+    ctx.restore();
+  }
+
+  private drawTickerBar(data: LiveCompositeContext, overlayCfg: LiveOverlayConfig) {
+    const ticker = overlayCfg.ticker;
+    if (!ticker || !ticker.enabled) return;
+
+    const ctx = this.ctx;
+    const W = 1280;
+    const H = 720;
+    const barH = 30;
+    const barY = H - barH;
+    const { matches, players, tables, tournaments, currentClub } = data;
+
+    const segments: string[] = [];
+    if (ticker.customMessage?.trim()) {
+      segments.push(ticker.customMessage.trim());
+    }
+
+    if (ticker.includeTournamentResults) {
+      const ongoingTour = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
+      const tourMatches = ongoingTour
+        ? Object.values(matches).filter(m => m.tournamentId === ongoingTour.id)
+        : Object.values(matches);
+
+      const playing = tourMatches
+        .filter(m => m.status === 'playing' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
+        .slice(0, 4);
+      playing.forEach(m => {
+        const tbl = m.tableId ? tables[m.tableId] : undefined;
+        const tblStr = tbl ? `${tbl.name || `Billard ${tbl.number}`} : ` : '';
+        segments.push(`EN COURS — ${tblStr}${players[m.player1Id].name} ${m.score1} - ${m.score2} ${players[m.player2Id].name}`);
+      });
+
+      const finished = tourMatches
+        .filter(m => m.status === 'finished' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
+        .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))
+        .slice(0, 4);
+      finished.forEach(m => {
+        segments.push(`RÉSULTAT — ${players[m.player1Id].name} ${m.score1} - ${m.score2} ${players[m.player2Id].name}`);
+      });
+
+      const upcoming = tourMatches
+        .filter(m => m.status === 'pending' && !m.tableId && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
+        .slice(0, 2);
+      upcoming.forEach(m => {
+        segments.push(`PROCHAIN MATCH — ${players[m.player1Id].name} vs ${players[m.player2Id].name}`);
+      });
+    }
+
+    if (segments.length === 0) {
+      segments.push(`${currentClub.name} • Direct Live Multi-Caméras`);
+    }
+
+    const fullLine = `${segments.join('    ◆    ')}    ◆    `;
+    const speedPxPerSec = ticker.speed === 1 ? 58 : ticker.speed === 3 ? 132 : 90;
+
+    ctx.save();
+    ctx.fillStyle = ticker.bgColor || 'rgba(10, 14, 22, 0.95)';
+    ctx.fillRect(0, barY, W, barH);
+    ctx.fillStyle = '#D4AF37';
+    ctx.fillRect(0, barY, W, 2);
+
+    const tagW = 104;
+    // Clip scrolling text to the area right of the badge
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(tagW, barY, W - tagW, barH);
+    ctx.clip();
+
+    ctx.font = '700 13px Outfit, Inter, sans-serif';
+    ctx.fillStyle = ticker.textColor || '#F8FAFC';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    const textW = Math.max(200, ctx.measureText(fullLine).width);
+    const offset = ((performance.now() / 1000) * speedPxPerSec) % textW;
+    let drawX = tagW - offset;
+    while (drawX < W + 40) {
+      ctx.fillText(fullLine, drawX, barY + barH / 2 + 1);
+      drawX += textW;
+    }
+    ctx.restore();
+
+    // Fixed left broadcast tag
+    ctx.fillStyle = '#DC2626';
+    ctx.fillRect(0, barY + 2, tagW, barH - 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 11px Outfit, Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('INFO LIVE', tagW / 2, barY + barH / 2 + 1);
+    ctx.restore();
+  }
+
+  // ============================================================================
+  // INSTANT REPLAY ENGINE (STAGGERED DUAL-RECORDER WEBM RING BUFFER)
+  // ============================================================================
+
+  private startReplaySlot(slotIdx: 0 | 1) {
+    if (!this.replayStream || !this.replayArmed) return;
+    const slot = this.replaySlots[slotIdx];
+    if (slot.rec && slot.rec.state !== 'inactive') {
+      try { slot.rec.stop(); } catch {}
+    }
+    const mimeCandidates = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'];
+    const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+    try {
+      const rec = new MediaRecorder(this.replayStream, {
+        ...(mimeType ? { mimeType } : {}),
+        videoBitsPerSecond: 1_500_000
+      });
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) {
+          chunks.push(ev.data);
+        }
+      };
+      slot.rec = rec;
+      slot.chunks = chunks;
+      slot.startedAt = Date.now();
+      slot.mimeType = mimeType;
+      rec.start(500);
+    } catch {}
+  }
+
+  public setReplayArmed(enabled: boolean) {
+    if (this.replayArmed === enabled) return;
+    this.replayArmed = enabled;
+    if (!enabled) {
+      this.stopInstantReplay();
+      if (this.replayCycleTimer !== null) {
+        window.clearInterval(this.replayCycleTimer);
+        this.replayCycleTimer = null;
+      }
+      for (const s of this.replaySlots) {
+        if (s.rec && s.rec.state !== 'inactive') {
+          try { s.rec.stop(); } catch {}
+        }
+        s.rec = null;
+        s.chunks = [];
+        s.startedAt = 0;
+      }
+      if (this.replayStream) {
+        this.replayStream.getTracks().forEach(t => t.stop());
+        this.replayStream = null;
+      }
+      this.emitStatus({ replayArmed: false, replayReadySec: 0 });
+      return;
+    }
+
+    try {
+      this.replayStream = this.canvas.captureStream(25);
+      this.replayNextSlot = 1;
+      this.startReplaySlot(0);
+      this.replayCycleTimer = window.setInterval(() => {
+        if (!this.replayArmed || this.isReplaying) return;
+        const idx = this.replayNextSlot;
+        this.replayNextSlot = idx === 0 ? 1 : 0;
+        this.startReplaySlot(idx);
+      }, 10_000);
+      this.emitStatus({ replayArmed: true, replayReadySec: 0 });
+    } catch {
+      this.replayArmed = false;
+      this.emitStatus({ replayArmed: false, replayReadySec: 0 });
+    }
+  }
+
+  public triggerInstantReplay(durationSec: number = 10, speed: number = 0.6): boolean {
+    if (this.isReplaying) return false;
+    if (!this.replayArmed) {
+      this.setReplayArmed(true);
+      return false;
+    }
+
+    // Pick the active slot with the longest continuous history
+    const candidates = [0, 1]
+      .map(i => ({ idx: i as 0 | 1, slot: this.replaySlots[i as 0 | 1] }))
+      .filter(c => c.slot.rec && c.slot.rec.state !== 'inactive' && c.slot.startedAt > 0)
+      .sort((a, b) => a.slot.startedAt - b.slot.startedAt);
+
+    if (candidates.length === 0) return false;
+    const chosen = candidates[0];
+    const rec = chosen.slot.rec!;
+    const chunks = chosen.slot.chunks;
+    const startedAt = chosen.slot.startedAt;
+    const mimeType = chosen.slot.mimeType || 'video/webm';
+
+    // Capture smooth crossfade entry frame
+    if (this.prevFrameCtx) {
+      this.prevFrameCanvas.width = this.canvas.width;
+      this.prevFrameCanvas.height = this.canvas.height;
+      this.prevFrameCtx.drawImage(this.canvas, 0, 0, this.canvas.width, this.canvas.height);
+      this.transitionStartAt = performance.now();
+    }
+
+    const totalSec = Math.max(1.5, (Date.now() - startedAt) / 1000);
+    const clipLen = Math.min(durationSec, totalSec);
+    const startOffset = Math.max(0, totalSec - clipLen);
+
+    rec.onstop = () => {
+      if (chunks.length === 0) {
+        this.stopInstantReplay();
+        return;
+      }
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const vid = document.createElement('video');
+      vid.src = url;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.preload = 'auto';
+
+      this.replayObjectUrl = url;
+      this.replayVideo = vid;
+      this.replayStartSec = startOffset;
+      this.replayEndSec = Math.max(startOffset + 0.8, totalSec - 0.15);
+      this.replaySpeed = speed;
+      this.isReplaying = true;
+      this.emitStatus({ isReplaying: true, replaySpeed: speed, replayProgress: 0 });
+
+      const beginPlay = () => {
+        vid.playbackRate = speed;
+        vid.play().catch(() => this.stopInstantReplay());
+      };
+
+      vid.onloadedmetadata = () => {
+        if (startOffset > 0.25) {
+          vid.onseeked = () => {
+            vid.onseeked = null;
+            beginPlay();
+          };
+          try {
+            vid.currentTime = startOffset;
+          } catch {
+            beginPlay();
+          }
+        } else {
+          beginPlay();
+        }
+      };
+      vid.onended = () => this.stopInstantReplay();
+      vid.onerror = () => this.stopInstantReplay();
+
+      if (this.replaySafetyTimer !== null) {
+        window.clearTimeout(this.replaySafetyTimer);
+      }
+      this.replaySafetyTimer = window.setTimeout(() => {
+        this.stopInstantReplay();
+      }, Math.round((clipLen / Math.max(0.3, speed) + 3.5) * 1000));
+    };
+
+    try {
+      rec.stop();
+    } catch {
+      return false;
+    }
+    chosen.slot.rec = null;
+    chosen.slot.startedAt = 0;
+    return true;
+  }
+
+  public stopInstantReplay() {
+    if (this.replaySafetyTimer !== null) {
+      window.clearTimeout(this.replaySafetyTimer);
+      this.replaySafetyTimer = null;
+    }
+    const wasReplaying = this.isReplaying;
+    if (wasReplaying && this.prevFrameCtx) {
+      this.prevFrameCanvas.width = this.canvas.width;
+      this.prevFrameCanvas.height = this.canvas.height;
+      this.prevFrameCtx.drawImage(this.canvas, 0, 0, this.canvas.width, this.canvas.height);
+      this.transitionStartAt = performance.now();
+    }
+    this.isReplaying = false;
+    if (this.replayVideo) {
+      try {
+        this.replayVideo.pause();
+        this.replayVideo.src = '';
+      } catch {}
+      this.replayVideo = null;
+    }
+    if (this.replayObjectUrl) {
+      try { URL.revokeObjectURL(this.replayObjectUrl); } catch {}
+      this.replayObjectUrl = null;
+    }
+    if (wasReplaying) {
+      this.emitStatus({ isReplaying: false, replayProgress: 0 });
+      // Re-arm fresh replay slot cleanly
+      if (this.replayArmed) {
+        this.startReplaySlot(0);
+      }
+    }
+  }
+
   private drawIntermissionScreen(data: LiveCompositeContext) {
     const ctx = this.ctx;
     const W = 1280;
@@ -1574,9 +2086,53 @@ export class LiveCompositeBroadcaster {
     ctx.fillStyle = '#02040a';
     ctx.fillRect(0, 0, W, H);
 
-    if (directorState.isIntermission) {
+    if (this.isReplaying && this.replayVideo && this.replayVideo.readyState >= 2) {
+      // INSTANT REPLAY FULLSCREEN PLAYBACK
+      ctx.drawImage(this.replayVideo, 0, 0, W, H);
+
+      // Broadcast gold/red vignette frame
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.75)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(2, 2, W - 4, H - 4);
+
+      // Top-left animated REPLAY broadcast pill
+      const pulse = Math.floor(Date.now() / 350) % 2 === 0;
+      const badgeW = this.replaySpeed < 0.95 ? 255 : 195;
+      drawRoundedRect(ctx, 22, 20, badgeW, 38, 6);
+      ctx.fillStyle = 'rgba(10, 14, 22, 0.92)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#EF4444';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(42, 39, 6, 0, Math.PI * 2);
+      ctx.fillStyle = pulse ? '#EF4444' : '#FCA5A5';
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 15px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const speedTag = this.replaySpeed < 0.95 ? `  •  RALENTI ${this.replaySpeed.toFixed(1)}×` : '  •  INSTANT';
+      ctx.fillText(`↺ REPLAY${speedTag}`, 56, 39);
+
+      // Bottom replay progress bar
+      const span = Math.max(0.5, this.replayEndSec - this.replayStartSec);
+      const prog = Math.max(0, Math.min(1, (this.replayVideo.currentTime - this.replayStartSec) / span));
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(0, H - 8, W, 8);
+      ctx.fillStyle = '#D4AF37';
+      ctx.fillRect(0, H - 8, W * prog, 8);
+
+      if (this.replayVideo.ended || this.replayVideo.currentTime >= this.replayEndSec) {
+        this.stopInstantReplay();
+      }
+    } else if (directorState.isIntermission) {
       this.drawIntermissionScreen(data);
       this.drawCustomOverlays(overlayCfg);
+      this.drawSponsorCarousel(data, overlayCfg);
+      this.drawTickerBar(data, overlayCfg);
     } else if ((directorState.broadcastMode === 'single' && directorState.focusedCameraId) || enabledCams.length <= 1) {
       const focusedCandidate = directorState.focusedCameraId
         ? directorState.cameras.find(c => c.id === directorState.focusedCameraId)
@@ -1590,6 +2146,9 @@ export class LiveCompositeBroadcaster {
           this.drawSingleScoreboard(assignment, slot, overlayCfg, currentClub);
         }
         this.drawCustomOverlays(overlayCfg);
+        this.drawShotClockOverlay(data);
+        this.drawSponsorCarousel(data, overlayCfg);
+        this.drawTickerBar(data, overlayCfg);
       }
     } else {
       const headerH = 44;
@@ -1723,8 +2282,11 @@ export class LiveCompositeBroadcaster {
         }
       });
 
-      // Render custom TV logos, sponsors & texts over the mosaic broadcast as well
+      // Render custom TV logos, sponsors, shot clock & scrolling ticker over the mosaic broadcast
       this.drawCustomOverlays(overlayCfg);
+      this.drawShotClockOverlay(data);
+      this.drawSponsorCarousel(data, overlayCfg);
+      this.drawTickerBar(data, overlayCfg);
     }
     ctx.restore();
 
@@ -1771,10 +2333,29 @@ export class LiveCompositeBroadcaster {
       this.recentBytesWindow = this.recentBytesWindow.filter(e => e.at >= cutoff);
       const windowBytes = this.recentBytesWindow.reduce((sum, e) => sum + e.bytes, 0);
       const bitrateKbps = this.status.isStreaming ? Math.round((windowBytes * 8) / 2000) : 0;
+
+      // Compute oldest active replay buffer age in seconds
+      let replayReadySec = 0;
+      if (this.replayArmed) {
+        const nowMs = Date.now();
+        for (const s of this.replaySlots) {
+          if (s.rec && s.rec.state !== 'inactive' && s.startedAt > 0) {
+            replayReadySec = Math.max(replayReadySec, Math.min(10, Math.floor((nowMs - s.startedAt) / 1000)));
+          }
+        }
+      }
+      let replayProgress = 0;
+      if (this.isReplaying && this.replayVideo) {
+        const span = Math.max(0.5, this.replayEndSec - this.replayStartSec);
+        replayProgress = Math.max(0, Math.min(1, (this.replayVideo.currentTime - this.replayStartSec) / span));
+      }
+
       this.emitStatus({
         currentFps: this.frameTimestamps.length,
         audioLevel,
-        bitrateKbps
+        bitrateKbps,
+        replayReadySec,
+        replayProgress
       });
     }
   }
@@ -2204,6 +2785,7 @@ export class LiveCompositeBroadcaster {
   }
 
   public destroy() {
+    this.setReplayArmed(false);
     this.stopLiveStream();
     this.stopLocalRecording();
     this.setCommentatorMicEnabled(false);

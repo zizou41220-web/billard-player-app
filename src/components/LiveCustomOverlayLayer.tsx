@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   LiveOverlayConfig,
   LiveOverlayImageItem,
@@ -26,6 +26,16 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
   previewScale = 1
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [sponsorTick, setSponsorTick] = useState(0);
+  const sponsorLogosLen = config.sponsorCarousel?.logos?.length || 0;
+  const sponsorEnabled = Boolean(config.sponsorCarousel?.enabled && sponsorLogosLen > 0);
+  const sponsorIntervalMs = Math.max(4, config.sponsorCarousel?.intervalSec || 10) * 1000;
+
+  useEffect(() => {
+    if (!sponsorEnabled || sponsorLogosLen <= 1) return;
+    const t = window.setInterval(() => setSponsorTick(v => v + 1), sponsorIntervalMs);
+    return () => window.clearInterval(t);
+  }, [sponsorEnabled, sponsorLogosLen, sponsorIntervalMs]);
   const [draggingState, setDraggingState] = useState<{
     kind: 'move-image' | 'resize-image' | 'move-text' | 'scale-text';
     id: string;
@@ -362,6 +372,112 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
             </div>
           );
         })}
+
+      {/* SPONSOR CAROUSEL PREVIEW / TV OUTPUT */}
+      {sponsorEnabled && config.sponsorCarousel && (() => {
+        const car = config.sponsorCarousel;
+        const activeLogo = car.logos[sponsorTick % car.logos.length];
+        if (!activeLogo) return null;
+        const tickerOffsetPct = config.ticker?.enabled ? 5.5 : 0;
+        const posStyle: React.CSSProperties =
+          car.position === 'top_left'
+            ? { top: '6%', left: '2%' }
+            : car.position === 'bottom_left'
+              ? { bottom: `${3 + tickerOffsetPct}%`, left: '2%' }
+              : car.position === 'bottom_right'
+                ? { bottom: `${3 + tickerOffsetPct}%`, right: '2%' }
+                : { top: '6%', right: '2%' };
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              ...posStyle,
+              width: `${car.widthPct || 13}%`,
+              background: 'rgba(10, 14, 22, 0.9)',
+              border: '1px solid rgba(255,255,255,0.16)',
+              borderTop: '2px solid #D4AF37',
+              borderRadius: '8px',
+              padding: `${4 * previewScale}px ${6 * previewScale}px`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: `${2 * previewScale}px`,
+              pointerEvents: 'none',
+              zIndex: 13
+            }}
+          >
+            {car.showLabel && (
+              <span style={{ fontSize: `${0.52 * previewScale}rem`, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.08em' }}>
+                PARTENAIRE
+              </span>
+            )}
+            <img
+              key={activeLogo.id}
+              src={activeLogo.url}
+              alt={activeLogo.label}
+              style={{
+                width: '100%',
+                aspectRatio: '16 / 9',
+                objectFit: 'contain',
+                display: 'block'
+              }}
+            />
+          </div>
+        );
+      })()}
+
+      {/* BOTTOM TICKER PREVIEW / TV OUTPUT */}
+      {config.ticker?.enabled && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: `${Math.max(16, Math.round(30 * previewScale))}px`,
+            background: config.ticker.bgColor || 'rgba(10, 14, 22, 0.95)',
+            borderTop: '2px solid #D4AF37',
+            display: 'flex',
+            alignItems: 'center',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            zIndex: 15
+          }}
+        >
+          <span
+            style={{
+              background: '#DC2626',
+              color: '#FFFFFF',
+              fontSize: `${Math.max(0.48, 0.72 * previewScale)}rem`,
+              fontWeight: 900,
+              padding: `0 ${Math.max(6, Math.round(10 * previewScale))}px`,
+              height: '100%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              flexShrink: 0
+            }}
+          >
+            INFO LIVE
+          </span>
+          <span
+            style={{
+              color: config.ticker.textColor || '#F8FAFC',
+              fontSize: `${Math.max(0.52, 0.8 * previewScale)}rem`,
+              fontWeight: 700,
+              paddingLeft: `${Math.max(8, Math.round(12 * previewScale))}px`,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            {config.ticker.customMessage?.trim()
+              ? config.ticker.customMessage.trim()
+              : config.ticker.includeTournamentResults
+                ? 'Résultats & matchs du tournoi en direct ◆ ...'
+                : 'Bandeau défilant actif'}
+          </span>
+        </div>
+      )}
     </div>
   );
 };

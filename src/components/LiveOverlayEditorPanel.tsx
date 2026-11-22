@@ -17,10 +17,13 @@ import {
   Check
 } from 'lucide-react';
 import {
+  DEFAULT_SPONSOR_CAROUSEL_CONFIG,
+  DEFAULT_TICKER_CONFIG,
   LiveOverlayConfig,
   LiveOverlayImageItem,
   LiveOverlayProject,
   LiveOverlayTextItem,
+  LiveTickerConfig,
   OVERLAY_COLOR_SWATCHES,
   OVERLAY_FONT_OPTIONS,
   OverlayFontFamily,
@@ -28,6 +31,7 @@ import {
   OverlayImageBg,
   OverlayImageFit,
   OverlayTextTheme,
+  SponsorCarouselConfig,
   getThemeDefaults,
   loadActiveOverlayProjectId,
   loadLiveOverlayConfig,
@@ -80,6 +84,12 @@ const cloneOverlayConfig = (cfg: LiveOverlayConfig): LiveOverlayConfig => ({
   scoreboardScale: cfg.scoreboardScale ?? 1,
   images: (cfg.images || []).map(i => ({ ...i })),
   texts: (cfg.texts || []).map(t => ({ ...t })),
+  ticker: { ...DEFAULT_TICKER_CONFIG, ...(cfg.ticker || {}) },
+  sponsorCarousel: {
+    ...DEFAULT_SPONSOR_CAROUSEL_CONFIG,
+    ...(cfg.sponsorCarousel || {}),
+    logos: (cfg.sponsorCarousel?.logos || []).map(l => ({ ...l }))
+  },
   updatedAt: Date.now()
 });
 
@@ -90,7 +100,13 @@ const serializeConfigForDiff = (cfg: LiveOverlayConfig) =>
     scoreboardY: cfg.scoreboardY ?? 12,
     scoreboardScale: cfg.scoreboardScale ?? 1,
     images: cfg.images || [],
-    texts: cfg.texts || []
+    texts: cfg.texts || [],
+    ticker: { ...DEFAULT_TICKER_CONFIG, ...(cfg.ticker || {}) },
+    sponsorCarousel: {
+      ...DEFAULT_SPONSOR_CAROUSEL_CONFIG,
+      ...(cfg.sponsorCarousel || {}),
+      logos: cfg.sponsorCarousel?.logos || []
+    }
   });
 
 export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
@@ -134,6 +150,22 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
 
   const previewRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const sponsorFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const tickerCfg: LiveTickerConfig = { ...DEFAULT_TICKER_CONFIG, ...(config.ticker || {}) };
+  const sponsorCfg: SponsorCarouselConfig = {
+    ...DEFAULT_SPONSOR_CAROUSEL_CONFIG,
+    ...(config.sponsorCarousel || {}),
+    logos: config.sponsorCarousel?.logos || []
+  };
+
+  const updateTicker = (patch: Partial<LiveTickerConfig>) => {
+    updateConfig({ ...config, ticker: { ...tickerCfg, ...patch } });
+  };
+
+  const updateSponsorCarousel = (patch: Partial<SponsorCarouselConfig>) => {
+    updateConfig({ ...config, sponsorCarousel: { ...sponsorCfg, ...patch } });
+  };
 
   useEffect(() => {
     setConfig(loadLiveOverlayConfig(clubId, channelId));
@@ -1617,6 +1649,271 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
             })}
           </div>
         )}
+      </div>
+
+      {/* 4. BANDEAU DÉFILANT (TICKER TV) & CARROUSEL SPONSORS AUTOMATIQUE */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.9rem' }}>
+        {/* 4A. TICKER DÉFILANT EN BAS D'ÉCRAN */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: `1px solid ${tickerCfg.enabled ? 'rgba(239, 68, 68, 0.48)' : 'rgba(255, 255, 255, 0.12)'}`,
+          borderRadius: '12px',
+          padding: '0.9rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.6rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+            <span style={{ fontWeight: 800, fontSize: '0.86rem', color: '#FCA5A5' }}>
+              📺 Bandeau Défilant (Ticker bas d'écran)
+            </span>
+            <button
+              type="button"
+              onClick={() => updateTicker({ enabled: !tickerCfg.enabled })}
+              style={{
+                padding: '3px 10px',
+                borderRadius: '999px',
+                fontSize: '0.7rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: `1px solid ${tickerCfg.enabled ? '#EF4444' : 'rgba(255,255,255,0.2)'}`,
+                background: tickerCfg.enabled ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
+                color: tickerCfg.enabled ? '#FCA5A5' : '#94A3B8'
+              }}
+            >
+              {tickerCfg.enabled ? '● ACTIF' : 'INACTIF'}
+            </button>
+          </div>
+
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Message défilant (ex: Finale à 21h • Buvette ouverte • Merci à nos partenaires)"
+            value={tickerCfg.customMessage}
+            onChange={(e) => updateTicker({ customMessage: e.target.value })}
+            style={{ fontSize: '0.78rem', padding: '0.45rem 0.65rem' }}
+          />
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.74rem', color: '#E2E8F0', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={tickerCfg.includeTournamentResults}
+              onChange={(e) => updateTicker({ includeTournamentResults: e.target.checked })}
+            />
+            Ajouter automatiquement les scores en cours, résultats et prochains matchs
+          </label>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Vitesse :</span>
+            {([
+              { v: 1 as const, label: 'Lent' },
+              { v: 2 as const, label: 'Normal' },
+              { v: 3 as const, label: 'Rapide' }
+            ]).map(s => (
+              <button
+                key={s.v}
+                type="button"
+                onClick={() => updateTicker({ speed: s.v })}
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: `1px solid ${tickerCfg.speed === s.v ? '#D4AF37' : 'rgba(255,255,255,0.16)'}`,
+                  background: tickerCfg.speed === s.v ? 'rgba(212,175,55,0.22)' : 'transparent',
+                  color: tickerCfg.speed === s.v ? '#FDE68A' : '#CBD5E1'
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+              Fond
+              <input
+                type="color"
+                value={tickerCfg.bgColor || '#0A0E16'}
+                onChange={(e) => updateTicker({ bgColor: e.target.value })}
+                style={{ width: '22px', height: '20px', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+              />
+            </label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+              Texte
+              <input
+                type="color"
+                value={tickerCfg.textColor || '#F8FAFC'}
+                onChange={(e) => updateTicker({ textColor: e.target.value })}
+                style={{ width: '22px', height: '20px', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* 4B. CARROUSEL SPONSORS AUTOMATIQUE */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: `1px solid ${sponsorCfg.enabled ? 'rgba(212, 175, 55, 0.5)' : 'rgba(255, 255, 255, 0.12)'}`,
+          borderRadius: '12px',
+          padding: '0.9rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.6rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+            <span style={{ fontWeight: 800, fontSize: '0.86rem', color: '#FDE68A' }}>
+              🏷️ Carrousel Sponsors Auto ({sponsorCfg.logos.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => updateSponsorCarousel({ enabled: !sponsorCfg.enabled })}
+              style={{
+                padding: '3px 10px',
+                borderRadius: '999px',
+                fontSize: '0.7rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: `1px solid ${sponsorCfg.enabled ? '#D4AF37' : 'rgba(255,255,255,0.2)'}`,
+                background: sponsorCfg.enabled ? 'rgba(212, 175, 55, 0.22)' : 'rgba(255,255,255,0.05)',
+                color: sponsorCfg.enabled ? '#FDE68A' : '#94A3B8'
+              }}
+            >
+              {sponsorCfg.enabled ? '● ACTIF' : 'INACTIF'}
+            </button>
+          </div>
+
+          <input
+            ref={sponsorFileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              if (files.length === 0) return;
+              const pending: { id: string; url: string; label: string }[] = [];
+              let remaining = files.length;
+              files.forEach((f) => {
+                readOverlayImageFile(f, (dataUrl) => {
+                  pending.push({
+                    id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    url: dataUrl,
+                    label: f.name.replace(/\.[^.]+$/, '')
+                  });
+                  remaining -= 1;
+                  if (remaining === 0) {
+                    updateSponsorCarousel({
+                      enabled: true,
+                      logos: [...sponsorCfg.logos, ...pending]
+                    });
+                  }
+                });
+              });
+              e.target.value = '';
+            }}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => sponsorFileInputRef.current?.click()}
+              style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', borderColor: 'rgba(212,175,55,0.55)', color: '#FDE68A', fontWeight: 700 }}
+            >
+              <Plus size={13} /> Ajouter logos partenaires
+            </button>
+
+            <select
+              className="input-field"
+              value={sponsorCfg.position}
+              onChange={(e) => updateSponsorCarousel({ position: e.target.value as SponsorCarouselConfig['position'] })}
+              style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 6px', background: '#041815', color: '#fff' }}
+            >
+              <option value="top_right">Haut-Droite</option>
+              <option value="top_left">Haut-Gauche</option>
+              <option value="bottom_right">Bas-Droite</option>
+              <option value="bottom_left">Bas-Gauche</option>
+            </select>
+
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#CBD5E1', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={sponsorCfg.showLabel}
+                onChange={(e) => updateSponsorCarousel({ showLabel: e.target.checked })}
+              />
+              « PARTENAIRE »
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div>
+              <span style={{ display: 'block', fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                Rotation toutes les {sponsorCfg.intervalSec}s
+              </span>
+              <input
+                type="range"
+                min={5}
+                max={30}
+                step={1}
+                value={sponsorCfg.intervalSec}
+                onChange={(e) => updateSponsorCarousel({ intervalSec: parseInt(e.target.value, 10) })}
+                style={{ width: '100%', accentColor: '#D4AF37' }}
+              />
+            </div>
+            <div>
+              <span style={{ display: 'block', fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                Taille ({sponsorCfg.widthPct}%)
+              </span>
+              <input
+                type="range"
+                min={8}
+                max={24}
+                step={1}
+                value={sponsorCfg.widthPct}
+                onChange={(e) => updateSponsorCarousel({ widthPct: parseInt(e.target.value, 10) })}
+                style={{ width: '100%', accentColor: '#D4AF37' }}
+              />
+            </div>
+          </div>
+
+          {sponsorCfg.logos.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {sponsorCfg.logos.map(l => (
+                <div
+                  key={l.id}
+                  style={{
+                    position: 'relative',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.16)',
+                    borderRadius: '7px',
+                    padding: '4px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <img src={l.url} alt={l.label} style={{ width: '40px', height: '24px', objectFit: 'contain' }} />
+                  <button
+                    type="button"
+                    onClick={() => updateSponsorCarousel({ logos: sponsorCfg.logos.filter(x => x.id !== l.id) })}
+                    title="Retirer ce sponsor"
+                    style={{
+                      background: 'rgba(239,68,68,0.22)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: '#FCA5A5',
+                      cursor: 'pointer',
+                      padding: '2px 4px',
+                      fontSize: '0.66rem',
+                      fontWeight: 800
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

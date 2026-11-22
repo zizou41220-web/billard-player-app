@@ -99,6 +99,30 @@ export interface LiveOverlayProject {
   updatedAt: number;
 }
 
+export interface LiveTickerConfig {
+  enabled: boolean;
+  customMessage: string;
+  includeTournamentResults: boolean;
+  speed: 1 | 2 | 3; // 1 = lent, 2 = normal, 3 = rapide
+  bgColor?: string;
+  textColor?: string;
+}
+
+export interface SponsorCarouselLogo {
+  id: string;
+  url: string;
+  label: string;
+}
+
+export interface SponsorCarouselConfig {
+  enabled: boolean;
+  position: 'top_right' | 'top_left' | 'bottom_right' | 'bottom_left';
+  intervalSec: number; // 5..30
+  widthPct: number; // 8..24
+  showLabel: boolean;
+  logos: SponsorCarouselLogo[];
+}
+
 export interface LiveOverlayConfig {
   scoreboardCustomPos?: boolean;
   scoreboardX?: number; // 0..100 (% from left)
@@ -106,8 +130,28 @@ export interface LiveOverlayConfig {
   scoreboardScale?: number; // 0.6..1.5
   images: LiveOverlayImageItem[];
   texts: LiveOverlayTextItem[];
+  ticker?: LiveTickerConfig;
+  sponsorCarousel?: SponsorCarouselConfig;
   updatedAt: number;
 }
+
+export const DEFAULT_TICKER_CONFIG: LiveTickerConfig = {
+  enabled: false,
+  customMessage: '',
+  includeTournamentResults: true,
+  speed: 2,
+  bgColor: '#0A0E16',
+  textColor: '#F8FAFC'
+};
+
+export const DEFAULT_SPONSOR_CAROUSEL_CONFIG: SponsorCarouselConfig = {
+  enabled: false,
+  position: 'top_right',
+  intervalSec: 10,
+  widthPct: 13,
+  showLabel: true,
+  logos: []
+};
 
 export const DEFAULT_LIVE_OVERLAY_CONFIG: LiveOverlayConfig = {
   scoreboardCustomPos: false,
@@ -116,6 +160,8 @@ export const DEFAULT_LIVE_OVERLAY_CONFIG: LiveOverlayConfig = {
   scoreboardScale: 1,
   images: [],
   texts: [],
+  ticker: DEFAULT_TICKER_CONFIG,
+  sponsorCarousel: DEFAULT_SPONSOR_CAROUSEL_CONFIG,
   updatedAt: 0
 };
 
@@ -142,7 +188,13 @@ export const loadLiveOverlayConfig = (clubId: string, channelId: string = 'live'
       ...DEFAULT_LIVE_OVERLAY_CONFIG,
       ...parsed,
       images: Array.isArray(parsed.images) ? parsed.images : [],
-      texts: Array.isArray(parsed.texts) ? parsed.texts : []
+      texts: Array.isArray(parsed.texts) ? parsed.texts : [],
+      ticker: { ...DEFAULT_TICKER_CONFIG, ...(parsed.ticker || {}) },
+      sponsorCarousel: {
+        ...DEFAULT_SPONSOR_CAROUSEL_CONFIG,
+        ...(parsed.sponsorCarousel || {}),
+        logos: Array.isArray(parsed.sponsorCarousel?.logos) ? parsed.sponsorCarousel.logos : []
+      }
     };
   } catch {
     return DEFAULT_LIVE_OVERLAY_CONFIG;

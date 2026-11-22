@@ -94,6 +94,34 @@ export interface StreamDestinationsConfig {
   qualityPreset?: StreamQualityPreset;
 }
 
+export interface ShotClockState {
+  enabled: boolean;
+  durationSec: number; // 30 | 45 | 60
+  extensionSec: number; // default 30
+  running: boolean;
+  remainingMs: number;
+  startedAt: number | null;
+  extensionUsed: boolean;
+  soundEnabled: boolean;
+}
+
+export const DEFAULT_SHOT_CLOCK: ShotClockState = {
+  enabled: false,
+  durationSec: 45,
+  extensionSec: 30,
+  running: false,
+  remainingMs: 45_000,
+  startedAt: null,
+  extensionUsed: false,
+  soundEnabled: true
+};
+
+export function getShotClockRemainingMs(sc?: ShotClockState | null, now: number = Date.now()): number {
+  if (!sc) return DEFAULT_SHOT_CLOCK.remainingMs;
+  if (!sc.running || !sc.startedAt) return Math.max(0, sc.remainingMs);
+  return Math.max(0, sc.remainingMs - Math.max(0, now - sc.startedAt));
+}
+
 export interface MultiCamDirectorState {
   situation: DirectorLiveSituation;
   regionalMatch: RegionalMatchConfig;
@@ -105,6 +133,7 @@ export interface MultiCamDirectorState {
   isIntermission?: boolean;
   intermissionTitle?: string;
   intermissionSubtitle?: string;
+  shotClock?: ShotClockState;
   isLiveStreaming: boolean;
   liveStartedAt: number | null;
   updatedAt: number;
@@ -218,6 +247,7 @@ export const DEFAULT_DIRECTOR_STATE: MultiCamDirectorState = {
   isIntermission: false,
   intermissionTitle: 'PAUSE — REPRISE DANS QUELQUES INSTANTS',
   intermissionSubtitle: '',
+  shotClock: DEFAULT_SHOT_CLOCK,
   isLiveStreaming: false,
   liveStartedAt: null,
   updatedAt: 0
@@ -274,6 +304,10 @@ export const loadDirectorState = (clubId: string): MultiCamDirectorState => {
       regionalMatch: {
         ...DEFAULT_REGIONAL_MATCH,
         ...(parsed.regionalMatch || {})
+      },
+      shotClock: {
+        ...DEFAULT_SHOT_CLOCK,
+        ...(parsed.shotClock || {})
       },
       cameras: Array.isArray(parsed.cameras) && parsed.cameras.length > 0
         ? parsed.cameras.map((c: DirectorCameraSlot) =>
