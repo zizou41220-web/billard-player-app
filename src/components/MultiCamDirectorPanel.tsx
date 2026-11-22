@@ -201,13 +201,22 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
     const canvas = virtualCanvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    drawVirtualScreenToCanvas(ctx, 0, 0, canvas.width, canvas.height, slot, {
-      tables,
-      matches,
-      players,
-      tournaments,
-      currentClub
-    });
+    drawVirtualScreenToCanvas(
+      ctx,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+      slot,
+      {
+        tables,
+        matches,
+        players,
+        tournaments,
+        currentClub
+      },
+      { hideTopHeader: true, bottomReservePx: 26 }
+    );
   }, [isVirtual, slot, tables, matches, players, tournaments, currentClub]);
 
   const assignment = resolveCameraAssignment(
@@ -381,84 +390,10 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           </div>
         )}
 
-        {/* Top Overlay: Tally + Assignment + Audio (hidden on virtual screens so their top broadcast header stays unobstructed) */}
-        {!isVirtual && (
-          <div style={{
-            position: 'absolute',
-            top: '6px',
-            left: '6px',
-            right: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '0.3rem',
-            pointerEvents: 'none'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
-              <span style={{
-                background: isFocused
-                  ? 'rgba(239, 68, 68, 0.92)'
-                  : isInMosaic
-                    ? 'rgba(10, 14, 22, 0.88)'
-                    : 'rgba(10, 14, 22, 0.78)',
-                border: isFocused
-                  ? '1px solid #ef4444'
-                  : isInMosaic
-                    ? '1px solid rgba(212, 175, 55, 0.65)'
-                    : '1px solid rgba(255,255,255,0.14)',
-                color: isFocused ? '#fff' : isInMosaic ? '#FDE68A' : 'rgba(255,255,255,0.6)',
-                padding: '2px 7px',
-                borderRadius: '4px',
-                fontSize: '0.6rem',
-                fontWeight: 800,
-                letterSpacing: '0.4px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <span style={{
-                  width: '5px',
-                  height: '5px',
-                  borderRadius: '50%',
-                  background: isFocused ? '#fff' : isInMosaic ? '#D4AF37' : '#64748B'
-                }} />
-                {isFocused ? 'PGM' : isInMosaic ? 'MOSAÏQUE' : 'VEILLE'}
-              </span>
-              <span style={{
-                background: 'rgba(10, 14, 22, 0.86)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                color: '#E2E8F0',
-                padding: '2px 7px',
-                borderRadius: '4px',
-                fontSize: '0.62rem',
-                fontWeight: 700
-              }}>
-                {isExternalLive ? slot.name : assignment.title}
-              </span>
-            </div>
-
-            <span style={{
-              background: isAudioSelected ? 'rgba(16, 185, 129, 0.22)' : 'rgba(10, 14, 22, 0.78)',
-              border: `1px solid ${isAudioSelected ? 'rgba(16, 185, 129, 0.65)' : 'rgba(255,255,255,0.12)'}`,
-              color: isAudioSelected ? '#6EE7B7' : 'rgba(255,255,255,0.55)',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '0.6rem',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '3px'
-            }}>
-              {isAudioSelected ? <Volume2 size={10} /> : <VolumeX size={10} />}
-              {isAudioSelected ? 'AUDIO' : 'MUET'}
-            </span>
-          </div>
-        )}
-
-        {/* Bottom Overlay */}
+        {/* Top Overlay: Tally + Assignment + Audio (uniform across both cameras and virtual screens) */}
         <div style={{
           position: 'absolute',
-          bottom: '6px',
+          top: '6px',
           left: '6px',
           right: '6px',
           display: 'flex',
@@ -467,7 +402,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           gap: '0.3rem',
           pointerEvents: 'none'
         }}>
-          {isVirtual ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
             <span style={{
               background: isFocused
                 ? 'rgba(239, 68, 68, 0.92)'
@@ -497,47 +432,89 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               }} />
               {isFocused ? 'PGM' : isInMosaic ? 'MOSAÏQUE' : 'VEILLE'}
             </span>
-          ) : (
-            <div style={{
-              background: 'rgba(5, 10, 22, 0.86)',
-              border: '1px solid rgba(255,255,255,0.14)',
-              borderRadius: '4px',
+            <span style={{
+              background: 'rgba(10, 14, 22, 0.86)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              color: isVirtual ? '#6EE7B7' : '#E2E8F0',
               padding: '2px 7px',
-              fontSize: '0.64rem',
-              fontWeight: 700,
-              color: '#E2E8F0',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              maxWidth: '70%'
+              borderRadius: '4px',
+              fontSize: '0.62rem',
+              fontWeight: 700
             }}>
-              {assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  {!isExternalLive && assignment.p1 && (
-                    <img
-                      src={getPlayerAvatar(assignment.p1)}
-                      alt=""
-                      style={{ width: '17px', height: '17px', borderRadius: '4px', objectFit: 'cover', objectPosition: 'center 22%', border: '1px solid #10B981', flexShrink: 0 }}
-                    />
-                  )}
-                  <span>{assignment.p1Name}</span>
-                  <span style={{ color: '#FBBF24', margin: '0 2px', fontWeight: 900 }}>
-                    {assignment.score1}-{assignment.score2}
-                  </span>
-                  <span>{assignment.p2Name}</span>
-                  {!isExternalLive && assignment.p2 && (
-                    <img
-                      src={getPlayerAvatar(assignment.p2)}
-                      alt=""
-                      style={{ width: '17px', height: '17px', borderRadius: '4px', objectFit: 'cover', objectPosition: 'center 22%', border: '1px solid #38BDF8', flexShrink: 0 }}
-                    />
-                  )}
-                </span>
-              ) : (
-                <span>{isExternalLive ? slot.name : assignment.subtitle}</span>
-              )}
-            </div>
+              {isExternalLive ? slot.name : assignment.title}
+            </span>
+          </div>
+
+          {!isVirtual && (
+            <span style={{
+              background: isAudioSelected ? 'rgba(16, 185, 129, 0.22)' : 'rgba(10, 14, 22, 0.78)',
+              border: `1px solid ${isAudioSelected ? 'rgba(16, 185, 129, 0.65)' : 'rgba(255,255,255,0.12)'}`,
+              color: isAudioSelected ? '#6EE7B7' : 'rgba(255,255,255,0.55)',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px'
+            }}>
+              {isAudioSelected ? <Volume2 size={10} /> : <VolumeX size={10} />}
+              {isAudioSelected ? 'AUDIO' : 'MUET'}
+            </span>
           )}
+        </div>
+
+        {/* Bottom Overlay (uniform across both cameras and virtual screens) */}
+        <div style={{
+          position: 'absolute',
+          bottom: '6px',
+          left: '6px',
+          right: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.3rem',
+          pointerEvents: 'none'
+        }}>
+          <div style={{
+            background: 'rgba(5, 10, 22, 0.86)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: '4px',
+            padding: '2px 7px',
+            fontSize: '0.64rem',
+            fontWeight: 700,
+            color: '#E2E8F0',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: '70%'
+          }}>
+            {!isVirtual && assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                {!isExternalLive && assignment.p1 && (
+                  <img
+                    src={getPlayerAvatar(assignment.p1)}
+                    alt=""
+                    style={{ width: '17px', height: '17px', borderRadius: '4px', objectFit: 'cover', objectPosition: 'center 22%', border: '1px solid #10B981', flexShrink: 0 }}
+                  />
+                )}
+                <span>{assignment.p1Name}</span>
+                <span style={{ color: '#FBBF24', margin: '0 2px', fontWeight: 900 }}>
+                  {assignment.score1}-{assignment.score2}
+                </span>
+                <span>{assignment.p2Name}</span>
+                {!isExternalLive && assignment.p2 && (
+                  <img
+                    src={getPlayerAvatar(assignment.p2)}
+                    alt=""
+                    style={{ width: '17px', height: '17px', borderRadius: '4px', objectFit: 'cover', objectPosition: 'center 22%', border: '1px solid #38BDF8', flexShrink: 0 }}
+                  />
+                )}
+              </span>
+            ) : (
+              <span>{isExternalLive ? slot.name : assignment.subtitle}</span>
+            )}
+          </div>
 
           <span style={{
             background: isFocused ? 'rgba(239,68,68,0.92)' : 'rgba(10,14,22,0.82)',

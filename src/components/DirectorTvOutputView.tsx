@@ -37,7 +37,11 @@ interface DirectorOutputTileProps {
   onClickTile?: () => void;
 }
 
-const VirtualScreenCanvas: React.FC<{ slot: DirectorCameraSlot }> = ({ slot }) => {
+const VirtualScreenCanvas: React.FC<{
+  slot: DirectorCameraSlot;
+  hideTopHeader?: boolean;
+  bottomReservePx?: number;
+}> = ({ slot, hideTopHeader = false, bottomReservePx = 0 }) => {
   const { tables, matches, players, tournaments, currentClub } = useStore();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -46,14 +50,23 @@ const VirtualScreenCanvas: React.FC<{ slot: DirectorCameraSlot }> = ({ slot }) =
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    drawVirtualScreenToCanvas(ctx, 0, 0, canvas.width, canvas.height, slot, {
-      tables,
-      matches,
-      players,
-      tournaments,
-      currentClub
-    });
-  }, [slot, tables, matches, players, tournaments, currentClub]);
+    drawVirtualScreenToCanvas(
+      ctx,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+      slot,
+      {
+        tables,
+        matches,
+        players,
+        tournaments,
+        currentClub
+      },
+      { hideTopHeader, bottomReservePx }
+    );
+  }, [slot, tables, matches, players, tournaments, currentClub, hideTopHeader, bottomReservePx]);
 
   return (
     <canvas
@@ -75,7 +88,8 @@ const DirectorVideoElement: React.FC<{
   slot: DirectorCameraSlot;
   stream: MediaStream | null;
   unmuteAudio: boolean;
-}> = ({ slot, stream, unmuteAudio }) => {
+  hideVirtualTopHeader?: boolean;
+}> = ({ slot, stream, unmuteAudio, hideVirtualTopHeader = false }) => {
   const { currentClub } = useStore();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -117,7 +131,13 @@ const DirectorVideoElement: React.FC<{
   }, [unmuteAudio, slot.sourceType]);
 
   if (isVirtual) {
-    return <VirtualScreenCanvas slot={slot} />;
+    return (
+      <VirtualScreenCanvas
+        slot={slot}
+        hideTopHeader={hideVirtualTopHeader}
+        bottomReservePx={hideVirtualTopHeader ? 90 : 0}
+      />
+    );
   }
 
   if (slot.sourceType === 'vdo') {
@@ -232,13 +252,18 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
       }}
       title={isFocusedFullscreen ? undefined : 'Cliquer pour diffuser cette fenêtre en plein écran'}
     >
-      <DirectorVideoElement slot={slot} stream={stream} unmuteAudio={isAudioActive} />
+      <DirectorVideoElement
+        slot={slot}
+        stream={stream}
+        unmuteAudio={isAudioActive}
+        hideVirtualTopHeader={!isFocusedFullscreen}
+      />
 
       {isFocusedFullscreen && overlayConfig && (
         <LiveCustomOverlayLayer config={overlayConfig} interactive={false} previewScale={1} />
       )}
 
-      {!isVirtual ? (
+      {(!isVirtual || !isFocusedFullscreen) ? (
         <div style={{
           position: 'relative',
           zIndex: 15,
@@ -262,8 +287,10 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#EF4444' }} />
                 LIVE
               </span>
-              <span style={{ color: '#D4AF37', fontWeight: 800 }}>{assignment.title}</span>
-              {assignment.match && (
+              <span style={{ color: '#D4AF37', fontWeight: 800 }}>
+                {isVirtual ? (activeTournament ? `Écran Live • ${activeTournament.name}` : 'Écran Live') : assignment.title}
+              </span>
+              {!isVirtual && assignment.match && (
                 <MatchTimerBadge
                   startTime={assignment.match.startTime}
                   durationMinutes={assignment.match.durationMinutes ?? resolveMatchDurationMinutes(assignment.match, activeTournament)}
@@ -276,10 +303,10 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
-              color: isFocusedFullscreen ? 'rgba(255,255,255,0.65)' : (isAudioActive ? '#D4AF37' : 'rgba(255,255,255,0.5)'),
+              color: isFocusedFullscreen ? 'rgba(255,255,255,0.65)' : (isVirtual ? '#D4AF37' : (isAudioActive ? '#D4AF37' : 'rgba(255,255,255,0.5)')),
               fontSize: isFocusedFullscreen ? '0.7rem' : '0.62rem'
             }}>
-              {isFocusedFullscreen ? (
+              {isFocusedFullscreen || isVirtual ? (
                 assignment.rulesLabel || currentClub.name
               ) : (
                 <>
@@ -290,7 +317,11 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
             </span>
           </div>
 
-          {hasMatchBanner ? (() => {
+          {isVirtual ? (
+            <div style={{ fontSize: '0.82rem', color: '#F8FAFC', fontWeight: 800, textAlign: 'center', letterSpacing: '0.4px' }}>
+              {assignment.title.replace(/^[^\p{L}\p{N}]+/u, '').toUpperCase()}
+            </div>
+          ) : hasMatchBanner ? (() => {
             const showGamerAvatars =
               directorState.situation === 'club_tables' &&
               (directorState.mosaicHeader?.showPlayerAvatars !== false) &&

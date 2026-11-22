@@ -540,6 +540,10 @@ export function drawVirtualScreenToCanvas(
     players: Record<string, Player>;
     tournaments: Record<string, Tournament>;
     currentClub: Club;
+  },
+  opts?: {
+    hideTopHeader?: boolean;
+    bottomReservePx?: number;
   }
 ) {
   const { tables, matches, players, tournaments, currentClub } = data;
@@ -568,60 +572,72 @@ export function drawVirtualScreenToCanvas(
   ctx.fillStyle = grad;
   ctx.fillRect(x, y, w, h);
 
-  // Uniform scale preserves exact 16:9 typography proportions inside tall side-by-side or wide stacked mosaic cells
-  const scale = Math.min(w / 1280, h / 720);
-  const drawW = 1280 * scale;
-  const contentX = x + (w - drawW) / 2;
-  const headerScaledH = 74 * scale;
+  const hideTopHeader = Boolean(opts?.hideTopHeader);
+  const bottomReserve = Math.max(0, opts?.bottomReservePx || 0);
 
-  // Full-width top header bar pinned cleanly to top of cell
-  ctx.fillStyle = '#0A0E16';
-  ctx.fillRect(x, y, w, headerScaledH);
-  ctx.fillStyle = '#D4AF37';
-  const goldLineH = Math.max(1.5, 2 * scale);
-  ctx.fillRect(x, y + headerScaledH - goldLineH, w, goldLineH);
+  if (hideTopHeader) {
+    // Mosaic / Thumbnail mode: no duplicate top bar — body scales uniformly above the unified bottom broadcast bar
+    const usableH = Math.max(60, h - bottomReserve);
+    const scale = Math.min(w / 1280, usableH / 646);
+    const drawW = 1280 * scale;
+    const contentX = x + (w - drawW) / 2;
+    const bodyScaledH = 646 * scale;
+    const bodyOffsetY = y + Math.max(0, (usableH - bodyScaledH) / 2) - 74 * scale;
+    ctx.translate(contentX, bodyOffsetY);
+    ctx.scale(scale, scale);
+  } else {
+    // Fullscreen mode: full-width top broadcast header + uniformly scaled body
+    const scale = Math.min(w / 1280, h / 720);
+    const drawW = 1280 * scale;
+    const contentX = x + (w - drawW) / 2;
+    const headerScaledH = 74 * scale;
 
-  // Header contents in crisp uniform 1280x720 coordinates
-  ctx.save();
-  ctx.translate(contentX, y);
-  ctx.scale(scale, scale);
+    ctx.fillStyle = '#0A0E16';
+    ctx.fillRect(x, y, w, headerScaledH);
+    ctx.fillStyle = '#D4AF37';
+    const goldLineH = Math.max(1.5, 2 * scale);
+    ctx.fillRect(x, y + headerScaledH - goldLineH, w, goldLineH);
 
-  ctx.beginPath();
-  ctx.arc(42, 37, 6, 0, Math.PI * 2);
-  ctx.fillStyle = '#EF4444';
-  ctx.fill();
-  ctx.fillStyle = '#F8FAFC';
-  ctx.font = '800 13px Inter, system-ui, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('LIVE', 56, 37);
+    ctx.save();
+    ctx.translate(contentX, y);
+    ctx.scale(scale, scale);
 
-  const headerTitle =
-    slot.sourceType === 'tournament_standings'
-      ? `CLASSEMENT DU TOURNOI${targetTour ? ` — ${targetTour.name}` : ''}`
-      : slot.sourceType === 'tournament_bracket'
-        ? `TABLEAU DES PHASES FINALES${targetTour ? ` — ${targetTour.name}` : ''}`
-        : slot.sourceType === 'matches_live_board'
-          ? `SCORES EN DIRECT — ${currentClub.name}`
-          : `CLASSEMENT GÉNÉRAL — ${currentClub.name}`;
+    ctx.beginPath();
+    ctx.arc(42, 37, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#EF4444';
+    ctx.fill();
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = '800 13px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('LIVE', 56, 37);
 
-  ctx.fillStyle = '#F8FAFC';
-  ctx.font = '800 24px Inter, system-ui, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText(headerTitle.toUpperCase().slice(0, 56), 110, 37);
+    const headerTitle =
+      slot.sourceType === 'tournament_standings'
+        ? `CLASSEMENT DU TOURNOI${targetTour ? ` — ${targetTour.name}` : ''}`
+        : slot.sourceType === 'tournament_bracket'
+          ? `TABLEAU DES PHASES FINALES${targetTour ? ` — ${targetTour.name}` : ''}`
+          : slot.sourceType === 'matches_live_board'
+            ? `SCORES EN DIRECT — ${currentClub.name}`
+            : `CLASSEMENT GÉNÉRAL — ${currentClub.name}`;
 
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.font = '600 15px Inter, system-ui, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(currentClub.name.toUpperCase(), 1250, 37);
-  ctx.restore();
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = '800 24px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(headerTitle.toUpperCase().slice(0, 56), 110, 37);
 
-  // Body contents (virtual y = 74..720) uniformly scaled and vertically centered in remaining cell height
-  const bodyAvailH = Math.max(0, h - headerScaledH);
-  const bodyScaledH = 646 * scale;
-  const bodyOffsetY = y + headerScaledH + Math.max(0, (bodyAvailH - bodyScaledH) / 2) - 74 * scale;
-  ctx.translate(contentX, bodyOffsetY);
-  ctx.scale(scale, scale);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '600 15px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(currentClub.name.toUpperCase(), 1250, 37);
+    ctx.restore();
+
+    const bodyAvailH = Math.max(0, h - headerScaledH - bottomReserve);
+    const bodyScaledH = 646 * scale;
+    const bodyOffsetY = y + headerScaledH + Math.max(0, (bodyAvailH - bodyScaledH) / 2) - 74 * scale;
+    ctx.translate(contentX, bodyOffsetY);
+    ctx.scale(scale, scale);
+  }
 
   if (slot.sourceType === 'tournament_standings') {
     if (!targetTour) {
@@ -1435,16 +1451,26 @@ export class LiveCompositeBroadcaster {
     w: number,
     h: number,
     slot: DirectorCameraSlot,
-    data: LiveCompositeContext
+    data: LiveCompositeContext,
+    virtualOpts?: { hideTopHeader?: boolean; bottomReservePx?: number }
   ) {
     if (isVirtualScreenSource(slot.sourceType)) {
-      drawVirtualScreenToCanvas(this.ctx, x, y, w, h, slot, {
-        tables: data.tables,
-        matches: data.matches,
-        players: data.players,
-        tournaments: data.tournaments,
-        currentClub: data.currentClub
-      });
+      drawVirtualScreenToCanvas(
+        this.ctx,
+        x,
+        y,
+        w,
+        h,
+        slot,
+        {
+          tables: data.tables,
+          matches: data.matches,
+          players: data.players,
+          tournaments: data.tournaments,
+          currentClub: data.currentClub
+        },
+        virtualOpts
+      );
       return;
     }
 
@@ -2896,20 +2922,38 @@ export class LiveCompositeBroadcaster {
         ? enabledCams
         : directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType)).slice(0, 1);
       const rects = getMosaicGridRects(list.length, directorState.mosaicLayout, W, H, headerH);
+      // Unified bottom bar height across EVERY tile in the mosaic (cameras AND virtual screens aligned pixel-for-pixel)
+      const uniformBarH = (isClubSituation && mh.showPlayerAvatars !== false) ? 50 : 46;
+      const activeMosaicTour = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
 
       list.forEach((slot, idx) => {
         const rect = rects[idx];
         if (!rect) return;
         const { x: cx, y: cy, w: cellW, h: cellH } = rect;
+        const isVirtualTile = isVirtualScreenSource(slot.sourceType);
 
-        this.drawVideoInRect(videoElements[slot.id], cx, cy, cellW, cellH, slot, data);
+        this.drawVideoInRect(
+          videoElements[slot.id],
+          cx,
+          cy,
+          cellW,
+          cellH,
+          slot,
+          data,
+          isVirtualTile ? { hideTopHeader: true, bottomReservePx: uniformBarH + 14 } : undefined
+        );
 
-        const isAudioActive = directorState.activeAudioCameraId === slot.id && !slot.forceMuted && !isVirtualScreenSource(slot.sourceType);
+        const isAudioActive = directorState.activeAudioCameraId === slot.id && !slot.forceMuted && !isVirtualTile;
         ctx.strokeStyle = isAudioActive ? '#D4AF37' : 'rgba(255,255,255,0.16)';
         ctx.lineWidth = isAudioActive ? 2 : 1;
         ctx.strokeRect(cx, cy, cellW, cellH);
 
-        if (!isVirtualScreenSource(slot.sourceType)) {
+        const barH = uniformBarH;
+        const barX = cx + 8;
+        const barY = cy + cellH - barH - 8;
+        const barW = cellW - 16;
+
+        if (!isVirtualTile) {
           const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub }, directorState);
           const hasMatchScore =
             assignment.isMatchView &&
@@ -2923,10 +2967,6 @@ export class LiveCompositeBroadcaster {
             hasMatchScore &&
             Boolean(assignment.p1 || assignment.p2);
 
-          const barH = showTilePortraits ? 50 : 44;
-          const barX = cx + 8;
-          const barY = cy + cellH - barH - 8;
-          const barW = cellW - 16;
           const portraitSize = showTilePortraits ? (cellW >= 540 ? 54 : 44) : 0;
           const sidePad = showTilePortraits ? portraitSize + 10 : 10;
 
@@ -2969,7 +3009,7 @@ export class LiveCompositeBroadcaster {
             const s1 = assignment.score1!;
             const s2 = assignment.score2!;
             const midX = barX + barW / 2;
-            const rowY = barY + (showTilePortraits ? 32 : 31);
+            const rowY = barY + 32;
             const sbW = 24;
             const sbH = 20;
             const gapC = 14;
@@ -3045,8 +3085,47 @@ export class LiveCompositeBroadcaster {
             ctx.fillStyle = '#CBD5E1';
             ctx.font = '600 11px Inter, system-ui, sans-serif';
             ctx.textAlign = 'left';
-            ctx.fillText(this.fitCanvasText(ctx, assignment.subtitle, Math.max(80, barW - 20)), barX + 10, barY + 31);
+            ctx.fillText(this.fitCanvasText(ctx, assignment.subtitle, Math.max(80, barW - 20)), barX + 10, barY + 32);
           }
+          ctx.restore();
+        } else {
+          // Matching unified bottom broadcast bar for virtual screens (exact same Y, height, border & gold accent line)
+          const virtualLabel =
+            slot.sourceType === 'tournament_standings'
+              ? 'CLASSEMENT DU TOURNOI'
+              : slot.sourceType === 'tournament_bracket'
+                ? 'TABLEAU DES PHASES FINALES'
+                : slot.sourceType === 'matches_live_board'
+                  ? 'SCORES EN DIRECT'
+                  : 'CLASSEMENT GÉNÉRAL';
+          const virtualMeta = activeMosaicTour
+            ? `ÉCRAN LIVE  •  ${activeMosaicTour.name.toUpperCase()}`
+            : 'ÉCRAN LIVE';
+
+          ctx.save();
+          drawRoundedRect(ctx, barX, barY, barW, barH, 5);
+          ctx.fillStyle = 'rgba(10, 14, 22, 0.93)';
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.stroke();
+          ctx.fillStyle = '#D4AF37';
+          ctx.fillRect(barX + 1, barY, barW - 2, 2);
+
+          ctx.fillStyle = 'rgba(255,255,255,0.68)';
+          ctx.font = '700 10px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(this.fitCanvasText(ctx, virtualMeta, Math.max(80, barW - 120)), barX + 10, barY + 13);
+
+          ctx.fillStyle = 'rgba(212, 175, 55, 0.85)';
+          ctx.textAlign = 'right';
+          ctx.fillText(this.fitCanvasText(ctx, currentClub.name.toUpperCase(), 110), barX + barW - 10, barY + 13);
+
+          ctx.fillStyle = '#F8FAFC';
+          ctx.font = '800 13px Outfit, Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(this.fitCanvasText(ctx, virtualLabel, Math.max(100, barW - 24)), barX + barW / 2, barY + 32);
           ctx.restore();
         }
       });
