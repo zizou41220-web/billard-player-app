@@ -20,7 +20,53 @@ export interface LiveOverlayImageItem {
   visible: boolean;
 }
 
-export type OverlayTextTheme = 'gold' | 'emerald' | 'live_red' | 'dark_glass' | 'light' | 'minimal';
+export type OverlayTextTheme =
+  | 'gold'
+  | 'emerald'
+  | 'live_red'
+  | 'royal_blue'
+  | 'purple_neon'
+  | 'dark_glass'
+  | 'light'
+  | 'minimal';
+
+export type OverlayFontFamily =
+  | 'Outfit'
+  | 'Bebas Neue'
+  | 'Oswald'
+  | 'Montserrat'
+  | 'Russo One'
+  | 'Anton'
+  | 'Orbitron'
+  | 'Playfair Display'
+  | 'Cinzel'
+  | 'Pacifico';
+
+export const OVERLAY_FONT_OPTIONS: { id: OverlayFontFamily; label: string; css: string }[] = [
+  { id: 'Outfit', label: 'Outfit — Moderne TV', css: "'Outfit', sans-serif" },
+  { id: 'Bebas Neue', label: 'Bebas Neue — Sport Impact', css: "'Bebas Neue', sans-serif" },
+  { id: 'Oswald', label: 'Oswald — Broadcast Pro', css: "'Oswald', sans-serif" },
+  { id: 'Montserrat', label: 'Montserrat — Géométrique', css: "'Montserrat', sans-serif" },
+  { id: 'Russo One', label: 'Russo One — Billard / Esport', css: "'Russo One', sans-serif" },
+  { id: 'Anton', label: 'Anton — Affiche Ultra-Gras', css: "'Anton', sans-serif" },
+  { id: 'Orbitron', label: 'Orbitron — Futuriste Néon', css: "'Orbitron', sans-serif" },
+  { id: 'Playfair Display', label: 'Playfair — Prestige Gala', css: "'Playfair Display', serif" },
+  { id: 'Cinzel', label: 'Cinzel — Tournoi Royal', css: "'Cinzel', serif" },
+  { id: 'Pacifico', label: 'Pacifico — Script Manuscrit', css: "'Pacifico', cursive" }
+];
+
+export const OVERLAY_COLOR_SWATCHES: { label: string; hex: string }[] = [
+  { label: 'Blanc', hex: '#FFFFFF' },
+  { label: 'Or', hex: '#F59E0B' },
+  { label: 'Jaune', hex: '#FACC15' },
+  { label: 'Émeraude', hex: '#34D399' },
+  { label: 'Cyan', hex: '#38BDF8' },
+  { label: 'Bleu', hex: '#3B82F6' },
+  { label: 'Rouge', hex: '#EF4444' },
+  { label: 'Rose', hex: '#F472B6' },
+  { label: 'Violet', hex: '#A855F7' },
+  { label: 'Noir', hex: '#090D16' }
+];
 
 export interface LiveOverlayTextItem {
   id: string;
@@ -31,6 +77,26 @@ export interface LiveOverlayTextItem {
   theme: OverlayTextTheme;
   uppercase: boolean;
   visible: boolean;
+  fontFamily?: OverlayFontFamily;
+  fontWeight?: number; // 400 | 700 | 900
+  italic?: boolean;
+  underline?: boolean;
+  textColor?: string; // custom hex override
+  bgColor?: string; // custom background hex override
+  bgOpacity?: number; // 0..1
+  borderColor?: string; // custom border hex override
+  borderWidth?: number; // 0..5 px
+  borderRadius?: number; // 0..32 px
+  letterSpacing?: number; // 0..8 px
+  textShadow?: boolean;
+}
+
+export interface LiveOverlayProject {
+  id: string;
+  name: string;
+  config: LiveOverlayConfig;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface LiveOverlayConfig {
@@ -269,6 +335,82 @@ export const readOverlayImageFile = (file: File, onLoaded: (dataUrl: string) => 
   reader.readAsDataURL(file);
 };
 
+export interface ResolvedOverlayTextStyle {
+  fontFamily: OverlayFontFamily;
+  fontCss: string;
+  fontWeight: number;
+  italic: boolean;
+  underline: boolean;
+  color: string;
+  bgFill: string; // rgba(...) or 'transparent'
+  borderColor: string;
+  borderWidth: number;
+  borderRadius: number;
+  letterSpacingPx: number;
+  textShadow: boolean;
+  hasBackground: boolean;
+}
+
+const hexToRgba = (hex: string, alpha: number): string => {
+  const clean = hex.replace('#', '').trim();
+  const full = clean.length === 3
+    ? clean.split('').map(c => c + c).join('')
+    : clean;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return `rgba(10, 15, 25, ${alpha})`;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
+};
+
+export const getThemeDefaults = (theme: OverlayTextTheme) => {
+  switch (theme) {
+    case 'gold':
+      return { textColor: '#FEF3C7', bgColor: '#121008', bgOpacity: 0.93, borderColor: '#F59E0B', borderWidth: 2, borderRadius: 12 };
+    case 'emerald':
+      return { textColor: '#ECFDF5', bgColor: '#05251F', bgOpacity: 0.93, borderColor: '#10B981', borderWidth: 2, borderRadius: 12 };
+    case 'live_red':
+      return { textColor: '#FFFFFF', bgColor: '#B91C1C', bgOpacity: 0.94, borderColor: '#FCA5A5', borderWidth: 2, borderRadius: 12 };
+    case 'royal_blue':
+      return { textColor: '#EFF6FF', bgColor: '#0C1E3E', bgOpacity: 0.93, borderColor: '#3B82F6', borderWidth: 2, borderRadius: 12 };
+    case 'purple_neon':
+      return { textColor: '#FAF5FF', bgColor: '#1D0A33', bgOpacity: 0.92, borderColor: '#C084FC', borderWidth: 2, borderRadius: 12 };
+    case 'dark_glass':
+      return { textColor: '#FFFFFF', bgColor: '#080E1A', bgOpacity: 0.88, borderColor: '#64748B', borderWidth: 1.5, borderRadius: 12 };
+    case 'light':
+      return { textColor: '#061512', bgColor: '#FFFFFF', bgOpacity: 0.95, borderColor: '#F59E0B', borderWidth: 2, borderRadius: 12 };
+    case 'minimal':
+    default:
+      return { textColor: '#FFFFFF', bgColor: '#000000', bgOpacity: 0, borderColor: '#FFFFFF', borderWidth: 0, borderRadius: 8 };
+  }
+};
+
+export const resolveOverlayTextStyle = (txt: LiveOverlayTextItem): ResolvedOverlayTextStyle => {
+  const def = getThemeDefaults(txt.theme);
+  const fontFamily: OverlayFontFamily = txt.fontFamily || 'Outfit';
+  const fontOpt = OVERLAY_FONT_OPTIONS.find(f => f.id === fontFamily) || OVERLAY_FONT_OPTIONS[0];
+  const bgOpacity = txt.bgOpacity !== undefined ? txt.bgOpacity : def.bgOpacity;
+  const bgHex = txt.bgColor || def.bgColor;
+  const borderWidth = txt.borderWidth !== undefined ? txt.borderWidth : def.borderWidth;
+  const hasBackground = bgOpacity > 0.01 || borderWidth > 0;
+
+  return {
+    fontFamily,
+    fontCss: fontOpt.css,
+    fontWeight: txt.fontWeight ?? (fontFamily === 'Pacifico' || fontFamily === 'Anton' || fontFamily === 'Bebas Neue' || fontFamily === 'Russo One' ? 400 : 800),
+    italic: Boolean(txt.italic),
+    underline: Boolean(txt.underline),
+    color: txt.textColor || def.textColor,
+    bgFill: bgOpacity > 0.01 ? hexToRgba(bgHex, bgOpacity) : 'transparent',
+    borderColor: txt.borderColor || def.borderColor,
+    borderWidth,
+    borderRadius: txt.borderRadius !== undefined ? txt.borderRadius : def.borderRadius,
+    letterSpacingPx: txt.letterSpacing !== undefined ? txt.letterSpacing : (txt.uppercase ? 2 : 0.5),
+    textShadow: txt.textShadow !== undefined ? txt.textShadow : true,
+    hasBackground
+  };
+};
+
 export const getTextThemeStyles = (theme: OverlayTextTheme): React.CSSProperties => {
   switch (theme) {
     case 'gold':
@@ -296,6 +438,24 @@ export const getTextThemeStyles = (theme: OverlayTextTheme): React.CSSProperties
         color: '#FFFFFF',
         boxShadow: '0 8px 24px rgba(185, 28, 28, 0.55)',
         padding: '0.42em 1.05em',
+        borderRadius: '12px'
+      };
+    case 'royal_blue':
+      return {
+        background: 'linear-gradient(135deg, rgba(12, 30, 62, 0.95), rgba(23, 55, 115, 0.95))',
+        border: '2px solid #3B82F6',
+        color: '#EFF6FF',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7), 0 0 18px rgba(59, 130, 246, 0.35)',
+        padding: '0.45em 1.1em',
+        borderRadius: '12px'
+      };
+    case 'purple_neon':
+      return {
+        background: 'linear-gradient(135deg, rgba(29, 10, 51, 0.94), rgba(68, 18, 110, 0.94))',
+        border: '2px solid #C084FC',
+        color: '#FAF5FF',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7), 0 0 18px rgba(192, 132, 252, 0.4)',
+        padding: '0.45em 1.1em',
         borderRadius: '12px'
       };
     case 'dark_glass':
@@ -327,6 +487,62 @@ export const getTextThemeStyles = (theme: OverlayTextTheme): React.CSSProperties
         padding: '0.2em 0.5em'
       };
   }
+};
+
+// ============================================================================
+// PROJETS D'HABILLAGE TV ENREGISTRÉS (CRÉER, CHARGER, MODIFIER, SUPPRIMER)
+// ============================================================================
+
+const getProjectsStorageKey = (clubId: string) =>
+  `mb_live_overlay_projects_${clubId || 'default'}`;
+
+const getActiveProjectStorageKey = (clubId: string) =>
+  `mb_live_overlay_active_project_${clubId || 'default'}`;
+
+export const loadOverlayProjects = (clubId: string): LiveOverlayProject[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(getProjectsStorageKey(clubId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((p): p is LiveOverlayProject => Boolean(p && p.id && p.name && p.config))
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  } catch {
+    return [];
+  }
+};
+
+export const saveOverlayProjects = (clubId: string, projects: LiveOverlayProject[]): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    localStorage.setItem(getProjectsStorageKey(clubId), JSON.stringify(projects));
+    return true;
+  } catch (e) {
+    console.warn('Quota localStorage atteint pour les projets Habillage TV:', e);
+    return false;
+  }
+};
+
+export const loadActiveOverlayProjectId = (clubId: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(getActiveProjectStorageKey(clubId)) || null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveActiveOverlayProjectId = (clubId: string, projectId: string | null) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (projectId) {
+      localStorage.setItem(getActiveProjectStorageKey(clubId), projectId);
+    } else {
+      localStorage.removeItem(getActiveProjectStorageKey(clubId));
+    }
+  } catch {}
 };
 
 export const getImageBgStyles = (bgStyle: OverlayImageBg): React.CSSProperties => {

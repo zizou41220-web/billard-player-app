@@ -4,7 +4,8 @@ import {
   LiveOverlayImageItem,
   LiveOverlayTextItem,
   getImageBgStyles,
-  getTextThemeStyles
+  getTextThemeStyles,
+  resolveOverlayTextStyle
 } from '../utils/liveOverlay';
 
 interface LiveCustomOverlayLayerProps {
@@ -253,7 +254,10 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
         .map((txt: LiveOverlayTextItem) => {
           const isSelected = interactive && selectedItemId === txt.id;
           const themeStyles = getTextThemeStyles(txt.theme);
+          const resolved = resolveOverlayTextStyle(txt);
           const baseFontRem = 1.25 * (txt.scale || 1) * previewScale;
+          const hasCustomBg = txt.bgColor !== undefined || txt.bgOpacity !== undefined;
+          const hasCustomBorder = txt.borderColor !== undefined || txt.borderWidth !== undefined;
 
           return (
             <div
@@ -284,10 +288,24 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
                 left: `${txt.x}%`,
                 top: `${txt.y}%`,
                 transform: 'translate(-50%, -50%)',
+                ...themeStyles,
                 fontSize: `${baseFontRem}rem`,
-                fontWeight: 900,
-                letterSpacing: txt.uppercase ? '0.07em' : '0.02em',
+                fontFamily: resolved.fontCss,
+                fontWeight: resolved.fontWeight,
+                fontStyle: resolved.italic ? 'italic' : 'normal',
+                textDecoration: resolved.underline ? 'underline' : 'none',
+                color: resolved.color,
+                ...(hasCustomBg ? { background: resolved.bgFill } : {}),
+                ...(hasCustomBorder
+                  ? { border: resolved.borderWidth > 0 ? `${resolved.borderWidth}px solid ${resolved.borderColor}` : 'none' }
+                  : {}),
+                borderRadius: `${resolved.borderRadius}px`,
+                padding: resolved.hasBackground ? '0.42em 1.05em' : '0.2em 0.5em',
+                letterSpacing: `${resolved.letterSpacingPx * previewScale}px`,
                 textTransform: txt.uppercase ? 'uppercase' : 'none',
+                textShadow: resolved.textShadow
+                  ? '0 3px 12px rgba(0,0,0,0.92), 0 1px 4px rgba(0,0,0,0.85)'
+                  : 'none',
                 whiteSpace: 'pre-wrap',
                 textAlign: 'center',
                 lineHeight: 1.2,
@@ -295,9 +313,7 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
                 cursor: interactive ? 'grab' : 'default',
                 pointerEvents: interactive ? 'auto' : 'none',
                 outline: isSelected ? '2px dashed #34D399' : 'none',
-                outlineOffset: '4px',
-                fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif",
-                ...themeStyles
+                outlineOffset: '4px'
               }}
             >
               {txt.text}

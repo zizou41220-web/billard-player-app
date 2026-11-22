@@ -1,5 +1,5 @@
 import { Club, Match, Player, Table, Tournament } from '../types';
-import { LiveOverlayConfig, DEFAULT_LIVE_OVERLAY_CONFIG } from './liveOverlay';
+import { LiveOverlayConfig, DEFAULT_LIVE_OVERLAY_CONFIG, resolveOverlayTextStyle } from './liveOverlay';
 import {
   DirectorCameraSlot,
   DirectorMosaicLayout,
@@ -1323,8 +1323,9 @@ export class LiveCompositeBroadcaster {
 
   private drawCustomOverlays(overlayCfg: LiveOverlayConfig) {
     const ctx = this.ctx;
-    const W = this.canvas.width;
-    const H = this.canvas.height;
+    // drawFrame() already scales ctx to virtual 1280x720 broadcast coordinates
+    const W = 1280;
+    const H = 720;
 
     for (const imgItem of overlayCfg.images || []) {
       if (!imgItem.visible || !imgItem.url) continue;
@@ -1346,46 +1347,122 @@ export class LiveCompositeBroadcaster {
 
       const x = (imgItem.x / 100) * W - w / 2;
       const y = (imgItem.y / 100) * H - h / 2;
+      const radius = imgItem.aspectRatio === 'circle' ? Math.min(w, h) / 2 : (imgItem.borderRadius ?? 10);
+      const pad = imgItem.bgStyle && imgItem.bgStyle !== 'transparent' ? 6 : 0;
+
       ctx.save();
       ctx.globalAlpha = imgItem.opacity ?? 1;
+
+      if (imgItem.bgStyle && imgItem.bgStyle !== 'transparent') {
+        if (imgItem.aspectRatio === 'circle') {
+          ctx.beginPath();
+          ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+        } else {
+          drawRoundedRect(ctx, x, y, w, h, radius);
+        }
+        ctx.fillStyle =
+          imgItem.bgStyle === 'white'
+            ? 'rgba(255, 255, 255, 0.95)'
+            : imgItem.bgStyle === 'emerald'
+              ? 'rgba(4, 24, 20, 0.9)'
+              : 'rgba(10, 14, 22, 0.88)';
+        ctx.fill();
+        if (imgItem.bgStyle === 'gold' || imgItem.bgStyle === 'emerald') {
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = imgItem.bgStyle === 'gold' ? '#F59E0B' : '#10B981';
+          ctx.stroke();
+        }
+      }
+
+      const ix = x + pad;
+      const iy = y + pad;
+      const iw = Math.max(1, w - pad * 2);
+      const ih = Math.max(1, h - pad * 2);
+
       if (imgItem.aspectRatio === 'circle') {
         ctx.beginPath();
-        ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+        ctx.arc(x + w / 2, y + h / 2, Math.min(iw, ih) / 2, 0, Math.PI * 2);
+        ctx.clip();
+      } else if (radius > 0) {
+        drawRoundedRect(ctx, ix, iy, iw, ih, Math.max(0, radius - pad / 2));
         ctx.clip();
       }
-      ctx.drawImage(img, x, y, w, h);
+
+      if (imgItem.aspectRatio === 'free' || imgItem.fitMode === 'fill') {
+        ctx.drawImage(img, ix, iy, iw, ih);
+      } else if (imgItem.fitMode === 'cover') {
+        const scale = Math.max(iw / img.naturalWidth, ih / img.naturalHeight);
+        const dw = img.naturalWidth * scale;
+        const dh = img.naturalHeight * scale;
+        ctx.drawImage(img, ix + (iw - dw) / 2, iy + (ih - dh) / 2, dw, dh);
+      } else {
+        const scale = Math.min(iw / img.naturalWidth, ih / img.naturalHeight);
+        const dw = img.naturalWidth * scale;
+        const dh = img.naturalHeight * scale;
+        ctx.drawImage(img, ix + (iw - dw) / 2, iy + (ih - dh) / 2, dw, dh);
+      }
       ctx.restore();
     }
 
     for (const txt of overlayCfg.texts || []) {
       if (!txt.visible || !txt.text.trim()) continue;
+      const resolved = resolveOverlayTextStyle(txt);
       const cx = (txt.x / 100) * W;
       const cy = (txt.y / 100) * H;
-      const label = txt.uppercase ? txt.text.toUpperCase() : txt.text;
-      const fontSize = Math.round(22 * (txt.scale || 1));
+      const rawText = txt.uppercase ? txt.text.toUpperCase() : txt.text;
+      const lines = rawText.split('\n');
+      const fontSize = Math.round(24 * (txt.scale || 1));
+      const lineHeight = Math.round(fontSize * 1.22);
+
       ctx.save();
-      ctx.font = `900 ${fontSize}px Inter, system-ui, sans-serif`;
-      const metrics = ctx.measureText(label);
-      const padX = 18;
-      const padY = 10;
-      const bw = metrics.width + padX * 2;
-      const bh = fontSize + padY * 2;
-      if (txt.theme !== 'minimal') {
-        drawRoundedRect(ctx, cx - bw / 2, cy - bh / 2, bw, bh, 10);
-        ctx.fillStyle = txt.theme === 'live_red'
-          ? 'rgba(185, 28, 28, 0.92)'
-          : txt.theme === 'light'
-            ? 'rgba(255, 255, 255, 0.95)'
-            : 'rgba(8, 14, 26, 0.9)';
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = txt.theme === 'emerald' ? '#10B981' : '#F59E0B';
-        ctx.stroke();
+      ctx.font = `${resolved.italic ? 'italic ' : ''}${resolved.fontWeight} ${fontSize}px ${resolved.fontCss}`;
+      if ('letterSpacing' in ctx) {
+        (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = `${resolved.letterSpacingPx}px`;
       }
-      ctx.fillStyle = txt.theme === 'light' ? '#061512' : '#FFFFFF';
+
+      let maxLineW = 0;
+      for (const line of lines) {
+        maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+      }
+
+      const padX = resolved.hasBackground ? Math.round(fontSize * 0.95) : 10;
+      const padY = resolved.hasBackground ? Math.round(fontSize * 0.42) : 6;
+      const bw = maxLineW + padX * 2;
+      const bh = lines.length * lineHeight + padY * 2;
+
+      if (resolved.hasBackground) {
+        drawRoundedRect(ctx, cx - bw / 2, cy - bh / 2, bw, bh, Math.min(resolved.borderRadius, bh / 2));
+        if (resolved.bgFill !== 'transparent') {
+          ctx.fillStyle = resolved.bgFill;
+          ctx.fill();
+        }
+        if (resolved.borderWidth > 0) {
+          ctx.lineWidth = resolved.borderWidth;
+          ctx.strokeStyle = resolved.borderColor;
+          ctx.stroke();
+        }
+      }
+
+      ctx.fillStyle = resolved.color;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, cx, cy);
+      if (resolved.textShadow) {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
+      }
+
+      const startY = cy - ((lines.length - 1) * lineHeight) / 2;
+      lines.forEach((line, idx) => {
+        const ly = startY + idx * lineHeight;
+        ctx.fillText(line, cx, ly);
+        if (resolved.underline && line.trim()) {
+          const lw = ctx.measureText(line).width;
+          ctx.fillRect(cx - lw / 2, ly + fontSize * 0.45, lw, Math.max(2, Math.round(fontSize * 0.07)));
+        }
+      });
+
       ctx.restore();
     }
   }
@@ -1645,6 +1722,9 @@ export class LiveCompositeBroadcaster {
           ctx.restore();
         }
       });
+
+      // Render custom TV logos, sponsors & texts over the mosaic broadcast as well
+      this.drawCustomOverlays(overlayCfg);
     }
     ctx.restore();
 

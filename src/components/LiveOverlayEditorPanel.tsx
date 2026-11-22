@@ -8,20 +8,36 @@ import {
   Move,
   Plus,
   RotateCcw,
-  Maximize2
+  Maximize2,
+  Save,
+  FolderOpen,
+  Copy,
+  Edit3,
+  FilePlus2,
+  Check
 } from 'lucide-react';
 import {
   LiveOverlayConfig,
   LiveOverlayImageItem,
+  LiveOverlayProject,
   LiveOverlayTextItem,
+  OVERLAY_COLOR_SWATCHES,
+  OVERLAY_FONT_OPTIONS,
+  OverlayFontFamily,
   OverlayImageAspect,
   OverlayImageBg,
   OverlayImageFit,
   OverlayTextTheme,
+  getThemeDefaults,
+  loadActiveOverlayProjectId,
   loadLiveOverlayConfig,
+  loadOverlayProjects,
+  readOverlayImageFile,
+  resolveOverlayTextStyle,
+  saveActiveOverlayProjectId,
   saveLiveOverlayConfig,
-  subscribeToLiveOverlayConfig,
-  readOverlayImageFile
+  saveOverlayProjects,
+  subscribeToLiveOverlayConfig
 } from '../utils/liveOverlay';
 import { LiveCustomOverlayLayer } from './LiveCustomOverlayLayer';
 
@@ -46,6 +62,37 @@ const QUICK_POSITIONS: { label: string; x: number; y: number }[] = [
   { label: 'Bas-Droite', x: 88, y: 82 }
 ];
 
+const TEXT_THEME_OPTIONS: { value: OverlayTextTheme; label: string }[] = [
+  { value: 'gold', label: 'Or Prestige' },
+  { value: 'emerald', label: 'Émeraude Club' },
+  { value: 'live_red', label: 'Rouge Direct' },
+  { value: 'royal_blue', label: 'Bleu Broadcast TV' },
+  { value: 'purple_neon', label: 'Violet Gala / Néon' },
+  { value: 'dark_glass', label: 'Bandeau TV Sombre' },
+  { value: 'light', label: 'Fond Blanc Chic' },
+  { value: 'minimal', label: 'Texte Seul (Sans fond)' }
+];
+
+const cloneOverlayConfig = (cfg: LiveOverlayConfig): LiveOverlayConfig => ({
+  scoreboardCustomPos: Boolean(cfg.scoreboardCustomPos),
+  scoreboardX: cfg.scoreboardX ?? 50,
+  scoreboardY: cfg.scoreboardY ?? 12,
+  scoreboardScale: cfg.scoreboardScale ?? 1,
+  images: (cfg.images || []).map(i => ({ ...i })),
+  texts: (cfg.texts || []).map(t => ({ ...t })),
+  updatedAt: Date.now()
+});
+
+const serializeConfigForDiff = (cfg: LiveOverlayConfig) =>
+  JSON.stringify({
+    scoreboardCustomPos: Boolean(cfg.scoreboardCustomPos),
+    scoreboardX: cfg.scoreboardX ?? 50,
+    scoreboardY: cfg.scoreboardY ?? 12,
+    scoreboardScale: cfg.scoreboardScale ?? 1,
+    images: cfg.images || [],
+    texts: cfg.texts || []
+  });
+
 export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
   clubId,
   channelId = 'live',
@@ -59,9 +106,24 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
   const [config, setConfig] = useState<LiveOverlayConfig>(() =>
     loadLiveOverlayConfig(clubId, channelId)
   );
+  const [projects, setProjects] = useState<LiveOverlayProject[]>(() =>
+    loadOverlayProjects(clubId)
+  );
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() =>
+    loadActiveOverlayProjectId(clubId)
+  );
+  const [projectNameInput, setProjectNameInput] = useState<string>(() => {
+    const list = loadOverlayProjects(clubId);
+    const activeId = loadActiveOverlayProjectId(clubId);
+    return list.find(p => p.id === activeId)?.name || '';
+  });
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [newTextValue, setNewTextValue] = useState<string>('');
   const [newTextTheme, setNewTextTheme] = useState<OverlayTextTheme>('gold');
+  const [newTextFont, setNewTextFont] = useState<OverlayFontFamily>('Outfit');
+  const [newTextColor, setNewTextColor] = useState<string>('');
   const [newImageUrlInput, setNewImageUrlInput] = useState<string>('');
   const [draggingScoreboard, setDraggingScoreboard] = useState<{
     startX: number;
@@ -75,6 +137,11 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
 
   useEffect(() => {
     setConfig(loadLiveOverlayConfig(clubId, channelId));
+    const list = loadOverlayProjects(clubId);
+    const activeId = loadActiveOverlayProjectId(clubId);
+    setProjects(list);
+    setActiveProjectId(activeId);
+    setProjectNameInput(list.find(p => p.id === activeId)?.name || '');
     return subscribeToLiveOverlayConfig(clubId, channelId, (updated) => {
       setConfig(updated);
     });
@@ -83,6 +150,133 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
   const updateConfig = (next: LiveOverlayConfig) => {
     setConfig(next);
     saveLiveOverlayConfig(clubId, next, channelId, true);
+  };
+
+  const triggerSaveFeedback = (msg: string) => {
+    setSaveFeedback(msg);
+    window.setTimeout(() => {
+      setSaveFeedback(prev => (prev === msg ? null : prev));
+    }, 2200);
+  };
+
+  const activeProject = projects.find(p => p.id === activeProjectId) || null;
+  const hasUnsavedProjectChanges = Boolean(
+    activeProject && serializeConfigForDiff(activeProject.config) !== serializeConfigForDiff(config)
+  );
+
+  // Save current overlay into active project (or create new one)
+  const handleSaveProject = (forceAsNew: boolean = false) => {
+    const trimmedName = projectNameInput.trim();
+    const now = Date.now();
+
+    if (!forceAsNew && activeProject) {
+      const finalName = trimmedName || activeProject.name;
+      const updatedList = projects
+        .map(p =>
+          p.id === activeProject.id
+            ? { ...p, name: finalName, config: cloneOverlayConfig(config), updatedAt: now }
+            : p
+        )
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+
+      if (!saveOverlayProjects(clubId, updatedList)) {
+        alert("Mémoire du navigateur pleine : essayez de réduire le nombre ou la taille des images enregistrées dans vos projets.");
+        return;
+      }
+      setProjects(updatedList);
+      setProjectNameInput(finalName);
+      triggerSaveFeedback(`Projet « ${finalName} » mis à jour !`);
+      return;
+    }
+
+    const defaultName = trimmedName || `Habillage #${projects.length + 1}`;
+    const newProj: LiveOverlayProject = {
+      id: `proj_${now}_${Math.random().toString(36).slice(2, 6)}`,
+      name: defaultName,
+      config: cloneOverlayConfig(config),
+      createdAt: now,
+      updatedAt: now
+    };
+    const nextList = [newProj, ...projects];
+    if (!saveOverlayProjects(clubId, nextList)) {
+      alert("Mémoire du navigateur pleine : supprimez un ancien projet contenant de grosses images avant d'en enregistrer un nouveau.");
+      return;
+    }
+    setProjects(nextList);
+    setActiveProjectId(newProj.id);
+    saveActiveOverlayProjectId(clubId, newProj.id);
+    setProjectNameInput(newProj.name);
+    triggerSaveFeedback(`Projet « ${newProj.name} » enregistré !`);
+  };
+
+  const handleLoadProject = (proj: LiveOverlayProject) => {
+    const loaded = cloneOverlayConfig(proj.config);
+    updateConfig(loaded);
+    setActiveProjectId(proj.id);
+    saveActiveOverlayProjectId(clubId, proj.id);
+    setProjectNameInput(proj.name);
+    setSelectedItemId(null);
+    triggerSaveFeedback(`Projet « ${proj.name} » chargé sur l'écran Live`);
+  };
+
+  const handleNewBlankProject = () => {
+    updateConfig({
+      scoreboardCustomPos: false,
+      scoreboardX: 50,
+      scoreboardY: overlayPos === 'top' ? 12 : 90,
+      scoreboardScale: 1,
+      images: [],
+      texts: [],
+      updatedAt: Date.now()
+    });
+    setActiveProjectId(null);
+    saveActiveOverlayProjectId(clubId, null);
+    setProjectNameInput('');
+    setSelectedItemId(null);
+  };
+
+  const handleRenameProject = (proj: LiveOverlayProject) => {
+    const nextName = window.prompt('Nouveau nom du projet :', proj.name);
+    if (!nextName || !nextName.trim()) return;
+    const trimmed = nextName.trim();
+    const updatedList = projects.map(p =>
+      p.id === proj.id ? { ...p, name: trimmed, updatedAt: Date.now() } : p
+    );
+    saveOverlayProjects(clubId, updatedList);
+    setProjects(updatedList);
+    if (activeProjectId === proj.id) {
+      setProjectNameInput(trimmed);
+    }
+  };
+
+  const handleDuplicateProject = (proj: LiveOverlayProject) => {
+    const now = Date.now();
+    const copy: LiveOverlayProject = {
+      id: `proj_${now}_${Math.random().toString(36).slice(2, 6)}`,
+      name: `${proj.name} (copie)`,
+      config: cloneOverlayConfig(proj.config),
+      createdAt: now,
+      updatedAt: now
+    };
+    const nextList = [copy, ...projects];
+    if (!saveOverlayProjects(clubId, nextList)) {
+      alert("Mémoire du navigateur pleine : impossible de dupliquer ce projet.");
+      return;
+    }
+    setProjects(nextList);
+    handleLoadProject(copy);
+  };
+
+  const handleDeleteProject = (proj: LiveOverlayProject) => {
+    if (!window.confirm(`Supprimer définitivement le projet « ${proj.name} » ?`)) return;
+    const nextList = projects.filter(p => p.id !== proj.id);
+    saveOverlayProjects(clubId, nextList);
+    setProjects(nextList);
+    if (activeProjectId === proj.id) {
+      setActiveProjectId(null);
+      saveActiveOverlayProjectId(clubId, null);
+      setProjectNameInput('');
+    }
   };
 
   // Add a new text item
@@ -96,9 +290,12 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
       text: val,
       x: 50,
       y: Math.min(92, defaultY + offset),
-      scale: 1.1,
+      scale: 1.15,
       theme: newTextTheme,
+      fontFamily: newTextFont,
+      ...(newTextColor ? { textColor: newTextColor } : {}),
       uppercase: false,
+      textShadow: true,
       visible: true
     };
     const next: LiveOverlayConfig = {
@@ -113,7 +310,6 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
   // Add a new image item
   const addImageFromUrl = (dataUrl: string, label: string = 'Image') => {
     if (!dataUrl) return;
-    // Smart default corner placement so multiple images don't stack on the exact same pixel
     const corners = [
       { x: 11, y: 15 },
       { x: 89, y: 15 },
@@ -167,6 +363,29 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
     });
   };
 
+  const duplicateTextItem = (txt: LiveOverlayTextItem) => {
+    const copy: LiveOverlayTextItem = {
+      ...txt,
+      id: `txt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      x: Math.min(92, txt.x + 3),
+      y: Math.min(92, txt.y + 6)
+    };
+    updateConfig({ ...config, texts: [...config.texts, copy] });
+    setSelectedItemId(copy.id);
+  };
+
+  const duplicateImageItem = (img: LiveOverlayImageItem) => {
+    const copy: LiveOverlayImageItem = {
+      ...img,
+      id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      label: `${img.label} (copie)`,
+      x: Math.min(92, img.x + 5),
+      y: Math.min(92, img.y + 5)
+    };
+    updateConfig({ ...config, images: [...config.images, copy] });
+    setSelectedItemId(copy.id);
+  };
+
   const deleteItem = (id: string) => {
     updateConfig({
       ...config,
@@ -196,10 +415,10 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontWeight: 800, fontSize: '1.02rem', color: '#F8FAFC' }}>
-            <Move size={18} color="#D4AF37" /> Habillage TV — Logos, Sponsors & Textes
+            <Move size={18} color="#D4AF37" /> Habillage TV — Projets, Logos, Sponsors & Textes
           </div>
           <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Ajoutez des images (format libre, carré, affiche, rond...) et des textes (ex: « Finale du tournoi régional ») puis glissez-les où vous voulez sur l'écran.
+            Personnalisez polices, couleurs, bandeaux et logos, puis enregistrez vos projets pour les recharger et les modifier à tout moment.
           </div>
         </div>
 
@@ -209,11 +428,11 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
             className="btn btn-outline"
             style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 10px', color: '#F87171', borderColor: 'rgba(248, 113, 113, 0.35)' }}
             onClick={() => {
-              if (window.confirm('Réinitialiser tous les textes, images et positions personnalisées de l\'écran Live ?')) {
+              if (window.confirm("Vider tous les textes et images de l'écran actuel ? (Vos projets enregistrés restent intacts.)")) {
                 updateConfig({
                   scoreboardCustomPos: false,
                   scoreboardX: 50,
-                  scoreboardY: 12,
+                  scoreboardY: overlayPos === 'top' ? 12 : 90,
                   scoreboardScale: 1,
                   images: [],
                   texts: [],
@@ -223,8 +442,216 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
               }
             }}
           >
-            <RotateCcw size={13} /> Tout réinitialiser
+            <RotateCcw size={13} /> Vider l'écran
           </button>
+        )}
+      </div>
+
+      {/* 0. MES PROJETS D'HABILLAGE TV (ENREGISTRER, CHARGER, MODIFIER) */}
+      <div style={{
+        background: 'rgba(212, 175, 55, 0.06)',
+        border: '1px solid rgba(212, 175, 55, 0.32)',
+        borderRadius: '12px',
+        padding: '0.9rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.7rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.45rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#FDE68A', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <FolderOpen size={16} color="#D4AF37" /> Mes Projets d'Habillage TV ({projects.length})
+            </span>
+            {activeProject && (
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                padding: '2px 8px',
+                borderRadius: '999px',
+                background: hasUnsavedProjectChanges ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                border: `1px solid ${hasUnsavedProjectChanges ? '#F59E0B' : '#10B981'}`,
+                color: hasUnsavedProjectChanges ? '#FCD34D' : '#6EE7B7'
+              }}>
+                {hasUnsavedProjectChanges
+                  ? `Projet « ${activeProject.name} » • Modifié`
+                  : `Projet « ${activeProject.name} » • Enregistré`}
+              </span>
+            )}
+            {saveFeedback && (
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34D399', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Check size={13} /> {saveFeedback}
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleNewBlankProject}
+            style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', borderColor: 'rgba(255,255,255,0.2)', color: '#E2E8F0' }}
+            title="Repartir d'un écran vierge pour créer un nouveau projet"
+          >
+            <FilePlus2 size={13} /> Nouveau projet vierge
+          </button>
+        </div>
+
+        {/* Save / Save As Bar */}
+        <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Nom du projet (ex: Finale Régionale, Tournoi Vendredi, Open Sponsors...)"
+            value={projectNameInput}
+            onChange={(e) => setProjectNameInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveProject(false);
+              }
+            }}
+            style={{ flex: '1 1 240px', fontSize: '0.82rem', padding: '0.48rem 0.75rem' }}
+          />
+          <button
+            type="button"
+            className="btn btn-neon"
+            onClick={() => handleSaveProject(false)}
+            style={{ width: 'auto', padding: '0.48rem 0.95rem', fontSize: '0.78rem', fontWeight: 900, color: '#000' }}
+          >
+            <Save size={14} /> {activeProject ? 'Enregistrer les modifications' : 'Enregistrer le projet'}
+          </button>
+          {activeProject && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => handleSaveProject(true)}
+              style={{ width: 'auto', padding: '0.48rem 0.85rem', fontSize: '0.76rem', fontWeight: 700, borderColor: 'rgba(212,175,55,0.5)', color: '#FDE68A' }}
+              title="Enregistrer une nouvelle copie sous le nom saisi sans écraser le projet actuel"
+            >
+              <Plus size={14} /> Enregistrer comme nouveau
+            </button>
+          )}
+        </div>
+
+        {/* Saved Projects Clickable Grid */}
+        {projects.length === 0 ? (
+          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            Aucun projet enregistré pour l'instant. Composez votre habillage ci-dessous (textes, polices, couleurs, logos) puis donnez-lui un nom et cliquez sur « Enregistrer le projet ».
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '0.55rem'
+          }}>
+            {projects.map((proj) => {
+              const isAct = proj.id === activeProjectId;
+              const txtCount = proj.config.texts?.length || 0;
+              const imgCount = proj.config.images?.length || 0;
+              const dateStr = proj.updatedAt
+                ? new Date(proj.updatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                : '';
+              return (
+                <div
+                  key={proj.id}
+                  onClick={() => handleLoadProject(proj)}
+                  title="Cliquer pour charger et modifier ce projet"
+                  style={{
+                    background: isAct ? 'rgba(16, 185, 129, 0.14)' : 'rgba(5, 9, 18, 0.72)',
+                    border: `1.5px solid ${isAct ? '#10B981' : 'rgba(255, 255, 255, 0.12)'}`,
+                    borderRadius: '10px',
+                    padding: '0.6rem 0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.4rem',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.15s ease, background 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
+                    <span style={{
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      color: isAct ? '#6EE7B7' : '#F8FAFC',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {proj.name}
+                    </span>
+                    {isAct && (
+                      <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#10B981', color: '#000', padding: '1px 6px', borderRadius: '999px', flexShrink: 0 }}>
+                        ACTIF
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Mini preview strip of logos + first text */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minHeight: '22px' }}>
+                    {(proj.config.images || []).slice(0, 3).map(im => (
+                      <img
+                        key={im.id}
+                        src={im.url}
+                        alt=""
+                        style={{
+                          width: '22px',
+                          height: '22px',
+                          objectFit: 'contain',
+                          borderRadius: '4px',
+                          background: 'rgba(255,255,255,0.08)',
+                          padding: '1px'
+                        }}
+                      />
+                    ))}
+                    <span style={{ fontSize: '0.68rem', color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {txtCount} texte{txtCount > 1 ? 's' : ''} • {imgCount} image{imgCount > 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem', paddingTop: '0.2rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.64rem', color: 'rgba(255,255,255,0.45)' }}>{dateStr}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem' }}
+                        title="Renommer ce projet"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenameProject(proj);
+                        }}
+                      >
+                        <Edit3 size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem' }}
+                        title="Dupliquer ce projet"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicateProject(proj);
+                        }}
+                      >
+                        <Copy size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ width: 'auto', padding: '2px 5px', fontSize: '0.66rem', color: '#F87171', borderColor: 'rgba(248,113,113,0.35)' }}
+                        title="Supprimer ce projet"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProject(proj);
+                        }}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -232,7 +659,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
           <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#34D399', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Maximize2 size={14} /> Aperçu Écran TV 16:9 — Glissez-déposez les éléments directement à la souris
+            <Maximize2 size={14} /> Aperçu Écran TV 16:9 — Cliquez un élément pour le styliser ou glissez-le à la souris
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Score :</span>
@@ -379,7 +806,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
         </div>
       </div>
 
-      {/* 2. ADD / MANAGE TEXT INFORMATION (ex: "Finale du tournoi régional") */}
+      {/* 2. ADD / MANAGE TEXT INFORMATION */}
       <div style={{
         background: 'rgba(255, 255, 255, 0.03)',
         border: '1px solid rgba(52, 211, 153, 0.28)',
@@ -395,8 +822,8 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
           </span>
         </div>
 
-        {/* Input + Style + Add Button */}
-        <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+        {/* Input + Font + Theme + Color + Add Button */}
+        <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <input
             type="text"
             className="input-field"
@@ -409,25 +836,73 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                 handleAddText();
               }
             }}
-            style={{ flex: '1 1 210px', fontSize: '0.84rem', padding: '0.5rem 0.75rem' }}
+            style={{ flex: '1 1 200px', fontSize: '0.84rem', padding: '0.5rem 0.75rem' }}
           />
           <select
             className="input-field"
-            value={newTextTheme}
-            onChange={(e) => setNewTextTheme(e.target.value as OverlayTextTheme)}
-            style={{ width: 'auto', fontSize: '0.8rem', padding: '0.45rem 0.65rem', background: '#041815', color: '#fff', fontWeight: 700 }}
+            value={newTextFont}
+            onChange={(e) => setNewTextFont(e.target.value as OverlayFontFamily)}
+            title="Police d'écriture"
+            style={{
+              width: 'auto',
+              fontSize: '0.78rem',
+              padding: '0.45rem 0.6rem',
+              background: '#041815',
+              color: '#fff',
+              fontWeight: 700,
+              fontFamily: OVERLAY_FONT_OPTIONS.find(f => f.id === newTextFont)?.css
+            }}
           >
-            <option value="gold">Style Or Prestige</option>
-            <option value="emerald">Style Émeraude Club</option>
-            <option value="live_red">Style Rouge Direct</option>
-            <option value="dark_glass">Style Bandeau TV Sombre</option>
-            <option value="light">Style Fond Blanc</option>
-            <option value="minimal">Texte Seul (Sans fond)</option>
+            {OVERLAY_FONT_OPTIONS.map(f => (
+              <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
+                {f.label}
+              </option>
+            ))}
           </select>
+          <select
+            className="input-field"
+            value={newTextTheme}
+            onChange={(e) => {
+              const t = e.target.value as OverlayTextTheme;
+              setNewTextTheme(t);
+              setNewTextColor('');
+            }}
+            title="Style du bandeau"
+            style={{ width: 'auto', fontSize: '0.78rem', padding: '0.45rem 0.6rem', background: '#041815', color: '#fff', fontWeight: 700 }}
+          >
+            {TEXT_THEME_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <label
+            title="Couleur du texte"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: '#041815',
+              border: '1px solid rgba(255,255,255,0.18)',
+              borderRadius: '8px',
+              padding: '3px 7px',
+              fontSize: '0.72rem',
+              color: '#CBD5E1',
+              cursor: 'pointer'
+            }}
+          >
+            <span>Couleur</span>
+            <input
+              type="color"
+              value={newTextColor || getThemeDefaults(newTextTheme).textColor}
+              onChange={(e) => setNewTextColor(e.target.value)}
+              style={{ width: '22px', height: '22px', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+            />
+          </label>
           <button
             type="button"
             className="btn btn-neon"
-            style={{ width: 'auto', padding: '0.5rem 0.9rem', fontSize: '0.8rem', fontWeight: 800 }}
+            style={{ width: 'auto', padding: '0.5rem 0.9rem', fontSize: '0.8rem', fontWeight: 800, color: '#000' }}
             onClick={() => handleAddText()}
           >
             <Plus size={15} /> Afficher sur l'écran
@@ -457,9 +932,19 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
 
         {/* List of active texts */}
         {config.texts.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.2rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.2rem' }}>
             {config.texts.map((txt) => {
               const isSel = selectedItemId === txt.id;
+              const resolved = resolveOverlayTextStyle(txt);
+              const themeDef = getThemeDefaults(txt.theme);
+              const curTextColor = txt.textColor || themeDef.textColor;
+              const curBgColor = txt.bgColor || themeDef.bgColor;
+              const curBgOpacity = txt.bgOpacity !== undefined ? txt.bgOpacity : themeDef.bgOpacity;
+              const curBorderColor = txt.borderColor || themeDef.borderColor;
+              const curBorderWidth = txt.borderWidth !== undefined ? txt.borderWidth : themeDef.borderWidth;
+              const curBorderRadius = txt.borderRadius !== undefined ? txt.borderRadius : themeDef.borderRadius;
+              const curLetterSpacing = txt.letterSpacing !== undefined ? txt.letterSpacing : (txt.uppercase ? 2 : 0.5);
+
               return (
                 <div
                   key={txt.id}
@@ -468,14 +953,14 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                     background: isSel ? 'rgba(16, 185, 129, 0.14)' : 'rgba(0,0,0,0.28)',
                     border: `1px solid ${isSel ? '#34D399' : 'rgba(255,255,255,0.1)'}`,
                     borderRadius: '10px',
-                    padding: '0.55rem 0.7rem',
+                    padding: '0.6rem 0.75rem',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.45rem',
+                    gap: '0.55rem',
                     cursor: 'pointer'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <input
                       type="text"
                       className="input-field"
@@ -486,8 +971,26 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                           texts: config.texts.map(t => (t.id === txt.id ? { ...t, text: e.target.value } : t))
                         })
                       }
-                      style={{ flex: 1, fontSize: '0.82rem', padding: '0.35rem 0.6rem', fontWeight: 700 }}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.84rem',
+                        padding: '0.35rem 0.6rem',
+                        fontWeight: 700,
+                        fontFamily: resolved.fontCss
+                      }}
                     />
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      style={{ width: 'auto', padding: '4px 7px', fontSize: '0.72rem' }}
+                      title="Dupliquer ce texte"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicateTextItem(txt);
+                      }}
+                    >
+                      <Copy size={13} />
+                    </button>
                     <button
                       type="button"
                       className="btn btn-outline"
@@ -517,27 +1020,226 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                     </button>
                   </div>
 
-                  {/* Fine controls when selected */}
+                  {/* Full Typography & Style Controls when selected */}
                   {isSel && selectedText && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingTop: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.45rem', alignItems: 'center' }}>
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingTop: '0.45rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}
+                    >
+                      {/* Row 1: Font + Theme + Format toggles (B / I / U / AA / Ombre) */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)' }}>Style du bandeau</label>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: '#34D399', fontWeight: 700, marginBottom: '2px' }}>
+                            Police d'écriture
+                          </label>
                           <select
                             className="input-field"
-                            value={selectedText.theme}
-                            onChange={(e) => updateSelectedText({ theme: e.target.value as OverlayTextTheme })}
-                            style={{ fontSize: '0.75rem', padding: '4px 6px', background: '#041815', color: '#fff' }}
+                            value={selectedText.fontFamily || 'Outfit'}
+                            onChange={(e) => updateSelectedText({ fontFamily: e.target.value as OverlayFontFamily })}
+                            style={{
+                              fontSize: '0.76rem',
+                              padding: '5px 7px',
+                              background: '#041815',
+                              color: '#fff',
+                              fontFamily: resolved.fontCss
+                            }}
                           >
-                            <option value="gold">Or Prestige</option>
-                            <option value="emerald">Émeraude Club</option>
-                            <option value="live_red">Rouge Direct</option>
-                            <option value="dark_glass">Bandeau Vitré</option>
-                            <option value="light">Fond Blanc</option>
-                            <option value="minimal">Texte Seul (Sans fond)</option>
+                            {OVERLAY_FONT_OPTIONS.map(f => (
+                              <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
+                                {f.label}
+                              </option>
+                            ))}
                           </select>
                         </div>
 
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                            Thème prédéfini
+                          </label>
+                          <select
+                            className="input-field"
+                            value={selectedText.theme}
+                            onChange={(e) => {
+                              const nextTheme = e.target.value as OverlayTextTheme;
+                              updateSelectedText({
+                                theme: nextTheme,
+                                textColor: undefined,
+                                bgColor: undefined,
+                                bgOpacity: undefined,
+                                borderColor: undefined,
+                                borderWidth: undefined
+                              });
+                            }}
+                            style={{ fontSize: '0.75rem', padding: '5px 7px', background: '#041815', color: '#fff' }}
+                          >
+                            {TEXT_THEME_OPTIONS.map(o => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                            Style du texte
+                          </label>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {[
+                              {
+                                key: 'bold',
+                                label: 'B',
+                                title: 'Gras / Extra-gras',
+                                active: (selectedText.fontWeight ?? 800) >= 700,
+                                style: { fontWeight: 900 },
+                                onClick: () => updateSelectedText({ fontWeight: (selectedText.fontWeight ?? 800) >= 700 ? 400 : 900 })
+                              },
+                              {
+                                key: 'italic',
+                                label: 'I',
+                                title: 'Italique',
+                                active: Boolean(selectedText.italic),
+                                style: { fontStyle: 'italic', fontWeight: 700 },
+                                onClick: () => updateSelectedText({ italic: !selectedText.italic })
+                              },
+                              {
+                                key: 'underline',
+                                label: 'U',
+                                title: 'Souligné',
+                                active: Boolean(selectedText.underline),
+                                style: { textDecoration: 'underline', fontWeight: 700 },
+                                onClick: () => updateSelectedText({ underline: !selectedText.underline })
+                              },
+                              {
+                                key: 'upper',
+                                label: 'AA',
+                                title: 'Majuscules',
+                                active: Boolean(selectedText.uppercase),
+                                style: { fontWeight: 800 },
+                                onClick: () => updateSelectedText({ uppercase: !selectedText.uppercase })
+                              },
+                              {
+                                key: 'shadow',
+                                label: 'Ombre',
+                                title: 'Ombre portée pour lisibilité sur vidéo',
+                                active: selectedText.textShadow !== false,
+                                style: { fontWeight: 700 },
+                                onClick: () => updateSelectedText({ textShadow: selectedText.textShadow === false })
+                              }
+                            ].map(btn => (
+                              <button
+                                key={btn.key}
+                                type="button"
+                                title={btn.title}
+                                onClick={btn.onClick}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.72rem',
+                                  cursor: 'pointer',
+                                  border: `1px solid ${btn.active ? '#34D399' : 'rgba(255,255,255,0.16)'}`,
+                                  background: btn.active ? 'rgba(16, 185, 129, 0.24)' : 'rgba(255,255,255,0.04)',
+                                  color: btn.active ? '#6EE7B7' : '#CBD5E1',
+                                  ...btn.style
+                                }}
+                              >
+                                {btn.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Text Color Swatches + Custom Color Picker */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                            Couleur du texte :
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                            {OVERLAY_COLOR_SWATCHES.map(sw => (
+                              <button
+                                key={sw.hex}
+                                type="button"
+                                title={sw.label}
+                                onClick={() => updateSelectedText({ textColor: sw.hex })}
+                                style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  background: sw.hex,
+                                  border: curTextColor.toLowerCase() === sw.hex.toLowerCase()
+                                    ? '2.5px solid #34D399'
+                                    : '1.5px solid rgba(255,255,255,0.35)',
+                                  cursor: 'pointer',
+                                  padding: 0
+                                }}
+                              />
+                            ))}
+                            <input
+                              type="color"
+                              value={curTextColor}
+                              onChange={(e) => updateSelectedText({ textColor: e.target.value })}
+                              title="Choisir n'importe quelle couleur"
+                              style={{ width: '24px', height: '22px', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Background Color + Opacity + Border Color + Border Width */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.55rem', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Fond :</label>
+                          <input
+                            type="color"
+                            value={curBgColor}
+                            onChange={(e) => updateSelectedText({ bgColor: e.target.value, bgOpacity: curBgOpacity === 0 ? 0.88 : curBgOpacity })}
+                            style={{ width: '26px', height: '22px', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <span style={{ display: 'block', fontSize: '0.64rem', color: 'var(--text-muted)' }}>
+                              Opacité fond ({Math.round(curBgOpacity * 100)}%)
+                            </span>
+                            <input
+                              type="range"
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={curBgOpacity}
+                              onChange={(e) => updateSelectedText({ bgOpacity: parseFloat(e.target.value) })}
+                              style={{ width: '100%', accentColor: '#10B981' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Bordure :</label>
+                          <input
+                            type="color"
+                            value={curBorderColor}
+                            onChange={(e) => updateSelectedText({ borderColor: e.target.value, borderWidth: curBorderWidth === 0 ? 2 : curBorderWidth })}
+                            style={{ width: '26px', height: '22px', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <span style={{ display: 'block', fontSize: '0.64rem', color: 'var(--text-muted)' }}>
+                              Épaisseur ({curBorderWidth}px)
+                            </span>
+                            <input
+                              type="range"
+                              min={0}
+                              max={5}
+                              step={0.5}
+                              value={curBorderWidth}
+                              onChange={(e) => updateSelectedText({ borderWidth: parseFloat(e.target.value) })}
+                              style={{ width: '100%', accentColor: '#F59E0B' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 4: Size + Letter spacing + Corner radius */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: '0.5rem' }}>
                         <div>
                           <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                             Taille ({Math.round((selectedText.scale || 1) * 100)}%)
@@ -545,7 +1247,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                           <input
                             type="range"
                             min={0.5}
-                            max={2.6}
+                            max={2.8}
                             step={0.05}
                             value={selectedText.scale || 1}
                             onChange={(e) => updateSelectedText({ scale: parseFloat(e.target.value) })}
@@ -553,16 +1255,34 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                           />
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '12px' }}>
-                          <input
-                            type="checkbox"
-                            checked={selectedText.uppercase}
-                            onChange={(e) => updateSelectedText({ uppercase: e.target.checked })}
-                            id={`upper_${selectedText.id}`}
-                          />
-                          <label htmlFor={`upper_${selectedText.id}`} style={{ fontSize: '0.74rem', cursor: 'pointer' }}>
-                            MAJUSCULES
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                            Espacement lettres ({curLetterSpacing}px)
                           </label>
+                          <input
+                            type="range"
+                            min={0}
+                            max={8}
+                            step={0.5}
+                            value={curLetterSpacing}
+                            onChange={(e) => updateSelectedText({ letterSpacing: parseFloat(e.target.value) })}
+                            style={{ width: '100%', accentColor: '#38BDF8' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                            Arrondi bandeau ({curBorderRadius}px)
+                          </label>
+                          <input
+                            type="range"
+                            min={0}
+                            max={30}
+                            step={2}
+                            value={curBorderRadius}
+                            onChange={(e) => updateSelectedText({ borderRadius: parseInt(e.target.value, 10) })}
+                            style={{ width: '100%', accentColor: '#D4AF37' }}
+                          />
                         </div>
                       </div>
 
@@ -590,7 +1310,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
         )}
       </div>
 
-      {/* 3. ADD / MANAGE IMAGES (LOGOS, SPONSORS, POSTERS, ANY FORMAT & POSITION) */}
+      {/* 3. ADD / MANAGE IMAGES (LOGOS, SPONSORS, POSTERS) */}
       <div style={{
         background: 'rgba(255, 255, 255, 0.03)',
         border: '1px solid rgba(245, 158, 11, 0.3)',
@@ -606,7 +1326,6 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
           </span>
         </div>
 
-        {/* Upload file or paste image URL */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <input
             ref={fileInputRef}
@@ -627,7 +1346,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
           <button
             type="button"
             className="btn btn-neon"
-            style={{ width: 'auto', fontSize: '0.8rem', padding: '0.5rem 0.95rem', fontWeight: 800 }}
+            style={{ width: 'auto', fontSize: '0.8rem', padding: '0.5rem 0.95rem', fontWeight: 800, color: '#000' }}
             onClick={() => fileInputRef.current?.click()}
           >
             <Plus size={15} /> Choisir une image / logo (PC ou Téléphone)
@@ -658,7 +1377,6 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
           </div>
         </div>
 
-        {/* List of added images and format controls */}
         {config.images.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginTop: '0.2rem' }}>
             {config.images.map((img, idx) => {
@@ -709,6 +1427,18 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                         type="button"
                         className="btn btn-outline"
                         style={{ width: 'auto', padding: '4px 7px', fontSize: '0.72rem' }}
+                        title="Dupliquer cette image"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          duplicateImageItem(img);
+                        }}
+                      >
+                        <Copy size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ width: 'auto', padding: '4px 7px', fontSize: '0.72rem' }}
                         title={img.visible ? 'Masquer cette image' : 'Afficher cette image'}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -737,11 +1467,12 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Format, Size & Position Controls when selected */}
                   {isSel && selectedImage && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}
+                    >
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '0.5rem' }}>
-                        {/* Format / Shape */}
                         <div>
                           <label style={{ display: 'block', fontSize: '0.68rem', color: '#FBBF24', fontWeight: 700, marginBottom: '2px' }}>
                             Format de l'image
@@ -762,7 +1493,6 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                           </select>
                         </div>
 
-                        {/* Fit Mode */}
                         {selectedImage.aspectRatio !== 'free' && (
                           <div>
                             <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
@@ -781,7 +1511,6 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                           </div>
                         )}
 
-                        {/* Background / Frame style */}
                         <div>
                           <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
                             Fond / Cadre
@@ -801,7 +1530,6 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                         </div>
                       </div>
 
-                      {/* Sliders for Width, Height (if custom_box), Radius, Opacity */}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '0.5rem' }}>
                         <div>
                           <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
@@ -868,7 +1596,6 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
                         </div>
                       </div>
 
-                      {/* Quick placement buttons */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Placer :</span>
                         {QUICK_POSITIONS.map(p => (
