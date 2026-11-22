@@ -3,6 +3,7 @@ import { useStore } from './store';
 import { Match, Player, Table, Tournament } from './types';
 import { computeAllPlayersStats, createDefaultPlayerStats } from './utils/playerStats';
 import { generateFigurineSvg, isCustomPlayerPhoto } from './utils/avatar';
+import { applyCloudOverlayProjectsRow, isOverlayProjectsCloudRow } from './utils/liveOverlay';
 
 let isReceiving = false;
 let hasClubColumn = false;
@@ -313,7 +314,13 @@ export const initSync = async () => {
 
   const rawTournaments: Record<string, Tournament> = {};
   if (!tournamentsRes.error && tournamentsRes.data) {
-    tournamentsRes.data.forEach(d => rawTournaments[d.id] = mapDBToTournament(d));
+    tournamentsRes.data.forEach(d => {
+      if (isOverlayProjectsCloudRow(d)) {
+        applyCloudOverlayProjectsRow(currentClubId, d);
+        return;
+      }
+      rawTournaments[d.id] = mapDBToTournament(d);
+    });
   } else {
     Object.assign(rawTournaments, useStore.getState().tournaments);
   }
@@ -490,6 +497,10 @@ export const initSync = async () => {
               }
             }
             if (storeKey === 'tournaments') {
+              if (isOverlayProjectsCloudRow(data)) {
+                applyCloudOverlayProjectsRow(state.currentClub.id, data);
+                return state;
+              }
               const existingT = state.tournaments[data.id];
               const parsedT = mapDBToTournament(data);
               mappedData = {

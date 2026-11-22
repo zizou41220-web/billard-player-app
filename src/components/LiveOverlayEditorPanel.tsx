@@ -14,7 +14,9 @@ import {
   Copy,
   Edit3,
   FilePlus2,
-  Check
+  Check,
+  Cloud,
+  RefreshCw
 } from 'lucide-react';
 import {
   DEFAULT_SPONSOR_CAROUSEL_CONFIG,
@@ -32,17 +34,20 @@ import {
   OverlayImageFit,
   OverlayTextTheme,
   SponsorCarouselConfig,
+  fetchOverlayProjectsFromCloud,
   getThemeDefaults,
   loadActiveOverlayProjectId,
   loadLiveOverlayConfig,
   loadOverlayProjects,
+  pushOverlayProjectsToCloud,
   readOverlayImageFile,
   resolveOverlayTextStyle,
   resolveSponsorCarouselCoords,
   saveActiveOverlayProjectId,
   saveLiveOverlayConfig,
   saveOverlayProjects,
-  subscribeToLiveOverlayConfig
+  subscribeToLiveOverlayConfig,
+  subscribeToOverlayProjects
 } from '../utils/liveOverlay';
 import { LiveCustomOverlayLayer } from './LiveCustomOverlayLayer';
 
@@ -135,6 +140,8 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
     return list.find(p => p.id === activeId)?.name || '';
   });
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [newTextValue, setNewTextValue] = useState<string>('');
@@ -168,6 +175,34 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
     updateConfig({ ...config, sponsorCarousel: { ...sponsorCfg, ...patch } });
   };
 
+  const syncCloudPull = async () => {
+    setCloudSyncStatus('syncing');
+    setCloudSyncError(null);
+    const res = await fetchOverlayProjectsFromCloud(clubId);
+    setProjects(res.projects);
+    setActiveProjectId(res.activeProjectId);
+    const found = res.projects.find(p => p.id === res.activeProjectId);
+    if (found) setProjectNameInput(found.name);
+    if (res.ok) {
+      setCloudSyncStatus('synced');
+    } else {
+      setCloudSyncStatus('error');
+      setCloudSyncError(res.error || 'Synchronisation Cloud indisponible');
+    }
+  };
+
+  const syncCloudPush = async (nextList: LiveOverlayProject[], nextActiveId: string | null, deletedId?: string) => {
+    setCloudSyncStatus('syncing');
+    setCloudSyncError(null);
+    const res = await pushOverlayProjectsToCloud(clubId, nextList, nextActiveId, deletedId);
+    if (res.ok) {
+      setCloudSyncStatus('synced');
+    } else {
+      setCloudSyncStatus('error');
+      setCloudSyncError(res.error || 'Sauvegarde Cloud indisponible');
+    }
+  };
+
   useEffect(() => {
     setConfig(loadLiveOverlayConfig(clubId, channelId));
     const list = loadOverlayProjects(clubId);
@@ -175,9 +210,19 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
     setProjects(list);
     setActiveProjectId(activeId);
     setProjectNameInput(list.find(p => p.id === activeId)?.name || '');
-    return subscribeToLiveOverlayConfig(clubId, channelId, (updated) => {
+    syncCloudPull();
+
+    const unsubCfg = subscribeToLiveOverlayConfig(clubId, channelId, (updated) => {
       setConfig(updated);
     });
+    const unsubProj = subscribeToOverlayProjects(clubId, (nextList, nextAct) => {
+      setProjects(nextList);
+      setActiveProjectId(nextAct);
+    });
+    return () => {
+      unsubCfg();
+      unsubProj();
+    };
   }, [clubId, channelId]);
 
   const updateConfig = (next: LiveOverlayConfig) => {
@@ -219,6 +264,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
       setProjects(updatedList);
       setProjectNameInput(finalName);
       triggerSaveFeedback(`Projet « ${finalName} » mis à jour !`);
+      syncCloudPush(updatedList, activeProject.id);
       return;
     }
 
@@ -240,6 +286,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
     saveActiveOverlayProjectId(clubId, newProj.id);
     setProjectNameInput(newProj.name);
     triggerSaveFeedback(`Projet « ${newProj.name} » enregistré !`);
+    syncCloudPush(nextList, newProj.id);
   };
 
   const handleLoadProject = (proj: LiveOverlayProject) => {
@@ -280,6 +327,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
     if (activeProjectId === proj.id) {
       setProjectNameInput(trimmed);
     }
+    syncCloudPush(updatedList, activeProjectId);
   };
 
   const handleDuplicateProject = (proj: LiveOverlayProject) => {
@@ -298,6 +346,7 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
     }
     setProjects(nextList);
     handleLoadProject(copy);
+    syncCloudPush(nextList, copy.id);
   };
 
   const handleDeleteProject = (proj: LiveOverlayProject) => {
@@ -305,11 +354,13 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
     const nextList = projects.filter(p => p.id !== proj.id);
     saveOverlayProjects(clubId, nextList);
     setProjects(nextList);
+    const nextActive = activeProjectId === proj.id ? null : activeProjectId;
     if (activeProjectId === proj.id) {
       setActiveProjectId(null);
       saveActiveOverlayProjectId(clubId, null);
       setProjectNameInput('');
     }
+    syncCloudPush(nextList, nextActive, proj.id);
   };
 
   // Add a new text item
@@ -517,15 +568,50 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
             )}
           </div>
 
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={handleNewBlankProject}
-            style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', borderColor: 'rgba(255,255,255,0.2)', color: '#E2E8F0' }}
-            title="Repartir d'un écran vierge pour créer un nouveau projet"
-          >
-            <FilePlus2 size={13} /> Nouveau projet vierge
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={syncCloudPull}
+              disabled={cloudSyncStatus === 'syncing'}
+              title={cloudSyncError || 'Synchronisation Cloud Supabase : vos projets sont sauvegardés pour votre club sur tous vos PC'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '999px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                background: cloudSyncStatus === 'synced'
+                  ? 'rgba(16, 185, 129, 0.16)'
+                  : cloudSyncStatus === 'error'
+                    ? 'rgba(245, 158, 11, 0.18)'
+                    : 'rgba(56, 189, 248, 0.14)',
+                border: `1px solid ${cloudSyncStatus === 'synced' ? 'rgba(16,185,129,0.45)' : cloudSyncStatus === 'error' ? 'rgba(245,158,11,0.45)' : 'rgba(56,189,248,0.4)'}`,
+                color: cloudSyncStatus === 'synced' ? '#6EE7B7' : cloudSyncStatus === 'error' ? '#FCD34D' : '#7DD3FC'
+              }}
+            >
+              {cloudSyncStatus === 'syncing' ? <RefreshCw size={11} /> : <Cloud size={12} />}
+              {cloudSyncStatus === 'syncing'
+                ? 'Synchro Cloud…'
+                : cloudSyncStatus === 'synced'
+                  ? 'Cloud OK'
+                  : cloudSyncStatus === 'error'
+                    ? 'Local (Cliquer pour réessayer)'
+                    : 'Synchro Cloud'}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={handleNewBlankProject}
+              style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', borderColor: 'rgba(255,255,255,0.2)', color: '#E2E8F0' }}
+              title="Repartir d'un écran vierge pour créer un nouveau projet"
+            >
+              <FilePlus2 size={13} /> Nouveau projet vierge
+            </button>
+          </div>
         </div>
 
         {/* Save / Save As Bar */}

@@ -79,12 +79,19 @@ import {
   resolveCameraAssignment
 } from '../utils/liveBroadcaster';
 import {
+  DEFAULT_LIVE_OVERLAY_CONFIG,
   DEFAULT_TICKER_CONFIG,
   LiveOverlayConfig,
+  LiveOverlayProject,
+  fetchOverlayProjectsFromCloud,
+  loadActiveOverlayProjectId,
   loadLiveOverlayConfig,
+  loadOverlayProjects,
   readOverlayImageFile,
+  saveActiveOverlayProjectId,
   saveLiveOverlayConfig,
-  subscribeToLiveOverlayConfig
+  subscribeToLiveOverlayConfig,
+  subscribeToOverlayProjects
 } from '../utils/liveOverlay';
 import { parseRtmpStreamInput } from '../utils/video';
 
@@ -174,7 +181,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
         el.srcObject = activeStream;
       }
       if (activeStream) {
-        el.play().catch(() => {});
+        el.play().catch(() => { });
       }
     }
     return () => {
@@ -212,17 +219,17 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
     Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
   const activeTournamentMatches = activeTournament
     ? Object.values(matches)
-        .filter(
-          m =>
-            m.status !== 'finished' &&
-            Boolean(m.player1Id && m.player2Id) &&
-            m.tournamentId === activeTournament.id
-        )
-        .sort((a, b) => {
-          if (a.status === 'playing' && b.status !== 'playing') return -1;
-          if (a.status !== 'playing' && b.status === 'playing') return 1;
-          return (a.tableId ? 0 : 1) - (b.tableId ? 0 : 1);
-        })
+      .filter(
+        m =>
+          m.status !== 'finished' &&
+          Boolean(m.player1Id && m.player2Id) &&
+          m.tournamentId === activeTournament.id
+      )
+      .sort((a, b) => {
+        if (a.status === 'playing' && b.status !== 'playing') return -1;
+        if (a.status !== 'playing' && b.status === 'playing') return 1;
+        return (a.tableId ? 0 : 1) - (b.tableId ? 0 : 1);
+      })
     : [];
 
   const assignmentSelectValue = (() => {
@@ -931,6 +938,12 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [, setShotClockUiTick] = useState<number>(0);
   const [showHeaderSettings, setShowHeaderSettings] = useState<boolean>(false);
   const headerLogoFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [overlayProjects, setOverlayProjects] = useState<LiveOverlayProject[]>(() =>
+    loadOverlayProjects(currentClub.id)
+  );
+  const [activeOverlayProjectId, setActiveOverlayProjectId] = useState<string | null>(() =>
+    loadActiveOverlayProjectId(currentClub.id)
+  );
   const [panelWidth, setPanelWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
@@ -990,9 +1003,20 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
     const unsubDir = subscribeToDirectorState(currentClub.id, setDirectorState);
     const unsubOv = subscribeToLiveOverlayConfig(currentClub.id, 'live', setOverlayConfig);
+    setOverlayProjects(loadOverlayProjects(currentClub.id));
+    setActiveOverlayProjectId(loadActiveOverlayProjectId(currentClub.id));
+    fetchOverlayProjectsFromCloud(currentClub.id).then(res => {
+      setOverlayProjects(res.projects);
+      setActiveOverlayProjectId(res.activeProjectId);
+    });
+    const unsubProj = subscribeToOverlayProjects(currentClub.id, (nextList, nextAct) => {
+      setOverlayProjects(nextList);
+      setActiveOverlayProjectId(nextAct);
+    });
     return () => {
       unsubDir();
       unsubOv();
+      unsubProj();
     };
   }, [currentClub.id]);
 
@@ -1001,7 +1025,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -1073,7 +1097,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const setupWebRtcForCamera = (camId: string) => {
     if (peersMapRef.current[camId]) {
-      try { peersMapRef.current[camId].pc.close(); } catch {}
+      try { peersMapRef.current[camId].pc.close(); } catch { }
       delete peersMapRef.current[camId];
     }
     if (signalingMapRef.current[camId]) {
@@ -1094,7 +1118,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       onOffer: async (sdp, sessionId, targetViewerId) => {
         if (targetViewerId !== viewerId) return;
         if (peersMapRef.current[camId]) {
-          try { peersMapRef.current[camId].pc.close(); } catch {}
+          try { peersMapRef.current[camId].pc.close(); } catch { }
         }
         pendingIce.length = 0;
         const pc = new RTCPeerConnection(RTC_ICE_CONFIG);
@@ -1123,7 +1147,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
           for (const c of pendingIce) {
-            try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch {}
+            try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { }
           }
           pendingIce.length = 0;
           const answer = await pc.createAnswer();
@@ -1139,7 +1163,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         const entry = peersMapRef.current[camId];
         if (targetViewerId !== viewerId || role !== 'sender' || !entry || entry.sessionId !== sessionId) return;
         if (entry.pc.remoteDescription) {
-          try { await entry.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+          try { await entry.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch { }
         } else {
           pendingIce.push(candidate);
         }
@@ -1161,7 +1185,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         signalingMapRef.current[camId].destroy();
         delete signalingMapRef.current[camId];
         if (peersMapRef.current[camId]) {
-          try { peersMapRef.current[camId].pc.close(); } catch {}
+          try { peersMapRef.current[camId].pc.close(); } catch { }
           delete peersMapRef.current[camId];
         }
         setRemoteStreams(prev => {
@@ -1183,7 +1207,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     return () => {
       Object.values(signalingMapRef.current).forEach(s => s.destroy());
       Object.values(peersMapRef.current).forEach(p => {
-        try { p.pc.close(); } catch {}
+        try { p.pc.close(); } catch { }
       });
       Object.values(usbStreamsRef.current).forEach(u => {
         u.stream.getTracks().forEach(t => t.stop());
@@ -1237,7 +1261,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           });
           usbStreamsRef.current[camId] = { deviceId: devId, stream: videoOnly };
           setUsbStreams(prev => ({ ...prev, [camId]: videoOnly }));
-        } catch {}
+        } catch { }
       }
     });
   }, [usbKey]);
@@ -1307,11 +1331,11 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       ...directorState,
       ...(shouldPrefillCueScore
         ? {
-            regionalMatch: {
-              ...currentRm,
-              cueScoreInput: extUrl
-            }
+          regionalMatch: {
+            ...currentRm,
+            cueScoreInput: extUrl
           }
+        }
         : {}),
       cameras: directorState.cameras.map(c => (c.id === cameraId ? { ...c, ...patch } : c))
     });
@@ -1358,12 +1382,12 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         cameras: directorState.cameras.map(c =>
           c.id === disabledEmpty.id
             ? {
-                ...c,
-                enabled: true,
-                sourceType,
-                name,
-                customViewTitle: title
-              }
+              ...c,
+              enabled: true,
+              sourceType,
+              name,
+              customViewTitle: title
+            }
             : c
         )
       });
@@ -1424,10 +1448,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       cameras: nextCams,
       ...(focus
         ? {
-            broadcastMode: 'single' as const,
-            focusedCameraId: cameraId,
-            activeAudioCameraId: keepMic ? directorState.activeAudioCameraId : cameraId
-          }
+          broadcastMode: 'single' as const,
+          focusedCameraId: cameraId,
+          activeAudioCameraId: keepMic ? directorState.activeAudioCameraId : cameraId
+        }
         : {})
     });
   };
@@ -1573,6 +1597,35 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     };
     setOverlayConfig(nextOv);
     saveLiveOverlayConfig(currentClub.id, nextOv, 'live', true);
+  };
+
+  const handleQuickSelectOverlayProject = (projectId: string) => {
+    if (projectId === '__none__') {
+      const blank: LiveOverlayConfig = {
+        ...DEFAULT_LIVE_OVERLAY_CONFIG,
+        images: [],
+        texts: [],
+        updatedAt: Date.now()
+      };
+      setOverlayConfig(blank);
+      saveLiveOverlayConfig(currentClub.id, blank, 'live', true);
+      setActiveOverlayProjectId(null);
+      saveActiveOverlayProjectId(currentClub.id, null);
+      return;
+    }
+    const found = overlayProjects.find(p => p.id === projectId);
+    if (!found) return;
+    const applied: LiveOverlayConfig = {
+      ...DEFAULT_LIVE_OVERLAY_CONFIG,
+      ...found.config,
+      images: (found.config.images || []).map(i => ({ ...i })),
+      texts: (found.config.texts || []).map(t => ({ ...t })),
+      updatedAt: Date.now()
+    };
+    setOverlayConfig(applied);
+    saveLiveOverlayConfig(currentClub.id, applied, 'live', true);
+    setActiveOverlayProjectId(found.id);
+    saveActiveOverlayProjectId(currentClub.id, found.id);
   };
 
   const mosaicHeader: MosaicHeaderConfig = {
@@ -1891,9 +1944,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       const matchPatch: Partial<RegionalMatchConfig> = chosen
         ? buildCueScoreMatchPatch(chosen, curRm.cueScoreCustomTargetSets || 5)
         : {
-            cueScoreMatchId: '',
-            cueScoreHasActiveMatch: Boolean(curRm.cueScoreShowCustomPrompt && curRm.cueScoreHasActiveMatch)
-          };
+          cueScoreMatchId: '',
+          cueScoreHasActiveMatch: Boolean(curRm.cueScoreShowCustomPrompt && curRm.cueScoreHasActiveMatch)
+        };
 
       updateDirector({
         ...latestState,
@@ -2374,6 +2427,46 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           >
             📺 Ticker {overlayConfig.ticker?.enabled ? 'ON' : 'OFF'}
           </button>
+
+          {/* SÉLECTEUR RAPIDE PROJET D'HABILLAGE TV EN PLEIN DIRECT */}
+          {overlayProjects.length > 0 && (
+            <select
+              className="input-field"
+              value={
+                activeOverlayProjectId && overlayProjects.some(p => p.id === activeOverlayProjectId)
+                  ? activeOverlayProjectId
+                  : (overlayConfig.images.length === 0 && overlayConfig.texts.length === 0 && !overlayConfig.ticker?.enabled && !overlayConfig.sponsorCarousel?.enabled)
+                    ? '__none__'
+                    : '__custom__'
+              }
+              onChange={(e) => {
+                if (e.target.value !== '__custom__') {
+                  handleQuickSelectOverlayProject(e.target.value);
+                }
+              }}
+              title="Changer de Projet d'Habillage TV en 1 clic sans quitter vos caméras"
+              style={{
+                width: 'auto',
+                maxWidth: '185px',
+                fontSize: '0.7rem',
+                padding: '3px 7px',
+                background: '#111827',
+                borderColor: activeOverlayProjectId ? 'rgba(212, 175, 55, 0.55)' : 'rgba(255,255,255,0.16)',
+                color: activeOverlayProjectId ? '#FDE68A' : '#E2E8F0',
+                fontWeight: 700
+              }}
+            >
+              <option value="__none__">🎨 Habillage : Aucun</option>
+              {!activeOverlayProjectId && (overlayConfig.images.length > 0 || overlayConfig.texts.length > 0 || overlayConfig.ticker?.enabled || overlayConfig.sponsorCarousel?.enabled) && (
+                <option value="__custom__">🎨 Habillage : Actuel</option>
+              )}
+              {overlayProjects.map(p => (
+                <option key={p.id} value={p.id}>
+                  🎨 {p.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <button
             type="button"
@@ -3665,28 +3758,28 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           {directorState.cameras
             .filter(slot => isClubSituation || !isVirtualScreenSource(slot.sourceType))
             .map(slot => (
-            <CameraTileCard
-              key={slot.id}
-              slot={slot}
-              directorState={directorState}
-              sortedTables={sortedTables}
-              videoDevices={videoDevices}
-              remoteStream={remoteStreams[slot.id] || null}
-              usbStream={usbStreams[slot.id] || null}
-              connectionState={rtcStates[slot.id] || 'idle'}
-              monitorAudioOnPc={monitorAudioOnPc}
-              onSelectFocus={handleSelectFocus}
-              onSelectAudio={handleSelectAudio}
-              onUpdateSlot={handleUpdateSlot}
-              onRemoveSlot={handleRemoveSlot}
-              onOpenQr={setQrModalCamId}
-              onReconnectWebRtc={setupWebRtcForCamera}
-              onScoreClubMatch={updateMatchScore}
-              onFinishClubMatch={finishMatch}
-              registerVideoEl={registerVideoEl}
-              canDelete={directorState.cameras.length > 2}
-            />
-          ))}
+              <CameraTileCard
+                key={slot.id}
+                slot={slot}
+                directorState={directorState}
+                sortedTables={sortedTables}
+                videoDevices={videoDevices}
+                remoteStream={remoteStreams[slot.id] || null}
+                usbStream={usbStreams[slot.id] || null}
+                connectionState={rtcStates[slot.id] || 'idle'}
+                monitorAudioOnPc={monitorAudioOnPc}
+                onSelectFocus={handleSelectFocus}
+                onSelectAudio={handleSelectAudio}
+                onUpdateSlot={handleUpdateSlot}
+                onRemoveSlot={handleRemoveSlot}
+                onOpenQr={setQrModalCamId}
+                onReconnectWebRtc={setupWebRtcForCamera}
+                onScoreClubMatch={updateMatchScore}
+                onFinishClubMatch={finishMatch}
+                registerVideoEl={registerVideoEl}
+                canDelete={directorState.cameras.length > 2}
+              />
+            ))}
         </div>
 
         {/* RIGHT COLUMN (STICKY): LIVE OUTPUT PREVIEW (ÉCRAN MULTIPLE / PLEIN ÉCRAN) */}

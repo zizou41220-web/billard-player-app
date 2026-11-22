@@ -576,6 +576,54 @@ const getProjectsStorageKey = (clubId: string) =>
 const getActiveProjectStorageKey = (clubId: string) =>
   `mb_live_overlay_active_project_${clubId || 'default'}`;
 
+const getDeletedProjectsStorageKey = (clubId: string) =>
+  `mb_live_overlay_deleted_projects_${clubId || 'default'}`;
+
+export const OVERLAY_PROJECTS_ROW_PREFIX = '__mcb_overlay_projects_';
+
+export const getOverlayProjectsCloudRowId = (clubId: string) =>
+  `${OVERLAY_PROJECTS_ROW_PREFIX}${clubId || 'default'}`;
+
+export const isOverlayProjectsCloudRow = (row: any): boolean => {
+  if (!row) return false;
+  if (typeof row.id === 'string' && row.id.startsWith(OVERLAY_PROJECTS_ROW_PREFIX)) return true;
+  if (row.settings && row.settings.__kind === 'overlay_projects_v1') return true;
+  return false;
+};
+
+const loadDeletedProjectIds = (clubId: string): Record<string, number> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(getDeletedProjectsStorageKey(clubId));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveDeletedProjectIds = (clubId: string, map: Record<string, number>) => {
+  if (typeof window === 'undefined') return;
+  try {
+    // Keep last 60 tombstones
+    const entries = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 60);
+    localStorage.setItem(getDeletedProjectsStorageKey(clubId), JSON.stringify(Object.fromEntries(entries)));
+  } catch {}
+};
+
+const notifyOverlayProjectsChanged = (clubId: string, projects: LiveOverlayProject[], activeProjectId: string | null) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent('mb-overlay-projects-updated', {
+        detail: { clubId, projects, activeProjectId }
+      })
+    );
+  } catch {}
+  try {
+    broadcastChannel?.postMessage({ kind: 'overlay_projects', clubId, projects, activeProjectId });
+  } catch {}
+};
+
 export const loadOverlayProjects = (clubId: string): LiveOverlayProject[] => {
   if (typeof window === 'undefined') return [];
   try {
@@ -595,6 +643,7 @@ export const saveOverlayProjects = (clubId: string, projects: LiveOverlayProject
   if (typeof window === 'undefined') return false;
   try {
     localStorage.setItem(getProjectsStorageKey(clubId), JSON.stringify(projects));
+    notifyOverlayProjectsChanged(clubId, projects, loadActiveOverlayProjectId(clubId));
     return true;
   } catch (e) {
     console.warn('Quota localStorage atteint pour les projets Habillage TV:', e);
@@ -619,7 +668,195 @@ export const saveActiveOverlayProjectId = (clubId: string, projectId: string | n
     } else {
       localStorage.removeItem(getActiveProjectStorageKey(clubId));
     }
+    notifyOverlayProjectsChanged(clubId, loadOverlayProjects(clubId), projectId);
   } catch {}
+};
+
+const mergeProjectLists = (
+  localList: LiveOverlayProject[],
+  cloudList: LiveOverlayProject[],
+  deletedMap: Record<string, number>
+): LiveOverlayProject[] => {
+  const byId = new Map<string, LiveOverlayProject>();
+  for (const p of [...cloudList, ...localList]) {
+    if (!p || !p.id || !p.name || !p.config) continue;
+    const delAt = deletedMap[p.id] || 0;
+    if (delAt >= (p.updatedAt || 0)) continue;
+    const existing = byId.get(p.id);
+    if (!existing || (p.updatedAt || 0) > (existing.updatedAt || 0)) {
+      byId.set(p.id, p);
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+};
+
+export const applyCloudOverlayProjectsRow = (clubId: string, row: any): { projects: LiveOverlayProject[]; activeProjectId: string | null } | null => {
+  if (!row || !isOverlayProjectsCloudRow(row)) return null;
+  const expectedId = getOverlayProjectsCloudRowId(clubId);
+  if (row.id !== expectedId) return null;
+  const settings = row.settings || {};
+  const cloudProjects: LiveOverlayProject[] = Array.isArray(settings.projects) ? settings.projects : [];
+  const cloudDeleted: Record<string, number> = settings.deletedIds && typeof settings.deletedIds === 'object' ? settings.deletedIds : {};
+  const localDeleted = loadDeletedProjectIds(clubId);
+  const mergedDeleted: Record<string, number> = { ...localDeleted };
+  for (const [k, ts] of Object.entries(cloudDeleted)) {
+    mergedDeleted[k] = Math.max(mergedDeleted[k] || 0, Number(ts) || 0);
+  }
+  saveDeletedProjectIds(clubId, mergedDeleted);
+
+  const localProjects = loadOverlayProjects(clubId);
+  const merged = mergeProjectLists(localProjects, cloudProjects, mergedDeleted);
+  try {
+    localStorage.setItem(getProjectsStorageKey(clubId), JSON.stringify(merged));
+  } catch {}
+
+  const localActive = loadActiveOverlayProjectId(clubId);
+  const cloudActive = typeof settings.activeProjectId === 'string' ? settings.activeProjectId : null;
+  const effectiveActive =
+    (localActive && merged.some(p => p.id === localActive) ? localActive : null) ||
+    (cloudActive && merged.some(p => p.id === cloudActive) ? cloudActive : null);
+  try {
+    if (effectiveActive) localStorage.setItem(getActiveProjectStorageKey(clubId), effectiveActive);
+    else localStorage.removeItem(getActiveProjectStorageKey(clubId));
+  } catch {}
+
+  notifyOverlayProjectsChanged(clubId, merged, effectiveActive);
+  return { projects: merged, activeProjectId: effectiveActive };
+};
+
+export const pushOverlayProjectsToCloud = async (
+  clubId: string,
+  projects: LiveOverlayProject[],
+  activeProjectId: string | null,
+  newlyDeletedId?: string
+): Promise<{ ok: boolean; error?: string }> => {
+  const deletedMap = loadDeletedProjectIds(clubId);
+  if (newlyDeletedId) {
+    deletedMap[newlyDeletedId] = Date.now();
+    saveDeletedProjectIds(clubId, deletedMap);
+  }
+  const rowId = getOverlayProjectsCloudRowId(clubId);
+  const baseRow: Record<string, any> = {
+    id: rowId,
+    name: '__MCB_OVERLAY_PROJECTS__',
+    format: 'poules',
+    status: 'finished',
+    participants: [],
+    matches: [],
+    settings: {
+      __kind: 'overlay_projects_v1',
+      clubId,
+      projects,
+      activeProjectId,
+      deletedIds: deletedMap,
+      updatedAt: Date.now()
+    }
+  };
+
+  try {
+    const withClub = await supabase.from('tournoi2_tournaments').upsert({ ...baseRow, club_id: clubId });
+    if (!withClub.error) return { ok: true };
+    if (withClub.error.message?.toLowerCase().includes('club_id')) {
+      const withoutClub = await supabase.from('tournoi2_tournaments').upsert(baseRow);
+      if (!withoutClub.error) return { ok: true };
+      return { ok: false, error: withoutClub.error.message };
+    }
+    return { ok: false, error: withClub.error.message };
+  } catch (err: any) {
+    return { ok: false, error: String(err?.message || 'Erreur réseau Cloud') };
+  }
+};
+
+export const fetchOverlayProjectsFromCloud = async (
+  clubId: string
+): Promise<{ ok: boolean; projects: LiveOverlayProject[]; activeProjectId: string | null; error?: string }> => {
+  const rowId = getOverlayProjectsCloudRowId(clubId);
+  try {
+    const { data, error } = await supabase
+      .from('tournoi2_tournaments')
+      .select('id, settings')
+      .eq('id', rowId)
+      .maybeSingle();
+
+    if (error) {
+      return {
+        ok: false,
+        projects: loadOverlayProjects(clubId),
+        activeProjectId: loadActiveOverlayProjectId(clubId),
+        error: error.message
+      };
+    }
+
+    if (!data) {
+      // No cloud row yet: if local projects exist, push them up to initialize Cloud!
+      const localList = loadOverlayProjects(clubId);
+      const localActive = loadActiveOverlayProjectId(clubId);
+      if (localList.length > 0) {
+        const pushed = await pushOverlayProjectsToCloud(clubId, localList, localActive);
+        return { ok: pushed.ok, projects: localList, activeProjectId: localActive, error: pushed.error };
+      }
+      return { ok: true, projects: [], activeProjectId: null };
+    }
+
+    const applied = applyCloudOverlayProjectsRow(clubId, data);
+    if (applied) {
+      // If local had newer/extra projects merged in, push merged result back to Cloud
+      const cloudCount = Array.isArray(data.settings?.projects) ? data.settings.projects.length : 0;
+      if (applied.projects.length > cloudCount) {
+        pushOverlayProjectsToCloud(clubId, applied.projects, applied.activeProjectId);
+      }
+      return { ok: true, projects: applied.projects, activeProjectId: applied.activeProjectId };
+    }
+    return {
+      ok: true,
+      projects: loadOverlayProjects(clubId),
+      activeProjectId: loadActiveOverlayProjectId(clubId)
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      projects: loadOverlayProjects(clubId),
+      activeProjectId: loadActiveOverlayProjectId(clubId),
+      error: String(err?.message || 'Hors-ligne')
+    };
+  }
+};
+
+export const subscribeToOverlayProjects = (
+  clubId: string,
+  onUpdate: (projects: LiveOverlayProject[], activeProjectId: string | null) => void
+): (() => void) => {
+  if (typeof window === 'undefined') return () => {};
+  const projKey = getProjectsStorageKey(clubId);
+  const actKey = getActiveProjectStorageKey(clubId);
+
+  const onCustom = (e: Event) => {
+    const d = (e as CustomEvent)?.detail;
+    if (d && d.clubId === clubId && Array.isArray(d.projects)) {
+      onUpdate(d.projects, d.activeProjectId ?? null);
+    }
+  };
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === projKey || e.key === actKey) {
+      onUpdate(loadOverlayProjects(clubId), loadActiveOverlayProjectId(clubId));
+    }
+  };
+  const onBc = (e: MessageEvent) => {
+    const d = e.data;
+    if (d && d.kind === 'overlay_projects' && d.clubId === clubId && Array.isArray(d.projects)) {
+      onUpdate(d.projects, d.activeProjectId ?? null);
+    }
+  };
+
+  window.addEventListener('mb-overlay-projects-updated', onCustom);
+  window.addEventListener('storage', onStorage);
+  broadcastChannel?.addEventListener('message', onBc);
+
+  return () => {
+    window.removeEventListener('mb-overlay-projects-updated', onCustom);
+    window.removeEventListener('storage', onStorage);
+    broadcastChannel?.removeEventListener('message', onBc);
+  };
 };
 
 export const getImageBgStyles = (bgStyle: OverlayImageBg): React.CSSProperties => {
