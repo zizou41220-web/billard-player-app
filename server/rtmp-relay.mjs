@@ -253,7 +253,11 @@ function handleRelayWebSocketConnection(socket) {
     const baseArgs = [
       '-hide_banner',
       '-loglevel', 'warning',
-      '-fflags', '+genpts',
+      '-stats',
+      '-fflags', '+genpts+nobuffer',
+      '-probesize', '65536',
+      '-analyzeduration', '1000000',
+      '-f', 'webm',
       '-i', 'pipe:0',
       '-map', '0:v:0',
       '-map', '0:a:0?',
@@ -266,6 +270,8 @@ function handleRelayWebSocketConnection(socket) {
       '-pix_fmt', 'yuv420p',
       '-r', `${fps}`,
       '-g', `${gopSize}`,
+      '-keyint_min', `${gopSize}`,
+      '-sc_threshold', '0',
       '-c:a', 'aac',
       '-b:a', '128k',
       '-ar', '44100',
@@ -282,6 +288,12 @@ function handleRelayWebSocketConnection(socket) {
 
     const procKey = useTee ? 'tee_multi' : validTargets[0].id;
     const targetIds = validTargets.map(t => t.id);
+    const maskedTargets = validTargets.map(t => {
+      const k = String(t.streamKey || '');
+      const tail = k.length > 4 ? `****${k.slice(-4)}` : '****';
+      return `${t.label || t.id} -> ${t.rtmpUrl} (${tail})`;
+    }).join(' | ');
+    console.log(`[Relais Live] Démarrage diffusion @ ${bitrateKbps}k ${fps}fps ${useTee ? '[TEE mono-encodage] ' : ''}: ${maskedTargets}`);
     const proc = spawn(ffmpegBin, [...baseArgs, ...outputArgs], { stdio: ['pipe', 'ignore', 'pipe'] });
     const entry = {
       proc,
@@ -298,29 +310,26 @@ function handleRelayWebSocketConnection(socket) {
     let stderrTail = '';
     proc.stderr.on('data', (chunk) => {
       const text = chunk.toString('utf8');
-      stderrTail = (stderrTail + text).slice(-800);
-      if (!entry.announcedLive && (text.includes('frame=') || text.includes('Output #0'))) {
+      stderrTail = (stderrTail + text).slice(-1200);
+      const trimmed = text.trim();
+      if (trimmed && !trimmed.startsWith('frame=')) {
+        console.log(`[FFmpeg] ${trimmed}`);
+      }
+      const frameMatch = text.match(/frame=\s*(\d+)/);
+      const frameCount = frameMatch ? Number(frameMatch[1]) : 0;
+      if (!entry.announcedLive && frameCount > 0) {
         entry.announcedLive = true;
+        console.log(`[Relais Live] Flux actif envoyé vers ${entry.label} (frame=${frameCount})`);
         for (const tid of targetIds) {
           sendWsJson(socket, { type: 'target_status', id: tid, status: 'live' });
         }
       }
     });
 
-    // Fallback: mark live after 2.5s if process stays alive and receives data
-    setTimeout(() => {
-      const cur = activeProcesses.get(procKey);
-      if (cur && cur.proc === proc && !proc.killed && proc.exitCode === null && !cur.announcedLive && bytesReceived > 0) {
-        cur.announcedLive = true;
-        for (const tid of targetIds) {
-          sendWsJson(socket, { type: 'target_status', id: tid, status: 'live' });
-        }
-      }
-    }, 2500);
-
     proc.on('close', (code) => {
       if (activeProcesses.get(procKey)?.proc === proc) {
         activeProcesses.delete(procKey);
+        console.log(`[Relais Live] FFmpeg arrêté (code ${code})`);
         if (code !== 0 && code !== null) {
           const msg = stderrTail.trim() || `FFmpeg arrêté (code ${code}). Vérifiez votre clé de stream.`;
           for (const tid of targetIds) {
@@ -353,7 +362,11 @@ function handleRelayWebSocketConnection(socket) {
       } catch {}
     } else if (opcode === 0x2) {
       // Binary WebM chunk -> fan out to every active FFmpeg target
+      const isFirstChunk = bytesReceived === 0 && payload.length > 0;
       bytesReceived += payload.length;
+      if (isFirstChunk) {
+        console.log(`[Relais Live] Flux vidéo reçu du navigateur (${Math.max(1, Math.round(payload.length / 1024))} Ko), envoi vers FFmpeg/RTMP...`);
+      }
       for (const [id, entry] of activeProcesses.entries()) {
         if (entry.proc.stdin && entry.proc.stdin.writable && !entry.proc.killed) {
           try {

@@ -1549,6 +1549,13 @@ export class LiveCompositeBroadcaster {
             : currentClub.name;
       ctx.fillText(`${mosaicHeaderTitle.toUpperCase()}  •  MULTI-CAMÉRAS`, 112, 22);
 
+      // Subtle live clock in top-right (also guarantees continuous canvas motion for MediaRecorder)
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = '700 12px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      const mosaicTime = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      ctx.fillText(mosaicTime, W - 16, 22);
+
       const list = enabledCams.length > 0
         ? enabledCams
         : directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType)).slice(0, 1);
@@ -1886,6 +1893,13 @@ export class LiveCompositeBroadcaster {
     const ws = await this.openFirstWorkingRelaySocket(destinations.relayWsUrl);
     this.ws = ws;
 
+    let resolveRelayReady: (() => void) | null = null;
+    let rejectRelayReady: ((err: Error) => void) | null = null;
+    const relayReadyPromise = new Promise<void>((resolve, reject) => {
+      resolveRelayReady = resolve;
+      rejectRelayReady = reject;
+    });
+
     ws.onmessage = (ev) => {
       try {
         const msg = JSON.parse(String(ev.data));
@@ -1895,8 +1909,14 @@ export class LiveCompositeBroadcaster {
             ffmpegAvailable: Boolean(msg.ffmpegAvailable),
             ffmpegPath: msg.ffmpegPath || null
           });
+        } else if (msg.type === 'relay_started') {
+          resolveRelayReady?.();
+          resolveRelayReady = null;
+          rejectRelayReady = null;
         } else if (msg.type === 'target_status' && msg.id) {
           this.emitStatus({
+            ...(msg.status === 'error' && msg.message ? { lastError: `${msg.label || msg.id} : ${msg.message}` } : {}),
+            ...(msg.status === 'live' ? { lastError: null } : {}),
             targetStatuses: {
               ...this.status.targetStatuses,
               [msg.id]: {
@@ -1907,10 +1927,14 @@ export class LiveCompositeBroadcaster {
             }
           });
         } else if (msg.type === 'error') {
+          const errMsg = msg.message || 'Erreur relais RTMP';
           this.emitStatus({
-            lastError: msg.message || 'Erreur relais RTMP',
+            lastError: errMsg,
             isStreaming: false
           });
+          rejectRelayReady?.(new Error(errMsg));
+          resolveRelayReady = null;
+          rejectRelayReady = null;
         } else if (msg.type === 'relay_stopped') {
           this.emitStatus({ isStreaming: false });
         }
@@ -1918,6 +1942,9 @@ export class LiveCompositeBroadcaster {
     };
 
     ws.onclose = () => {
+      rejectRelayReady?.(new Error('Connexion au relais Live interrompue.'));
+      resolveRelayReady = null;
+      rejectRelayReady = null;
       if (this.ws === ws) {
         this.ws = null;
         this.emitStatus({ connectedToRelay: false, isStreaming: false, bitrateKbps: 0 });
@@ -1935,6 +1962,16 @@ export class LiveCompositeBroadcaster {
       }
     }));
 
+    // Wait for FFmpeg process to be spawned before starting MediaRecorder so the EBML WebM header is never dropped
+    await Promise.race([
+      relayReadyPromise,
+      new Promise<void>((resolve) => window.setTimeout(resolve, 4000))
+    ]);
+
+    if (this.ws !== ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error(this.status.lastError || 'Le relais Live s’est déconnecté avant le démarrage du flux.');
+    }
+
     const canvasStream = this.canvas.captureStream(profile.fps);
     const tracks: MediaStreamTrack[] = [...canvasStream.getVideoTracks()];
     if (this.audioDest) {
@@ -1943,9 +1980,9 @@ export class LiveCompositeBroadcaster {
     const combinedStream = new MediaStream(tracks);
 
     const mimeCandidates = [
-      'video/webm;codecs=h264,opus',
       'video/webm;codecs=vp8,opus',
       'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=h264,opus',
       'video/webm'
     ];
     const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || '';
@@ -1957,13 +1994,18 @@ export class LiveCompositeBroadcaster {
     });
     this.recorder = recorder;
 
-    recorder.ondataavailable = async (ev) => {
+    recorder.onerror = (ev: any) => {
+      const errMsg = ev?.error?.message || 'Erreur MediaRecorder lors de la capture du flux Mosaïque.';
+      this.emitStatus({ lastError: errMsg });
+    };
+
+    // Send Blobs synchronously in strict FIFO order (avoids async arrayBuffer reordering that corrupts WebM!)
+    recorder.ondataavailable = (ev) => {
       if (ev.data && ev.data.size > 0 && this.ws && this.ws.readyState === WebSocket.OPEN) {
-        const buf = await ev.data.arrayBuffer();
-        if (this.ws && this.ws.readyState === WebSocket.OPEN && this.ws.bufferedAmount < 4_000_000) {
-          this.ws.send(buf);
-          this.recentBytesWindow.push({ at: Date.now(), bytes: buf.byteLength });
-          this.emitStatus({ bytesSent: this.status.bytesSent + buf.byteLength });
+        if (this.ws.bufferedAmount < 4_000_000) {
+          this.ws.send(ev.data);
+          this.recentBytesWindow.push({ at: Date.now(), bytes: ev.data.size });
+          this.emitStatus({ bytesSent: this.status.bytesSent + ev.data.size });
         }
       }
     };
