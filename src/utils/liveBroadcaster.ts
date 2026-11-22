@@ -1816,18 +1816,28 @@ export class LiveCompositeBroadcaster {
 
     const targets: { id: string; label: string; rtmpUrl: string; streamKey: string }[] = [];
     if (destinations.facebookEnabled && destinations.facebookStreamKey.trim()) {
+      const rawFbUrl = destinations.facebookRtmpUrl.trim();
+      const safeFbUrl =
+        !rawFbUrl || /^rtmps?:\/\/[^/]+\/?$/i.test(rawFbUrl)
+          ? 'rtmps://live-api-s.facebook.com:443/rtmp/'
+          : rawFbUrl;
       targets.push({
         id: 'facebook',
         label: 'Facebook Live',
-        rtmpUrl: destinations.facebookRtmpUrl.trim() || 'rtmps://live-api-s.facebook.com:443/rtmp/',
+        rtmpUrl: safeFbUrl,
         streamKey: destinations.facebookStreamKey.trim()
       });
     }
     if (destinations.youtubeEnabled && destinations.youtubeStreamKey.trim()) {
+      const rawYtUrl = destinations.youtubeRtmpUrl.trim();
+      const safeYtUrl =
+        !rawYtUrl || /^rtmps?:\/\/a\.rtmp\.youtube\.com\/?$/i.test(rawYtUrl)
+          ? 'rtmp://a.rtmp.youtube.com/live2/'
+          : rawYtUrl;
       targets.push({
         id: 'youtube',
         label: 'YouTube Live',
-        rtmpUrl: destinations.youtubeRtmpUrl.trim() || 'rtmp://a.rtmp.youtube.com/live2/',
+        rtmpUrl: safeYtUrl,
         streamKey: destinations.youtubeStreamKey.trim()
       });
     }

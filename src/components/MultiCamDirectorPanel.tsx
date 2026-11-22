@@ -3838,13 +3838,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                     autoComplete="new-password"
                     data-lpignore="true"
                     className="input-field"
-                    placeholder="Collez la clé ou l'URL rtmps:// complète..."
+                    placeholder="Collez la Clé de stream (ex: FB-xxxx...)"
                     value={destinations.facebookStreamKey}
                     onChange={(e) => {
                       const parsed = parseRtmpStreamInput(
                         e.target.value,
-                        destinations.facebookRtmpUrl || 'rtmps://live-api-s.facebook.com:443/rtmp/'
+                        'rtmps://live-api-s.facebook.com:443/rtmp/'
                       );
+                      if (parsed.isServerUrlOnly) {
+                        alert("Vous avez collé l'URL du serveur Facebook (rtmps://...), qui est déjà configurée.\n\nCopiez plutôt la « Clé de stream » située juste en dessous dans Facebook Live Producer.");
+                        updateDestinations({ facebookRtmpUrl: parsed.rtmpUrl, facebookStreamKey: '' });
+                        return;
+                      }
                       updateDestinations({
                         facebookRtmpUrl: parsed.rtmpUrl,
                         facebookStreamKey: parsed.streamKey,
@@ -3915,13 +3920,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                     autoComplete="new-password"
                     data-lpignore="true"
                     className="input-field"
-                    placeholder="Collez la clé ou l'URL rtmp:// complète..."
+                    placeholder="Collez la Clé de flux (ex: xxxx-xxxx-xxxx-xxxx-xxxx)"
                     value={destinations.youtubeStreamKey}
                     onChange={(e) => {
                       const parsed = parseRtmpStreamInput(
                         e.target.value,
-                        destinations.youtubeRtmpUrl || 'rtmp://a.rtmp.youtube.com/live2/'
+                        'rtmp://a.rtmp.youtube.com/live2/'
                       );
+                      if (parsed.isServerUrlOnly) {
+                        alert("Vous avez collé l'URL de flux (rtmp://a.rtmp.youtube.com/live2), qui est déjà configurée.\n\nCopiez plutôt la « Clé de flux » (masquée par des points ••••-••••) située juste au-dessus sur YouTube Studio.");
+                        updateDestinations({ youtubeRtmpUrl: parsed.rtmpUrl, youtubeStreamKey: '' });
+                        return;
+                      }
                       updateDestinations({
                         youtubeRtmpUrl: parsed.rtmpUrl,
                         youtubeStreamKey: parsed.streamKey,

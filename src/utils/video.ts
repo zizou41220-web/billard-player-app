@@ -143,15 +143,19 @@ export const normalizePublicLiveUrl = (rawUrl: string): string => {
 
 /**
  * Splits a pasted RTMP(S) URL + stream key (e.g. "rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx")
- * or keeps a raw stream key intact.
+ * or keeps a raw stream key intact. Protects against pasting a bare server URL (e.g. ".../live2" or ".../rtmp").
  */
 export const parseRtmpStreamInput = (
   rawInput: string,
   defaultRtmpUrl: string
-): { rtmpUrl: string; streamKey: string } => {
+): { rtmpUrl: string; streamKey: string; isServerUrlOnly?: boolean } => {
   const trimmed = (rawInput || '').trim();
   if (/^rtmps?:\/\//i.test(trimmed)) {
     const clean = trimmed.replace(/\/+$/, '');
+    // Bare server URL without an actual stream key (e.g. rtmp://a.rtmp.youtube.com/live2 or rtmps://.../rtmp)
+    if (/\/(live2|live|rtmp|app)$/i.test(clean)) {
+      return { rtmpUrl: `${clean}/`, streamKey: '', isServerUrlOnly: true };
+    }
     const lastSlash = clean.lastIndexOf('/');
     if (lastSlash > 8) {
       return {
@@ -159,7 +163,7 @@ export const parseRtmpStreamInput = (
         streamKey: clean.slice(lastSlash + 1)
       };
     }
-    return { rtmpUrl: clean, streamKey: '' };
+    return { rtmpUrl: `${clean}/`, streamKey: '', isServerUrlOnly: true };
   }
   return { rtmpUrl: defaultRtmpUrl, streamKey: trimmed };
 };
