@@ -3,6 +3,7 @@ import { supabase } from '../supabase';
 export type DirectorCameraSourceType =
   | 'smartphone_webrtc'
   | 'usb'
+  | 'screen_capture'
   | 'vdo'
   | 'external'
   | 'tournament_standings'

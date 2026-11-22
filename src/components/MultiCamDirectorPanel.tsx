@@ -91,6 +91,7 @@ interface CameraTileCardProps {
   videoDevices: MediaDeviceInfo[];
   remoteStream: MediaStream | null;
   usbStream: MediaStream | null;
+  screenStream: MediaStream | null;
   connectionState: string;
   monitorAudioOnPc: boolean;
   onSelectFocus: (cameraId: string) => void;
@@ -98,6 +99,7 @@ interface CameraTileCardProps {
   onUpdateSlot: (cameraId: string, patch: Partial<DirectorCameraSlot>) => void;
   onRemoveSlot: (cameraId: string) => void;
   onOpenQr: (cameraId: string) => void;
+  onStartScreenCapture: (cameraId: string) => void;
   onReconnectWebRtc: (cameraId: string) => void;
   onScoreClubMatch: (matchId: string, score1: number, score2: number) => void;
   onFinishClubMatch: (matchId: string) => void;
@@ -112,6 +114,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   videoDevices,
   remoteStream,
   usbStream,
+  screenStream,
   connectionState,
   monitorAudioOnPc,
   onSelectFocus,
@@ -119,6 +122,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   onUpdateSlot,
   onRemoveSlot,
   onOpenQr,
+  onStartScreenCapture,
   onReconnectWebRtc,
   onScoreClubMatch,
   onFinishClubMatch,
@@ -139,7 +143,9 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
       ? remoteStream
       : slot.sourceType === 'usb'
         ? usbStream
-        : null;
+        : slot.sourceType === 'screen_capture'
+          ? screenStream
+          : null;
 
   const isSingleMode = directorState.broadcastMode === 'single';
   const isFocused = isSingleMode && directorState.focusedCameraId === slot.id;
@@ -322,7 +328,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           />
         )}
 
-        {!isVirtual && (slot.sourceType === 'smartphone_webrtc' || slot.sourceType === 'usb') && (
+        {!isVirtual && (slot.sourceType === 'smartphone_webrtc' || slot.sourceType === 'usb' || slot.sourceType === 'screen_capture') && (
           <video
             ref={videoRef}
             autoPlay
@@ -372,6 +378,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
 
         {!isVirtual && ((slot.sourceType === 'smartphone_webrtc' && !remoteStream) ||
           (slot.sourceType === 'usb' && !usbStream) ||
+          (slot.sourceType === 'screen_capture' && !screenStream) ||
           (slot.sourceType === 'external' && !slot.externalUrl)) && (
           <div style={{
             position: 'absolute',
@@ -394,7 +401,9 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                   : 'Smartphone non connecté'
                 : slot.sourceType === 'usb'
                   ? 'Choisir caméra PC / USB'
-                  : 'Coller un lien vidéo'}
+                  : slot.sourceType === 'screen_capture'
+                    ? 'Cliquez sur « Partager écran »'
+                    : 'Coller un lien vidéo (TV uniquement)'}
             </div>
           </div>
         )}
@@ -720,8 +729,9 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               fontWeight: 700
             }}
           >
-            <optgroup label="Caméras">
+            <optgroup label="Caméras & Écran PC (YouTube / FB)">
               <option value="smartphone_webrtc">Smartphone (QR Code)</option>
+              <option value="screen_capture">Capture Écran / Onglet PC</option>
               {videoDevices.map((d, idx) => (
                 <option key={d.deviceId} value={`usb:${d.deviceId}`}>
                   {d.label || `Caméra PC #${idx + 1}`}
@@ -730,8 +740,8 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               {videoDevices.length === 0 && (
                 <option value="usb">Caméra USB / PC</option>
               )}
-              <option value="vdo">VDO.Ninja</option>
-              <option value="external">Lien Externe</option>
+              <option value="vdo">VDO.Ninja (TV uniquement)</option>
+              <option value="external">Lien Externe (TV uniquement)</option>
             </optgroup>
             {!isExternalLive && (
               <optgroup label="Écrans Live (Régie)">
@@ -742,6 +752,26 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               </optgroup>
             )}
           </select>
+
+          {slot.sourceType === 'screen_capture' && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => onStartScreenCapture(slot.id)}
+              style={{
+                width: 'auto',
+                padding: '3px 7px',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                background: screenStream ? 'rgba(16, 185, 129, 0.2)' : '#1E293B',
+                borderColor: screenStream ? '#10B981' : 'rgba(212, 175, 55, 0.55)',
+                color: screenStream ? '#6EE7B7' : '#FDE68A'
+              }}
+              title="Partager un écran, une fenêtre ou l'onglet principal de l'application vers le direct YouTube/Facebook"
+            >
+              <MonitorPlay size={12} /> {screenStream ? 'Changer écran' : 'Partager écran'}
+            </button>
+          )}
 
           {slot.sourceType === 'smartphone_webrtc' && (
             <button
@@ -960,6 +990,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream | null>>({});
   const [usbStreams, setUsbStreams] = useState<Record<string, MediaStream | null>>({});
+  const [screenStreams, setScreenStreams] = useState<Record<string, MediaStream | null>>({});
   const [rtcStates, setRtcStates] = useState<Record<string, string>>({});
   const [monitorAudioOnPc, setMonitorAudioOnPc] = useState<boolean>(true);
   const [qrModalCamId, setQrModalCamId] = useState<string | null>(null);
@@ -1080,7 +1111,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           ? (remoteStreams[cam.id] || null)
           : cam.sourceType === 'usb'
             ? (usbStreams[cam.id] || null)
-            : null;
+            : cam.sourceType === 'screen_capture'
+              ? (screenStreams[cam.id] || null)
+              : null;
     });
 
     broadcasterRef.current?.updateContext({
@@ -1094,7 +1127,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       currentClub,
       overlayConfig
     });
-  }, [directorState, remoteStreams, usbStreams, tables, matches, players, tournaments, currentClub, overlayConfig]);
+  }, [directorState, remoteStreams, usbStreams, screenStreams, tables, matches, players, tournaments, currentClub, overlayConfig]);
 
   useEffect(() => {
     if (!broadcasterStatus.isStreaming) {
@@ -1514,6 +1547,30 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     destinations.youtubeEnabled && destinations.youtubeStreamKey.trim() ? 'YouTube' : null,
     destinations.customEnabled && destinations.customStreamKey.trim() ? 'RTMP' : null
   ].filter(Boolean);
+
+  const handleStartScreenCapture = async (cameraId: string) => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      alert("Le partage d'écran n'est pas supporté par ce navigateur.");
+      return;
+    }
+    try {
+      const existing = screenStreams[cameraId];
+      if (existing) {
+        existing.getTracks().forEach(t => t.stop());
+      }
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30, max: 30 } },
+        audio: true
+      });
+      const vTrack = stream.getVideoTracks()[0];
+      if (vTrack) {
+        vTrack.onended = () => {
+          setScreenStreams(prev => ({ ...prev, [cameraId]: null }));
+        };
+      }
+      setScreenStreams(prev => ({ ...prev, [cameraId]: stream }));
+    } catch {}
+  };
 
   const handleToggleIntermission = () => {
     updateDirector({
@@ -2315,7 +2372,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             {broadcasterStatus.isStreaming && (
               <>
                 <span style={{ color: 'rgba(255,255,255,0.25)' }}>|</span>
-                {((broadcasterStatus.bitrateKbps || 0) / 1000).toFixed(1)} Mbps
+                {(broadcasterStatus.bitrateKbps || 0) >= 100
+                  ? `${((broadcasterStatus.bitrateKbps || 0) / 1000).toFixed(1)} Mbps`
+                  : `${broadcasterStatus.bitrateKbps || 0} kbps`}
               </>
             )}
           </span>
@@ -3436,6 +3495,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               videoDevices={videoDevices}
               remoteStream={remoteStreams[slot.id] || null}
               usbStream={usbStreams[slot.id] || null}
+              screenStream={screenStreams[slot.id] || null}
               connectionState={rtcStates[slot.id] || 'idle'}
               monitorAudioOnPc={monitorAudioOnPc}
               onSelectFocus={handleSelectFocus}
@@ -3443,6 +3503,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               onUpdateSlot={handleUpdateSlot}
               onRemoveSlot={handleRemoveSlot}
               onOpenQr={setQrModalCamId}
+              onStartScreenCapture={handleStartScreenCapture}
               onReconnectWebRtc={setupWebRtcForCamera}
               onScoreClubMatch={updateMatchScore}
               onFinishClubMatch={finishMatch}
