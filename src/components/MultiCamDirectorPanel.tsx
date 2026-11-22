@@ -2143,10 +2143,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               borderColor: monitorAudioOnPc ? '#10b981' : 'rgba(255,255,255,0.2)',
               color: monitorAudioOnPc ? '#34d399' : '#fff'
             }}
-            title="Activer/Couper l'écoute sur le PC"
+            title="Haut-parleurs de votre PC uniquement (coupe votre retour local sans couper le son envoyé sur YouTube/Facebook)"
           >
             {monitorAudioOnPc ? <Volume2 size={13} /> : <VolumeX size={13} />}
-            {monitorAudioOnPc ? 'Écoute PC' : 'PC Muet'}
+            {monitorAudioOnPc ? 'Haut-parleurs PC' : 'Haut-parleurs OFF'}
           </button>
 
           <button

@@ -38,6 +38,7 @@ import {
   loadOverlayProjects,
   readOverlayImageFile,
   resolveOverlayTextStyle,
+  resolveSponsorCarouselCoords,
   saveActiveOverlayProjectId,
   saveLiveOverlayConfig,
   saveOverlayProjects,
@@ -1822,18 +1823,6 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
               <Plus size={13} /> Ajouter logos partenaires
             </button>
 
-            <select
-              className="input-field"
-              value={sponsorCfg.position}
-              onChange={(e) => updateSponsorCarousel({ position: e.target.value as SponsorCarouselConfig['position'] })}
-              style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 6px', background: '#041815', color: '#fff' }}
-            >
-              <option value="top_right">Haut-Droite</option>
-              <option value="top_left">Haut-Gauche</option>
-              <option value="bottom_right">Bas-Droite</option>
-              <option value="bottom_left">Bas-Gauche</option>
-            </select>
-
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#CBD5E1', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -1842,6 +1831,30 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
               />
               « PARTENAIRE »
             </label>
+
+            {(() => {
+              const scCoords = resolveSponsorCarouselCoords(sponsorCfg, tickerCfg.enabled);
+              return (
+                <span style={{ fontSize: '0.66rem', color: '#94A3B8', marginLeft: 'auto' }}>
+                  Position libre : X {Math.round(scCoords.x)}% • Y {Math.round(scCoords.y)}% (glissez sur l'aperçu TV)
+                </span>
+              );
+            })()}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.28rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Placer :</span>
+            {QUICK_POSITIONS.map(p => (
+              <button
+                key={p.label}
+                type="button"
+                className="btn btn-outline"
+                style={{ width: 'auto', fontSize: '0.64rem', padding: '2px 6px' }}
+                onClick={() => updateSponsorCarousel({ x: p.x, y: p.y })}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
@@ -1861,12 +1874,12 @@ export const LiveOverlayEditorPanel: React.FC<LiveOverlayEditorPanelProps> = ({
             </div>
             <div>
               <span style={{ display: 'block', fontSize: '0.66rem', color: 'var(--text-muted)' }}>
-                Taille ({sponsorCfg.widthPct}%)
+                Taille ({Math.round(sponsorCfg.widthPct)}%)
               </span>
               <input
                 type="range"
-                min={8}
-                max={24}
+                min={6}
+                max={36}
                 step={1}
                 value={sponsorCfg.widthPct}
                 onChange={(e) => updateSponsorCarousel({ widthPct: parseInt(e.target.value, 10) })}

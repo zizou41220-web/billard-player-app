@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  DEFAULT_SPONSOR_CAROUSEL_CONFIG,
   LiveOverlayConfig,
   LiveOverlayImageItem,
   LiveOverlayTextItem,
   getImageBgStyles,
   getTextThemeStyles,
-  resolveOverlayTextStyle
+  resolveOverlayTextStyle,
+  resolveSponsorCarouselCoords
 } from '../utils/liveOverlay';
 
 interface LiveCustomOverlayLayerProps {
@@ -37,7 +39,7 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
     return () => window.clearInterval(t);
   }, [sponsorEnabled, sponsorLogosLen, sponsorIntervalMs]);
   const [draggingState, setDraggingState] = useState<{
-    kind: 'move-image' | 'resize-image' | 'move-text' | 'scale-text';
+    kind: 'move-image' | 'resize-image' | 'move-text' | 'scale-text' | 'move-sponsor' | 'resize-sponsor';
     id: string;
     startClientX: number;
     startClientY: number;
@@ -98,6 +100,21 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
         texts: config.texts.map(txt =>
           txt.id === draggingState.id ? { ...txt, scale: nextScale } : txt
         )
+      });
+    } else if (draggingState.kind === 'move-sponsor') {
+      const nextX = Math.round(clamp(draggingState.initialX + dxPct, 4, 96) * 10) / 10;
+      const nextY = Math.round(clamp(draggingState.initialY + dyPct, 4, 96) * 10) / 10;
+      const baseCar = { ...DEFAULT_SPONSOR_CAROUSEL_CONFIG, ...(config.sponsorCarousel || {}) };
+      onChangeConfig({
+        ...config,
+        sponsorCarousel: { ...baseCar, x: nextX, y: nextY }
+      });
+    } else if (draggingState.kind === 'resize-sponsor') {
+      const nextW = Math.round(clamp(draggingState.initialW + dxPct * 1.4, 6, 36) * 10) / 10;
+      const baseCar = { ...DEFAULT_SPONSOR_CAROUSEL_CONFIG, ...(config.sponsorCarousel || {}) };
+      onChangeConfig({
+        ...config,
+        sponsorCarousel: { ...baseCar, widthPct: nextW }
       });
     }
   };
@@ -373,25 +390,43 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
           );
         })}
 
-      {/* SPONSOR CAROUSEL PREVIEW / TV OUTPUT */}
+      {/* SPONSOR CAROUSEL PREVIEW / TV OUTPUT (FREELY DRAGGABLE & RESIZABLE) */}
       {sponsorEnabled && config.sponsorCarousel && (() => {
         const car = config.sponsorCarousel;
         const activeLogo = car.logos[sponsorTick % car.logos.length];
         if (!activeLogo) return null;
-        const tickerOffsetPct = config.ticker?.enabled ? 5.5 : 0;
-        const posStyle: React.CSSProperties =
-          car.position === 'top_left'
-            ? { top: '6%', left: '2%' }
-            : car.position === 'bottom_left'
-              ? { bottom: `${3 + tickerOffsetPct}%`, left: '2%' }
-              : car.position === 'bottom_right'
-                ? { bottom: `${3 + tickerOffsetPct}%`, right: '2%' }
-                : { top: '6%', right: '2%' };
+        const coords = resolveSponsorCarouselCoords(car, Boolean(config.ticker?.enabled));
+        const isSponsorSelected = interactive && selectedItemId === '__sponsor_carousel__';
+
         return (
           <div
+            onClick={(e) => {
+              e.stopPropagation();
+              if (interactive && onSelectItem) onSelectItem('__sponsor_carousel__');
+            }}
+            onPointerDown={(e) => {
+              if (!interactive) return;
+              e.stopPropagation();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              onSelectItem?.('__sponsor_carousel__');
+              setDraggingState({
+                kind: 'move-sponsor',
+                id: '__sponsor_carousel__',
+                startClientX: e.clientX,
+                startClientY: e.clientY,
+                initialX: coords.x,
+                initialY: coords.y,
+                initialW: car.widthPct || 13,
+                initialH: 0,
+                initialScale: 1
+              });
+            }}
+            title={interactive ? 'Glisser pour placer le Carrousel Sponsors où vous voulez' : undefined}
             style={{
               position: 'absolute',
-              ...posStyle,
+              left: `${coords.x}%`,
+              top: `${coords.y}%`,
+              transform: 'translate(-50%, -50%)',
               width: `${car.widthPct || 13}%`,
               background: 'rgba(10, 14, 22, 0.9)',
               border: '1px solid rgba(255,255,255,0.16)',
@@ -402,8 +437,11 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
               flexDirection: 'column',
               alignItems: 'center',
               gap: `${2 * previewScale}px`,
-              pointerEvents: 'none',
-              zIndex: 13
+              cursor: interactive ? 'grab' : 'default',
+              pointerEvents: interactive ? 'auto' : 'none',
+              outline: isSponsorSelected ? '2px dashed #D4AF37' : 'none',
+              outlineOffset: '3px',
+              zIndex: 15
             }}
           >
             {car.showLabel && (
@@ -415,13 +453,56 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
               key={activeLogo.id}
               src={activeLogo.url}
               alt={activeLogo.label}
+              draggable={false}
               style={{
                 width: '100%',
                 aspectRatio: '16 / 9',
                 objectFit: 'contain',
-                display: 'block'
+                display: 'block',
+                pointerEvents: 'none'
               }}
             />
+
+            {interactive && isSponsorSelected && (
+              <div
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  setDraggingState({
+                    kind: 'resize-sponsor',
+                    id: '__sponsor_carousel__',
+                    startClientX: e.clientX,
+                    startClientY: e.clientY,
+                    initialX: coords.x,
+                    initialY: coords.y,
+                    initialW: car.widthPct || 13,
+                    initialH: 0,
+                    initialScale: 1
+                  });
+                }}
+                title="Glisser pour redimensionner le Carrousel Sponsors"
+                style={{
+                  position: 'absolute',
+                  right: '-8px',
+                  bottom: '-8px',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  background: '#D4AF37',
+                  border: '2px solid #000',
+                  cursor: 'nwse-resize',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  color: '#000',
+                  fontWeight: 900
+                }}
+              >
+                ↘
+              </div>
+            )}
           </div>
         );
       })()}

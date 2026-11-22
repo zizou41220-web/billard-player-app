@@ -117,11 +117,34 @@ export interface SponsorCarouselLogo {
 export interface SponsorCarouselConfig {
   enabled: boolean;
   position: 'top_right' | 'top_left' | 'bottom_right' | 'bottom_left';
+  x?: number; // 0..100 (% from left, center-anchored — freely draggable)
+  y?: number; // 0..100 (% from top, center-anchored — freely draggable)
   intervalSec: number; // 5..30
-  widthPct: number; // 8..24
+  widthPct: number; // 6..36
   showLabel: boolean;
   logos: SponsorCarouselLogo[];
 }
+
+export const resolveSponsorCarouselCoords = (
+  car: SponsorCarouselConfig,
+  tickerEnabled: boolean = false
+): { x: number; y: number } => {
+  if (typeof car.x === 'number' && typeof car.y === 'number') {
+    return { x: car.x, y: car.y };
+  }
+  const bottomY = tickerEnabled ? 82 : 88;
+  switch (car.position) {
+    case 'top_left':
+      return { x: 10, y: 15 };
+    case 'bottom_left':
+      return { x: 10, y: bottomY };
+    case 'bottom_right':
+      return { x: 90, y: bottomY };
+    case 'top_right':
+    default:
+      return { x: 90, y: 15 };
+  }
+};
 
 export interface LiveOverlayConfig {
   scoreboardCustomPos?: boolean;
@@ -147,6 +170,8 @@ export const DEFAULT_TICKER_CONFIG: LiveTickerConfig = {
 export const DEFAULT_SPONSOR_CAROUSEL_CONFIG: SponsorCarouselConfig = {
   enabled: false,
   position: 'top_right',
+  x: 90,
+  y: 15,
   intervalSec: 10,
   widthPct: 13,
   showLabel: true,

@@ -1,5 +1,5 @@
 import { Club, Match, Player, Table, Tournament } from '../types';
-import { LiveOverlayConfig, DEFAULT_LIVE_OVERLAY_CONFIG, resolveOverlayTextStyle } from './liveOverlay';
+import { LiveOverlayConfig, DEFAULT_LIVE_OVERLAY_CONFIG, resolveOverlayTextStyle, resolveSponsorCarouselCoords } from './liveOverlay';
 import {
   DirectorCameraSlot,
   DirectorMosaicLayout,
@@ -1614,7 +1614,7 @@ export class LiveCompositeBroadcaster {
     ctx.restore();
   }
 
-  private drawSponsorCarousel(data: LiveCompositeContext, overlayCfg: LiveOverlayConfig) {
+  private drawSponsorCarousel(_data: LiveCompositeContext, overlayCfg: LiveOverlayConfig) {
     const car = overlayCfg.sponsorCarousel;
     if (!car || !car.enabled || !car.logos || car.logos.length === 0) return;
 
@@ -1640,21 +1640,9 @@ export class LiveCompositeBroadcaster {
     const cardW = Math.round(((car.widthPct || 13) / 100) * W);
     const labelH = car.showLabel ? 16 : 0;
     const cardH = Math.round(cardW * 0.56) + labelH;
-    const tickerOffset = overlayCfg.ticker?.enabled ? 34 : 0;
-    const shotClockOffset = data.directorState.shotClock?.enabled && car.position === 'top_right' ? 164 : 0;
-
-    let x = W - cardW - 18 - shotClockOffset;
-    let y = 54;
-    if (car.position === 'top_left') {
-      x = 18;
-      y = 54;
-    } else if (car.position === 'bottom_left') {
-      x = 18;
-      y = H - cardH - 18 - tickerOffset;
-    } else if (car.position === 'bottom_right') {
-      x = W - cardW - 18;
-      y = H - cardH - 18 - tickerOffset;
-    }
+    const coords = resolveSponsorCarouselCoords(car, Boolean(overlayCfg.ticker?.enabled));
+    const x = Math.max(4, Math.min(W - cardW - 4, Math.round((coords.x / 100) * W - cardW / 2)));
+    const y = Math.max(4, Math.min(H - cardH - 4, Math.round((coords.y / 100) * H - cardH / 2)));
 
     ctx.save();
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
