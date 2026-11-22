@@ -78,7 +78,7 @@ import {
   loadLiveOverlayConfig,
   subscribeToLiveOverlayConfig
 } from '../utils/liveOverlay';
-import { formatEmbedVideoUrl, normalizePublicLiveUrl, parseRtmpStreamInput } from '../utils/video';
+import { parseRtmpStreamInput } from '../utils/video';
 
 interface MultiCamDirectorPanelProps {
   getAppBaseUrl: () => string;
@@ -91,7 +91,6 @@ interface CameraTileCardProps {
   videoDevices: MediaDeviceInfo[];
   remoteStream: MediaStream | null;
   usbStream: MediaStream | null;
-  screenStream: MediaStream | null;
   connectionState: string;
   monitorAudioOnPc: boolean;
   onSelectFocus: (cameraId: string) => void;
@@ -99,7 +98,6 @@ interface CameraTileCardProps {
   onUpdateSlot: (cameraId: string, patch: Partial<DirectorCameraSlot>) => void;
   onRemoveSlot: (cameraId: string) => void;
   onOpenQr: (cameraId: string) => void;
-  onStartScreenCapture: (cameraId: string) => void;
   onReconnectWebRtc: (cameraId: string) => void;
   onScoreClubMatch: (matchId: string, score1: number, score2: number) => void;
   onFinishClubMatch: (matchId: string) => void;
@@ -114,7 +112,6 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   videoDevices,
   remoteStream,
   usbStream,
-  screenStream,
   connectionState,
   monitorAudioOnPc,
   onSelectFocus,
@@ -122,7 +119,6 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   onUpdateSlot,
   onRemoveSlot,
   onOpenQr,
-  onStartScreenCapture,
   onReconnectWebRtc,
   onScoreClubMatch,
   onFinishClubMatch,
@@ -143,9 +139,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
       ? remoteStream
       : slot.sourceType === 'usb'
         ? usbStream
-        : slot.sourceType === 'screen_capture'
-          ? screenStream
-          : null;
+        : null;
 
   const isSingleMode = directorState.broadcastMode === 'single';
   const isFocused = isSingleMode && directorState.focusedCameraId === slot.id;
@@ -328,7 +322,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           />
         )}
 
-        {!isVirtual && (slot.sourceType === 'smartphone_webrtc' || slot.sourceType === 'usb' || slot.sourceType === 'screen_capture') && (
+        {!isVirtual && (
           <video
             ref={videoRef}
             autoPlay
@@ -346,40 +340,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           />
         )}
 
-        {slot.sourceType === 'vdo' && (
-          <iframe
-            src={`https://vdo.ninja/?view=${encodeURIComponent(slot.vdoRoom || `MCB_${currentClub.id}_${slot.id}`)}&cleanoutput&autoplay&muted`}
-            allow="autoplay; camera; microphone; fullscreen"
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              pointerEvents: 'none',
-              transform: `rotate(${slot.rotation || 0}deg) scale(${slot.zoom || 1})`
-            }}
-            title={slot.name}
-          />
-        )}
-
-        {slot.sourceType === 'external' && slot.externalUrl && (
-          <iframe
-            src={formatEmbedVideoUrl(slot.externalUrl)}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              pointerEvents: 'none',
-              transform: `rotate(${slot.rotation || 0}deg) scale(${slot.zoom || 1})`
-            }}
-            title={slot.name}
-          />
-        )}
-
-        {!isVirtual && ((slot.sourceType === 'smartphone_webrtc' && !remoteStream) ||
-          (slot.sourceType === 'usb' && !usbStream) ||
-          (slot.sourceType === 'screen_capture' && !screenStream) ||
-          (slot.sourceType === 'external' && !slot.externalUrl)) && (
+        {!isVirtual && !activeStream && (
           <div style={{
             position: 'absolute',
             inset: 0,
@@ -395,15 +356,11 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           }}>
             <Camera size={22} color="rgba(255,255,255,0.4)" />
             <div style={{ fontSize: '0.73rem', fontWeight: 800, color: '#fff' }}>
-              {slot.sourceType === 'smartphone_webrtc'
-                ? connectionState === 'connecting'
+              {slot.sourceType === 'usb'
+                ? 'Choisir caméra PC / USB'
+                : connectionState === 'connecting'
                   ? 'Connexion smartphone...'
-                  : 'Smartphone non connecté'
-                : slot.sourceType === 'usb'
-                  ? 'Choisir caméra PC / USB'
-                  : slot.sourceType === 'screen_capture'
-                    ? 'Cliquez sur « Partager écran »'
-                    : 'Coller un lien vidéo (TV uniquement)'}
+                  : 'Smartphone non connecté'}
             </div>
           </div>
         )}
@@ -729,9 +686,8 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               fontWeight: 700
             }}
           >
-            <optgroup label="Caméras & Écran PC (YouTube / FB)">
+            <optgroup label="Caméras">
               <option value="smartphone_webrtc">Smartphone (QR Code)</option>
-              <option value="screen_capture">Capture Écran / Onglet PC</option>
               {videoDevices.map((d, idx) => (
                 <option key={d.deviceId} value={`usb:${d.deviceId}`}>
                   {d.label || `Caméra PC #${idx + 1}`}
@@ -740,8 +696,6 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               {videoDevices.length === 0 && (
                 <option value="usb">Caméra USB / PC</option>
               )}
-              <option value="vdo">VDO.Ninja (TV uniquement)</option>
-              <option value="external">Lien Externe (TV uniquement)</option>
             </optgroup>
             {!isExternalLive && (
               <optgroup label="Écrans Live (Régie)">
@@ -752,26 +706,6 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               </optgroup>
             )}
           </select>
-
-          {slot.sourceType === 'screen_capture' && (
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => onStartScreenCapture(slot.id)}
-              style={{
-                width: 'auto',
-                padding: '3px 7px',
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                background: screenStream ? 'rgba(16, 185, 129, 0.2)' : '#1E293B',
-                borderColor: screenStream ? '#10B981' : 'rgba(212, 175, 55, 0.55)',
-                color: screenStream ? '#6EE7B7' : '#FDE68A'
-              }}
-              title="Partager un écran, une fenêtre ou l'onglet principal de l'application vers le direct YouTube/Facebook"
-            >
-              <MonitorPlay size={12} /> {screenStream ? 'Changer écran' : 'Partager écran'}
-            </button>
-          )}
 
           {slot.sourceType === 'smartphone_webrtc' && (
             <button
@@ -835,17 +769,6 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
             placeholder="Nom de la vue (ex: Table Finale, Podium...)"
             value={slot.customViewTitle || ''}
             onChange={(e) => onUpdateSlot(slot.id, { customViewTitle: e.target.value })}
-            style={{ fontSize: '0.7rem', padding: '3px 6px' }}
-          />
-        )}
-
-        {slot.sourceType === 'external' && (
-          <input
-            type="url"
-            className="input-field"
-            placeholder="Collez l'URL YouTube / Caméra IP..."
-            value={slot.externalUrl || ''}
-            onChange={(e) => onUpdateSlot(slot.id, { externalUrl: e.target.value })}
             style={{ fontSize: '0.7rem', padding: '3px 6px' }}
           />
         )}
@@ -974,9 +897,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     updateMatchScore,
     startTournamentMatch,
     finishMatch,
-    launchMatchOnTable,
-    setTableLiveStream,
-    setMatchLiveStream
+    launchMatchOnTable
   } = useStore();
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
     loadDirectorState(currentClub.id)
@@ -990,16 +911,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream | null>>({});
   const [usbStreams, setUsbStreams] = useState<Record<string, MediaStream | null>>({});
-  const [screenStreams, setScreenStreams] = useState<Record<string, MediaStream | null>>({});
   const [rtcStates, setRtcStates] = useState<Record<string, string>>({});
   const [monitorAudioOnPc, setMonitorAudioOnPc] = useState<boolean>(true);
   const [qrModalCamId, setQrModalCamId] = useState<string | null>(null);
   const [showPlatformsModal, setShowPlatformsModal] = useState<boolean>(false);
   const [copiedCamUrl, setCopiedCamUrl] = useState<boolean>(false);
-  const [showCustomRtmp, setShowCustomRtmp] = useState<boolean>(false);
   const [showStreamKeys, setShowStreamKeys] = useState<boolean>(false);
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
-  const [assignLiveTableId, setAssignLiveTableId] = useState<string>('');
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
   const [panelWidth, setPanelWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1280
@@ -1111,9 +1029,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           ? (remoteStreams[cam.id] || null)
           : cam.sourceType === 'usb'
             ? (usbStreams[cam.id] || null)
-            : cam.sourceType === 'screen_capture'
-              ? (screenStreams[cam.id] || null)
-              : null;
+            : null;
     });
 
     broadcasterRef.current?.updateContext({
@@ -1127,7 +1043,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       currentClub,
       overlayConfig
     });
-  }, [directorState, remoteStreams, usbStreams, screenStreams, tables, matches, players, tournaments, currentClub, overlayConfig]);
+  }, [directorState, remoteStreams, usbStreams, tables, matches, players, tournaments, currentClub, overlayConfig]);
 
   useEffect(() => {
     if (!broadcasterStatus.isStreaming) {
@@ -1529,10 +1445,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     ? directorState.cameras.find(c => c.id === directorState.focusedCameraId) || null
     : null;
 
-  const focusedAssignment = focusedCam
-    ? resolveCameraAssignment(focusedCam, { tables, matches, players, tournaments, currentClub }, directorState)
-    : null;
-
   const formatDuration = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
@@ -1544,33 +1456,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const activePlatformsLabel = [
     destinations.facebookEnabled && destinations.facebookStreamKey.trim() ? 'Facebook' : null,
-    destinations.youtubeEnabled && destinations.youtubeStreamKey.trim() ? 'YouTube' : null,
-    destinations.customEnabled && destinations.customStreamKey.trim() ? 'RTMP' : null
+    destinations.youtubeEnabled && destinations.youtubeStreamKey.trim() ? 'YouTube' : null
   ].filter(Boolean);
-
-  const handleStartScreenCapture = async (cameraId: string) => {
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      alert("Le partage d'écran n'est pas supporté par ce navigateur.");
-      return;
-    }
-    try {
-      const existing = screenStreams[cameraId];
-      if (existing) {
-        existing.getTracks().forEach(t => t.stop());
-      }
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: 30, max: 30 } },
-        audio: true
-      });
-      const vTrack = stream.getVideoTracks()[0];
-      if (vTrack) {
-        vTrack.onended = () => {
-          setScreenStreams(prev => ({ ...prev, [cameraId]: null }));
-        };
-      }
-      setScreenStreams(prev => ({ ...prev, [cameraId]: stream }));
-    } catch {}
-  };
 
   const handleToggleIntermission = () => {
     updateDirector({
@@ -2378,107 +2265,38 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               </>
             )}
           </span>
-        </div>
-      </div>
-
-      {/* BARRE RAPIDE LIENS LIVES YOUTUBE / FACEBOOK & STATUT RELAIS */}
-      {(destinations.youtubeLiveUrl?.trim() || destinations.facebookLiveUrl?.trim() || activePlatformsLabel.length > 0) && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          background: '#0B0F17',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '8px',
-          padding: '0.4rem 0.8rem',
-          fontSize: '0.73rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ color: '#94A3B8', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <Link2 size={12} /> Liens Directs :
-            </span>
-            {destinations.youtubeLiveUrl?.trim() && (() => {
-              const ytPublic = normalizePublicLiveUrl(destinations.youtubeLiveUrl);
-              return (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 0, 51, 0.1)', border: '1px solid rgba(255, 51, 68, 0.35)', borderRadius: '6px', padding: '2px 8px' }}>
-                  <Youtube size={13} color="#ff6b81" />
-                  <a href={ytPublic} target="_blank" rel="noreferrer" style={{ color: '#fda4af', fontWeight: 700, textDecoration: 'none' }}>
-                    YouTube <ExternalLink size={10} />
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(ytPublic);
-                      setCopiedLinkId('yt');
-                      setTimeout(() => setCopiedLinkId(null), 1800);
-                    }}
-                    style={{ background: 'transparent', border: 'none', color: copiedLinkId === 'yt' ? '#34d399' : '#cbd5e1', cursor: 'pointer', padding: '0 2px', fontSize: '0.7rem' }}
-                    title="Copier le lien public YouTube"
-                  >
-                    {copiedLinkId === 'yt' ? <Check size={12} /> : <Copy size={12} />}
-                  </button>
-                </span>
-              );
-            })()}
-            {destinations.facebookLiveUrl?.trim() && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(24, 119, 242, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: '6px', padding: '2px 8px' }}>
-                <Facebook size={13} color="#60a5fa" />
-                <a href={destinations.facebookLiveUrl.trim()} target="_blank" rel="noreferrer" style={{ color: '#93c5fd', fontWeight: 700, textDecoration: 'none' }}>
-                  Facebook <ExternalLink size={10} />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(destinations.facebookLiveUrl?.trim() || '');
-                    setCopiedLinkId('fb');
-                    setTimeout(() => setCopiedLinkId(null), 1800);
-                  }}
-                  style={{ background: 'transparent', border: 'none', color: copiedLinkId === 'fb' ? '#34d399' : '#cbd5e1', cursor: 'pointer', padding: '0 2px', fontSize: '0.7rem' }}
-                  title="Copier le lien public Facebook"
-                >
-                  {copiedLinkId === 'fb' ? <Check size={12} /> : <Copy size={12} />}
-                </button>
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <span style={{
-              fontSize: '0.7rem',
+          <button
+            type="button"
+            onClick={() => setShowPlatformsModal(true)}
+            style={{
+              fontSize: '0.68rem',
               fontWeight: 700,
-              padding: '2px 8px',
-              borderRadius: '5px',
+              padding: '3px 8px',
+              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
+              cursor: 'pointer',
               background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
                 ? 'rgba(16, 185, 129, 0.12)'
                 : 'rgba(245, 158, 11, 0.12)',
               border: `1px solid ${broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
               color: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#6EE7B7' : '#FCD34D'
-            }}>
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#10B981' : '#F59E0B'
-              }} />
-              {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                ? 'Relais PC prêt'
-                : 'Relais PC hors ligne'}
-            </span>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setShowPlatformsModal(true)}
-              style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 8px', borderColor: 'rgba(255,255,255,0.15)', color: '#CBD5E1' }}
-            >
-              <Settings size={11} /> Configurer
-            </button>
-          </div>
+            }}
+            title="Statut du Relais PC (cliquer pour configurer YouTube / Facebook)"
+          >
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#10B981' : '#F59E0B'
+            }} />
+            {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+              ? 'Relais PC prêt'
+              : 'Relais PC hors ligne'}
+          </button>
         </div>
-      )}
+      </div>
 
       {/* 1A. 🏆 TOURNOI DE L'APPLI EN DIRECT (PILOTAGE & DIFFUSION SANS QUITTER LE LIVE) */}
       {directorState.situation === 'club_tables' && appTournament && (
@@ -3495,7 +3313,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               videoDevices={videoDevices}
               remoteStream={remoteStreams[slot.id] || null}
               usbStream={usbStreams[slot.id] || null}
-              screenStream={screenStreams[slot.id] || null}
               connectionState={rtcStates[slot.id] || 'idle'}
               monitorAudioOnPc={monitorAudioOnPc}
               onSelectFocus={handleSelectFocus}
@@ -3503,7 +3320,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               onUpdateSlot={handleUpdateSlot}
               onRemoveSlot={handleRemoveSlot}
               onOpenQr={setQrModalCamId}
-              onStartScreenCapture={handleStartScreenCapture}
               onReconnectWebRtc={setupWebRtcForCamera}
               onScoreClubMatch={updateMatchScore}
               onFinishClubMatch={finishMatch}
@@ -3596,176 +3412,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 cursor: 'pointer'
               }}
             />
-
-            {/* Superposition des sources Iframe (Lien Externe / VDO.Ninja) avec DOM persistant Mosaïque ↔ Plein Écran */}
-            {(() => {
-              const isSingle = directorState.broadcastMode === 'single' || enabledCams.length <= 1;
-              const singleTargetId = isSingle ? (focusedCam?.id || enabledCams[0]?.id || null) : null;
-              const basePreviewList = enabledCams.length > 0
-                ? enabledCams
-                : directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType)).slice(0, 1);
-              const previewList =
-                focusedCam && !basePreviewList.some(c => c.id === focusedCam.id)
-                  ? [...basePreviewList, focusedCam]
-                  : basePreviewList;
-              const previewRects = getMosaicGridRects(previewList.length, directorState.mosaicLayout, 1280, 720);
-
-              return previewList.map((slot, idx) => {
-                const isIframeSlot =
-                  (slot.sourceType === 'external' && Boolean(slot.externalUrl?.trim())) ||
-                  slot.sourceType === 'vdo';
-                if (!isIframeSlot) return null;
-
-                const isFocusedInSingle = isSingle && singleTargetId === slot.id;
-                const isHiddenInSingle = (isSingle && singleTargetId !== slot.id) || Boolean(directorState.isIntermission);
-                const rect = previewRects[idx];
-                if (!rect && !isSingle) return null;
-
-                const iframeSrc =
-                  slot.sourceType === 'external' && slot.externalUrl
-                    ? formatEmbedVideoUrl(slot.externalUrl)
-                    : `https://vdo.ninja/?view=${encodeURIComponent(slot.vdoRoom || `MCB_${currentClub.id}_${slot.id}`)}&cleanoutput&autoplay&muted`;
-
-                const cellAssign =
-                  isFocusedInSingle && focusedAssignment
-                    ? focusedAssignment
-                    : resolveCameraAssignment(
-                        slot,
-                        { tables, matches, players, tournaments, currentClub },
-                        directorState
-                      );
-                const isAudioActive =
-                  directorState.activeAudioCameraId === slot.id &&
-                  !slot.forceMuted &&
-                  !isVirtualScreenSource(slot.sourceType);
-                const hasMatchBanner =
-                  cellAssign.isMatchView &&
-                  cellAssign.p1Name &&
-                  cellAssign.p2Name &&
-                  cellAssign.score1 !== undefined &&
-                  cellAssign.score2 !== undefined;
-
-                return (
-                  <div
-                    key={`preview-iframe-slot-${slot.id}`}
-                    style={{
-                      position: 'absolute',
-                      left: isSingle || !rect ? '0%' : `${(rect.x / 1280) * 100}%`,
-                      top: isSingle || !rect ? '0%' : `${(rect.y / 720) * 100}%`,
-                      width: isSingle || !rect ? '100%' : `${(rect.w / 1280) * 100}%`,
-                      height: isSingle || !rect ? '100%' : `${(rect.h / 720) * 100}%`,
-                      zIndex: isFocusedInSingle ? 3 : isHiddenInSingle ? 0 : 2,
-                      opacity: isHiddenInSingle ? 0 : 1,
-                      pointerEvents: 'none',
-                      overflow: 'hidden',
-                      background: '#050814',
-                      boxSizing: 'border-box',
-                      border: isSingle
-                        ? 'none'
-                        : isAudioActive
-                          ? '2px solid #10B981'
-                          : '1px solid rgba(255,255,255,0.22)'
-                    }}
-                  >
-                    <iframe
-                      key="slot-iframe"
-                      src={iframeSrc}
-                      allow="autoplay; camera; microphone; encrypted-media; picture-in-picture"
-                      title={`Aperçu ${slot.name}`}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        border: 'none',
-                        pointerEvents: 'none',
-                        transform: `rotate(${slot.rotation || 0}deg) scale(${slot.zoom || 1})`,
-                        transformOrigin: 'center center',
-                        display: 'block'
-                      }}
-                    />
-
-                    {isFocusedInSingle ? (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '3%',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: hasMatchBanner ? '82%' : 'auto',
-                          maxWidth: '92%',
-                          background: 'rgba(6, 12, 24, 0.9)',
-                          border: '1.5px solid rgba(0, 255, 170, 0.7)',
-                          borderRadius: '10px',
-                          padding: '5px 12px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '3px',
-                          boxSizing: 'border-box'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.68rem', fontWeight: 800 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ background: '#ff2244', color: '#fff', padding: '1px 5px', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 900 }}>
-                              LIVE
-                            </span>
-                            <span style={{ color: '#00ffaa' }}>
-                              {cellAssign.title}
-                              {cellAssign.rulesLabel ? ` • ${cellAssign.rulesLabel}` : ''}
-                            </span>
-                          </div>
-                          <span style={{ color: 'rgba(255,255,255,0.68)', fontSize: '0.64rem' }}>
-                            {currentClub.name}
-                          </span>
-                        </div>
-
-                        {hasMatchBanner ? (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.82rem', fontWeight: 900 }}>
-                            <span style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {cellAssign.p1Name}
-                              {cellAssign.p1Club ? <span style={{ color: '#34D399', fontSize: '0.64rem', marginLeft: '5px' }}>({cellAssign.p1Club})</span> : null}
-                            </span>
-                            <span style={{ background: '#F59E0B', color: '#000', padding: '1px 9px', borderRadius: '6px', flexShrink: 0 }}>
-                              {cellAssign.score1} - {cellAssign.score2}
-                            </span>
-                            <span style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                              {cellAssign.p2Club ? <span style={{ color: '#FBBF24', fontSize: '0.64rem', marginRight: '5px' }}>({cellAssign.p2Club})</span> : null}
-                              {cellAssign.p2Name}
-                            </span>
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.78)' }}>
-                            {cellAssign.subtitle}
-                          </div>
-                        )}
-                      </div>
-                    ) : !isSingle ? (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '5px',
-                          left: '5px',
-                          right: '5px',
-                          background: 'rgba(6, 10, 22, 0.86)',
-                          padding: '3px 6px',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '1px'
-                        }}
-                      >
-                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#00ffaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {isAudioActive ? '🔊 ' : ''}{cellAssign.title}
-                        </div>
-                        <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {hasMatchBanner
-                            ? `${cellAssign.p1Name}  ${cellAssign.score1} - ${cellAssign.score2}  ${cellAssign.p2Name}`
-                            : cellAssign.subtitle}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              });
-            })()}
           </div>
 
           <div style={{ fontSize: '0.68rem', color: '#94A3B8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
@@ -3809,11 +3455,11 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
-                <div style={{ fontWeight: 900, fontSize: '1.12rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Radio size={20} color="#ef4444" /> Studio Diffusion YouTube & Facebook (Sans OBS)
+                <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Radio size={20} color="#ef4444" /> Diffusion YouTube & Facebook
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Collez simplement les liens de vos lives et/ou vos clés de stream pour diffuser la régie multi-caméras + scores TV en direct.
+                  Choisissez la destination et collez votre clé de stream pour diffuser la mosaïque en direct.
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -3845,11 +3491,66 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               </div>
             </div>
 
+            {/* SÉLECTEUR RAPIDE 1 CLIC : FACEBOOK / YOUTUBE / LES 2 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#CBD5E1' }}>
+                Où souhaitez-vous diffuser ?
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.5rem' }}>
+                {[
+                  {
+                    id: 'fb',
+                    label: 'Facebook seul',
+                    active: destinations.facebookEnabled && !destinations.youtubeEnabled,
+                    accent: '#3b82f6',
+                    bg: 'rgba(24, 119, 242, 0.22)',
+                    onClick: () => updateDestinations({ facebookEnabled: true, youtubeEnabled: false })
+                  },
+                  {
+                    id: 'yt',
+                    label: 'YouTube seul',
+                    active: !destinations.facebookEnabled && destinations.youtubeEnabled,
+                    accent: '#ff3344',
+                    bg: 'rgba(255, 0, 51, 0.2)',
+                    onClick: () => updateDestinations({ facebookEnabled: false, youtubeEnabled: true })
+                  },
+                  {
+                    id: 'both',
+                    label: 'Facebook + YouTube',
+                    active: destinations.facebookEnabled && destinations.youtubeEnabled,
+                    accent: '#10b981',
+                    bg: 'rgba(16, 185, 129, 0.2)',
+                    onClick: () => updateDestinations({ facebookEnabled: true, youtubeEnabled: true })
+                  }
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={opt.onClick}
+                    style={{
+                      padding: '0.55rem 0.6rem',
+                      borderRadius: '9px',
+                      border: `1.5px solid ${opt.active ? opt.accent : 'rgba(255,255,255,0.12)'}`,
+                      background: opt.active ? opt.bg : 'rgba(255,255,255,0.03)',
+                      color: opt.active ? '#fff' : '#94A3B8',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {opt.active ? '✓ ' : ''}{opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.9rem' }}>
               {/* FACEBOOK LIVE */}
               <div style={{
-                background: destinations.facebookEnabled ? 'rgba(24, 119, 242, 0.12)' : 'rgba(255,255,255,0.03)',
-                border: `1.5px solid ${destinations.facebookEnabled ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`,
+                background: destinations.facebookEnabled ? 'rgba(24, 119, 242, 0.12)' : 'rgba(255,255,255,0.02)',
+                border: `1.5px solid ${destinations.facebookEnabled ? '#3b82f6' : 'rgba(255,255,255,0.08)'}`,
+                opacity: destinations.facebookEnabled ? 1 : 0.55,
                 borderRadius: '12px',
                 padding: '0.95rem',
                 display: 'flex',
@@ -3857,14 +3558,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 gap: '0.6rem'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontWeight: 900, fontSize: '0.92rem', color: '#60a5fa' }}>
-                    <input
-                      type="checkbox"
-                      checked={destinations.facebookEnabled}
-                      onChange={(e) => updateDestinations({ facebookEnabled: e.target.checked })}
-                    />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 900, fontSize: '0.92rem', color: '#60a5fa' }}>
                     <Facebook size={17} /> Facebook Live
-                  </label>
+                    <span style={{
+                      fontSize: '0.64rem',
+                      padding: '2px 6px',
+                      borderRadius: '999px',
+                      background: destinations.facebookEnabled ? 'rgba(59,130,246,0.28)' : 'rgba(255,255,255,0.08)',
+                      color: destinations.facebookEnabled ? '#bfdbfe' : '#94a3b8'
+                    }}>
+                      {destinations.facebookEnabled ? 'ACTIF' : 'INACTIF'}
+                    </span>
+                  </div>
                   <a
                     href="https://www.facebook.com/live/producer"
                     target="_blank"
@@ -3875,23 +3580,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   </a>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '0.72rem', color: '#bfdbfe', fontWeight: 700 }}>
-                    1. Lien public du Live Facebook (URL spectateurs)
-                  </label>
-                  <input
-                    type="url"
-                    className="input-field"
-                    placeholder="https://www.facebook.com/.../videos/... ou fb.watch/..."
-                    value={destinations.facebookLiveUrl || ''}
-                    onChange={(e) => updateDestinations({ facebookLiveUrl: e.target.value })}
-                    style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <label style={{ fontSize: '0.72rem', color: '#bfdbfe', fontWeight: 700 }}>
-                    2. Clé de stream Facebook (pour diffuser sans OBS)
+                    Clé de stream Facebook
                   </label>
                   <input
                     type={showStreamKeys ? 'text' : 'password'}
@@ -3907,25 +3598,25 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                         'rtmps://live-api-s.facebook.com:443/rtmp/'
                       );
                       if (parsed.isServerUrlOnly) {
-                        alert("Vous avez collé l'URL du serveur Facebook (rtmps://...), qui est déjà configurée.\n\nCopiez plutôt la « Clé de stream » située juste en dessous dans Facebook Live Producer.");
+                        alert("Vous avez collé l'URL du serveur Facebook (rtmps://...), qui est déjà configurée.\n\nCopiez uniquement la « Clé de stream » (commençant par FB-...) dans Facebook Live Producer.");
                         updateDestinations({ facebookRtmpUrl: parsed.rtmpUrl, facebookStreamKey: '' });
                         return;
                       }
                       updateDestinations({
                         facebookRtmpUrl: parsed.rtmpUrl,
-                        facebookStreamKey: parsed.streamKey,
-                        facebookEnabled: parsed.streamKey ? true : destinations.facebookEnabled
+                        facebookStreamKey: parsed.streamKey
                       });
                     }}
-                    style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
+                    style={{ fontSize: '0.8rem', padding: '0.55rem 0.7rem' }}
                   />
                 </div>
               </div>
 
               {/* YOUTUBE LIVE */}
               <div style={{
-                background: destinations.youtubeEnabled ? 'rgba(255, 0, 51, 0.1)' : 'rgba(255,255,255,0.03)',
-                border: `1.5px solid ${destinations.youtubeEnabled ? '#ff3344' : 'rgba(255,255,255,0.1)'}`,
+                background: destinations.youtubeEnabled ? 'rgba(255, 0, 51, 0.1)' : 'rgba(255,255,255,0.02)',
+                border: `1.5px solid ${destinations.youtubeEnabled ? '#ff3344' : 'rgba(255,255,255,0.08)'}`,
+                opacity: destinations.youtubeEnabled ? 1 : 0.55,
                 borderRadius: '12px',
                 padding: '0.95rem',
                 display: 'flex',
@@ -3933,14 +3624,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 gap: '0.6rem'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontWeight: 900, fontSize: '0.92rem', color: '#ff6b81' }}>
-                    <input
-                      type="checkbox"
-                      checked={destinations.youtubeEnabled}
-                      onChange={(e) => updateDestinations({ youtubeEnabled: e.target.checked })}
-                    />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 900, fontSize: '0.92rem', color: '#ff6b81' }}>
                     <Youtube size={17} /> YouTube Live
-                  </label>
+                    <span style={{
+                      fontSize: '0.64rem',
+                      padding: '2px 6px',
+                      borderRadius: '999px',
+                      background: destinations.youtubeEnabled ? 'rgba(255,51,68,0.28)' : 'rgba(255,255,255,0.08)',
+                      color: destinations.youtubeEnabled ? '#fecdd3' : '#94a3b8'
+                    }}>
+                      {destinations.youtubeEnabled ? 'ACTIF' : 'INACTIF'}
+                    </span>
+                  </div>
                   <a
                     href="https://studio.youtube.com/channel/UC/livestreaming"
                     target="_blank"
@@ -3951,29 +3646,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   </a>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '0.72rem', color: '#fecdd3', fontWeight: 700 }}>
-                    1. Lien du Live YouTube (Watch, Live ou Studio)
-                  </label>
-                  <input
-                    type="url"
-                    className="input-field"
-                    placeholder="https://youtube.com/live/... ou studio.youtube.com/video/..."
-                    value={destinations.youtubeLiveUrl || ''}
-                    onChange={(e) => updateDestinations({ youtubeLiveUrl: e.target.value })}
-                    onBlur={(e) => {
-                      const norm = normalizePublicLiveUrl(e.target.value);
-                      if (norm && norm !== e.target.value) {
-                        updateDestinations({ youtubeLiveUrl: norm });
-                      }
-                    }}
-                    style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <label style={{ fontSize: '0.72rem', color: '#fecdd3', fontWeight: 700 }}>
-                    2. Clé de stream YouTube (pour diffuser sans OBS)
+                    Clé de stream YouTube
                   </label>
                   <input
                     type={showStreamKeys ? 'text' : 'password'}
@@ -3989,133 +3664,20 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                         'rtmp://a.rtmp.youtube.com/live2/'
                       );
                       if (parsed.isServerUrlOnly) {
-                        alert("Vous avez collé l'URL de flux (rtmp://a.rtmp.youtube.com/live2), qui est déjà configurée.\n\nCopiez plutôt la « Clé de flux » (masquée par des points ••••-••••) située juste au-dessus sur YouTube Studio.");
+                        alert("Vous avez collé l'URL du serveur (rtmp://a.rtmp.youtube.com/live2), qui est déjà configurée.\n\nCopiez uniquement la « Clé de flux » (masquée par des points ••••-••••) dans YouTube Studio.");
                         updateDestinations({ youtubeRtmpUrl: parsed.rtmpUrl, youtubeStreamKey: '' });
                         return;
                       }
                       updateDestinations({
                         youtubeRtmpUrl: parsed.rtmpUrl,
-                        youtubeStreamKey: parsed.streamKey,
-                        youtubeEnabled: parsed.streamKey ? true : destinations.youtubeEnabled
+                        youtubeStreamKey: parsed.streamKey
                       });
                     }}
-                    style={{ fontSize: '0.78rem', padding: '0.5rem 0.7rem' }}
+                    style={{ fontSize: '0.8rem', padding: '0.55rem 0.7rem' }}
                   />
                 </div>
               </div>
             </div>
-
-            {/* Associer rapidement un lien Live à une table du club */}
-            {(destinations.youtubeLiveUrl?.trim() || destinations.facebookLiveUrl?.trim()) && sortedTables.length > 0 && (
-              <div style={{
-                background: 'rgba(16, 185, 129, 0.08)',
-                border: '1px solid rgba(16, 185, 129, 0.35)',
-                borderRadius: '10px',
-                padding: '0.65rem 0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '0.5rem',
-                fontSize: '0.76rem'
-              }}>
-                <span style={{ color: '#6ee7b7', fontWeight: 800 }}>
-                  📺 Afficher ce Live dans l'appli joueurs (avec scores en direct) :
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  <select
-                    className="input-field"
-                    value={assignLiveTableId || sortedTables[0]?.id || ''}
-                    onChange={(e) => setAssignLiveTableId(e.target.value)}
-                    style={{ width: 'auto', fontSize: '0.74rem', padding: '0.35rem 0.6rem' }}
-                  >
-                    {sortedTables.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name || `Billard ${t.number}`}
-                      </option>
-                    ))}
-                  </select>
-                  {destinations.youtubeLiveUrl?.trim() && (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => {
-                        const tId = assignLiveTableId || sortedTables[0]?.id;
-                        if (!tId) return;
-                        const pubUrl = normalizePublicLiveUrl(destinations.youtubeLiveUrl || '');
-                        const wrapped = `${getAppBaseUrl()}/?overlay=${tId}&video=${encodeURIComponent(pubUrl)}&club=${encodeURIComponent(currentClub.id)}`;
-                        setTableLiveStream(tId, wrapped);
-                        const activeM = tables[tId]?.currentMatchId ? matches[tables[tId].currentMatchId!] : undefined;
-                        if (activeM) setMatchLiveStream(activeM.id, wrapped);
-                        setCopiedLinkId('pub_yt');
-                        setTimeout(() => setCopiedLinkId(null), 2000);
-                      }}
-                      style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', borderColor: '#ff3344', color: '#fda4af' }}
-                    >
-                      {copiedLinkId === 'pub_yt' ? '✅ YouTube lié !' : '▶ Lier YouTube'}
-                    </button>
-                  )}
-                  {destinations.facebookLiveUrl?.trim() && (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => {
-                        const tId = assignLiveTableId || sortedTables[0]?.id;
-                        if (!tId) return;
-                        const pubUrl = (destinations.facebookLiveUrl || '').trim();
-                        const wrapped = `${getAppBaseUrl()}/?overlay=${tId}&video=${encodeURIComponent(pubUrl)}&club=${encodeURIComponent(currentClub.id)}`;
-                        setTableLiveStream(tId, wrapped);
-                        const activeM = tables[tId]?.currentMatchId ? matches[tables[tId].currentMatchId!] : undefined;
-                        if (activeM) setMatchLiveStream(activeM.id, wrapped);
-                        setCopiedLinkId('pub_fb');
-                        setTimeout(() => setCopiedLinkId(null), 2000);
-                      }}
-                      style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px', borderColor: '#3b82f6', color: '#93c5fd' }}
-                    >
-                      {copiedLinkId === 'pub_fb' ? '✅ Facebook lié !' : '📘 Lier Facebook'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setShowCustomRtmp(v => !v)}
-              style={{ width: 'auto', alignSelf: 'flex-start', fontSize: '0.74rem', padding: '4px 10px' }}
-            >
-              {showCustomRtmp ? 'Masquer autre RTMP' : '+ Autre plateforme (Twitch / TikTok / RTMP)'}
-            </button>
-
-            {showCustomRtmp && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.76rem', fontWeight: 700 }}>
-                  <input
-                    type="checkbox"
-                    checked={destinations.customEnabled}
-                    onChange={(e) => updateDestinations({ customEnabled: e.target.checked })}
-                  />
-                  Activer 3ème destination RTMP
-                </label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="Serveur RTMP (rtmp://...)"
-                  value={destinations.customRtmpUrl}
-                  onChange={(e) => updateDestinations({ customRtmpUrl: e.target.value })}
-                  style={{ fontSize: '0.75rem', padding: '0.45rem' }}
-                />
-                <input
-                  type={showStreamKeys ? 'text' : 'password'}
-                  className="input-field"
-                  placeholder="Clé de stream"
-                  value={destinations.customStreamKey}
-                  onChange={(e) => updateDestinations({ customStreamKey: e.target.value })}
-                  style={{ fontSize: '0.75rem', padding: '0.45rem' }}
-                />
-              </div>
-            )}
 
             <div style={{
               background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
@@ -4135,10 +3697,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             }}>
               <div>
                 {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? (
-                  <span><b>🟢 Relais OBS intégré prêt :</b> vous pouvez cliquer sur « Enregistrer & Lancer le Live » pour diffuser directement sur YouTube & Facebook sans OBS.</span>
+                  <span><b>🟢 Relais PC prêt :</b> cliquez sur « Lancer le Live » pour diffuser la mosaïque directement (sans OBS).</span>
                 ) : (
                   <>
-                    <b>Pour diffuser sans OBS depuis le PC du club :</b> lancez <b>« Lancer le Relais Live.bat »</b> (ou <code>npm run relay</code> dans le dossier de l'appli). FFmpeg s'installe automatiquement au 1er lancement.
+                    <b>Relais PC non démarré :</b> lancez <b>« Lancer le Relais Live.bat »</b> dans le dossier de l'appli sur ce PC.
                   </>
                 )}
               </div>
@@ -4167,14 +3729,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               >
                 Fermer
               </button>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setShowPlatformsModal(false)}
-                style={{ width: 'auto', padding: '0.55rem 1.1rem', borderColor: '#00ffaa', color: '#00ffaa', fontWeight: 800 }}
-              >
-                💾 Enregistrer les liens
-              </button>
               {activePlatformsLabel.length > 0 && !broadcasterStatus.isStreaming && (
                 <button
                   type="button"
@@ -4185,7 +3739,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   }}
                   style={{ width: 'auto', padding: '0.55rem 1.2rem', fontWeight: 900, color: '#000' }}
                 >
-                  🔴 Enregistrer & Lancer le Live ({activePlatformsLabel.join('+')})
+                  🔴 Lancer le Live ({activePlatformsLabel.join(' + ')})
                 </button>
               )}
             </div>

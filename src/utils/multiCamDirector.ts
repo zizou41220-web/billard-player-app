@@ -276,7 +276,11 @@ export const loadDirectorState = (clubId: string): MultiCamDirectorState => {
         ...(parsed.regionalMatch || {})
       },
       cameras: Array.isArray(parsed.cameras) && parsed.cameras.length > 0
-        ? parsed.cameras
+        ? parsed.cameras.map((c: DirectorCameraSlot) =>
+            c && (c.sourceType === 'external' || c.sourceType === 'vdo' || c.sourceType === 'screen_capture')
+              ? { ...c, sourceType: 'smartphone_webrtc' as DirectorCameraSourceType }
+              : c
+          )
         : DEFAULT_CAMERAS
     };
   } catch {

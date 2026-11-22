@@ -6,7 +6,7 @@ import {
   Lock, Unlock, ArrowRight, Play, AlertTriangle, RotateCcw,
   Swords, CheckCircle2, Building2, Copy, Check,
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
-  Radio, Tv, Smartphone, ExternalLink, Trash2, Shuffle,
+  Radio, Tv, Trash2, Shuffle,
   Search, X, Volume2, VolumeX, Clock, UserPlus,
   Sun, Moon
 } from 'lucide-react';
@@ -33,7 +33,6 @@ import { useTheme } from '../utils/theme';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
-import { ensureTableWebRtcCameraSlot, resolveTableWebRtcCameraId } from '../utils/multiCamDirector';
 import { getPlayerAvatar } from '../utils/avatar';
 
 const AdminView: React.FC = () => {
@@ -110,15 +109,6 @@ const AdminView: React.FC = () => {
     }
     const cleanPath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/+$/, '');
     return `${window.location.origin}${cleanPath}`;
-  };
-
-  const resolveStreamHref = (rawUrl?: string) => {
-    if (!rawUrl) return '';
-    const qIdx = rawUrl.indexOf('?overlay=');
-    if (qIdx !== -1) {
-      return `${getAppBaseUrl()}/${rawUrl.slice(qIdx)}`;
-    }
-    return rawUrl;
   };
 
   const getClubShareUrl = () => {
@@ -5825,179 +5815,42 @@ const AdminView: React.FC = () => {
                 </div>
               )}
 
-              {/* ========================================================= */}
-              {/* ========================================================= */}
-              {/* LIVE & STREAMING HUB                                      */}
-              {/* ========================================================= */}
+              {/* Raccourci discret vers la Régie Live unifiée */}
               <div style={{
-                background: 'rgba(5, 12, 28, 0.94)',
-                border: '1px solid rgba(0, 255, 170, 0.35)',
-                borderRadius: '16px',
-                padding: '1.2rem',
-                width: '100%',
-                boxSizing: 'border-box',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.6)'
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                width: '100%',
+                paddingTop: '0.5rem',
+                borderTop: '1px solid rgba(255,255,255,0.08)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 900, color: 'var(--accent-primary)', fontSize: '1.05rem' }}>
-                    <Radio size={20} style={{ color: '#ff2244', animation: 'pulse 1.5s infinite' }} /> Régie Live & Streaming
-                  </div>
-                  {Boolean(table.liveStreamUrl || match?.liveStreamUrl) ? (
-                    <span style={{ fontSize: '0.72rem', background: '#ff2244', color: '#fff', padding: '3px 10px', borderRadius: '12px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />
-                      DIRECT CONNECTÉ
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', padding: '3px 10px', borderRadius: '12px' }}>
-                      En attente de diffusion
-                    </span>
-                  )}
-                </div>
-
-                {/* Active Stream Banner (shown on all tabs when a live stream is active) */}
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ flex: 1, fontSize: '0.8rem', padding: '0.55rem 0.85rem', borderColor: 'rgba(255, 59, 92, 0.45)', color: '#ff9aa4', fontWeight: 800, justifyContent: 'center' }}
+                  onClick={() => {
+                    setSelectedTableForQR(null);
+                    setActiveTab('live_studio');
+                  }}
+                >
+                  <Radio size={15} /> Ouvrir la Régie Live (YouTube / Facebook)
+                </button>
                 {Boolean(table.liveStreamUrl || match?.liveStreamUrl) && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '0.5rem',
-                    background: 'rgba(255, 34, 68, 0.14)',
-                    border: '1px solid rgba(255, 34, 68, 0.45)',
-                    padding: '0.55rem 0.8rem',
-                    borderRadius: '10px',
-                    flexWrap: 'wrap'
-                  }}>
-                    <span style={{ fontSize: '0.78rem', color: '#ff8a96', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      🔴 Direct actif sur cette table
-                    </span>
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      <a
-                        href={resolveStreamHref(table.liveStreamUrl || match?.liveStreamUrl)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-neon"
-                        style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
-                      >
-                        <ExternalLink size={13} /> 👁️ Voir le Direct
-                      </a>
-                      <a
-                        href={`${getAppBaseUrl()}/?overlay=all&club=${currentClub.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-outline"
-                        style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', borderColor: 'rgba(245, 158, 11, 0.45)', whiteSpace: 'nowrap' }}
-                        title="Ouvrir le mur vidéo avec tous les billards sur le même écran"
-                      >
-                        <Tv size={13} /> ⊞ Multi-Billards
-                      </a>
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px', color: '#ff6b81', borderColor: 'rgba(255,107,129,0.4)', whiteSpace: 'nowrap' }}
-                        onClick={() => {
-                          setTableLiveStream(table.id, undefined);
-                          if (match) setMatchLiveStream(match.id, undefined);
-                        }}
-                      >
-                        ⏹ Couper
-                      </button>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ width: 'auto', fontSize: '0.74rem', padding: '0.55rem 0.8rem', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.4)' }}
+                    onClick={() => {
+                      setTableLiveStream(table.id, undefined);
+                      if (match) setMatchLiveStream(match.id, undefined);
+                    }}
+                    title="Retirer l'ancien lien vidéo attaché à cette table"
+                  >
+                    ⏹ Couper ancien lien
+                  </button>
                 )}
-
-                {/* DIFFUSION DU MATCH : QR CODE SMARTPHONE NATIF (UNIFIÉ RÉGIE) + URL DIRECT FACEBOOK */}
-                {(() => {
-                  const tableLabel = table.name || `Billard ${table.number}`;
-                  const unifiedCamId = resolveTableWebRtcCameraId(currentClub.id, table.id, table.number);
-                  const nativeCamQrUrl = `${getAppBaseUrl()}/?camera=${encodeURIComponent(unifiedCamId)}&club=${encodeURIComponent(currentClub.id)}`;
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'center', textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.45', textAlign: 'left', width: '100%', background: 'rgba(15, 23, 42, 0.7)', padding: '0.7rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
-                        <div><b style={{ color: '#F8FAFC' }}>Étape 1 :</b> Posez un smartphone face au billard et flashez ce QR Code (caméra native unifiée avec la Régie YouTube/Facebook).</div>
-                        <div style={{ marginTop: '5px' }}><b style={{ color: '#F8FAFC' }}>Étape 2 :</b> Activez le direct smartphone ci-dessous <b>ou</b> collez l'URL de votre direct Facebook.</div>
-                      </div>
-
-                      <div style={{ background: '#fff', padding: '10px', borderRadius: '10px', display: 'inline-block' }}>
-                        <QRCode value={nativeCamQrUrl} size={135} />
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn btn-neon"
-                        style={{ width: '100%', fontSize: '0.82rem', padding: '0.65rem', justifyContent: 'center', fontWeight: 800 }}
-                        onClick={() => {
-                          const baseUrl = getAppBaseUrl();
-                          const camId = ensureTableWebRtcCameraSlot(currentClub.id, table.id, tableLabel, table.number);
-                          const liveViewerUrl = `${baseUrl}/?overlay=${table.id}&cam=${encodeURIComponent(camId)}&pos=${overlayPos}&club=${currentClub.id}`;
-                          setTableLiveStream(table.id, liveViewerUrl);
-                          if (match) setMatchLiveStream(match.id, liveViewerUrl);
-                        }}
-                      >
-                        <Radio size={15} /> Activer le Direct Smartphone (Vidéo + Score TV)
-                      </button>
-                    </div>
-                  );
-                })()}
-
-                {/* URL DU DIRECT FACEBOOK */}
-                <div style={{ background: 'rgba(24, 119, 242, 0.08)', border: '1px solid rgba(24, 119, 242, 0.35)', borderRadius: '12px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.84rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Smartphone size={16} /> URL du direct Facebook
-                  </div>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                    Si vous diffusez le match sur Facebook, collez le lien du direct Facebook ci-dessous :
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <input
-                      type="url"
-                      className="input-field"
-                      placeholder="https://www.facebook.com/.../videos/... ou https://fb.watch/..."
-                      defaultValue={(() => {
-                        const raw = table.liveStreamUrl || match?.liveStreamUrl || '';
-                        const qIdx = raw.indexOf('?');
-                        if (qIdx !== -1 && raw.includes('overlay=')) {
-                          const v = new URLSearchParams(raw.slice(qIdx)).get('video');
-                          return v || '';
-                        }
-                        return raw.includes('vdo=') || raw.includes('cam=') ? '' : raw;
-                      })()}
-                      id={`stream-input-${table.id}-fb`}
-                      style={{
-                        width: '100%',
-                        fontSize: '0.82rem',
-                        padding: '0.6rem 0.85rem',
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1px solid rgba(24, 119, 242, 0.5)',
-                        color: '#fff',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-neon"
-                      style={{ width: '100%', fontSize: '0.82rem', padding: '0.6rem 1rem', fontWeight: 800, background: '#1877f2', borderColor: '#1877f2', color: '#fff' }}
-                      onClick={() => {
-                        const input = document.getElementById(`stream-input-${table.id}-fb`) as HTMLInputElement;
-                        const trimmed = input?.value.trim() || '';
-                        if (!trimmed) {
-                          setTableLiveStream(table.id, undefined);
-                          if (match) setMatchLiveStream(match.id, undefined);
-                          return;
-                        }
-                        const wrappedUrl = trimmed.includes('?overlay=')
-                          ? trimmed
-                          : `${getAppBaseUrl()}/?overlay=${table.id}&video=${encodeURIComponent(trimmed)}&pos=${overlayPos}&club=${currentClub.id}`;
-                        setTableLiveStream(table.id, wrappedUrl);
-                        if (match) setMatchLiveStream(match.id, wrappedUrl);
-                      }}
-                    >
-                      🔵 Diffuser ce Live Facebook dans l'application
-                    </button>
-                  </div>
-                </div>
               </div>
 
               <button className="btn btn-outline" onClick={() => setSelectedTableForQR(null)}>Fermer</button>
