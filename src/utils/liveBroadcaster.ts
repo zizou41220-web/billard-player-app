@@ -544,22 +544,39 @@ export function drawVirtualScreenToCanvas(
   ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
-  ctx.translate(x, y);
-  ctx.scale(w / 1280, h / 720);
 
-  // Rich broadcast dark emerald background
-  const grad = ctx.createRadialGradient(640, 180, 60, 640, 360, 820);
+  // Rich broadcast dark emerald background across the entire cell (seamless, no distortion)
+  const grad = ctx.createRadialGradient(
+    x + w * 0.5,
+    y + h * 0.25,
+    Math.min(w, h) * 0.08,
+    x + w * 0.5,
+    y + h * 0.5,
+    Math.max(w, h) * 0.78
+  );
   grad.addColorStop(0, '#0a2923');
   grad.addColorStop(0.6, '#05111e');
   grad.addColorStop(1, '#02050c');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 1280, 720);
+  ctx.fillRect(x, y, w, h);
 
-  // Header bar (Broadcast Pro matte dark)
+  // Uniform scale preserves exact 16:9 typography proportions inside tall side-by-side or wide stacked mosaic cells
+  const scale = Math.min(w / 1280, h / 720);
+  const drawW = 1280 * scale;
+  const contentX = x + (w - drawW) / 2;
+  const headerScaledH = 74 * scale;
+
+  // Full-width top header bar pinned cleanly to top of cell
   ctx.fillStyle = '#0A0E16';
-  ctx.fillRect(0, 0, 1280, 74);
+  ctx.fillRect(x, y, w, headerScaledH);
   ctx.fillStyle = '#D4AF37';
-  ctx.fillRect(0, 72, 1280, 2);
+  const goldLineH = Math.max(1.5, 2 * scale);
+  ctx.fillRect(x, y + headerScaledH - goldLineH, w, goldLineH);
+
+  // Header contents in crisp uniform 1280x720 coordinates
+  ctx.save();
+  ctx.translate(contentX, y);
+  ctx.scale(scale, scale);
 
   ctx.beginPath();
   ctx.arc(42, 37, 6, 0, Math.PI * 2);
@@ -589,6 +606,14 @@ export function drawVirtualScreenToCanvas(
   ctx.font = '600 15px Inter, system-ui, sans-serif';
   ctx.textAlign = 'right';
   ctx.fillText(currentClub.name.toUpperCase(), 1250, 37);
+  ctx.restore();
+
+  // Body contents (virtual y = 74..720) uniformly scaled and vertically centered in remaining cell height
+  const bodyAvailH = Math.max(0, h - headerScaledH);
+  const bodyScaledH = 646 * scale;
+  const bodyOffsetY = y + headerScaledH + Math.max(0, (bodyAvailH - bodyScaledH) / 2) - 74 * scale;
+  ctx.translate(contentX, bodyOffsetY);
+  ctx.scale(scale, scale);
 
   if (slot.sourceType === 'tournament_standings') {
     if (!targetTour) {
@@ -1299,13 +1324,32 @@ export class LiveCompositeBroadcaster {
         ctx.fillText(slot.externalUrl.slice(0, 48), x + w / 2, y + h / 2 + 14);
       }
     } else {
+      const assignment = resolveCameraAssignment(
+        slot,
+        {
+          tables: data.tables,
+          matches: data.matches,
+          players: data.players,
+          tournaments: data.tournaments,
+          currentClub: data.currentClub
+        },
+        data.directorState
+      );
+      const placeholderLabel =
+        data.directorState.situation === 'club_tables' && assignment.title
+          ? assignment.title
+          : slot.name;
       ctx.fillStyle = '#090D16';
       ctx.fillRect(x, y, w, h);
-      ctx.fillStyle = 'rgba(255,255,255,0.38)';
+      ctx.fillStyle = 'rgba(255,255,255,0.42)';
       ctx.font = '600 14px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${slot.name.toUpperCase()} — EN ATTENTE DE SIGNAL`, x + w / 2, y + h / 2);
+      ctx.fillText(
+        this.fitCanvasText(ctx, `${placeholderLabel.toUpperCase()} — EN ATTENTE DE SIGNAL`, Math.max(120, w - 32)),
+        x + w / 2,
+        y + h / 2
+      );
     }
 
     ctx.restore();

@@ -5082,7 +5082,7 @@ const AdminView: React.FC = () => {
             margin: '0 auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.9rem',
+            gap: '0.65rem',
             paddingBottom: '1.5rem'
           }}>
             <div style={{
@@ -5092,29 +5092,30 @@ const AdminView: React.FC = () => {
               flexWrap: 'wrap',
               gap: '0.6rem',
               background: '#0B0F17',
-              padding: '0.4rem 0.6rem',
-              borderRadius: '10px',
-              border: '1px solid rgba(255,255,255,0.1)'
+              padding: '0.42rem 0.65rem',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 6px 20px rgba(0,0,0,0.26)'
             }}>
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
                   type="button"
                   onClick={() => setLiveStudioSubTab('cameras')}
                   style={{
                     background: liveStudioSubTab === 'cameras' ? '#1E293B' : 'transparent',
-                    color: liveStudioSubTab === 'cameras' ? '#F8FAFC' : 'rgba(255,255,255,0.6)',
+                    color: liveStudioSubTab === 'cameras' ? '#F8FAFC' : 'rgba(255,255,255,0.62)',
                     fontWeight: 700,
                     border: liveStudioSubTab === 'cameras' ? '1px solid rgba(212, 175, 55, 0.65)' : '1px solid transparent',
-                    padding: '0.45rem 0.9rem',
-                    borderRadius: '7px',
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '8px',
                     cursor: 'pointer',
-                    fontSize: '0.8rem',
+                    fontSize: '0.78rem',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.45rem'
                   }}
                 >
-                  <MonitorPlay size={15} color={liveStudioSubTab === 'cameras' ? '#D4AF37' : 'currentColor'} />
+                  <MonitorPlay size={14} color={liveStudioSubTab === 'cameras' ? '#D4AF37' : 'currentColor'} />
                   Régie Live Multi-Caméras
                 </button>
                 <button
@@ -5122,13 +5123,13 @@ const AdminView: React.FC = () => {
                   onClick={() => setLiveStudioSubTab('overlay')}
                   style={{
                     background: liveStudioSubTab === 'overlay' ? '#1E293B' : 'transparent',
-                    color: liveStudioSubTab === 'overlay' ? '#F8FAFC' : 'rgba(255,255,255,0.6)',
+                    color: liveStudioSubTab === 'overlay' ? '#F8FAFC' : 'rgba(255,255,255,0.62)',
                     fontWeight: 700,
                     border: liveStudioSubTab === 'overlay' ? '1px solid rgba(212, 175, 55, 0.65)' : '1px solid transparent',
-                    padding: '0.45rem 0.9rem',
-                    borderRadius: '7px',
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '8px',
                     cursor: 'pointer',
-                    fontSize: '0.8rem',
+                    fontSize: '0.78rem',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.45rem'
@@ -5138,6 +5139,9 @@ const AdminView: React.FC = () => {
                   Habillage TV (Logos, Sponsors & Textes)
                 </button>
               </div>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', letterSpacing: '0.3px', paddingRight: '0.2rem' }}>
+                STUDIO DIFFUSION LIVE
+              </span>
             </div>
 
             {liveStudioSubTab === 'cameras' && (
