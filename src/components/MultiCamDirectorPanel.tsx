@@ -44,6 +44,7 @@ import {
 import {
   CUSTOM_VIEW_PRESETS,
   CameraSignalingHandle,
+  DEFAULT_MOSAIC_HEADER,
   DEFAULT_REGIONAL_MATCH,
   DEFAULT_SHOT_CLOCK,
   DirectorAssignmentType,
@@ -51,6 +52,7 @@ import {
   DirectorCameraSourceType,
   DirectorLiveSituation,
   DirectorMosaicLayout,
+  MosaicHeaderConfig,
   MultiCamDirectorState,
   RTC_ICE_CONFIG,
   RegionalMatchConfig,
@@ -80,6 +82,7 @@ import {
   DEFAULT_TICKER_CONFIG,
   LiveOverlayConfig,
   loadLiveOverlayConfig,
+  readOverlayImageFile,
   saveLiveOverlayConfig,
   subscribeToLiveOverlayConfig
 } from '../utils/liveOverlay';
@@ -926,6 +929,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
   const [replaySpeedChoice, setReplaySpeedChoice] = useState<number>(0.6);
   const [, setShotClockUiTick] = useState<number>(0);
+  const [showHeaderSettings, setShowHeaderSettings] = useState<boolean>(false);
+  const headerLogoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [panelWidth, setPanelWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
@@ -1569,6 +1574,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     saveLiveOverlayConfig(currentClub.id, nextOv, 'live', true);
   };
 
+  const mosaicHeader: MosaicHeaderConfig = {
+    ...DEFAULT_MOSAIC_HEADER,
+    ...(directorState.mosaicHeader || {})
+  };
+
+  const updateMosaicHeader = (patch: Partial<MosaicHeaderConfig>) => {
+    updateDirector({
+      ...directorState,
+      mosaicHeader: { ...mosaicHeader, ...patch }
+    });
+  };
+
   const handleTriggerReplay = (speed?: number) => {
     if (broadcasterStatus.isReplaying) {
       broadcasterRef.current?.stopInstantReplay();
@@ -1720,7 +1737,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     const cy = ((e.clientY - rect.top) / rect.height) * 720;
 
     const list = enabledCams.length > 0 ? enabledCams : directorState.cameras.slice(0, 1);
-    const cells = getMosaicGridRects(list.length, directorState.mosaicLayout, 1280, 720);
+    const headerH = mosaicHeader.showBar !== false ? 50 : 0;
+    const cells = getMosaicGridRects(list.length, directorState.mosaicLayout, 1280, 720, headerH);
     const hit = cells.find(cell => cx >= cell.x && cx <= cell.x + cell.w && cy >= cell.y && cy <= cell.y + cell.h);
     if (hit && list[hit.index]) {
       handleSelectFocus(list[hit.index].id);
@@ -3689,7 +3707,24 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               PROGRAMME LIVE ({directorState.isIntermission ? 'Pause' : directorState.broadcastMode === 'single' ? 'Plein Écran' : 'Mosaïque'})
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setShowHeaderSettings(v => !v)}
+                className="btn btn-outline"
+                style={{
+                  width: 'auto',
+                  padding: '3px 8px',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  background: showHeaderSettings ? 'rgba(212, 175, 55, 0.2)' : 'transparent',
+                  borderColor: showHeaderSettings ? '#D4AF37' : 'rgba(255,255,255,0.18)',
+                  color: showHeaderSettings ? '#FDE68A' : '#E2E8F0'
+                }}
+                title="Modifier, agrandir, remplacer ou masquer le logo et le bandeau haut de la mosaïque"
+              >
+                🖼️ Logo / En-tête
+              </button>
               {directorState.broadcastMode === 'single' && (
                 <button
                   type="button"
@@ -3718,6 +3753,142 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             </div>
           </div>
 
+          {/* RÉGLAGE DIRECT LOGO & BANDEAU EN-TÊTE MOSAÏQUE */}
+          {showHeaderSettings && (
+            <div style={{
+              background: '#050811',
+              border: '1px solid rgba(212, 175, 55, 0.35)',
+              borderRadius: '8px',
+              padding: '0.55rem 0.7rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.45rem',
+              fontSize: '0.7rem'
+            }}>
+              <input
+                ref={headerLogoFileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  readOverlayImageFile(file, (dataUrl) => {
+                    updateMosaicHeader({ logoMode: 'custom', customLogoUrl: dataUrl });
+                  });
+                  e.target.value = '';
+                }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <span style={{ color: '#FDE68A', fontWeight: 800 }}>Logo en-tête :</span>
+                {([
+                  { id: 'none' as const, label: 'Masquer' },
+                  { id: 'club' as const, label: 'Logo Club' },
+                  { id: 'custom' as const, label: mosaicHeader.customLogoUrl ? 'Logo Perso' : 'Importer Logo…' }
+                ]).map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      if (opt.id === 'custom' && !mosaicHeader.customLogoUrl) {
+                        headerLogoFileInputRef.current?.click();
+                      } else {
+                        updateMosaicHeader({ logoMode: opt.id });
+                      }
+                    }}
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: `1px solid ${mosaicHeader.logoMode === opt.id ? '#D4AF37' : 'rgba(255,255,255,0.16)'}`,
+                      background: mosaicHeader.logoMode === opt.id ? 'rgba(212,175,55,0.22)' : 'transparent',
+                      color: mosaicHeader.logoMode === opt.id ? '#FDE68A' : '#CBD5E1'
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                {mosaicHeader.logoMode === 'custom' && (
+                  <button
+                    type="button"
+                    onClick={() => headerLogoFileInputRef.current?.click()}
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: '1px solid rgba(52,211,153,0.45)',
+                      background: 'rgba(16,185,129,0.15)',
+                      color: '#6EE7B7'
+                    }}
+                  >
+                    📷 Changer image
+                  </button>
+                )}
+
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', color: '#CBD5E1', cursor: 'pointer', fontWeight: 700 }}>
+                  <input
+                    type="checkbox"
+                    checked={mosaicHeader.showBar !== false}
+                    onChange={(e) => updateMosaicHeader({ showBar: e.target.checked })}
+                  />
+                  Bandeau noir haut
+                </label>
+              </div>
+
+              {mosaicHeader.logoMode !== 'none' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 160px' }}>
+                    <span style={{ color: '#94A3B8', whiteSpace: 'nowrap' }}>
+                      Taille ({mosaicHeader.logoHeightPx || 56}px)
+                    </span>
+                    <input
+                      type="range"
+                      min={36}
+                      max={115}
+                      step={2}
+                      value={mosaicHeader.logoHeightPx || 56}
+                      onChange={(e) => updateMosaicHeader({ logoHeightPx: parseInt(e.target.value, 10) })}
+                      style={{ flex: 1, accentColor: '#D4AF37' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ color: '#94A3B8' }}>Fond :</span>
+                    {([
+                      { id: 'transparent' as const, label: 'Transparent' },
+                      { id: 'white' as const, label: 'Blanc' },
+                      { id: 'dark_gold' as const, label: 'Médaillon Or' }
+                    ]).map(bg => (
+                      <button
+                        key={bg.id}
+                        type="button"
+                        onClick={() => updateMosaicHeader({ logoBg: bg.id })}
+                        style={{
+                          padding: '2px 7px',
+                          borderRadius: '5px',
+                          fontSize: '0.66rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: `1px solid ${(mosaicHeader.logoBg || 'dark_gold') === bg.id ? '#D4AF37' : 'rgba(255,255,255,0.14)'}`,
+                          background: (mosaicHeader.logoBg || 'dark_gold') === bg.id ? 'rgba(212,175,55,0.22)' : 'transparent',
+                          color: (mosaicHeader.logoBg || 'dark_gold') === bg.id ? '#FDE68A' : '#CBD5E1'
+                        }}
+                      >
+                        {bg.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ fontSize: '0.64rem', color: '#94A3B8' }}>
+                Astuce : choisissez <b>Masquer</b> ici si vous préférez placer librement vos logos à la souris dans l'onglet <b>Habillage TV</b>.
+              </div>
+            </div>
+          )}
+
           <div
             style={{
               position: 'relative',
@@ -3735,8 +3906,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 broadcasterRef.current?.setPreviewCanvas(el);
               }}
               onClick={handlePreviewCanvasClick}
-              width={960}
-              height={540}
+              width={1280}
+              height={720}
               title={
                 directorState.broadcastMode === 'mosaic'
                   ? 'Aperçu en direct de l’Écran Multiple — Cliquez sur un cadran pour le diffuser seul'

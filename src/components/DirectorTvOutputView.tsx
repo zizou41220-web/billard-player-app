@@ -3,6 +3,7 @@ import { Maximize2, Volume2, VolumeX } from 'lucide-react';
 import { useStore } from '../store';
 import {
   CameraSignalingHandle,
+  DEFAULT_MOSAIC_HEADER,
   DirectorCameraSlot,
   MultiCamDirectorState,
   RTC_ICE_CONFIG,
@@ -622,68 +623,91 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
           )}
         </div>
       )}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'rgba(10, 15, 30, 0.92)',
-        border: '1px solid rgba(255,255,255,0.14)',
-        borderRadius: '10px',
-        padding: '0.45rem 1rem',
-        color: '#fff',
-        flexShrink: 0,
-        gap: '0.6rem',
-        flexWrap: 'wrap'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-          <div style={{ background: '#fff', padding: '2px 6px', borderRadius: '6px', display: 'inline-flex' }}>
-            <img
-              src={getClubLogoUrl(currentClub.logoUrl)}
-              alt={currentClub.name}
-              style={{ height: '24px', objectFit: 'contain' }}
-              onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
-            />
-          </div>
-          <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#F8FAFC', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#EF4444' }} />
-            MULTI-CAMÉRAS • {directorState.situation === 'cuescore_live' ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim()) ? directorState.regionalMatch.cueScoreTournamentName : 'Live CueScore') : directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
-          </span>
-          {directorState.situation === 'club_tables' && activeTournament && (
-            <span style={{ fontSize: '0.74rem', color: '#D4AF37', background: 'rgba(212, 175, 55, 0.12)', border: '1px solid rgba(212, 175, 55, 0.3)', padding: '2px 8px', borderRadius: '5px', fontWeight: 700 }}>
-              {activeTournament.name}
-            </span>
-          )}
-        </div>
+      {(() => {
+        const mh = { ...DEFAULT_MOSAIC_HEADER, ...(directorState.mosaicHeader || {}) };
+        if (mh.showBar === false) return null;
+        const logoSrc =
+          mh.logoMode === 'none'
+            ? ''
+            : mh.logoMode === 'custom'
+              ? (mh.customLogoUrl || '')
+              : getClubLogoUrl(currentClub.logoUrl);
+        const logoH = Math.max(28, Math.min(72, Math.round((mh.logoHeightPx || 56) * 0.65)));
+        const bgMode = mh.logoBg || 'dark_gold';
+        return (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'rgba(10, 15, 30, 0.92)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: '10px',
+            padding: '0.4rem 1rem',
+            color: '#fff',
+            flexShrink: 0,
+            gap: '0.6rem',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+              {logoSrc && (
+                <div style={{
+                  background: bgMode === 'white' ? '#fff' : bgMode === 'dark_gold' ? 'rgba(10,14,22,0.95)' : 'transparent',
+                  border: bgMode === 'dark_gold' ? '1.5px solid #D4AF37' : 'none',
+                  padding: bgMode === 'transparent' ? 0 : '3px 7px',
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center'
+                }}>
+                  <img
+                    src={logoSrc}
+                    alt={currentClub.name}
+                    style={{ height: `${logoH}px`, maxWidth: '140px', objectFit: 'contain' }}
+                    onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
+                  />
+                </div>
+              )}
+              <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#F8FAFC', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#EF4444' }} />
+                MULTI-CAMÉRAS • {directorState.situation === 'cuescore_live' ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim()) ? directorState.regionalMatch.cueScoreTournamentName : 'Live CueScore') : directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
+              </span>
+              {directorState.situation === 'club_tables' && activeTournament && (
+                <span style={{ fontSize: '0.74rem', color: '#D4AF37', background: 'rgba(212, 175, 55, 0.12)', border: '1px solid rgba(212, 175, 55, 0.3)', padding: '2px 8px', borderRadius: '5px', fontWeight: 700 }}>
+                  {activeTournament.name}
+                </span>
+              )}
+            </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-          <button
-            type="button"
-            onClick={() => setSoundAllowed(v => !v)}
-            style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
-          >
-            {soundAllowed ? '🔊 Son ON' : '🔇 Muet'}
-          </button>
-          {onExitToAll && (
-            <button
-              type="button"
-              onClick={onExitToAll}
-              style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
-            >
-              🎱 Vue Billards
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
-              else document.exitFullscreen?.();
-            }}
-            style={{ background: '#00ffaa', color: '#000', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '0.76rem', fontWeight: 900, cursor: 'pointer' }}
-          >
-            ⛶ PLEIN ÉCRAN
-          </button>
-        </div>
-      </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <button
+                type="button"
+                onClick={() => setSoundAllowed(v => !v)}
+                style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+              >
+                {soundAllowed ? '🔊 Son ON' : '🔇 Muet'}
+              </button>
+              {onExitToAll && (
+                <button
+                  type="button"
+                  onClick={onExitToAll}
+                  style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  🎱 Vue Billards
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+                  else document.exitFullscreen?.();
+                }}
+                style={{ background: '#00ffaa', color: '#000', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '0.76rem', fontWeight: 900, cursor: 'pointer' }}
+              >
+                ⛶ PLEIN ÉCRAN
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{
         flex: 1,

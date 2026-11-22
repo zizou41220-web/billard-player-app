@@ -122,6 +122,22 @@ export function getShotClockRemainingMs(sc?: ShotClockState | null, now: number 
   return Math.max(0, sc.remainingMs - Math.max(0, now - sc.startedAt));
 }
 
+export interface MosaicHeaderConfig {
+  showBar: boolean;
+  logoMode: 'club' | 'custom' | 'none';
+  customLogoUrl?: string;
+  logoHeightPx?: number; // 36..115 px
+  logoBg?: 'transparent' | 'white' | 'dark_gold';
+}
+
+export const DEFAULT_MOSAIC_HEADER: MosaicHeaderConfig = {
+  showBar: true,
+  logoMode: 'club',
+  customLogoUrl: '',
+  logoHeightPx: 56,
+  logoBg: 'dark_gold'
+};
+
 export interface MultiCamDirectorState {
   situation: DirectorLiveSituation;
   regionalMatch: RegionalMatchConfig;
@@ -130,6 +146,7 @@ export interface MultiCamDirectorState {
   focusedCameraId: string | null;
   activeAudioCameraId: string | null;
   mosaicLayout: DirectorMosaicLayout;
+  mosaicHeader?: MosaicHeaderConfig;
   isIntermission?: boolean;
   intermissionTitle?: string;
   intermissionSubtitle?: string;
@@ -244,6 +261,7 @@ export const DEFAULT_DIRECTOR_STATE: MultiCamDirectorState = {
   focusedCameraId: null,
   activeAudioCameraId: 'cam_1',
   mosaicLayout: 'auto',
+  mosaicHeader: DEFAULT_MOSAIC_HEADER,
   isIntermission: false,
   intermissionTitle: 'PAUSE — REPRISE DANS QUELQUES INSTANTS',
   intermissionSubtitle: '',
@@ -308,6 +326,10 @@ export const loadDirectorState = (clubId: string): MultiCamDirectorState => {
       shotClock: {
         ...DEFAULT_SHOT_CLOCK,
         ...(parsed.shotClock || {})
+      },
+      mosaicHeader: {
+        ...DEFAULT_MOSAIC_HEADER,
+        ...(parsed.mosaicHeader || {})
       },
       cameras: Array.isArray(parsed.cameras) && parsed.cameras.length > 0
         ? parsed.cameras.map((c: DirectorCameraSlot) =>

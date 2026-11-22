@@ -1,6 +1,7 @@
 import { Club, Match, Player, Table, Tournament } from '../types';
 import { LiveOverlayConfig, DEFAULT_LIVE_OVERLAY_CONFIG, resolveOverlayTextStyle, resolveSponsorCarouselCoords } from './liveOverlay';
 import {
+  DEFAULT_MOSAIC_HEADER,
   DirectorCameraSlot,
   DirectorMosaicLayout,
   MultiCamDirectorState,
@@ -88,10 +89,10 @@ export function getMosaicGridRects(
   count: number,
   mosaicLayout: DirectorMosaicLayout,
   W: number = 1280,
-  H: number = 720
+  H: number = 720,
+  headerH: number = 50
 ): MosaicCellRect[] {
   const safeCount = Math.max(1, count);
-  const headerH = 44;
   let cols = 1;
   let rows = 1;
   if (safeCount === 1) {
@@ -2139,51 +2140,68 @@ export class LiveCompositeBroadcaster {
         this.drawTickerBar(data, overlayCfg);
       }
     } else {
-      const headerH = 44;
-      ctx.fillStyle = '#0A0E16';
-      ctx.fillRect(0, 0, W, headerH);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.fillRect(0, headerH - 1, W, 1);
+      const mh = { ...DEFAULT_MOSAIC_HEADER, ...(directorState.mosaicHeader || {}) };
+      const showBar = mh.showBar !== false;
+      const headerH = showBar ? 50 : 0;
 
-      const clubLogo = this.getCachedImage(getClubLogoUrl(currentClub.logoUrl) || defaultClubLogo);
-      if (clubLogo) {
-        ctx.drawImage(clubLogo, 14, 7, 30, 30);
+      // Resolve crisp header logo (club / custom / none)
+      const activeLogoUrl =
+        mh.logoMode === 'none'
+          ? ''
+          : mh.logoMode === 'custom'
+            ? (mh.customLogoUrl || '')
+            : (getClubLogoUrl(currentClub.logoUrl) || defaultClubLogo);
+      const headerLogoImg = activeLogoUrl ? this.getCachedImage(activeLogoUrl) : null;
+      const logoBoxH = Math.max(34, Math.min(115, Number(mh.logoHeightPx) || 56));
+      const logoAspect = headerLogoImg
+        ? Math.max(0.5, Math.min(3.2, headerLogoImg.naturalWidth / Math.max(1, headerLogoImg.naturalHeight)))
+        : 1;
+      const logoBoxW = Math.round(logoBoxH * logoAspect);
+      const hasVisibleLogo = Boolean(headerLogoImg);
+
+      if (showBar) {
+        ctx.fillStyle = '#0A0E16';
+        ctx.fillRect(0, 0, W, headerH);
+        ctx.fillStyle = 'rgba(212, 175, 55, 0.35)';
+        ctx.fillRect(0, headerH - 1.5, W, 1.5);
+
+        const textStartX = hasVisibleLogo ? (16 + logoBoxW + 18) : 20;
+
+        ctx.beginPath();
+        ctx.arc(textStartX, headerH / 2, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#EF4444';
+        ctx.fill();
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = '800 12px Outfit, Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('LIVE', textStartX + 11, headerH / 2);
+
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = '800 16px Outfit, Inter, sans-serif';
+        ctx.textAlign = 'left';
+        const mosaicHeaderTitle =
+          directorState.situation === 'cuescore_live'
+            ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim())
+                ? directorState.regionalMatch.cueScoreTournamentName.trim()
+                : 'LIVE CUESCORE')
+            : directorState.situation === 'regional_match'
+              ? (directorState.regionalMatch.eventTitle?.trim() || 'TOURNOI RÉGIONAL')
+              : currentClub.name;
+        ctx.fillText(`${mosaicHeaderTitle.toUpperCase()}  •  MULTI-CAMÉRAS`, textStartX + 54, headerH / 2);
+
+        // Subtle live clock in top-right (also guarantees continuous canvas motion for MediaRecorder)
+        ctx.fillStyle = 'rgba(255,255,255,0.58)';
+        ctx.font = '700 13px Outfit, Inter, sans-serif';
+        ctx.textAlign = 'right';
+        const mosaicTime = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        ctx.fillText(mosaicTime, W - 16, headerH / 2);
       }
-
-      ctx.beginPath();
-      ctx.arc(60, 22, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#EF4444';
-      ctx.fill();
-      ctx.fillStyle = '#F8FAFC';
-      ctx.font = '800 11px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('LIVE', 70, 22);
-
-      ctx.fillStyle = '#F8FAFC';
-      ctx.font = '800 14px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      const mosaicHeaderTitle =
-        directorState.situation === 'cuescore_live'
-          ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim())
-              ? directorState.regionalMatch.cueScoreTournamentName.trim()
-              : 'LIVE CUESCORE')
-          : directorState.situation === 'regional_match'
-            ? (directorState.regionalMatch.eventTitle?.trim() || 'TOURNOI RÉGIONAL')
-            : currentClub.name;
-      ctx.fillText(`${mosaicHeaderTitle.toUpperCase()}  •  MULTI-CAMÉRAS`, 112, 22);
-
-      // Subtle live clock in top-right (also guarantees continuous canvas motion for MediaRecorder)
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.font = '700 12px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'right';
-      const mosaicTime = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      ctx.fillText(mosaicTime, W - 16, 22);
 
       const list = enabledCams.length > 0
         ? enabledCams
         : directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType)).slice(0, 1);
-      const rects = getMosaicGridRects(list.length, directorState.mosaicLayout, W, H);
+      const rects = getMosaicGridRects(list.length, directorState.mosaicLayout, W, H, headerH);
 
       list.forEach((slot, idx) => {
         const rect = rects[idx];
@@ -2269,6 +2287,37 @@ export class LiveCompositeBroadcaster {
           ctx.restore();
         }
       });
+
+      // Crisp high-res broadcast header logo medallion drawn on top (never clipped, aspect preserved)
+      if (hasVisibleLogo && headerLogoImg) {
+        const lx = 14;
+        const ly = showBar ? (logoBoxH <= headerH - 6 ? Math.round((headerH - logoBoxH) / 2) : 6) : 12;
+        const bgMode = mh.logoBg || 'dark_gold';
+        const pad = bgMode === 'transparent' ? 0 : 5;
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        if (bgMode !== 'transparent') {
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 3;
+          drawRoundedRect(ctx, lx, ly, logoBoxW, logoBoxH, 10);
+          ctx.fillStyle = bgMode === 'white' ? 'rgba(255, 255, 255, 0.96)' : 'rgba(10, 14, 22, 0.95)';
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.lineWidth = bgMode === 'dark_gold' ? 2 : 1.5;
+          ctx.strokeStyle = bgMode === 'dark_gold' ? '#D4AF37' : 'rgba(255, 255, 255, 0.45)';
+          ctx.stroke();
+        }
+        const iw = Math.max(1, logoBoxW - pad * 2);
+        const ih = Math.max(1, logoBoxH - pad * 2);
+        const scale = Math.min(iw / Math.max(1, headerLogoImg.naturalWidth), ih / Math.max(1, headerLogoImg.naturalHeight));
+        const dw = headerLogoImg.naturalWidth * scale;
+        const dh = headerLogoImg.naturalHeight * scale;
+        ctx.drawImage(headerLogoImg, lx + pad + (iw - dw) / 2, ly + pad + (ih - dh) / 2, dw, dh);
+        ctx.restore();
+      }
 
       // Render custom TV logos, sponsors, shot clock & scrolling ticker over the mosaic broadcast
       this.drawCustomOverlays(overlayCfg);
