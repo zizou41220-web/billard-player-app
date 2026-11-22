@@ -127,15 +127,15 @@ export interface MosaicHeaderConfig {
   logoMode: 'club' | 'custom' | 'none';
   customLogoUrl?: string;
   logoHeightPx?: number; // 36..115 px
-  logoBg?: 'transparent' | 'white' | 'dark_gold';
+  logoBg?: 'circle' | 'transparent' | 'white' | 'dark_gold';
 }
 
 export const DEFAULT_MOSAIC_HEADER: MosaicHeaderConfig = {
   showBar: true,
   logoMode: 'club',
   customLogoUrl: '',
-  logoHeightPx: 56,
-  logoBg: 'dark_gold'
+  logoHeightPx: 62,
+  logoBg: 'circle'
 };
 
 export interface MultiCamDirectorState {

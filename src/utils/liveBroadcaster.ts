@@ -832,6 +832,7 @@ export class LiveCompositeBroadcaster {
   private contextData: LiveCompositeContext | null = null;
   private rafTimer: number | null = null;
   private imageCache = new Map<string, HTMLImageElement>();
+  private mipmapCache = new Map<string, HTMLCanvasElement>();
 
   // Web Audio Mixer
   private audioCtx: AudioContext | null = null;
@@ -932,6 +933,89 @@ export class LiveCompositeBroadcaster {
 
   public setPreviewCanvas(canvas: HTMLCanvasElement | null) {
     this.previewCanvas = canvas;
+  }
+
+  public setQualityPreset(preset: StreamQualityPreset) {
+    const profile = STREAM_QUALITY_PROFILES[preset] || STREAM_QUALITY_PROFILES['720p'];
+    if (!this.status.isStreaming && (this.canvas.width !== profile.width || this.canvas.height !== profile.height)) {
+      this.canvas.width = profile.width;
+      this.canvas.height = profile.height;
+    }
+    this.emitStatus({ qualityPreset: preset });
+  }
+
+  private fitCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+    if (!text) return '';
+    if (maxWidth <= 20 || ctx.measureText(text).width <= maxWidth) return text;
+    let lo = 0;
+    let hi = text.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (ctx.measureText(`${text.slice(0, mid)}…`).width <= maxWidth) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return lo > 0 ? `${text.slice(0, lo).trimEnd()}…` : '…';
+  }
+
+  /**
+   * Multi-step progressive 2x mipmap downscaler to avoid single-pass Canvas2D aliasing/blur on HD logos.
+   */
+  private getCrispScaledImage(
+    img: HTMLImageElement,
+    destW: number,
+    destH: number
+  ): HTMLImageElement | HTMLCanvasElement {
+    const scaleFactor = Math.max(1, this.canvas.width / 1280);
+    const targetW = Math.max(2, Math.round(destW * scaleFactor));
+    const targetH = Math.max(2, Math.round(destH * scaleFactor));
+
+    if (img.naturalWidth <= targetW * 2 && img.naturalHeight <= targetH * 2) {
+      return img;
+    }
+
+    const cacheKey = `${img.src}|${targetW}x${targetH}`;
+    const cached = this.mipmapCache.get(cacheKey);
+    if (cached) return cached;
+
+    let cur: HTMLImageElement | HTMLCanvasElement = img;
+    let cw = img.naturalWidth;
+    let ch = img.naturalHeight;
+
+    while (cw > targetW * 2 || ch > targetH * 2) {
+      const nw = Math.max(targetW, Math.round(cw * 0.5));
+      const nh = Math.max(targetH, Math.round(ch * 0.5));
+      const stepCanvas = document.createElement('canvas');
+      stepCanvas.width = nw;
+      stepCanvas.height = nh;
+      const sCtx = stepCanvas.getContext('2d');
+      if (!sCtx) break;
+      sCtx.imageSmoothingEnabled = true;
+      sCtx.imageSmoothingQuality = 'high';
+      sCtx.drawImage(cur, 0, 0, nw, nh);
+      cur = stepCanvas;
+      cw = nw;
+      ch = nh;
+    }
+
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = targetW;
+    finalCanvas.height = targetH;
+    const fCtx = finalCanvas.getContext('2d');
+    if (fCtx) {
+      fCtx.imageSmoothingEnabled = true;
+      fCtx.imageSmoothingQuality = 'high';
+      fCtx.drawImage(cur, 0, 0, targetW, targetH);
+      if (this.mipmapCache.size > 48) {
+        const firstKey = this.mipmapCache.keys().next().value;
+        if (firstKey) this.mipmapCache.delete(firstKey);
+      }
+      this.mipmapCache.set(cacheKey, finalCanvas);
+      return finalCanvas;
+    }
+    return cur;
   }
 
   public getStatus(): BroadcasterStatusSnapshot {
@@ -1309,25 +1393,26 @@ export class LiveCompositeBroadcaster {
       ctx.fillText(`${assignment.score2}`, s2X + scoreBoxW / 2, rowY + 1);
 
       const p1Right = s1X - 16;
+      const maxSingleNameW = Math.max(120, p1Right - (left + 16));
       ctx.fillStyle = '#F8FAFC';
       ctx.font = '800 19px Inter, system-ui, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText((assignment.p1Name || 'Joueur 1').slice(0, 24), p1Right, hasClubs ? rowY - 4 : rowY);
+      ctx.fillText(this.fitCanvasText(ctx, assignment.p1Name || 'Joueur 1', maxSingleNameW), p1Right, hasClubs ? rowY - 4 : rowY);
       if (assignment.p1Club) {
         ctx.fillStyle = '#94A3B8';
         ctx.font = '600 11px Inter, system-ui, sans-serif';
-        ctx.fillText(assignment.p1Club.slice(0, 28), p1Right, rowY + 14);
+        ctx.fillText(this.fitCanvasText(ctx, assignment.p1Club, maxSingleNameW), p1Right, rowY + 14);
       }
 
       const p2Left = s2X + scoreBoxW + 16;
       ctx.fillStyle = '#F8FAFC';
       ctx.font = '800 19px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText((assignment.p2Name || 'Joueur 2').slice(0, 24), p2Left, hasClubs ? rowY - 4 : rowY);
+      ctx.fillText(this.fitCanvasText(ctx, assignment.p2Name || 'Joueur 2', maxSingleNameW), p2Left, hasClubs ? rowY - 4 : rowY);
       if (assignment.p2Club) {
         ctx.fillStyle = '#94A3B8';
         ctx.font = '600 11px Inter, system-ui, sans-serif';
-        ctx.fillText(assignment.p2Club.slice(0, 28), p2Left, rowY + 14);
+        ctx.fillText(this.fitCanvasText(ctx, assignment.p2Club, maxSingleNameW), p2Left, rowY + 14);
       }
       ctx.restore();
     } else {
@@ -1423,18 +1508,23 @@ export class LiveCompositeBroadcaster {
         ctx.clip();
       }
 
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       if (imgItem.aspectRatio === 'free' || imgItem.fitMode === 'fill') {
-        ctx.drawImage(img, ix, iy, iw, ih);
+        const crisp = this.getCrispScaledImage(img, iw, ih);
+        ctx.drawImage(crisp, ix, iy, iw, ih);
       } else if (imgItem.fitMode === 'cover') {
         const scale = Math.max(iw / img.naturalWidth, ih / img.naturalHeight);
         const dw = img.naturalWidth * scale;
         const dh = img.naturalHeight * scale;
-        ctx.drawImage(img, ix + (iw - dw) / 2, iy + (ih - dh) / 2, dw, dh);
+        const crisp = this.getCrispScaledImage(img, dw, dh);
+        ctx.drawImage(crisp, ix + (iw - dw) / 2, iy + (ih - dh) / 2, dw, dh);
       } else {
         const scale = Math.min(iw / img.naturalWidth, ih / img.naturalHeight);
         const dw = img.naturalWidth * scale;
         const dh = img.naturalHeight * scale;
-        ctx.drawImage(img, ix + (iw - dw) / 2, iy + (ih - dh) / 2, dw, dh);
+        const crisp = this.getCrispScaledImage(img, dw, dh);
+        ctx.drawImage(crisp, ix + (iw - dw) / 2, iy + (ih - dh) / 2, dw, dh);
       }
       ctx.restore();
     }
@@ -1672,7 +1762,8 @@ export class LiveCompositeBroadcaster {
     const scale = Math.min(boxW / Math.max(1, img.naturalWidth), boxH / Math.max(1, img.naturalHeight));
     const dw = img.naturalWidth * scale;
     const dh = img.naturalHeight * scale;
-    ctx.drawImage(img, boxX + (boxW - dw) / 2, boxY + (boxH - dh) / 2, dw, dh);
+    const crispSponsor = this.getCrispScaledImage(img, dw, dh);
+    ctx.drawImage(crispSponsor, boxX + (boxW - dw) / 2, boxY + (boxH - dh) / 2, dw, dh);
     ctx.restore();
   }
 
@@ -2071,18 +2162,59 @@ export class LiveCompositeBroadcaster {
     const headerLogoImg = activeLogoUrl ? this.getCachedImage(activeLogoUrl) : null;
     if (!headerLogoImg) return;
 
-    const logoBoxH = Math.max(34, Math.min(115, Number(mh.logoHeightPx) || 56));
-    const logoAspect = Math.max(0.5, Math.min(3.2, headerLogoImg.naturalWidth / Math.max(1, headerLogoImg.naturalHeight)));
+    const bgMode = mh.logoBg || 'circle';
+    const isCircle = bgMode === 'circle';
+    const logoBoxH = Math.max(34, Math.min(115, Number(mh.logoHeightPx) || 62));
+    const logoAspect = isCircle
+      ? 1
+      : Math.max(0.5, Math.min(3.2, headerLogoImg.naturalWidth / Math.max(1, headerLogoImg.naturalHeight)));
     const logoBoxW = Math.round(logoBoxH * logoAspect);
     const lx = showBar ? 14 : 18;
     const ly = showBar ? (logoBoxH <= headerH - 6 ? Math.round((headerH - logoBoxH) / 2) : 6) : 16;
-    const bgMode = mh.logoBg || 'dark_gold';
-    const pad = bgMode === 'transparent' ? 0 : 5;
+    const pad = bgMode === 'transparent' || isCircle ? 0 : 5;
     const ctx = this.ctx;
 
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
+
+    if (isCircle) {
+      const cx = lx + logoBoxW / 2;
+      const cy = ly + logoBoxH / 2;
+      const r = logoBoxH / 2;
+      // Soft broadcast drop shadow
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.restore();
+
+      // Clip cleanly inside circle (eliminates ugly white square corners!)
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
+      ctx.clip();
+      const coverScale = Math.max(logoBoxW / Math.max(1, headerLogoImg.naturalWidth), logoBoxH / Math.max(1, headerLogoImg.naturalHeight));
+      const dw = headerLogoImg.naturalWidth * coverScale;
+      const dh = headerLogoImg.naturalHeight * coverScale;
+      const crispLogo = this.getCrispScaledImage(headerLogoImg, dw, dh);
+      ctx.drawImage(crispLogo, cx - dw / 2, cy - dh / 2, dw, dh);
+      ctx.restore();
+
+      // Crisp gold broadcast rim
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - 0.75, 0, Math.PI * 2);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#D4AF37';
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
     if (bgMode !== 'transparent') {
       ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
       ctx.shadowBlur = 12;
@@ -2101,7 +2233,8 @@ export class LiveCompositeBroadcaster {
     const scale = Math.min(iw / Math.max(1, headerLogoImg.naturalWidth), ih / Math.max(1, headerLogoImg.naturalHeight));
     const dw = headerLogoImg.naturalWidth * scale;
     const dh = headerLogoImg.naturalHeight * scale;
-    ctx.drawImage(headerLogoImg, lx + pad + (iw - dw) / 2, ly + pad + (ih - dh) / 2, dw, dh);
+    const crispLogo = this.getCrispScaledImage(headerLogoImg, dw, dh);
+    ctx.drawImage(crispLogo, lx + pad + (iw - dw) / 2, ly + pad + (ih - dh) / 2, dw, dh);
     ctx.restore();
   }
 
@@ -2304,7 +2437,8 @@ export class LiveCompositeBroadcaster {
           ctx.font = '700 10px Inter, system-ui, sans-serif';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(assignment.title.toUpperCase().slice(0, 38), barX + 10, barY + 13);
+          const titleMaxW = Math.max(80, barW - (isAudioActive ? 64 : 20));
+          ctx.fillText(this.fitCanvasText(ctx, assignment.title.toUpperCase(), titleMaxW), barX + 10, barY + 13);
 
           if (isAudioActive) {
             ctx.fillStyle = '#D4AF37';
@@ -2340,17 +2474,18 @@ export class LiveCompositeBroadcaster {
             ctx.font = '800 13px Inter, system-ui, sans-serif';
             ctx.fillText(`${assignment.score2}`, s2X + sbW / 2, rowY + 0.5);
 
+            const maxSideW = Math.max(60, s1X - barX - 18);
             ctx.fillStyle = '#F8FAFC';
-            ctx.font = '700 12px Inter, system-ui, sans-serif';
+            ctx.font = '700 12.5px Inter, system-ui, sans-serif';
             ctx.textAlign = 'right';
-            ctx.fillText(assignment.p1Name.slice(0, 14), s1X - 8, rowY);
+            ctx.fillText(this.fitCanvasText(ctx, assignment.p1Name, maxSideW), s1X - 8, rowY);
             ctx.textAlign = 'left';
-            ctx.fillText(assignment.p2Name.slice(0, 14), s2X + sbW + 8, rowY);
+            ctx.fillText(this.fitCanvasText(ctx, assignment.p2Name, maxSideW), s2X + sbW + 8, rowY);
           } else {
             ctx.fillStyle = '#CBD5E1';
             ctx.font = '600 11px Inter, system-ui, sans-serif';
             ctx.textAlign = 'left';
-            ctx.fillText(assignment.subtitle.slice(0, 38), barX + 10, barY + 31);
+            ctx.fillText(this.fitCanvasText(ctx, assignment.subtitle, Math.max(80, barW - 20)), barX + 10, barY + 31);
           }
           ctx.restore();
         }
@@ -2382,8 +2517,14 @@ export class LiveCompositeBroadcaster {
     }
 
     if (this.previewCanvas) {
+      if (this.previewCanvas.width !== this.canvas.width || this.previewCanvas.height !== this.canvas.height) {
+        this.previewCanvas.width = this.canvas.width;
+        this.previewCanvas.height = this.canvas.height;
+      }
       const pCtx = this.previewCanvas.getContext('2d');
       if (pCtx) {
+        pCtx.imageSmoothingEnabled = true;
+        pCtx.imageSmoothingQuality = 'high';
         pCtx.drawImage(this.canvas, 0, 0, this.previewCanvas.width, this.previewCanvas.height);
       }
     }

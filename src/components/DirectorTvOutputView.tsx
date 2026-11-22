@@ -633,7 +633,8 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
               ? (mh.customLogoUrl || '')
               : getClubLogoUrl(currentClub.logoUrl);
         const logoH = Math.max(28, Math.min(72, Math.round((mh.logoHeightPx || 56) * 0.65)));
-        const bgMode = mh.logoBg || 'dark_gold';
+        const bgMode = mh.logoBg || 'circle';
+        const isCircle = bgMode === 'circle';
         return (
           <div style={{
             display: 'flex',
@@ -651,17 +652,26 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
               {logoSrc && (
                 <div style={{
-                  background: bgMode === 'white' ? '#fff' : bgMode === 'dark_gold' ? 'rgba(10,14,22,0.95)' : 'transparent',
-                  border: bgMode === 'dark_gold' ? '1.5px solid #D4AF37' : 'none',
-                  padding: bgMode === 'transparent' ? 0 : '3px 7px',
-                  borderRadius: '8px',
+                  background: isCircle || bgMode === 'white' ? '#fff' : bgMode === 'dark_gold' ? 'rgba(10,14,22,0.95)' : 'transparent',
+                  border: isCircle || bgMode === 'dark_gold' ? '1.5px solid #D4AF37' : 'none',
+                  padding: isCircle || bgMode === 'transparent' ? 0 : '3px 7px',
+                  borderRadius: isCircle ? '50%' : '8px',
+                  overflow: 'hidden',
+                  width: isCircle ? `${logoH}px` : undefined,
+                  height: isCircle ? `${logoH}px` : undefined,
                   display: 'inline-flex',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}>
                   <img
                     src={logoSrc}
                     alt={currentClub.name}
-                    style={{ height: `${logoH}px`, maxWidth: '140px', objectFit: 'contain' }}
+                    style={{
+                      height: `${logoH}px`,
+                      width: isCircle ? `${logoH}px` : undefined,
+                      maxWidth: isCircle ? undefined : '140px',
+                      objectFit: isCircle ? 'cover' : 'contain'
+                    }}
                     onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
                   />
                 </div>

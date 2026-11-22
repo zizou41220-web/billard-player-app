@@ -1018,6 +1018,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     if (previewCanvasRef.current) {
       b.setPreviewCanvas(previewCanvasRef.current);
     }
+    b.setQualityPreset(destinations.qualityPreset || '720p');
     b.startRenderLoop();
     b.setReplayArmed(true);
     b.checkRelayAvailability(destinations.relayWsUrl);
@@ -2462,7 +2463,11 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             className="input-field"
             disabled={broadcasterStatus.isStreaming}
             value={destinations.qualityPreset || '720p'}
-            onChange={(e) => updateDestinations({ qualityPreset: e.target.value as StreamQualityPreset })}
+            onChange={(e) => {
+              const nextPreset = e.target.value as StreamQualityPreset;
+              updateDestinations({ qualityPreset: nextPreset });
+              broadcasterRef.current?.setQualityPreset(nextPreset);
+            }}
             style={{
               width: 'auto',
               fontSize: '0.7rem',
@@ -3855,12 +3860,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                       style={{ flex: 1, accentColor: '#D4AF37' }}
                     />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: '#94A3B8' }}>Fond :</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                    <span style={{ color: '#94A3B8' }}>Forme / Fond :</span>
                     {([
+                      { id: 'circle' as const, label: 'Rond Or' },
                       { id: 'transparent' as const, label: 'Transparent' },
                       { id: 'white' as const, label: 'Blanc' },
-                      { id: 'dark_gold' as const, label: 'Médaillon Or' }
+                      { id: 'dark_gold' as const, label: 'Carré Or' }
                     ]).map(bg => (
                       <button
                         key={bg.id}
@@ -3872,9 +3878,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                           fontSize: '0.66rem',
                           fontWeight: 700,
                           cursor: 'pointer',
-                          border: `1px solid ${(mosaicHeader.logoBg || 'dark_gold') === bg.id ? '#D4AF37' : 'rgba(255,255,255,0.14)'}`,
-                          background: (mosaicHeader.logoBg || 'dark_gold') === bg.id ? 'rgba(212,175,55,0.22)' : 'transparent',
-                          color: (mosaicHeader.logoBg || 'dark_gold') === bg.id ? '#FDE68A' : '#CBD5E1'
+                          border: `1px solid ${(mosaicHeader.logoBg || 'circle') === bg.id ? '#D4AF37' : 'rgba(255,255,255,0.14)'}`,
+                          background: (mosaicHeader.logoBg || 'circle') === bg.id ? 'rgba(212,175,55,0.22)' : 'transparent',
+                          color: (mosaicHeader.logoBg || 'circle') === bg.id ? '#FDE68A' : '#CBD5E1'
                         }}
                       >
                         {bg.label}
