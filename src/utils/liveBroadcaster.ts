@@ -1313,8 +1313,10 @@ export class LiveCompositeBroadcaster {
 
   private drawSingleScoreboard(assignment: ResolvedCameraAssignment, slot: DirectorCameraSlot, overlayCfg: LiveOverlayConfig, club: Club) {
     const ctx = this.ctx;
-    const W = this.canvas.width;
-    const H = this.canvas.height;
+    // drawFrame() already scales ctx to virtual 1280x720 broadcast coordinates (works in 480p, 720p & 1080p!)
+    const W = 1280;
+    const H = 720;
+    const tickerPad = overlayCfg.ticker?.enabled ? 28 : 0;
 
     const hasScoreBoard = assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined;
     if (hasScoreBoard) {
@@ -1323,7 +1325,7 @@ export class LiveCompositeBroadcaster {
       const hasClubs = Boolean(assignment.p1Club || assignment.p2Club);
       const boxH = hasClubs ? 64 : 56;
       const cx = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardX ?? 50) / 100) * W : W / 2;
-      const cy = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardY ?? 91) / 100) * H : (H - boxH / 2 - 22);
+      const cy = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardY ?? 91) / 100) * H : (H - boxH / 2 - 22 - tickerPad);
       const left = Math.max(20, Math.min(W - boxW - 20, cx - boxW / 2));
       const top = Math.max(16, Math.min(H - boxH - 16, cy - boxH / 2));
 
