@@ -128,6 +128,7 @@ export interface MosaicHeaderConfig {
   customLogoUrl?: string;
   logoHeightPx?: number; // 36..115 px
   logoBg?: 'circle' | 'transparent' | 'white' | 'dark_gold';
+  showPlayerAvatars?: boolean;
 }
 
 export const DEFAULT_MOSAIC_HEADER: MosaicHeaderConfig = {
@@ -135,7 +136,8 @@ export const DEFAULT_MOSAIC_HEADER: MosaicHeaderConfig = {
   logoMode: 'club',
   customLogoUrl: '',
   logoHeightPx: 62,
-  logoBg: 'circle'
+  logoBg: 'circle',
+  showPlayerAvatars: true
 };
 
 export interface MultiCamDirectorState {

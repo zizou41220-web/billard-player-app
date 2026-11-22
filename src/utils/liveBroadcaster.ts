@@ -12,6 +12,7 @@ import {
 } from './multiCamDirector';
 import { getMatchScoringRules } from './rules';
 import { getClubLogoUrl, defaultClubLogo } from './logo';
+import { getPlayerAvatar, generateFigurineSvg } from './avatar';
 import { getTournamentQualificationStatus, PlayerQualifStat } from './qualifiers';
 import { isFinalStageMatch } from './bracket';
 
@@ -73,6 +74,7 @@ export interface ResolvedCameraAssignment {
   p2Club?: string;
   score1?: number;
   score2?: number;
+  maxSets?: number;
   rulesLabel: string;
   isMatchView: boolean;
 }
@@ -305,7 +307,8 @@ export function resolveCameraAssignment(
     const table = tMatch?.tableId ? tables[tMatch.tableId] : undefined;
     const p1 = tMatch ? players[tMatch.player1Id] : undefined;
     const p2 = tMatch ? players[tMatch.player2Id] : undefined;
-    const rulesLabel = tMatch ? (getMatchScoringRules(tMatch, matchTour, players).formatLabel || '') : '';
+    const matchRules = tMatch ? getMatchScoringRules(tMatch, matchTour, players) : null;
+    const rulesLabel = matchRules?.formatLabel || '';
     const stageLabel = formatTournamentStageLabel(tMatch, matchTour);
     const tableLabel = table ? (table.name || `Billard ${table.number}`) : '';
     const title = [tableLabel, matchTour?.name || 'Tournoi Appli', stageLabel].filter(Boolean).join(' • ');
@@ -322,6 +325,7 @@ export function resolveCameraAssignment(
       p2Club: p2?.clubName || p2?.stats?.clubName,
       score1: tMatch?.score1,
       score2: tMatch?.score2,
+      maxSets: matchRules?.maxSets,
       rulesLabel,
       isMatchView: true
     };
@@ -341,7 +345,8 @@ export function resolveCameraAssignment(
       : tableTitle;
     const p1 = validMatch ? players[validMatch.player1Id] : undefined;
     const p2 = validMatch ? players[validMatch.player2Id] : undefined;
-    const rulesLabel = validMatch ? (getMatchScoringRules(validMatch, matchTour, players).formatLabel || '') : '';
+    const matchRules = validMatch ? getMatchScoringRules(validMatch, matchTour, players) : null;
+    const rulesLabel = matchRules?.formatLabel || '';
     return {
       title,
       subtitle: validMatch && p1 && p2 ? `${p1.name} vs ${p2.name}` : 'En attente de match',
@@ -355,6 +360,7 @@ export function resolveCameraAssignment(
       p2Club: p2?.clubName || p2?.stats?.clubName,
       score1: validMatch?.score1,
       score2: validMatch?.score2,
+      maxSets: matchRules?.maxSets,
       rulesLabel,
       isMatchView: true
     };
@@ -364,7 +370,8 @@ export function resolveCameraAssignment(
     const liveMatch = Object.values(matches).find(m => m.tableId === 'live' && m.status !== 'finished');
     const p1 = liveMatch ? players[liveMatch.player1Id] : undefined;
     const p2 = liveMatch ? players[liveMatch.player2Id] : undefined;
-    const rulesLabel = liveMatch ? (getMatchScoringRules(liveMatch, null, players).formatLabel || '') : '';
+    const matchRules = liveMatch ? getMatchScoringRules(liveMatch, null, players) : null;
+    const rulesLabel = matchRules?.formatLabel || '';
     return {
       title: 'Match Studio Live',
       subtitle: liveMatch && p1 && p2 ? `${p1.name} vs ${p2.name}` : currentClub.name,
@@ -377,6 +384,7 @@ export function resolveCameraAssignment(
       p2Club: p2?.clubName || p2?.stats?.clubName,
       score1: liveMatch?.score1,
       score2: liveMatch?.score2,
+      maxSets: matchRules?.maxSets,
       rulesLabel,
       isMatchView: true
     };
@@ -857,6 +865,7 @@ export class LiveCompositeBroadcaster {
   private contextData: LiveCompositeContext | null = null;
   private rafTimer: number | null = null;
   private imageCache = new Map<string, HTMLImageElement>();
+  private failedImageUrls = new Set<string>();
   private mipmapCache = new Map<string, HTMLCanvasElement>();
 
   // Web Audio Mixer
@@ -1053,16 +1062,181 @@ export class LiveCompositeBroadcaster {
   }
 
   private getCachedImage(url?: string): HTMLImageElement | null {
-    if (!url) return null;
+    if (!url || this.failedImageUrls.has(url)) return null;
     const cached = this.imageCache.get(url);
     if (cached) {
       return cached.complete && cached.naturalWidth > 0 ? cached : null;
     }
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (!url.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onerror = () => {
+      this.failedImageUrls.add(url);
+    };
     img.src = url;
     this.imageCache.set(url, img);
     return null;
+  }
+
+  /**
+   * Resolves a player's portrait image safely for Canvas2D (real uploaded photo or 3D figurine fallback,
+   * guaranteed never to taint the broadcast canvas).
+   */
+  private getPlayerAvatarImage(player?: Player): HTMLImageElement | null {
+    if (!player) return null;
+    const primaryUrl = getPlayerAvatar(player);
+    if (!this.failedImageUrls.has(primaryUrl)) {
+      const img = this.getCachedImage(primaryUrl);
+      if (img) return img;
+    }
+    if (this.failedImageUrls.has(primaryUrl)) {
+      const fallbackSvg = generateFigurineSvg(player.id, player.name);
+      return this.getCachedImage(fallbackSvg);
+    }
+    return null;
+  }
+
+  /**
+   * Draws a video-game / eSports chamfered portrait medallion (FIFA / Tekken / Street Fighter HUD style)
+   * with glowing rim, face-centered cover crop, and subtle glass specular sheen.
+   */
+  private drawGamerPortrait(
+    x: number,
+    y: number,
+    size: number,
+    img: HTMLImageElement | null,
+    opts: {
+      accentColor: string;
+      isLeading: boolean;
+      isPrestige: boolean;
+      playerName?: string;
+    }
+  ) {
+    const ctx = this.ctx;
+    const cut = Math.max(6, Math.round(size * 0.16));
+    const rimColor = opts.isLeading ? '#FBBF24' : opts.accentColor;
+
+    const traceOctagon = (ox: number, oy: number, s: number, c: number) => {
+      ctx.beginPath();
+      ctx.moveTo(ox + c, oy);
+      ctx.lineTo(ox + s - c, oy);
+      ctx.lineTo(ox + s, oy + c);
+      ctx.lineTo(ox + s, oy + s - c);
+      ctx.lineTo(ox + s - c, oy + s);
+      ctx.lineTo(ox + c, oy + s);
+      ctx.lineTo(ox, oy + s - c);
+      ctx.lineTo(ox, oy + c);
+      ctx.closePath();
+    };
+
+    ctx.save();
+
+    // Outer ambient glow / drop shadow
+    ctx.save();
+    ctx.shadowColor = opts.isLeading ? 'rgba(251, 191, 36, 0.52)' : 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = opts.isLeading ? 16 : 12;
+    ctx.shadowOffsetY = 3;
+    traceOctagon(x, y, size, cut);
+    const backGrad = ctx.createLinearGradient(x, y, x, y + size);
+    backGrad.addColorStop(0, '#131E33');
+    backGrad.addColorStop(1, '#060A13');
+    ctx.fillStyle = backGrad;
+    ctx.fill();
+    ctx.restore();
+
+    // Clipped portrait photo or stylized initials fallback
+    ctx.save();
+    traceOctagon(x + 2, y + 2, size - 4, Math.max(4, cut - 1));
+    ctx.clip();
+
+    // Team-color radial backdrop behind portrait
+    const aura = ctx.createRadialGradient(
+      x + size / 2,
+      y + size * 0.35,
+      size * 0.08,
+      x + size / 2,
+      y + size / 2,
+      size * 0.72
+    );
+    aura.addColorStop(0, opts.isLeading ? 'rgba(251, 191, 36, 0.32)' : `${opts.accentColor}44`);
+    aura.addColorStop(1, '#050811');
+    ctx.fillStyle = aura;
+    ctx.fillRect(x, y, size, size);
+
+    if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      const iw = size - 4;
+      const ih = size - 4;
+      const scale = Math.max(iw / img.naturalWidth, ih / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      // Bias crop toward top-center (22%) so players' faces & eyes stay framed instead of cutting off heads
+      const dx = x + 2 + (iw - dw) / 2;
+      const dy = y + 2 + (ih - dh) * (dh > ih ? 0.22 : 0.5);
+      const crisp = this.getCrispScaledImage(img, dw, dh);
+      ctx.drawImage(crisp, dx, dy, dw, dh);
+    } else if (opts.playerName) {
+      const initials = opts.playerName
+        .trim()
+        .split(/\s+/)
+        .map(w => w[0]?.toUpperCase() || '')
+        .slice(0, 2)
+        .join('');
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = `900 ${Math.round(size * 0.34)}px Outfit, Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(initials || '?', x + size / 2, y + size / 2 + 1);
+    }
+
+    // Subtle glass specular highlight across top edge (game HUD polish)
+    const sheen = ctx.createLinearGradient(x, y, x, y + size * 0.42);
+    sheen.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+    sheen.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(x, y, size, size * 0.42);
+
+    // Subtle bottom inner vignette for depth
+    const vig = ctx.createLinearGradient(x, y + size * 0.65, x, y + size);
+    vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vig.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(x, y + size * 0.65, size, size * 0.35);
+    ctx.restore();
+
+    // Inner dark bezel + outer glowing metallic rim
+    traceOctagon(x + 2, y + 2, size - 4, Math.max(4, cut - 1));
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.stroke();
+
+    traceOctagon(x + 0.5, y + 0.5, size - 1, cut);
+    ctx.lineWidth = size >= 70 ? 2.8 : 2;
+    ctx.strokeStyle = rimColor;
+    ctx.stroke();
+
+    // Prestige micro star badge on bottom-right corner
+    if (opts.isPrestige && size >= 46) {
+      const br = size >= 76 ? 10 : 7;
+      const bx = x + size - br + 1;
+      const by = y + size - br + 1;
+      ctx.beginPath();
+      ctx.arc(bx, by, br, 0, Math.PI * 2);
+      ctx.fillStyle = '#090D16';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#FBBF24';
+      ctx.stroke();
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = `900 ${size >= 76 ? 11 : 8}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('★', bx, by + 0.5);
+    }
+
+    ctx.restore();
   }
 
   public updateContext(data: LiveCompositeContext) {
@@ -1355,7 +1529,13 @@ export class LiveCompositeBroadcaster {
     ctx.restore();
   }
 
-  private drawSingleScoreboard(assignment: ResolvedCameraAssignment, slot: DirectorCameraSlot, overlayCfg: LiveOverlayConfig, club: Club) {
+  private drawSingleScoreboard(
+    assignment: ResolvedCameraAssignment,
+    slot: DirectorCameraSlot,
+    overlayCfg: LiveOverlayConfig,
+    club: Club,
+    directorState?: MultiCamDirectorState
+  ) {
     const ctx = this.ctx;
     // drawFrame() already scales ctx to virtual 1280x720 broadcast coordinates (works in 480p, 720p & 1080p!)
     const W = 1280;
@@ -1363,8 +1543,222 @@ export class LiveCompositeBroadcaster {
     const tickerPad = overlayCfg.ticker?.enabled ? 28 : 0;
 
     const hasScoreBoard = assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined;
-    if (hasScoreBoard) {
-      // Matchroom / WNT sleek lower-third TV broadcast bar
+    const showGamerHud =
+      directorState?.situation === 'club_tables' &&
+      (directorState.mosaicHeader?.showPlayerAvatars !== false) &&
+      Boolean(assignment.p1 || assignment.p2);
+
+    if (hasScoreBoard && showGamerHud) {
+      // VIDEO-GAME / ESPORTS DUEL HUD (Pop-out glowing portraits + segmented set bars)
+      const boxW = Math.min(1040, W - 64);
+      const boxH = 74;
+      const portraitSize = 90;
+      const cx = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardX ?? 50) / 100) * W : W / 2;
+      const cy = overlayCfg.scoreboardCustomPos ? ((overlayCfg.scoreboardY ?? 90) / 100) * H : (H - boxH / 2 - 20 - tickerPad);
+      const left = Math.max(18, Math.min(W - boxW - 18, cx - boxW / 2));
+      const top = Math.max(26, Math.min(H - boxH - 12, cy - boxH / 2));
+      const centerX = left + boxW / 2;
+
+      const s1 = assignment.score1!;
+      const s2 = assignment.score2!;
+      const p1Lead = s1 > s2;
+      const p2Lead = s2 > s1;
+      const p1Accent = '#10B981';
+      const p2Accent = '#38BDF8';
+      const p1Prestige = assignment.p1?.level === 'Prestige' || assignment.p1?.level === 'Confirmé';
+      const p2Prestige = assignment.p2?.level === 'Prestige' || assignment.p2?.level === 'Confirmé';
+
+      ctx.save();
+
+      // Main HUD chassis with subtle dual-team color wash
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetY = 4;
+      drawRoundedRect(ctx, left + 20, top, boxW - 40, boxH, 7);
+      ctx.fillStyle = 'rgba(8, 12, 22, 0.94)';
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      drawRoundedRect(ctx, left + 20, top, boxW - 40, boxH, 7);
+      ctx.clip();
+      const leftWash = ctx.createLinearGradient(left + 20, top, centerX, top);
+      leftWash.addColorStop(0, p1Lead ? 'rgba(251, 191, 36, 0.16)' : 'rgba(16, 185, 129, 0.14)');
+      leftWash.addColorStop(1, 'rgba(16, 185, 129, 0)');
+      ctx.fillStyle = leftWash;
+      ctx.fillRect(left + 20, top, (boxW - 40) / 2, boxH);
+
+      const rightWash = ctx.createLinearGradient(left + boxW - 20, top, centerX, top);
+      rightWash.addColorStop(0, p2Lead ? 'rgba(251, 191, 36, 0.16)' : 'rgba(56, 189, 248, 0.14)');
+      rightWash.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctx.fillStyle = rightWash;
+      ctx.fillRect(centerX, top, (boxW - 40) / 2, boxH);
+
+      // Top tri-accent energy edge (P1 Emerald/Gold -> Center Gold -> P2 Cyan/Gold)
+      const topBarGrad = ctx.createLinearGradient(left + 20, top, left + boxW - 20, top);
+      topBarGrad.addColorStop(0, p1Lead ? '#FBBF24' : p1Accent);
+      topBarGrad.addColorStop(0.5, '#D4AF37');
+      topBarGrad.addColorStop(1, p2Lead ? '#FBBF24' : p2Accent);
+      ctx.fillStyle = topBarGrad;
+      ctx.fillRect(left + 20, top, boxW - 40, 2.5);
+      ctx.restore();
+
+      drawRoundedRect(ctx, left + 20, top, boxW - 40, boxH, 7);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.stroke();
+
+      // Top metadata row (inset cleanly between the two pop-out portraits)
+      const innerLeft = left + portraitSize + 18;
+      const innerRight = left + boxW - portraitSize - 18;
+      const metaY = top + 14;
+      ctx.beginPath();
+      ctx.arc(innerLeft + 5, metaY, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#EF4444';
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      ctx.font = '700 10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      let timerPart = '';
+      if (assignment.match?.startTime && assignment.match.status === 'playing') {
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - assignment.match.startTime) / 1000));
+        const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+        const ss = String(elapsedSec % 60).padStart(2, '0');
+        timerPart = `${mm}:${ss}`;
+      }
+      const metaText = [assignment.title, assignment.rulesLabel, timerPart].filter(Boolean).join('  •  ').toUpperCase();
+      ctx.fillText(this.fitCanvasText(ctx, metaText, Math.max(160, innerRight - innerLeft - 140)), innerLeft + 15, metaY);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.48)';
+      ctx.font = '700 10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(this.fitCanvasText(ctx, club.name.toUpperCase(), 130), innerRight, metaY);
+
+      // Center score core ([ s1 ] VS [ s2 ])
+      const rowY = top + 42;
+      const scoreBoxW = 48;
+      const scoreBoxH = 38;
+      const gapCenter = 38;
+      const s1X = centerX - gapCenter / 2 - scoreBoxW;
+      const s2X = centerX + gapCenter / 2;
+
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = '900 12px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('VS', centerX, rowY);
+
+      drawRoundedRect(ctx, s1X, rowY - scoreBoxH / 2, scoreBoxW, scoreBoxH, 5);
+      ctx.fillStyle = p1Lead ? '#FBBF24' : '#1E293B';
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = p1Lead ? '#FEF3C7' : 'rgba(16, 185, 129, 0.45)';
+      ctx.stroke();
+      ctx.fillStyle = p1Lead ? '#090D16' : '#F8FAFC';
+      ctx.font = '900 24px Outfit, Inter, sans-serif';
+      ctx.fillText(`${s1}`, s1X + scoreBoxW / 2, rowY + 1);
+
+      drawRoundedRect(ctx, s2X, rowY - scoreBoxH / 2, scoreBoxW, scoreBoxH, 5);
+      ctx.fillStyle = p2Lead ? '#FBBF24' : '#1E293B';
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = p2Lead ? '#FEF3C7' : 'rgba(56, 189, 248, 0.45)';
+      ctx.stroke();
+      ctx.fillStyle = p2Lead ? '#090D16' : '#F8FAFC';
+      ctx.font = '900 24px Outfit, Inter, sans-serif';
+      ctx.fillText(`${s2}`, s2X + scoreBoxW / 2, rowY + 1);
+
+      // Player 1 Name + Sub + Segmented Game Progress Bar
+      const p1Right = s1X - 14;
+      const p1SpanW = Math.max(100, p1Right - innerLeft);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '900 19px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(this.fitCanvasText(ctx, assignment.p1Name || 'Joueur 1', p1SpanW), p1Right, top + 36);
+
+      const p1Sub = [p1Prestige ? '★ PRESTIGE' : '', assignment.p1Club || ''].filter(Boolean).join(' • ');
+      if (p1Sub) {
+        ctx.fillStyle = p1Prestige ? '#FDE68A' : '#94A3B8';
+        ctx.font = '700 10px Inter, system-ui, sans-serif';
+        ctx.fillText(this.fitCanvasText(ctx, p1Sub, p1SpanW), p1Right, top + 51);
+      }
+
+      // Player 2 Name + Sub
+      const p2Left = s2X + scoreBoxW + 14;
+      const p2SpanW = Math.max(100, innerRight - p2Left);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '900 19px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(this.fitCanvasText(ctx, assignment.p2Name || 'Joueur 2', p2SpanW), p2Left, top + 36);
+
+      const p2Sub = [p2Prestige ? '★ PRESTIGE' : '', assignment.p2Club || ''].filter(Boolean).join(' • ');
+      if (p2Sub) {
+        ctx.fillStyle = p2Prestige ? '#FDE68A' : '#94A3B8';
+        ctx.font = '700 10px Inter, system-ui, sans-serif';
+        ctx.fillText(this.fitCanvasText(ctx, p2Sub, p2SpanW), p2Left, top + 51);
+      }
+
+      // Video-Game Segmented Set Bars (Health/Round gauges filling toward center VS)
+      const gaugeY = top + boxH - 11;
+      const gaugeH = 5;
+      const maxSegs = assignment.maxSets && assignment.maxSets >= 2 && assignment.maxSets <= 15
+        ? assignment.maxSets
+        : 0;
+      if (maxSegs > 0) {
+        const segGap = 3;
+        const p1BarW = Math.min(p1SpanW, 240);
+        const p1BarStartX = p1Right - p1BarW;
+        const segW1 = (p1BarW - segGap * (maxSegs - 1)) / maxSegs;
+        for (let i = 0; i < maxSegs; i++) {
+          // Fill from outer edge (left) toward center score box
+          const filled = i < s1;
+          const sx = p1BarStartX + i * (segW1 + segGap);
+          drawRoundedRect(ctx, sx, gaugeY, segW1, gaugeH, 2);
+          ctx.fillStyle = filled ? (p1Lead ? '#FBBF24' : p1Accent) : 'rgba(255, 255, 255, 0.12)';
+          ctx.fill();
+        }
+
+        const p2BarW = Math.min(p2SpanW, 240);
+        const segW2 = (p2BarW - segGap * (maxSegs - 1)) / maxSegs;
+        for (let i = 0; i < maxSegs; i++) {
+          // Symmetric fill from outer right edge toward center score box
+          const filled = i < s2;
+          const sx = p2Left + (maxSegs - 1 - i) * (segW2 + segGap);
+          drawRoundedRect(ctx, sx, gaugeY, segW2, gaugeH, 2);
+          ctx.fillStyle = filled ? (p2Lead ? '#FBBF24' : p2Accent) : 'rgba(255, 255, 255, 0.12)';
+          ctx.fill();
+        }
+      } else {
+        drawRoundedRect(ctx, innerLeft, gaugeY + 1, p1SpanW, 3, 2);
+        ctx.fillStyle = p1Lead ? '#FBBF24' : 'rgba(16, 185, 129, 0.55)';
+        ctx.fill();
+        drawRoundedRect(ctx, p2Left, gaugeY + 1, p2SpanW, 3, 2);
+        ctx.fillStyle = p2Lead ? '#FBBF24' : 'rgba(56, 189, 248, 0.55)';
+        ctx.fill();
+      }
+
+      // Pop-out Video-Game Portraits (rising cleanly above the left & right ends of the HUD bar)
+      const portraitY = top + boxH - portraitSize + 2;
+      const p1Img = this.getPlayerAvatarImage(assignment.p1);
+      const p2Img = this.getPlayerAvatarImage(assignment.p2);
+      this.drawGamerPortrait(left + 4, portraitY, portraitSize, p1Img, {
+        accentColor: p1Accent,
+        isLeading: p1Lead,
+        isPrestige: p1Prestige,
+        playerName: assignment.p1Name
+      });
+      this.drawGamerPortrait(left + boxW - portraitSize - 4, portraitY, portraitSize, p2Img, {
+        accentColor: p2Accent,
+        isLeading: p2Lead,
+        isPrestige: p2Prestige,
+        playerName: assignment.p2Name
+      });
+
+      ctx.restore();
+    } else if (hasScoreBoard) {
+      // Matchroom / WNT sleek lower-third TV broadcast bar (Regional / CueScore / avatars hidden)
       const boxW = Math.min(980, W - 80);
       const hasClubs = Boolean(assignment.p1Club || assignment.p2Club);
       const boxH = hasClubs ? 64 : 56;
@@ -2173,20 +2567,73 @@ export class LiveCompositeBroadcaster {
     ctx.fillStyle = 'rgba(212, 175, 55, 0.7)';
     ctx.fillRect(W / 2 - 120, 404, 240, 2);
 
-    // Subtitle or next pending match
-    let subText = directorState.intermissionSubtitle?.trim() || '';
-    if (!subText && ongoingTour) {
-      const nextPending = Object.values(matches).find(
-        m => m.tournamentId === ongoingTour.id && m.status === 'pending' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id]
-      );
-      if (nextPending) {
-        subText = `PROCHAIN MATCH : ${players[nextPending.player1Id].name}  VS  ${players[nextPending.player2Id].name}`;
+    // Subtitle or next pending match (Video-Game VS Card with portraits in Club mode)
+    const customSub = directorState.intermissionSubtitle?.trim() || '';
+    const nextPending =
+      !customSub && ongoingTour
+        ? Object.values(matches).find(
+            m => m.tournamentId === ongoingTour.id && m.status === 'pending' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id]
+          )
+        : undefined;
+
+    if (nextPending && directorState.situation === 'club_tables' && (mhPause.showPlayerAvatars !== false)) {
+      const np1 = players[nextPending.player1Id];
+      const np2 = players[nextPending.player2Id];
+      const cardW = 760;
+      const cardH = 112;
+      const cardX = W / 2 - cardW / 2;
+      const cardY = 434;
+
+      ctx.save();
+      drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 12);
+      ctx.fillStyle = 'rgba(10, 15, 28, 0.9)';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.45)';
+      ctx.stroke();
+
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = '800 12px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PROCHAIN MATCH', W / 2, cardY + 20);
+
+      const pSize = 84;
+      const py = cardY + (cardH - pSize) / 2 + 4;
+      this.drawGamerPortrait(cardX + 18, py, pSize, this.getPlayerAvatarImage(np1), {
+        accentColor: '#10B981',
+        isLeading: false,
+        isPrestige: np1.level === 'Prestige' || np1.level === 'Confirmé',
+        playerName: np1.name
+      });
+      this.drawGamerPortrait(cardX + cardW - pSize - 18, py, pSize, this.getPlayerAvatarImage(np2), {
+        accentColor: '#38BDF8',
+        isLeading: false,
+        isPrestige: np2.level === 'Prestige' || np2.level === 'Confirmé',
+        playerName: np2.name
+      });
+
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = '900 22px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('VS', W / 2, cardY + 66);
+
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '900 22px Outfit, Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(this.fitCanvasText(ctx, np1.name, 225), W / 2 - 34, cardY + 66);
+      ctx.textAlign = 'left';
+      ctx.fillText(this.fitCanvasText(ctx, np2.name, 225), W / 2 + 34, cardY + 66);
+      ctx.restore();
+    } else {
+      const subText = customSub || (nextPending
+        ? `PROCHAIN MATCH : ${players[nextPending.player1Id].name}  VS  ${players[nextPending.player2Id].name}`
+        : '');
+      if (subText) {
+        ctx.fillStyle = '#CBD5E1';
+        ctx.font = '700 20px Inter, system-ui, sans-serif';
+        ctx.fillText(subText.slice(0, 64), W / 2, 452);
       }
-    }
-    if (subText) {
-      ctx.fillStyle = '#CBD5E1';
-      ctx.font = '700 20px Inter, system-ui, sans-serif';
-      ctx.fillText(subText.slice(0, 64), W / 2, 452);
     }
 
     // Live clock at bottom
@@ -2378,7 +2825,7 @@ export class LiveCompositeBroadcaster {
         this.drawVideoInRect(videoElements[slot.id], 0, 0, W, H, slot, data);
         if (!isVirtualScreenSource(slot.sourceType)) {
           const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub }, directorState);
-          this.drawSingleScoreboard(assignment, slot, overlayCfg, currentClub);
+          this.drawSingleScoreboard(assignment, slot, overlayCfg, currentClub, directorState);
         }
         this.drawBroadcastHeaderLogo(data, false, 0);
         this.drawCustomOverlays(overlayCfg);
@@ -2464,69 +2911,136 @@ export class LiveCompositeBroadcaster {
 
         if (!isVirtualScreenSource(slot.sourceType)) {
           const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub }, directorState);
-          const barH = 44;
+          const hasMatchScore =
+            assignment.isMatchView &&
+            assignment.p1Name &&
+            assignment.p2Name &&
+            assignment.score1 !== undefined &&
+            assignment.score2 !== undefined;
+          const showTilePortraits =
+            isClubSituation &&
+            mh.showPlayerAvatars !== false &&
+            hasMatchScore &&
+            Boolean(assignment.p1 || assignment.p2);
+
+          const barH = showTilePortraits ? 50 : 44;
           const barX = cx + 8;
           const barY = cy + cellH - barH - 8;
           const barW = cellW - 16;
+          const portraitSize = showTilePortraits ? (cellW >= 540 ? 54 : 44) : 0;
+          const sidePad = showTilePortraits ? portraitSize + 10 : 10;
 
           ctx.save();
-          drawRoundedRect(ctx, barX, barY, barW, barH, 4);
-          ctx.fillStyle = 'rgba(10, 14, 22, 0.92)';
+          drawRoundedRect(ctx, barX, barY, barW, barH, 5);
+          ctx.fillStyle = 'rgba(10, 14, 22, 0.93)';
           ctx.fill();
           ctx.lineWidth = 1;
           ctx.strokeStyle = 'rgba(255,255,255,0.12)';
           ctx.stroke();
-          ctx.fillStyle = '#D4AF37';
-          ctx.fillRect(barX + 1, barY, barW - 2, 2);
 
-          ctx.fillStyle = 'rgba(255,255,255,0.65)';
+          if (showTilePortraits) {
+            const s1 = assignment.score1!;
+            const s2 = assignment.score2!;
+            const topGrad = ctx.createLinearGradient(barX, barY, barX + barW, barY);
+            topGrad.addColorStop(0, s1 > s2 ? '#FBBF24' : '#10B981');
+            topGrad.addColorStop(0.5, '#D4AF37');
+            topGrad.addColorStop(1, s2 > s1 ? '#FBBF24' : '#38BDF8');
+            ctx.fillStyle = topGrad;
+            ctx.fillRect(barX + 1, barY, barW - 2, 2);
+          } else {
+            ctx.fillStyle = '#D4AF37';
+            ctx.fillRect(barX + 1, barY, barW - 2, 2);
+          }
+
+          ctx.fillStyle = 'rgba(255,255,255,0.68)';
           ctx.font = '700 10px Inter, system-ui, sans-serif';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          const titleMaxW = Math.max(80, barW - (isAudioActive ? 64 : 20));
-          ctx.fillText(this.fitCanvasText(ctx, assignment.title.toUpperCase(), titleMaxW), barX + 10, barY + 13);
+          const titleMaxW = Math.max(70, barW - sidePad * 2 - (isAudioActive ? 48 : 0));
+          ctx.fillText(this.fitCanvasText(ctx, assignment.title.toUpperCase(), titleMaxW), barX + sidePad, barY + 13);
 
           if (isAudioActive) {
             ctx.fillStyle = '#D4AF37';
             ctx.textAlign = 'right';
-            ctx.fillText('AUDIO', barX + barW - 10, barY + 13);
+            ctx.fillText('AUDIO', barX + barW - sidePad, barY + 13);
           }
 
-          if (assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined) {
+          if (hasMatchScore) {
+            const s1 = assignment.score1!;
+            const s2 = assignment.score2!;
             const midX = barX + barW / 2;
-            const rowY = barY + 31;
+            const rowY = barY + (showTilePortraits ? 32 : 31);
             const sbW = 24;
-            const sbH = 19;
+            const sbH = 20;
             const gapC = 14;
             const s1X = midX - gapC / 2 - sbW;
             const s2X = midX + gapC / 2;
 
-            ctx.fillStyle = 'rgba(255,255,255,0.35)';
-            ctx.font = '700 9px Inter, system-ui, sans-serif';
+            ctx.fillStyle = showTilePortraits ? '#D4AF37' : 'rgba(255,255,255,0.35)';
+            ctx.font = '800 9px Inter, system-ui, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('-', midX, rowY);
+            ctx.fillText(showTilePortraits ? 'VS' : '-', midX, rowY);
 
             drawRoundedRect(ctx, s1X, rowY - sbH / 2, sbW, sbH, 3);
-            ctx.fillStyle = assignment.score1 > assignment.score2 ? '#D4AF37' : '#1E293B';
+            ctx.fillStyle = s1 > s2 ? '#FBBF24' : '#1E293B';
             ctx.fill();
-            ctx.fillStyle = assignment.score1 > assignment.score2 ? '#090D16' : '#F8FAFC';
-            ctx.font = '800 13px Inter, system-ui, sans-serif';
-            ctx.fillText(`${assignment.score1}`, s1X + sbW / 2, rowY + 0.5);
+            ctx.fillStyle = s1 > s2 ? '#090D16' : '#F8FAFC';
+            ctx.font = '900 13px Outfit, Inter, sans-serif';
+            ctx.fillText(`${s1}`, s1X + sbW / 2, rowY + 0.5);
 
             drawRoundedRect(ctx, s2X, rowY - sbH / 2, sbW, sbH, 3);
-            ctx.fillStyle = assignment.score2 > assignment.score1 ? '#D4AF37' : '#1E293B';
+            ctx.fillStyle = s2 > s1 ? '#FBBF24' : '#1E293B';
             ctx.fill();
-            ctx.fillStyle = assignment.score2 > assignment.score1 ? '#090D16' : '#F8FAFC';
-            ctx.font = '800 13px Inter, system-ui, sans-serif';
-            ctx.fillText(`${assignment.score2}`, s2X + sbW / 2, rowY + 0.5);
+            ctx.fillStyle = s2 > s1 ? '#090D16' : '#F8FAFC';
+            ctx.font = '900 13px Outfit, Inter, sans-serif';
+            ctx.fillText(`${s2}`, s2X + sbW / 2, rowY + 0.5);
 
-            const maxSideW = Math.max(60, s1X - barX - 18);
+            const maxSideW = Math.max(48, s1X - (barX + sidePad) - 8);
             ctx.fillStyle = '#F8FAFC';
-            ctx.font = '700 12.5px Inter, system-ui, sans-serif';
+            ctx.font = '800 12.5px Outfit, Inter, sans-serif';
             ctx.textAlign = 'right';
-            ctx.fillText(this.fitCanvasText(ctx, assignment.p1Name, maxSideW), s1X - 8, rowY);
+            ctx.fillText(this.fitCanvasText(ctx, assignment.p1Name!, maxSideW), s1X - 7, rowY);
             ctx.textAlign = 'left';
-            ctx.fillText(this.fitCanvasText(ctx, assignment.p2Name, maxSideW), s2X + sbW + 8, rowY);
+            ctx.fillText(this.fitCanvasText(ctx, assignment.p2Name!, maxSideW), s2X + sbW + 7, rowY);
+
+            // Mini bottom set-progress / team-energy bars inside mosaic tile
+            if (showTilePortraits) {
+              const gY = barY + barH - 5;
+              const maxSegs = assignment.maxSets && assignment.maxSets >= 2 && assignment.maxSets <= 15
+                ? assignment.maxSets
+                : 0;
+              const sideBarW = Math.max(28, s1X - (barX + sidePad) - 10);
+              if (maxSegs > 0) {
+                const segGap = 2;
+                const segW = (sideBarW - segGap * (maxSegs - 1)) / maxSegs;
+                for (let i = 0; i < maxSegs; i++) {
+                  ctx.fillStyle = i < s1 ? (s1 > s2 ? '#FBBF24' : '#10B981') : 'rgba(255,255,255,0.12)';
+                  ctx.fillRect(barX + sidePad + i * (segW + segGap), gY, Math.max(2, segW), 2.5);
+                  ctx.fillStyle = i < s2 ? (s2 > s1 ? '#FBBF24' : '#38BDF8') : 'rgba(255,255,255,0.12)';
+                  ctx.fillRect(s2X + sbW + 8 + (maxSegs - 1 - i) * (segW + segGap), gY, Math.max(2, segW), 2.5);
+                }
+              } else {
+                ctx.fillStyle = s1 > s2 ? '#FBBF24' : 'rgba(16, 185, 129, 0.55)';
+                ctx.fillRect(barX + sidePad, gY, sideBarW, 2);
+                ctx.fillStyle = s2 > s1 ? '#FBBF24' : 'rgba(56, 189, 248, 0.55)';
+                ctx.fillRect(s2X + sbW + 8, gY, sideBarW, 2);
+              }
+
+              // Pop-out Video-Game Portraits on Left & Right of each Mosaic Tile
+              const pY = barY + barH - portraitSize + 1;
+              this.drawGamerPortrait(barX + 2, pY, portraitSize, this.getPlayerAvatarImage(assignment.p1), {
+                accentColor: '#10B981',
+                isLeading: s1 > s2,
+                isPrestige: assignment.p1?.level === 'Prestige' || assignment.p1?.level === 'Confirmé',
+                playerName: assignment.p1Name
+              });
+              this.drawGamerPortrait(barX + barW - portraitSize - 2, pY, portraitSize, this.getPlayerAvatarImage(assignment.p2), {
+                accentColor: '#38BDF8',
+                isLeading: s2 > s1,
+                isPrestige: assignment.p2?.level === 'Prestige' || assignment.p2?.level === 'Confirmé',
+                playerName: assignment.p2Name
+              });
+            }
           } else {
             ctx.fillStyle = '#CBD5E1';
             ctx.font = '600 11px Inter, system-ui, sans-serif';

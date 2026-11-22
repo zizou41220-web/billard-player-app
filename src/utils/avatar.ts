@@ -108,7 +108,7 @@ export function generateFigurineSvg(seed?: string, name?: string): string {
     .slice(0, 2)
     .join('');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="256" height="256">
   <defs>
     <!-- Background Gradient -->
     <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
@@ -289,6 +289,12 @@ export function isCustomPlayerPhoto(url?: string | null): boolean {
 export function getPlayerAvatar(player?: { id?: string; name?: string; avatarUrl?: string } | null): string {
   if (!player) return generateFigurineSvg('default', '');
   if (player.avatarUrl && isCustomPlayerPhoto(player.avatarUrl) && !player.avatarUrl.includes('pravatar.cc')) {
+    // Normalize legacy figurine SVGs saved with percentage dimensions so HTML5 Canvas drawImage renders them crisply
+    if (player.avatarUrl.startsWith('data:image/svg+xml') && player.avatarUrl.includes('100%25')) {
+      return player.avatarUrl
+        .replace(/width%3D%22100%25%22/gi, 'width%3D%22256%22')
+        .replace(/height%3D%22100%25%22/gi, 'height%3D%22256%22');
+    }
     return player.avatarUrl;
   }
   return generateFigurineSvg(player.id, player.name);

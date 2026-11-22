@@ -290,69 +290,130 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
             </span>
           </div>
 
-          {hasMatchBanner ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: isFocusedFullscreen ? '0.9rem' : '0.45rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: isFocusedFullscreen ? '0.65rem' : '0.35rem', minWidth: 0 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0 }}>
-                  <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: isFocusedFullscreen ? '1.15rem' : '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {assignment.p1Name}
-                  </span>
-                  {assignment.p1Club && (
-                    <span style={{ color: '#94A3B8', fontWeight: 600, fontSize: isFocusedFullscreen ? '0.7rem' : '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {assignment.p1Club}
+          {hasMatchBanner ? (() => {
+            const showGamerAvatars =
+              directorState.situation === 'club_tables' &&
+              (directorState.mosaicHeader?.showPlayerAvatars !== false) &&
+              Boolean(assignment.p1 || assignment.p2);
+            const p1Lead = (assignment.score1 ?? 0) > (assignment.score2 ?? 0);
+            const p2Lead = (assignment.score2 ?? 0) > (assignment.score1 ?? 0);
+            const avatarSize = isFocusedFullscreen ? 68 : 42;
+            const octClip = 'polygon(16% 0%, 84% 0%, 100% 16%, 100% 84%, 84% 100%, 16% 100%, 0% 84%, 0% 16%)';
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: isFocusedFullscreen ? '0.9rem' : '0.45rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isFocusedFullscreen ? '0.7rem' : '0.4rem', minWidth: 0 }}>
+                  {showGamerAvatars && assignment.p1 && (
+                    <div style={{
+                      width: `${avatarSize}px`,
+                      height: `${avatarSize}px`,
+                      marginTop: isFocusedFullscreen ? '-26px' : '-14px',
+                      marginBottom: '-2px',
+                      padding: '2.5px',
+                      background: p1Lead ? '#FBBF24' : '#10B981',
+                      clipPath: octClip,
+                      boxShadow: p1Lead ? '0 0 18px rgba(251, 191, 36, 0.55)' : '0 4px 12px rgba(0,0,0,0.65)',
+                      flexShrink: 0
+                    }}>
+                      <img
+                        src={getPlayerAvatar(assignment.p1)}
+                        alt={assignment.p1Name || ''}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center 22%',
+                          clipPath: octClip,
+                          background: '#060A13',
+                          display: 'block'
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0, flex: 1 }}>
+                    <span style={{ color: '#F8FAFC', fontWeight: 900, fontSize: isFocusedFullscreen ? '1.15rem' : '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                      {assignment.p1Name}
                     </span>
+                    {assignment.p1Club && (
+                      <span style={{ color: '#94A3B8', fontWeight: 600, fontSize: isFocusedFullscreen ? '0.7rem' : '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                        {assignment.p1Club}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: isFocusedFullscreen ? '0.5rem' : '0.3rem' }}>
+                  <span style={{
+                    minWidth: isFocusedFullscreen ? '44px' : '26px',
+                    textAlign: 'center',
+                    background: p1Lead ? '#FBBF24' : '#1E293B',
+                    color: p1Lead ? '#090D16' : '#F8FAFC',
+                    fontWeight: 900,
+                    fontSize: isFocusedFullscreen ? '1.45rem' : '0.95rem',
+                    padding: isFocusedFullscreen ? '2px 10px' : '1px 6px',
+                    borderRadius: '4px',
+                    border: `1px solid ${p1Lead ? '#FEF3C7' : 'rgba(16, 185, 129, 0.45)'}`
+                  }}>
+                    {assignment.score1}
+                  </span>
+                  <span style={{ color: '#D4AF37', fontSize: isFocusedFullscreen ? '0.74rem' : '0.62rem', fontWeight: 900 }}>VS</span>
+                  <span style={{
+                    minWidth: isFocusedFullscreen ? '44px' : '26px',
+                    textAlign: 'center',
+                    background: p2Lead ? '#FBBF24' : '#1E293B',
+                    color: p2Lead ? '#090D16' : '#F8FAFC',
+                    fontWeight: 900,
+                    fontSize: isFocusedFullscreen ? '1.45rem' : '0.95rem',
+                    padding: isFocusedFullscreen ? '2px 10px' : '1px 6px',
+                    borderRadius: '4px',
+                    border: `1px solid ${p2Lead ? '#FEF3C7' : 'rgba(56, 189, 248, 0.45)'}`
+                  }}>
+                    {assignment.score2}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isFocusedFullscreen ? '0.7rem' : '0.4rem', minWidth: 0 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0, flex: 1 }}>
+                    <span style={{ color: '#F8FAFC', fontWeight: 900, fontSize: isFocusedFullscreen ? '1.15rem' : '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                      {assignment.p2Name}
+                    </span>
+                    {assignment.p2Club && (
+                      <span style={{ color: '#94A3B8', fontWeight: 600, fontSize: isFocusedFullscreen ? '0.7rem' : '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                        {assignment.p2Club}
+                      </span>
+                    )}
+                  </div>
+                  {showGamerAvatars && assignment.p2 && (
+                    <div style={{
+                      width: `${avatarSize}px`,
+                      height: `${avatarSize}px`,
+                      marginTop: isFocusedFullscreen ? '-26px' : '-14px',
+                      marginBottom: '-2px',
+                      padding: '2.5px',
+                      background: p2Lead ? '#FBBF24' : '#38BDF8',
+                      clipPath: octClip,
+                      boxShadow: p2Lead ? '0 0 18px rgba(251, 191, 36, 0.55)' : '0 4px 12px rgba(0,0,0,0.65)',
+                      flexShrink: 0
+                    }}>
+                      <img
+                        src={getPlayerAvatar(assignment.p2)}
+                        alt={assignment.p2Name || ''}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center 22%',
+                          clipPath: octClip,
+                          background: '#060A13',
+                          display: 'block'
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
-                {assignment.p1 && isFocusedFullscreen && (
-                  <img src={getPlayerAvatar(assignment.p1)} alt="" style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.22)' }} />
-                )}
               </div>
-
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: isFocusedFullscreen ? '0.5rem' : '0.3rem' }}>
-                <span style={{
-                  minWidth: isFocusedFullscreen ? '42px' : '26px',
-                  textAlign: 'center',
-                  background: (assignment.score1 ?? 0) > (assignment.score2 ?? 0) ? '#D4AF37' : '#1E293B',
-                  color: (assignment.score1 ?? 0) > (assignment.score2 ?? 0) ? '#090D16' : '#F8FAFC',
-                  fontWeight: 900,
-                  fontSize: isFocusedFullscreen ? '1.45rem' : '0.95rem',
-                  padding: isFocusedFullscreen ? '2px 10px' : '1px 6px',
-                  borderRadius: '4px'
-                }}>
-                  {assignment.score1}
-                </span>
-                <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: isFocusedFullscreen ? '0.72rem' : '0.62rem', fontWeight: 800 }}>VS</span>
-                <span style={{
-                  minWidth: isFocusedFullscreen ? '42px' : '26px',
-                  textAlign: 'center',
-                  background: (assignment.score2 ?? 0) > (assignment.score1 ?? 0) ? '#D4AF37' : '#1E293B',
-                  color: (assignment.score2 ?? 0) > (assignment.score1 ?? 0) ? '#090D16' : '#F8FAFC',
-                  fontWeight: 900,
-                  fontSize: isFocusedFullscreen ? '1.45rem' : '0.95rem',
-                  padding: isFocusedFullscreen ? '2px 10px' : '1px 6px',
-                  borderRadius: '4px'
-                }}>
-                  {assignment.score2}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: isFocusedFullscreen ? '0.65rem' : '0.35rem', minWidth: 0 }}>
-                {assignment.p2 && isFocusedFullscreen && (
-                  <img src={getPlayerAvatar(assignment.p2)} alt="" style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.22)' }} />
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
-                  <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: isFocusedFullscreen ? '1.15rem' : '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {assignment.p2Name}
-                  </span>
-                  {assignment.p2Club && (
-                    <span style={{ color: '#94A3B8', fontWeight: 600, fontSize: isFocusedFullscreen ? '0.7rem' : '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {assignment.p2Club}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
+            );
+          })() : (
             <div style={{ fontSize: isFocusedFullscreen ? '0.84rem' : '0.72rem', color: '#CBD5E1', textAlign: 'center' }}>
               {assignment.subtitle}
             </div>

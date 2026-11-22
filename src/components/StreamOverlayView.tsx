@@ -268,12 +268,35 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
           </span>
         </div>
 
-        {/* Players & Score row */}
+        {/* Players & Score row (Video-Game HUD portraits) */}
         {match && p1 && p2 ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.45rem', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', overflow: 'hidden' }}>
-                <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.45rem', minWidth: 0 }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                marginTop: '-14px',
+                padding: '2px',
+                background: match.score1 > match.score2 ? '#FBBF24' : '#10B981',
+                clipPath: 'polygon(16% 0%, 84% 0%, 100% 16%, 100% 84%, 84% 100%, 16% 100%, 0% 84%, 0% 16%)',
+                flexShrink: 0
+              }}>
+                <img
+                  src={getPlayerAvatar(p1)}
+                  alt={p1.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center 22%',
+                    clipPath: 'polygon(16% 0%, 84% 0%, 100% 16%, 100% 84%, 84% 100%, 16% 100%, 0% 84%, 0% 16%)',
+                    background: '#060A13',
+                    display: 'block'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', overflow: 'hidden', flex: 1 }}>
+                <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                   {p1.name}
                 </span>
                 {(p1.clubName || p1.stats?.clubName) && (
@@ -288,7 +311,7 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
               <span style={{
                 minWidth: '28px',
                 textAlign: 'center',
-                background: match.score1 > match.score2 ? '#D4AF37' : '#1E293B',
+                background: match.score1 > match.score2 ? '#FBBF24' : '#1E293B',
                 color: match.score1 > match.score2 ? '#090D16' : '#F8FAFC',
                 fontWeight: 900,
                 fontSize: '1rem',
@@ -297,11 +320,11 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
               }}>
                 {match.score1}
               </span>
-              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.64rem', fontWeight: 800 }}>VS</span>
+              <span style={{ color: '#D4AF37', fontSize: '0.64rem', fontWeight: 900 }}>VS</span>
               <span style={{
                 minWidth: '28px',
                 textAlign: 'center',
-                background: match.score2 > match.score1 ? '#D4AF37' : '#1E293B',
+                background: match.score2 > match.score1 ? '#FBBF24' : '#1E293B',
                 color: match.score2 > match.score1 ? '#090D16' : '#F8FAFC',
                 fontWeight: 900,
                 fontSize: '1rem',
@@ -312,9 +335,9 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '0.45rem', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'hidden' }}>
-                <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.45rem', minWidth: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'hidden', flex: 1 }}>
+                <span style={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                   {p2.name}
                 </span>
                 {(p2.clubName || p2.stats?.clubName) && (
@@ -322,6 +345,29 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
                     {p2.clubName || p2.stats?.clubName}
                   </span>
                 )}
+              </div>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                marginTop: '-14px',
+                padding: '2px',
+                background: match.score2 > match.score1 ? '#FBBF24' : '#38BDF8',
+                clipPath: 'polygon(16% 0%, 84% 0%, 100% 16%, 100% 84%, 84% 100%, 16% 100%, 0% 84%, 0% 16%)',
+                flexShrink: 0
+              }}>
+                <img
+                  src={getPlayerAvatar(p2)}
+                  alt={p2.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center 22%',
+                    clipPath: 'polygon(16% 0%, 84% 0%, 100% 16%, 100% 84%, 84% 100%, 16% 100%, 0% 84%, 0% 16%)',
+                    background: '#060A13',
+                    display: 'block'
+                  }}
+                />
               </div>
             </div>
           </div>

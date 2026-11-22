@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store';
 import { Table } from '../types';
+import { getPlayerAvatar } from '../utils/avatar';
 import {
   CueScoreMatch,
   CueScoreTournamentData,
@@ -511,12 +512,26 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               maxWidth: '70%'
             }}>
               {assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined ? (
-                <span>
-                  {assignment.p1Name}{' '}
-                  <span style={{ color: '#FBBF24', margin: '0 3px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  {!isExternalLive && assignment.p1 && (
+                    <img
+                      src={getPlayerAvatar(assignment.p1)}
+                      alt=""
+                      style={{ width: '17px', height: '17px', borderRadius: '4px', objectFit: 'cover', objectPosition: 'center 22%', border: '1px solid #10B981', flexShrink: 0 }}
+                    />
+                  )}
+                  <span>{assignment.p1Name}</span>
+                  <span style={{ color: '#FBBF24', margin: '0 2px', fontWeight: 900 }}>
                     {assignment.score1}-{assignment.score2}
-                  </span>{' '}
-                  {assignment.p2Name}
+                  </span>
+                  <span>{assignment.p2Name}</span>
+                  {!isExternalLive && assignment.p2 && (
+                    <img
+                      src={getPlayerAvatar(assignment.p2)}
+                      alt=""
+                      style={{ width: '17px', height: '17px', borderRadius: '4px', objectFit: 'cover', objectPosition: 'center 22%', border: '1px solid #38BDF8', flexShrink: 0 }}
+                    />
+                  )}
                 </span>
               ) : (
                 <span>{isExternalLive ? slot.name : assignment.subtitle}</span>
@@ -4136,6 +4151,20 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                       />
                       Bandeau noir haut
                     </label>
+
+                    {isClubSituation && (
+                      <label
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#6EE7B7', cursor: 'pointer', fontWeight: 700 }}
+                        title="Afficher les portraits des joueurs en mode HUD jeu vidéo sur les matchs du club"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={mosaicHeader.showPlayerAvatars !== false}
+                          onChange={(e) => updateMosaicHeader({ showPlayerAvatars: e.target.checked })}
+                        />
+                        Photos joueurs (HUD)
+                      </label>
+                    )}
                   </div>
 
                   {mosaicHeader.logoMode !== 'none' && (
