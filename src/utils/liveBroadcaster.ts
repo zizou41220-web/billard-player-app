@@ -1988,13 +1988,34 @@ export class LiveCompositeBroadcaster {
     ctx.fillRect(0, 0, W, 4);
     ctx.fillRect(0, H - 4, W, 4);
 
-    // Club Logo card
-    const clubLogo = this.getCachedImage(getClubLogoUrl(currentClub.logoUrl) || defaultClubLogo);
-    if (clubLogo) {
-      drawRoundedRect(ctx, W / 2 - 64, 118, 128, 128, 16);
-      ctx.fillStyle = '#ffffff';
+    // Logo card (respects Logo / En-tête setting: custom, club, or hidden)
+    const mhPause = { ...DEFAULT_MOSAIC_HEADER, ...(directorState.mosaicHeader || {}) };
+    const pauseLogoUrl =
+      mhPause.logoMode === 'none'
+        ? ''
+        : mhPause.logoMode === 'custom' && mhPause.customLogoUrl
+          ? mhPause.customLogoUrl
+          : (getClubLogoUrl(currentClub.logoUrl) || defaultClubLogo);
+    const pauseLogo = pauseLogoUrl ? this.getCachedImage(pauseLogoUrl) : null;
+    if (pauseLogo) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      drawRoundedRect(ctx, W / 2 - 74, 112, 148, 136, 16);
+      ctx.fillStyle = mhPause.logoBg === 'dark_gold' ? 'rgba(10, 14, 22, 0.94)' : '#ffffff';
       ctx.fill();
-      ctx.drawImage(clubLogo, W / 2 - 50, 132, 100, 100);
+      if (mhPause.logoBg === 'dark_gold') {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#D4AF37';
+        ctx.stroke();
+      }
+      const maxW = 124;
+      const maxH = 112;
+      const sc = Math.min(maxW / Math.max(1, pauseLogo.naturalWidth), maxH / Math.max(1, pauseLogo.naturalHeight));
+      const dw = pauseLogo.naturalWidth * sc;
+      const dh = pauseLogo.naturalHeight * sc;
+      ctx.drawImage(pauseLogo, W / 2 - dw / 2, 180 - dh / 2, dw, dh);
+      ctx.restore();
     }
 
     // LIVE + Club Name pill
@@ -2036,6 +2057,52 @@ export class LiveCompositeBroadcaster {
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.font = '700 16px Inter, system-ui, sans-serif';
     ctx.fillText(`DIRECT EN COURS  •  ${timeStr}`, W / 2, H - 56);
+  }
+
+  private drawBroadcastHeaderLogo(data: LiveCompositeContext, showBar: boolean, headerH: number) {
+    const { directorState, currentClub } = data;
+    const mh = { ...DEFAULT_MOSAIC_HEADER, ...(directorState.mosaicHeader || {}) };
+    const activeLogoUrl =
+      mh.logoMode === 'none'
+        ? ''
+        : mh.logoMode === 'custom'
+          ? (mh.customLogoUrl || '')
+          : (getClubLogoUrl(currentClub.logoUrl) || defaultClubLogo);
+    const headerLogoImg = activeLogoUrl ? this.getCachedImage(activeLogoUrl) : null;
+    if (!headerLogoImg) return;
+
+    const logoBoxH = Math.max(34, Math.min(115, Number(mh.logoHeightPx) || 56));
+    const logoAspect = Math.max(0.5, Math.min(3.2, headerLogoImg.naturalWidth / Math.max(1, headerLogoImg.naturalHeight)));
+    const logoBoxW = Math.round(logoBoxH * logoAspect);
+    const lx = showBar ? 14 : 18;
+    const ly = showBar ? (logoBoxH <= headerH - 6 ? Math.round((headerH - logoBoxH) / 2) : 6) : 16;
+    const bgMode = mh.logoBg || 'dark_gold';
+    const pad = bgMode === 'transparent' ? 0 : 5;
+    const ctx = this.ctx;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if (bgMode !== 'transparent') {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 3;
+      drawRoundedRect(ctx, lx, ly, logoBoxW, logoBoxH, 10);
+      ctx.fillStyle = bgMode === 'white' ? 'rgba(255, 255, 255, 0.96)' : 'rgba(10, 14, 22, 0.95)';
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.lineWidth = bgMode === 'dark_gold' ? 2 : 1.5;
+      ctx.strokeStyle = bgMode === 'dark_gold' ? '#D4AF37' : 'rgba(255, 255, 255, 0.45)';
+      ctx.stroke();
+    }
+    const iw = Math.max(1, logoBoxW - pad * 2);
+    const ih = Math.max(1, logoBoxH - pad * 2);
+    const scale = Math.min(iw / Math.max(1, headerLogoImg.naturalWidth), ih / Math.max(1, headerLogoImg.naturalHeight));
+    const dw = headerLogoImg.naturalWidth * scale;
+    const dh = headerLogoImg.naturalHeight * scale;
+    ctx.drawImage(headerLogoImg, lx + pad + (iw - dw) / 2, ly + pad + (ih - dh) / 2, dw, dh);
+    ctx.restore();
   }
 
   public drawFrame() {
@@ -2134,6 +2201,7 @@ export class LiveCompositeBroadcaster {
           const assignment = resolveCameraAssignment(slot, { tables, matches, players, tournaments, currentClub }, directorState);
           this.drawSingleScoreboard(assignment, slot, overlayCfg, currentClub);
         }
+        this.drawBroadcastHeaderLogo(data, false, 0);
         this.drawCustomOverlays(overlayCfg);
         this.drawShotClockOverlay(data);
         this.drawSponsorCarousel(data, overlayCfg);
@@ -2289,35 +2357,7 @@ export class LiveCompositeBroadcaster {
       });
 
       // Crisp high-res broadcast header logo medallion drawn on top (never clipped, aspect preserved)
-      if (hasVisibleLogo && headerLogoImg) {
-        const lx = 14;
-        const ly = showBar ? (logoBoxH <= headerH - 6 ? Math.round((headerH - logoBoxH) / 2) : 6) : 12;
-        const bgMode = mh.logoBg || 'dark_gold';
-        const pad = bgMode === 'transparent' ? 0 : 5;
-        ctx.save();
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        if (bgMode !== 'transparent') {
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetY = 3;
-          drawRoundedRect(ctx, lx, ly, logoBoxW, logoBoxH, 10);
-          ctx.fillStyle = bgMode === 'white' ? 'rgba(255, 255, 255, 0.96)' : 'rgba(10, 14, 22, 0.95)';
-          ctx.fill();
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetY = 0;
-          ctx.lineWidth = bgMode === 'dark_gold' ? 2 : 1.5;
-          ctx.strokeStyle = bgMode === 'dark_gold' ? '#D4AF37' : 'rgba(255, 255, 255, 0.45)';
-          ctx.stroke();
-        }
-        const iw = Math.max(1, logoBoxW - pad * 2);
-        const ih = Math.max(1, logoBoxH - pad * 2);
-        const scale = Math.min(iw / Math.max(1, headerLogoImg.naturalWidth), ih / Math.max(1, headerLogoImg.naturalHeight));
-        const dw = headerLogoImg.naturalWidth * scale;
-        const dh = headerLogoImg.naturalHeight * scale;
-        ctx.drawImage(headerLogoImg, lx + pad + (iw - dw) / 2, ly + pad + (ih - dh) / 2, dw, dh);
-        ctx.restore();
-      }
+      this.drawBroadcastHeaderLogo(data, showBar, headerH);
 
       // Render custom TV logos, sponsors, shot clock & scrolling ticker over the mosaic broadcast
       this.drawCustomOverlays(overlayCfg);
