@@ -276,15 +276,47 @@ export function resolveCameraAssignment(
     const rm = directorState.regionalMatch;
     const p1Name = rm.player1Name.trim() || 'Joueur 1';
     const p2Name = rm.player2Name.trim() || 'Joueur 2';
+    const p1Photo = rm.player1PhotoUrl?.trim() || undefined;
+    const p2Photo = rm.player2PhotoUrl?.trim() || undefined;
+    const anyRegPhoto = Boolean(p1Photo || p2Photo);
+    const matchedP1 = Object.values(players).find(p => p.name.trim().toLowerCase() === p1Name.toLowerCase());
+    const matchedP2 = Object.values(players).find(p => p.name.trim().toLowerCase() === p2Name.toLowerCase());
+    const p1Obj: Player | undefined = anyRegPhoto
+      ? {
+          ...(matchedP1 || {
+            id: 'regional_p1',
+            name: p1Name,
+            level: 'Amateur' as const,
+            stats: { matchesPlayed: 0, wins: 0, winRate: 0 }
+          }),
+          name: p1Name,
+          ...(p1Photo ? { avatarUrl: p1Photo } : {})
+        }
+      : undefined;
+    const p2Obj: Player | undefined = anyRegPhoto
+      ? {
+          ...(matchedP2 || {
+            id: 'regional_p2',
+            name: p2Name,
+            level: 'Amateur' as const,
+            stats: { matchesPlayed: 0, wins: 0, winRate: 0 }
+          }),
+          name: p2Name,
+          ...(p2Photo ? { avatarUrl: p2Photo } : {})
+        }
+      : undefined;
     return {
       title: rm.eventTitle.trim() || 'Tournoi Régional',
       subtitle: `${p1Name} vs ${p2Name}`,
+      p1: p1Obj,
+      p2: p2Obj,
       p1Name,
       p1Club: rm.player1Club.trim() || undefined,
       p2Name,
       p2Club: rm.player2Club.trim() || undefined,
       score1: rm.score1 ?? 0,
       score2: rm.score2 ?? 0,
+      maxSets: rm.targetSets > 0 ? rm.targetSets : undefined,
       rulesLabel: rm.targetSets > 0 ? `1er à ${rm.targetSets}` : '',
       isMatchView: true
     };
@@ -1569,9 +1601,12 @@ export class LiveCompositeBroadcaster {
     const tickerPad = overlayCfg.ticker?.enabled ? 28 : 0;
 
     const hasScoreBoard = assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined;
+    const hasRegionalPhoto =
+      directorState?.situation === 'regional_match' &&
+      Boolean(directorState.regionalMatch?.player1PhotoUrl || directorState.regionalMatch?.player2PhotoUrl);
     const showGamerHud =
-      directorState?.situation === 'club_tables' &&
-      (directorState.mosaicHeader?.showPlayerAvatars !== false) &&
+      (directorState?.situation === 'club_tables' || hasRegionalPhoto) &&
+      (directorState?.mosaicHeader?.showPlayerAvatars !== false) &&
       Boolean(assignment.p1 || assignment.p2);
 
     if (hasScoreBoard && showGamerHud) {
@@ -2922,8 +2957,12 @@ export class LiveCompositeBroadcaster {
         ? enabledCams
         : directorState.cameras.filter(c => isClubSituation || !isVirtualScreenSource(c.sourceType)).slice(0, 1);
       const rects = getMosaicGridRects(list.length, directorState.mosaicLayout, W, H, headerH);
+      const hasRegionalPhoto =
+        directorState.situation === 'regional_match' &&
+        Boolean(directorState.regionalMatch?.player1PhotoUrl || directorState.regionalMatch?.player2PhotoUrl);
+      const allowMosaicPortraits = (isClubSituation || hasRegionalPhoto) && mh.showPlayerAvatars !== false;
       // Unified bottom bar height across EVERY tile in the mosaic (cameras AND virtual screens aligned pixel-for-pixel)
-      const uniformBarH = (isClubSituation && mh.showPlayerAvatars !== false) ? 50 : 46;
+      const uniformBarH = allowMosaicPortraits ? 50 : 46;
       const activeMosaicTour = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
 
       list.forEach((slot, idx) => {
@@ -2962,8 +3001,7 @@ export class LiveCompositeBroadcaster {
             assignment.score1 !== undefined &&
             assignment.score2 !== undefined;
           const showTilePortraits =
-            isClubSituation &&
-            mh.showPlayerAvatars !== false &&
+            allowMosaicPortraits &&
             hasMatchScore &&
             Boolean(assignment.p1 || assignment.p2);
 

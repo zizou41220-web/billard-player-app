@@ -29,8 +29,10 @@ export interface RegionalMatchConfig {
   targetSets: number;
   player1Name: string;
   player1Club: string;
+  player1PhotoUrl?: string;
   player2Name: string;
   player2Club: string;
+  player2PhotoUrl?: string;
   score1: number;
   score2: number;
   cueScoreInput?: string;
@@ -163,8 +165,10 @@ export const DEFAULT_REGIONAL_MATCH: RegionalMatchConfig = {
   targetSets: 5,
   player1Name: 'Joueur 1',
   player1Club: '',
+  player1PhotoUrl: '',
   player2Name: 'Joueur 2',
   player2Club: '',
+  player2PhotoUrl: '',
   score1: 0,
   score2: 0,
   cueScoreInput: '',

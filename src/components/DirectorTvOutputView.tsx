@@ -322,8 +322,11 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
               {assignment.title.replace(/^[^\p{L}\p{N}]+/u, '').toUpperCase()}
             </div>
           ) : hasMatchBanner ? (() => {
+            const hasRegionalPhoto =
+              directorState.situation === 'regional_match' &&
+              Boolean(directorState.regionalMatch?.player1PhotoUrl || directorState.regionalMatch?.player2PhotoUrl);
             const showGamerAvatars =
-              directorState.situation === 'club_tables' &&
+              (directorState.situation === 'club_tables' || hasRegionalPhoto) &&
               (directorState.mosaicHeader?.showPlayerAvatars !== false) &&
               Boolean(assignment.p1 || assignment.p2);
             const p1Lead = (assignment.score1 ?? 0) > (assignment.score2 ?? 0);

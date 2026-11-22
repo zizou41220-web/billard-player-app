@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store';
 import { Table } from '../types';
-import { getPlayerAvatar } from '../utils/avatar';
+import { getPlayerAvatar, isCustomPlayerPhoto } from '../utils/avatar';
 import {
   CueScoreMatch,
   CueScoreTournamentData,
@@ -491,7 +491,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           }}>
             {!isVirtual && assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                {!isExternalLive && assignment.p1 && (
+                {assignment.p1 && (
                   <img
                     src={getPlayerAvatar(assignment.p1)}
                     alt=""
@@ -503,7 +503,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
                   {assignment.score1}-{assignment.score2}
                 </span>
                 <span>{assignment.p2Name}</span>
-                {!isExternalLive && assignment.p2 && (
+                {assignment.p2 && (
                   <img
                     src={getPlayerAvatar(assignment.p2)}
                     alt=""
@@ -1036,6 +1036,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const cueScoreInputRef = useRef<HTMLInputElement | null>(null);
+  const regionalP1PhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const regionalP2PhotoInputRef = useRef<HTMLInputElement | null>(null);
   const directorStateRef = useRef<MultiCamDirectorState>(directorState);
   directorStateRef.current = directorState;
   const signalingMapRef = useRef<Record<string, CameraSignalingHandle>>({});
@@ -1878,12 +1880,17 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const rm = directorState.regionalMatch || DEFAULT_REGIONAL_MATCH;
 
   const playerSuggestions = (() => {
-    const map = new Map<string, { id: string; name: string; club: string }>();
+    const map = new Map<string, { id: string; name: string; club: string; photoUrl?: string }>();
     sortedPlayers.forEach(p => {
+      const hasRealPhoto =
+        Boolean(p.avatarUrl) &&
+        isCustomPlayerPhoto(p.avatarUrl) &&
+        !p.avatarUrl!.startsWith('data:image/svg+xml');
       map.set(p.name.trim().toLowerCase(), {
         id: p.id,
         name: p.name,
-        club: p.clubName || p.stats?.clubName || ''
+        club: p.clubName || p.stats?.clubName || '',
+        ...(hasRealPhoto ? { photoUrl: p.avatarUrl } : {})
       });
     });
     (cueScoreData?.players || []).forEach(csP => {
@@ -1899,17 +1906,51 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   })();
 
+  const handleUploadRegionalPlayerPhoto = (file: File, side: 1 | 2) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rawUrl = typeof reader.result === 'string' ? reader.result : '';
+      if (!rawUrl) return;
+      const img = new Image();
+      img.onload = () => {
+        // Compress & crop cleanly to crisp 320x320 portrait JPEG so localStorage & TV sync stay lightweight
+        const maxSide = 320;
+        const c = document.createElement('canvas');
+        c.width = maxSide;
+        c.height = maxSide;
+        const ctx = c.getContext('2d');
+        let finalUrl = rawUrl;
+        if (ctx && img.naturalWidth > 0 && img.naturalHeight > 0) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          const scale = Math.max(maxSide / img.naturalWidth, maxSide / img.naturalHeight);
+          const dw = img.naturalWidth * scale;
+          const dh = img.naturalHeight * scale;
+          const dx = (maxSide - dw) / 2;
+          const dy = (maxSide - dh) * (dh > maxSide ? 0.22 : 0.5);
+          ctx.drawImage(img, dx, dy, dw, dh);
+          finalUrl = c.toDataURL('image/jpeg', 0.88);
+        }
+        updateRegionalMatch(side === 1 ? { player1PhotoUrl: finalUrl } : { player2PhotoUrl: finalUrl });
+      };
+      img.src = rawUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const autoFillPlayerClub = (typedName: string, side: 1 | 2) => {
     const found = playerSuggestions.find(p => p.name.toLowerCase() === typedName.trim().toLowerCase());
     if (side === 1) {
       updateRegionalMatch({
         player1Name: typedName,
-        ...(found?.club ? { player1Club: found.club } : {})
+        ...(found?.club ? { player1Club: found.club } : {}),
+        ...(found?.photoUrl ? { player1PhotoUrl: found.photoUrl } : {})
       });
     } else {
       updateRegionalMatch({
         player2Name: typedName,
-        ...(found?.club ? { player2Club: found.club } : {})
+        ...(found?.club ? { player2Club: found.club } : {}),
+        ...(found?.photoUrl ? { player2PhotoUrl: found.photoUrl } : {})
       });
     }
   };
@@ -3628,8 +3669,30 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               <option key={p.id} value={p.name} />
             ))}
           </datalist>
+          <input
+            ref={regionalP1PhotoInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUploadRegionalPlayerPhoto(file, 1);
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={regionalP2PhotoInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUploadRegionalPlayerPhoto(file, 2);
+              e.target.value = '';
+            }}
+          />
 
-          {/* PLAYER 1 + SCORE 1 */}
+          {/* PLAYER 1 + PHOTO + SCORE 1 */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -3639,6 +3702,72 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             borderRadius: '10px',
             padding: '0.5rem 0.65rem'
           }}>
+            {/* Photo Joueur 1 */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => regionalP1PhotoInputRef.current?.click()}
+                title={rm.player1PhotoUrl ? 'Changer la photo du Joueur 1' : 'Importer une photo pour Joueur 1 (HUD direct)'}
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  padding: 0,
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  background: '#060A13',
+                  border: rm.player1PhotoUrl ? '2px solid #10B981' : '1.5px dashed rgba(16, 185, 129, 0.6)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '2px',
+                  color: '#6EE7B7'
+                }}
+              >
+                {rm.player1PhotoUrl ? (
+                  <img
+                    src={rm.player1PhotoUrl}
+                    alt={rm.player1Name || 'Joueur 1'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 22%', display: 'block' }}
+                  />
+                ) : (
+                  <>
+                    <Camera size={16} />
+                    <span style={{ fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.2px' }}>PHOTO</span>
+                  </>
+                )}
+              </button>
+              {rm.player1PhotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => updateRegionalMatch({ player1PhotoUrl: '' })}
+                  title="Retirer la photo du Joueur 1"
+                  style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-5px',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    background: '#0B0F17',
+                    color: '#FCA5A5',
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
               <input
                 type="text"
@@ -3715,13 +3844,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             </div>
           </div>
 
-          {/* PLAYER 2 + SCORE 2 */}
+          {/* PLAYER 2 + SCORE 2 + PHOTO */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '0.6rem',
-            background: 'rgba(245, 158, 11, 0.08)',
-            border: '1px solid rgba(245, 158, 11, 0.35)',
+            background: 'rgba(56, 189, 248, 0.08)',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
             borderRadius: '10px',
             padding: '0.5rem 0.65rem'
           }}>
@@ -3763,8 +3892,74 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 placeholder="Club Joueur 2 (ex: BC Tours)"
                 value={rm.player2Club}
                 onChange={(e) => updateRegionalMatch({ player2Club: e.target.value })}
-                style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#FBBF24', textAlign: 'right' }}
+                style={{ fontSize: '0.74rem', padding: '3px 8px', color: '#7DD3FC', textAlign: 'right' }}
               />
+            </div>
+
+            {/* Photo Joueur 2 */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => regionalP2PhotoInputRef.current?.click()}
+                title={rm.player2PhotoUrl ? 'Changer la photo du Joueur 2' : 'Importer une photo pour Joueur 2 (HUD direct)'}
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  padding: 0,
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  background: '#060A13',
+                  border: rm.player2PhotoUrl ? '2px solid #38BDF8' : '1.5px dashed rgba(56, 189, 248, 0.6)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '2px',
+                  color: '#7DD3FC'
+                }}
+              >
+                {rm.player2PhotoUrl ? (
+                  <img
+                    src={rm.player2PhotoUrl}
+                    alt={rm.player2Name || 'Joueur 2'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 22%', display: 'block' }}
+                  />
+                ) : (
+                  <>
+                    <Camera size={16} />
+                    <span style={{ fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.2px' }}>PHOTO</span>
+                  </>
+                )}
+              </button>
+              {rm.player2PhotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => updateRegionalMatch({ player2PhotoUrl: '' })}
+                  title="Retirer la photo du Joueur 2"
+                  style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-5px',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    background: '#0B0F17',
+                    color: '#FCA5A5',
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0
+                  }}
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -4129,10 +4324,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                       Bandeau noir haut
                     </label>
 
-                    {isClubSituation && (
+                    {(isClubSituation || directorState.situation === 'regional_match') && (
                       <label
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#6EE7B7', cursor: 'pointer', fontWeight: 700 }}
-                        title="Afficher les portraits des joueurs en mode HUD jeu vidéo sur les matchs du club"
+                        title="Afficher les portraits des joueurs en mode HUD jeu vidéo sur les matchs"
                       >
                         <input
                           type="checkbox"
