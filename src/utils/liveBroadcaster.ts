@@ -1,5 +1,5 @@
 import { Club, Match, Player, Table, Tournament } from '../types';
-import { LiveOverlayConfig, DEFAULT_LIVE_OVERLAY_CONFIG, resolveOverlayTextStyle, resolveSponsorCarouselCoords } from './liveOverlay';
+import { LiveOverlayConfig, DEFAULT_LIVE_OVERLAY_CONFIG, buildLiveTickerText, resolveOverlayTextStyle, resolveSponsorCarouselCoords } from './liveOverlay';
 import {
   DEFAULT_MOSAIC_HEADER,
   DirectorCameraSlot,
@@ -2286,48 +2286,15 @@ export class LiveCompositeBroadcaster {
     const barH = 30;
     const barY = H - barH;
     const { matches, players, tables, tournaments, currentClub } = data;
-
-    const segments: string[] = [];
-    if (ticker.customMessage?.trim()) {
-      segments.push(ticker.customMessage.trim());
-    }
-
-    if (ticker.includeTournamentResults) {
-      const ongoingTour = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
-      const tourMatches = ongoingTour
-        ? Object.values(matches).filter(m => m.tournamentId === ongoingTour.id)
-        : Object.values(matches);
-
-      const playing = tourMatches
-        .filter(m => m.status === 'playing' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
-        .slice(0, 4);
-      playing.forEach(m => {
-        const tbl = m.tableId ? tables[m.tableId] : undefined;
-        const tblStr = tbl ? `${tbl.name || `Billard ${tbl.number}`} : ` : '';
-        segments.push(`EN COURS — ${tblStr}${players[m.player1Id].name} ${m.score1} - ${m.score2} ${players[m.player2Id].name}`);
-      });
-
-      const finished = tourMatches
-        .filter(m => m.status === 'finished' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
-        .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))
-        .slice(0, 4);
-      finished.forEach(m => {
-        segments.push(`RÉSULTAT — ${players[m.player1Id].name} ${m.score1} - ${m.score2} ${players[m.player2Id].name}`);
-      });
-
-      const upcoming = tourMatches
-        .filter(m => m.status === 'pending' && !m.tableId && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
-        .slice(0, 2);
-      upcoming.forEach(m => {
-        segments.push(`PROCHAIN MATCH — ${players[m.player1Id].name} vs ${players[m.player2Id].name}`);
-      });
-    }
-
-    if (segments.length === 0) {
-      segments.push(`${currentClub.name} • Direct Live Multi-Caméras`);
-    }
-
-    const fullLine = `${segments.join('    ◆    ')}    ◆    `;
+    const baseLine = buildLiveTickerText({
+      ticker,
+      matches,
+      players,
+      tables,
+      tournaments,
+      clubName: currentClub.name
+    });
+    const fullLine = `${baseLine}    ◆    `;
     const speedPxPerSec = ticker.speed === 1 ? 58 : ticker.speed === 3 ? 132 : 90;
 
     ctx.save();

@@ -254,6 +254,9 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
         flexDirection: 'column',
         justifyContent: 'flex-end',
         padding: isFocusedFullscreen ? '1.4rem' : '0.55rem',
+        paddingBottom: isFocusedFullscreen
+          ? (overlayConfig?.ticker?.enabled ? '3.1rem' : '1.4rem')
+          : '0.55rem',
         boxSizing: 'border-box'
       }}
       title={isFocusedFullscreen ? undefined : 'Cliquer pour diffuser cette fenêtre en plein écran'}
@@ -264,10 +267,6 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
         unmuteAudio={isAudioActive}
         hideVirtualTopHeader={!isFocusedFullscreen}
       />
-
-      {isFocusedFullscreen && overlayConfig && (
-        <LiveCustomOverlayLayer config={overlayConfig} interactive={false} previewScale={1} />
-      )}
 
       {(!isVirtual || !isFocusedFullscreen) ? (
         <div style={{
@@ -684,6 +683,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
       display: 'flex',
       flexDirection: 'column',
       padding: '0.6rem',
+      paddingBottom: overlayConfig.ticker?.enabled && !directorState.isIntermission ? '2.6rem' : '0.6rem',
       gap: '0.6rem',
       boxSizing: 'border-box',
       fontFamily: 'Inter, system-ui, sans-serif'
@@ -869,12 +869,18 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
         })}
       </div>
 
+      {!directorState.isIntermission && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 30, pointerEvents: 'none' }}>
+          <LiveCustomOverlayLayer config={overlayConfig} interactive={false} previewScale={1} />
+        </div>
+      )}
+
       {focusedCam && !isObsClean && (
         <div style={{
           position: 'fixed',
           bottom: '16px',
           right: '16px',
-          zIndex: 25,
+          zIndex: 35,
           display: 'flex',
           alignItems: 'center',
           gap: '0.45rem',

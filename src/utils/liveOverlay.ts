@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { Match, Player, Table, Tournament } from '../types';
 
 export type OverlayImageAspect = 'free' | '1:1' | '16:9' | '4:3' | '3:4' | 'circle' | 'custom_box';
 export type OverlayImageFit = 'contain' | 'cover' | 'fill';
@@ -166,6 +167,58 @@ export const DEFAULT_TICKER_CONFIG: LiveTickerConfig = {
   bgColor: '#0A0E16',
   textColor: '#F8FAFC'
 };
+
+export function buildLiveTickerText(params: {
+  ticker?: LiveTickerConfig | null;
+  matches: Record<string, Match>;
+  players: Record<string, Player>;
+  tables: Record<string, Table>;
+  tournaments: Record<string, Tournament>;
+  clubName: string;
+}): string {
+  const { ticker, matches, players, tables, tournaments, clubName } = params;
+  const segments: string[] = [];
+  if (ticker?.customMessage?.trim()) {
+    segments.push(ticker.customMessage.trim());
+  }
+
+  if (ticker?.includeTournamentResults) {
+    const ongoingTour = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;
+    const tourMatches = ongoingTour
+      ? Object.values(matches).filter(m => m.tournamentId === ongoingTour.id)
+      : Object.values(matches);
+
+    const playing = tourMatches
+      .filter(m => m.status === 'playing' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
+      .slice(0, 6);
+    playing.forEach(m => {
+      const tbl = m.tableId ? tables[m.tableId] : undefined;
+      const tblStr = tbl ? `${tbl.name || `Billard ${tbl.number}`} : ` : '';
+      segments.push(`EN COURS — ${tblStr}${players[m.player1Id].name} ${m.score1} - ${m.score2} ${players[m.player2Id].name}`);
+    });
+
+    const finished = tourMatches
+      .filter(m => m.status === 'finished' && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
+      .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))
+      .slice(0, 4);
+    finished.forEach(m => {
+      segments.push(`RÉSULTAT — ${players[m.player1Id].name} ${m.score1} - ${m.score2} ${players[m.player2Id].name}`);
+    });
+
+    const upcoming = tourMatches
+      .filter(m => m.status === 'pending' && !m.tableId && m.player1Id && m.player2Id && players[m.player1Id] && players[m.player2Id])
+      .slice(0, 2);
+    upcoming.forEach(m => {
+      segments.push(`PROCHAIN MATCH — ${players[m.player1Id].name} vs ${players[m.player2Id].name}`);
+    });
+  }
+
+  if (segments.length === 0) {
+    segments.push(`${clubName} • Direct Live Multi-Caméras`);
+  }
+
+  return segments.join('    ◆    ');
+}
 
 export const DEFAULT_SPONSOR_CAROUSEL_CONFIG: SponsorCarouselConfig = {
   enabled: false,

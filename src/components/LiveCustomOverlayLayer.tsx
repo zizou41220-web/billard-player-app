@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useStore } from '../store';
 import {
   DEFAULT_SPONSOR_CAROUSEL_CONFIG,
   LiveOverlayConfig,
   LiveOverlayImageItem,
   LiveOverlayTextItem,
+  buildLiveTickerText,
   getImageBgStyles,
   getTextThemeStyles,
   resolveOverlayTextStyle,
@@ -27,6 +29,7 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
   onChangeConfig,
   previewScale = 1
 }) => {
+  const { matches, players, tables, tournaments, currentClub } = useStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [sponsorTick, setSponsorTick] = useState(0);
   const sponsorLogosLen = config.sponsorCarousel?.logos?.length || 0;
@@ -508,57 +511,89 @@ export const LiveCustomOverlayLayer: React.FC<LiveCustomOverlayLayerProps> = ({
       })()}
 
       {/* BOTTOM TICKER PREVIEW / TV OUTPUT */}
-      {config.ticker?.enabled && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: `${Math.max(16, Math.round(30 * previewScale))}px`,
-            background: config.ticker.bgColor || 'rgba(10, 14, 22, 0.95)',
-            borderTop: '2px solid #D4AF37',
-            display: 'flex',
-            alignItems: 'center',
-            overflow: 'hidden',
-            pointerEvents: 'none',
-            zIndex: 15
-          }}
-        >
-          <span
+      {config.ticker?.enabled && (() => {
+        const tickerLine = buildLiveTickerText({
+          ticker: config.ticker,
+          matches,
+          players,
+          tables,
+          tournaments,
+          clubName: currentClub.name
+        });
+        const tickerDurationSec = config.ticker.speed === 1 ? 75 : config.ticker.speed === 3 ? 34 : 52;
+        return (
+          <div
             style={{
-              background: '#DC2626',
-              color: '#FFFFFF',
-              fontSize: `${Math.max(0.48, 0.72 * previewScale)}rem`,
-              fontWeight: 900,
-              padding: `0 ${Math.max(6, Math.round(10 * previewScale))}px`,
-              height: '100%',
-              display: 'inline-flex',
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: `${Math.max(18, Math.round(30 * previewScale))}px`,
+              background: config.ticker.bgColor || 'rgba(10, 14, 22, 0.95)',
+              borderTop: '2px solid #D4AF37',
+              display: 'flex',
               alignItems: 'center',
-              flexShrink: 0
-            }}
-          >
-            INFO LIVE
-          </span>
-          <span
-            style={{
-              color: config.ticker.textColor || '#F8FAFC',
-              fontSize: `${Math.max(0.52, 0.8 * previewScale)}rem`,
-              fontWeight: 700,
-              paddingLeft: `${Math.max(8, Math.round(12 * previewScale))}px`,
-              whiteSpace: 'nowrap',
               overflow: 'hidden',
-              textOverflow: 'ellipsis'
+              pointerEvents: 'none',
+              zIndex: 15
             }}
           >
-            {config.ticker.customMessage?.trim()
-              ? config.ticker.customMessage.trim()
-              : config.ticker.includeTournamentResults
-                ? 'Résultats & matchs du tournoi en direct ◆ ...'
-                : 'Bandeau défilant actif'}
-          </span>
-        </div>
-      )}
+            <span
+              style={{
+                background: '#DC2626',
+                color: '#FFFFFF',
+                fontSize: `${Math.max(0.48, 0.72 * previewScale)}rem`,
+                fontWeight: 900,
+                padding: `0 ${Math.max(6, Math.round(10 * previewScale))}px`,
+                height: '100%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                flexShrink: 0,
+                zIndex: 2
+              }}
+            >
+              INFO LIVE
+            </span>
+            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+              {interactive ? (
+                <span
+                  style={{
+                    color: config.ticker.textColor || '#F8FAFC',
+                    fontSize: `${Math.max(0.52, 0.8 * previewScale)}rem`,
+                    fontWeight: 700,
+                    paddingLeft: `${Math.max(8, Math.round(12 * previewScale))}px`,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {tickerLine}
+                </span>
+              ) : (
+                <div
+                  className="broadcast-ticker"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    whiteSpace: 'nowrap',
+                    animationDuration: `${tickerDurationSec}s`,
+                    color: config.ticker.textColor || '#F8FAFC',
+                    fontSize: `${Math.max(0.52, 0.8 * previewScale)}rem`,
+                    fontWeight: 700
+                  }}
+                >
+                  <span style={{ paddingLeft: `${Math.max(12, Math.round(18 * previewScale))}px`, paddingRight: '3rem' }}>
+                    {tickerLine}    ◆
+                  </span>
+                  <span style={{ paddingRight: '3rem' }}>
+                    {tickerLine}    ◆
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
