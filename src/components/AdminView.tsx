@@ -35,6 +35,160 @@ import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScorin
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
 import { getPlayerAvatar } from '../utils/avatar';
 
+interface QualifiersCountSelectorProps {
+  value: number;
+  onChange: (nextVal: number) => void;
+  participantsCount: number;
+  nbPoules?: number;
+  disabled?: boolean;
+  disabledNote?: string;
+}
+
+/** Sélecteur réutilisable du nombre de qualifiés / sortants (gère la saisie clavier libre + bornes). */
+const QualifiersCountSelector: React.FC<QualifiersCountSelectorProps> = ({
+  value,
+  onChange,
+  participantsCount,
+  nbPoules = 1,
+  disabled = false,
+  disabledNote
+}) => {
+  const maxAllowed = participantsCount >= 3
+    ? participantsCount - 1
+    : (participantsCount === 2 ? 2 : 128);
+  const clampedValue = Math.min(maxAllowed, Math.max(2, value || 2));
+  const [draft, setDraft] = useState<string>(() => String(clampedValue));
+
+  React.useEffect(() => {
+    setDraft(String(clampedValue));
+  }, [clampedValue]);
+
+  const commitDraft = (raw: string) => {
+    const parsed = parseInt(raw, 10);
+    const next = isNaN(parsed) ? 2 : Math.min(maxAllowed, Math.max(2, parsed));
+    setDraft(String(next));
+    if (next !== value) {
+      onChange(next);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+        <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>
+          Nombre de sortants / qualifiés pour le tableau final (2 à {maxAllowed} joueurs)
+        </label>
+        {participantsCount >= 3 && (
+          <span style={{ fontSize: '0.75rem', background: 'rgba(0, 255, 204, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 204, 0.3)' }}>
+            Max : {maxAllowed} qualifiés ({participantsCount} inscrits - 1)
+          </span>
+        )}
+      </div>
+
+      {disabled ? (
+        <div style={{
+          padding: '0.65rem 0.85rem',
+          borderRadius: '8px',
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
+          color: '#cbd5e1',
+          fontSize: '0.82rem',
+          fontWeight: 700
+        }}>
+          🔒 {clampedValue} qualifiés — {disabledNote || 'Phase finale déjà lancée.'}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.6rem' }}>
+            {[2, 4, 8, 16, 32, 64, 128].map(n => {
+              const isDis = participantsCount >= 3 && n > maxAllowed;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={isDis}
+                  onClick={() => {
+                    if (!isDis) {
+                      setDraft(String(n));
+                      onChange(n);
+                    }
+                  }}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '8px',
+                    border: clampedValue === n ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                    background: clampedValue === n ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.04)',
+                    color: clampedValue === n ? 'var(--accent-primary)' : (isDis ? 'rgba(255,255,255,0.25)' : '#fff'),
+                    cursor: isDis ? 'not-allowed' : 'pointer',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    opacity: isDis ? 0.35 : 1
+                  }}
+                  title={isDis ? `Impossible avec ${participantsCount} inscrits : il faut au moins 1 éliminé (max ${maxAllowed} qualifiés)` : undefined}
+                >
+                  {n === 128 ? '128 (64es)' : n === 64 ? '64 (32es)' : n === 32 ? '32 (16es)' : n === 16 ? '16 (8es)' : n === 8 ? '8 (1/4)' : n === 4 ? '4 (1/2)' : '2 (Fin)'}
+                </button>
+              );
+            })}
+            {participantsCount >= 3 && ![2, 4, 8, 16, 32, 64, 128].includes(maxAllowed) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(String(maxAllowed));
+                  onChange(maxAllowed);
+                }}
+                style={{
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '8px',
+                  border: clampedValue === maxAllowed ? '1px solid var(--accent-primary)' : '1px solid rgba(0, 255, 204, 0.3)',
+                  background: clampedValue === maxAllowed ? 'rgba(0, 255, 204, 0.25)' : 'rgba(0, 255, 204, 0.08)',
+                  color: 'var(--accent-primary)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  fontWeight: 700
+                }}
+              >
+                {maxAllowed} (Max : {participantsCount - 1})
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: '0.78rem', color: participantsCount < 3 ? '#ffcc00' : 'var(--accent-primary)', marginBottom: '0.5rem', lineHeight: '1.4' }}>
+            {participantsCount >= 3 ? (
+              <span>
+                💡 <strong>Règle d'élimination :</strong> Sur {participantsCount} joueurs inscrits, il doit y avoir au moins 1 éliminé (maximum {maxAllowed} qualifiés).
+                {nbPoules > 1 && clampedValue >= nbPoules && (
+                  <> (~{Math.ceil(clampedValue / nbPoules)} par poule).</>
+                )}
+                {clampedValue % 2 !== 0 && ' Les Blancs éventuels seront automatiquement attribués aux premiers du classement.'}
+              </span>
+            ) : (
+              <span>
+                💡 <strong>Règle d'élimination :</strong> En poules / cartésien, au moins 1 joueur doit être éliminé pour que la phase de qualification ait un sens (max qualifiés = inscrits - 1).
+              </span>
+            )}
+          </div>
+          <input
+            type="number"
+            className="input-field"
+            value={draft}
+            onChange={e => {
+              const raw = e.target.value;
+              setDraft(raw);
+              const parsed = parseInt(raw, 10);
+              if (!isNaN(parsed) && parsed >= 2) {
+                onChange(Math.min(maxAllowed, parsed));
+              }
+            }}
+            onBlur={e => commitDraft(e.target.value)}
+            min={2}
+            max={maxAllowed}
+          />
+        </>
+      )}
+    </div>
+  );
+};
+
 const AdminView: React.FC = () => {
   const {
     tournaments, matches, players, tables, currentClub, setClub,
@@ -176,9 +330,6 @@ const AdminView: React.FC = () => {
   const maxAllowedThirdPlaceHandicap = getMaxAllowedFinalHandicap(thirdPlaceNbSetsMixed, thirdPlaceIsWinningSets);
 
   const isPoolFormat = newTourFormat !== 'direct_ko' && newTourFormat !== 'double_ko_bracket';
-  const maxAllowedQualifiers = isPoolFormat && selectedPlayers.length >= 3
-    ? selectedPlayers.length - 1
-    : (isPoolFormat && selectedPlayers.length === 2 ? 2 : 128);
 
   // Nettoyer automatiquement selectedPlayers si un joueur a été supprimé ou est invalide
   React.useEffect(() => {
@@ -1134,17 +1285,51 @@ const AdminView: React.FC = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
             <span>Tournoi : <b style={{ color: '#fff' }}>{activeTournament.name}</b></span>
-            <span style={{
-              background: 'rgba(0, 255, 170, 0.1)',
-              color: 'var(--accent-primary)',
-              padding: '3px 10px',
-              borderRadius: '12px',
-              fontWeight: 700,
-              fontSize: '0.75rem',
-              border: '1px solid rgba(0, 255, 170, 0.25)'
-            }}>
-              {activeTournament.settings?.qualifNbQualifiers || 4} qualifiés
-            </span>
+            {activeTournament.format !== 'direct_ko' && activeTournament.format !== 'double_ko_bracket' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeTournament.settings) {
+                    setEditTourSettings({
+                      ...activeTournament.settings,
+                      qualifNbQualifiers: qualifStatus.numQualifiers
+                    });
+                    setShowEditRulesModal(true);
+                  }
+                }}
+                style={{
+                  background: 'rgba(0, 255, 170, 0.12)',
+                  color: 'var(--accent-primary)',
+                  padding: '3px 10px',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  border: '1px solid rgba(0, 255, 170, 0.35)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title={qualifStatus.isFinalLaunched
+                  ? 'Phase finale déjà lancée : nombre de sortants verrouillé'
+                  : 'Cliquer pour modifier le nombre de sortants / qualifiés'}
+              >
+                {qualifStatus.numQualifiers} qualifiés
+                {!qualifStatus.isFinalLaunched && <span style={{ fontSize: '0.7rem', opacity: 0.9 }}>✎</span>}
+              </button>
+            ) : (
+              <span style={{
+                background: 'rgba(0, 255, 170, 0.1)',
+                color: 'var(--accent-primary)',
+                padding: '3px 10px',
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                border: '1px solid rgba(0, 255, 170, 0.25)'
+              }}>
+                {activeTournament.participants.length} joueurs
+              </span>
+            )}
 
             {/* Match Duration Badge on Dashboard */}
             <span style={{
@@ -1188,11 +1373,14 @@ const AdminView: React.FC = () => {
               }}
               onClick={() => {
                 if (activeTournament.settings) {
-                  setEditTourSettings({ ...activeTournament.settings });
+                  setEditTourSettings({
+                    ...activeTournament.settings,
+                    qualifNbQualifiers: activeTournament.settings.qualifNbQualifiers || qualifStatus.numQualifiers || 4
+                  });
                   setShowEditRulesModal(true);
                 }
               }}
-              title="Modifier les règles, la durée des matchs et les handicaps du tournoi en cours"
+              title="Modifier le nombre de qualifiés, les règles, la durée des matchs et les handicaps du tournoi en cours"
             >
               <Clock size={13} /> Régler Temps & Règles
             </button>
@@ -2232,83 +2420,11 @@ const AdminView: React.FC = () => {
                             />
                           </div>
                           <div style={{ gridColumn: 'span 2' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                              <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>
-                                Nombre de qualifiés pour le tableau final (2 à {maxAllowedQualifiers} joueurs)
-                              </label>
-                              {selectedPlayers.length >= 3 && (
-                                <span style={{ fontSize: '0.75rem', background: 'rgba(0, 255, 204, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 204, 0.3)' }}>
-                                  Max : {maxAllowedQualifiers} qualifiés ({selectedPlayers.length} inscrits - 1)
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.6rem' }}>
-                              {[2, 4, 8, 16, 32, 64, 128].map(n => {
-                                const isDis = selectedPlayers.length >= 3 && n > maxAllowedQualifiers;
-                                return (
-                                  <button
-                                    key={n}
-                                    type="button"
-                                    disabled={isDis}
-                                    onClick={() => !isDis && setQualifNbQualifiers(n)}
-                                    style={{
-                                      padding: '0.35rem 0.75rem',
-                                      borderRadius: '8px',
-                                      border: qualifNbQualifiers === n ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                                      background: qualifNbQualifiers === n ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.04)',
-                                      color: qualifNbQualifiers === n ? 'var(--accent-primary)' : (isDis ? 'rgba(255,255,255,0.25)' : '#fff'),
-                                      cursor: isDis ? 'not-allowed' : 'pointer',
-                                      fontSize: '0.8rem',
-                                      fontWeight: 700,
-                                      opacity: isDis ? 0.35 : 1
-                                    }}
-                                    title={isDis ? `Impossible avec ${selectedPlayers.length} inscrits : il faut au moins 1 éliminé (max ${maxAllowedQualifiers} qualifiés)` : undefined}
-                                  >
-                                    {n === 128 ? '128 (64es)' : n === 64 ? '64 (32es)' : n === 32 ? '32 (16es)' : n === 16 ? '16 (8es)' : n === 8 ? '8 (1/4)' : n === 4 ? '4 (1/2)' : '2 (Fin)'}
-                                  </button>
-                                );
-                              })}
-                              {selectedPlayers.length >= 3 && ![2, 4, 8, 16, 32, 64, 128].includes(maxAllowedQualifiers) && (
-                                <button
-                                  type="button"
-                                  onClick={() => setQualifNbQualifiers(maxAllowedQualifiers)}
-                                  style={{
-                                    padding: '0.35rem 0.75rem',
-                                    borderRadius: '8px',
-                                    border: qualifNbQualifiers === maxAllowedQualifiers ? '1px solid var(--accent-primary)' : '1px solid rgba(0, 255, 204, 0.3)',
-                                    background: qualifNbQualifiers === maxAllowedQualifiers ? 'rgba(0, 255, 204, 0.25)' : 'rgba(0, 255, 204, 0.08)',
-                                    color: 'var(--accent-primary)',
-                                    cursor: 'pointer',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700
-                                  }}
-                                >
-                                  {maxAllowedQualifiers} (Max : {selectedPlayers.length - 1})
-                                </button>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.78rem', color: selectedPlayers.length < 3 ? '#ffcc00' : 'var(--accent-primary)', marginBottom: '0.5rem', lineHeight: '1.4' }}>
-                              {selectedPlayers.length >= 3 ? (
-                                <span>
-                                  💡 <strong>Règle d'élimination :</strong> Sur {selectedPlayers.length} joueurs inscrits, il doit y avoir au moins 1 éliminé (maximum {maxAllowedQualifiers} qualifiés).
-                                  {qualifNbQualifiers % 2 !== 0 && ' Les Blancs éventuels seront automatiquement attribués aux premiers du classement.'}
-                                </span>
-                              ) : (
-                                <span>
-                                  💡 <strong>Règle d'élimination :</strong> En poules / cartésien, au moins 1 joueur doit être éliminé pour que la phase de qualification ait un sens (max qualifiés = inscrits - 1).
-                                </span>
-                              )}
-                            </div>
-                            <input
-                              type="number"
-                              className="input-field"
+                            <QualifiersCountSelector
                               value={qualifNbQualifiers}
-                              onChange={e => {
-                                const val = parseInt(e.target.value, 10);
-                                setQualifNbQualifiers(isNaN(val) ? 2 : Math.min(maxAllowedQualifiers, Math.max(2, val)));
-                              }}
-                              min={2}
-                              max={maxAllowedQualifiers}
+                              onChange={setQualifNbQualifiers}
+                              participantsCount={selectedPlayers.length}
+                              nbPoules={(newTourFormat === 'cartesien' || newTourFormat === 'robin') ? qualifNbPoules : 1}
                             />
                           </div>
 
@@ -6238,46 +6354,57 @@ const AdminView: React.FC = () => {
 
               {/* SECTION 0: QUALIFICATIONS (si format poules/cartésien) */}
               {activeTournament.format !== 'direct_ko' && activeTournament.format !== 'double_ko_bracket' && (
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-primary)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Clock size={16} /> Temps imparti par match (Qualifications)
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {[0, 15, 20, 30, 45, 60].map(mins => {
-                      const curMins = editTourSettings.qualifMatchDurationMinutes ?? 0;
-                      const isSel = curMins === mins;
-                      return (
-                        <button
-                          key={mins}
-                          type="button"
-                          onClick={() => setEditTourSettings({ ...editTourSettings, qualifMatchDurationMinutes: mins })}
-                          className="btn"
-                          style={{
-                            padding: '0.4rem 0.8rem',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            borderRadius: '8px',
-                            border: isSel ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.15)',
-                            background: isSel ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.02)',
-                            color: isSel ? 'var(--accent-primary)' : '#fff'
-                          }}
-                        >
-                          {mins === 0 ? 'Illimité (0)' : `${mins} min`}
-                        </button>
-                      );
-                    })}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Personnalisé :</span>
-                      <input
-                        type="number"
-                        className="input-field"
-                        min={0}
-                        max={240}
-                        value={editTourSettings.qualifMatchDurationMinutes ?? 0}
-                        onChange={e => setEditTourSettings({ ...editTourSettings, qualifMatchDurationMinutes: Math.max(0, parseInt(e.target.value, 10) || 0) })}
-                        style={{ width: '65px', padding: '0.3rem 0.4rem', textAlign: 'center', fontWeight: 700, fontSize: '0.8rem' }}
-                      />
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>min</span>
+                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <QualifiersCountSelector
+                    value={editTourSettings.qualifNbQualifiers ?? qualifStatus.numQualifiers ?? 4}
+                    onChange={(nextVal) => setEditTourSettings({ ...editTourSettings, qualifNbQualifiers: nextVal })}
+                    participantsCount={activeTournament.participants.length}
+                    nbPoules={editTourSettings.qualifNbPoules || 1}
+                    disabled={qualifStatus.isFinalLaunched}
+                    disabledNote="La phase finale a déjà démarré : ce nombre ne peut plus être modifié."
+                  />
+
+                  <div style={{ paddingTop: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-primary)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={16} /> Temps imparti par match (Qualifications)
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {[0, 15, 20, 30, 45, 60].map(mins => {
+                        const curMins = editTourSettings.qualifMatchDurationMinutes ?? 0;
+                        const isSel = curMins === mins;
+                        return (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => setEditTourSettings({ ...editTourSettings, qualifMatchDurationMinutes: mins })}
+                            className="btn"
+                            style={{
+                              padding: '0.4rem 0.8rem',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              borderRadius: '8px',
+                              border: isSel ? '2px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.15)',
+                              background: isSel ? 'rgba(0, 255, 204, 0.2)' : 'rgba(255,255,255,0.02)',
+                              color: isSel ? 'var(--accent-primary)' : '#fff'
+                            }}
+                          >
+                            {mins === 0 ? 'Illimité (0)' : `${mins} min`}
+                          </button>
+                        );
+                      })}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Personnalisé :</span>
+                        <input
+                          type="number"
+                          className="input-field"
+                          min={0}
+                          max={240}
+                          value={editTourSettings.qualifMatchDurationMinutes ?? 0}
+                          onChange={e => setEditTourSettings({ ...editTourSettings, qualifMatchDurationMinutes: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                          style={{ width: '65px', padding: '0.3rem 0.4rem', textAlign: 'center', fontWeight: 700, fontSize: '0.8rem' }}
+                        />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>min</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -6662,7 +6789,17 @@ const AdminView: React.FC = () => {
                   className="btn btn-neon"
                   style={{ color: '#000', fontWeight: 800 }}
                   onClick={() => {
-                    updateTournamentSettings(activeTournament.id, editTourSettings);
+                    const isPool = activeTournament.format !== 'direct_ko' && activeTournament.format !== 'double_ko_bracket';
+                    const maxQ = activeTournament.participants.length >= 3
+                      ? activeTournament.participants.length - 1
+                      : (activeTournament.participants.length === 2 ? 2 : 128);
+                    const nextSettings = isPool && !qualifStatus.isFinalLaunched
+                      ? {
+                          ...editTourSettings,
+                          qualifNbQualifiers: Math.min(maxQ, Math.max(2, Number(editTourSettings.qualifNbQualifiers) || 2))
+                        }
+                      : editTourSettings;
+                    updateTournamentSettings(activeTournament.id, nextSettings);
                     setShowEditRulesModal(false);
                   }}
                 >
