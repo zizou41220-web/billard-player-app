@@ -477,7 +477,14 @@ function drawStandingsList(
     headerOffset = 48;
   }
 
-  // Table header
+  // Table header (responsive column spacing for 1 pool or multi-pool)
+  const isWideBox = boxW >= 700;
+  const colPtsX = boxX + boxW - (isWideBox ? 46 : 36);
+  const colDiffX = boxX + boxW - (isWideBox ? 112 : 84);
+  const colLostX = boxX + boxW - (isWideBox ? 172 : 130);
+  const colWonX = boxX + boxW - (isWideBox ? 226 : 172);
+  const colPlayedX = boxX + boxW - (isWideBox ? 280 : 214);
+
   const colY = boxY + headerOffset + 12;
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.font = '800 15px Inter, system-ui, sans-serif';
@@ -486,11 +493,14 @@ function drawStandingsList(
   ctx.fillText('#', boxX + 20, colY);
   ctx.fillText('JOUEUR', boxX + 62, colY);
   ctx.textAlign = 'center';
-  ctx.fillText('J', boxX + boxW - 230, colY);
-  ctx.fillText('V', boxX + boxW - 175, colY);
-  ctx.fillText('+/-', boxX + boxW - 115, colY);
+  ctx.fillText('J', colPlayedX, colY);
+  ctx.fillText('V', colWonX, colY);
+  ctx.fillStyle = '#F87171';
+  ctx.fillText('P', colLostX, colY);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillText('+/-', colDiffX, colY);
   ctx.fillStyle = '#00ffaa';
-  ctx.fillText('PTS', boxX + boxW - 48, colY);
+  ctx.fillText('PTS', colPtsX, colY);
 
   const startY = colY + 22;
   const availH = boxH - (startY - boxY) - 14;
@@ -522,13 +532,13 @@ function drawStandingsList(
     const pName = players[stat.id]?.name || stat.name || 'Joueur';
     ctx.fillStyle = '#ffffff';
     ctx.font = '800 19px Inter, system-ui, sans-serif';
-    const maxNameChars = boxW > 700 ? 28 : 16;
+    const maxNameChars = isWideBox ? 26 : (boxW > 500 ? 15 : 11);
     ctx.fillText(pName.slice(0, maxNameChars), boxX + 62, midY);
 
     if (stat.isSure && boxW > 650) {
       const nameW = ctx.measureText(pName.slice(0, maxNameChars)).width;
       const badgeX = boxX + 74 + nameW;
-      if (badgeX + 86 < boxX + boxW - 260) {
+      if (badgeX + 86 < colPlayedX - 24) {
         drawRoundedRect(ctx, badgeX, midY - 11, 78, 22, 6);
         ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
         ctx.fill();
@@ -543,16 +553,18 @@ function drawStandingsList(
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '700 18px Inter, system-ui, sans-serif';
-    ctx.fillText(`${stat.played}`, boxX + boxW - 230, midY);
-    ctx.fillText(`${stat.won}`, boxX + boxW - 175, midY);
+    ctx.fillText(`${stat.played}`, colPlayedX, midY);
+    ctx.fillText(`${stat.won}`, colWonX, midY);
+    ctx.fillStyle = stat.lost > 0 ? '#FCA5A5' : 'rgba(255,255,255,0.6)';
+    ctx.fillText(`${stat.lost}`, colLostX, midY);
 
     const diff = stat.sf - stat.sa;
     ctx.fillStyle = diff > 0 ? '#34D399' : diff < 0 ? '#F87171' : 'rgba(255,255,255,0.65)';
-    ctx.fillText(`${diff > 0 ? '+' : ''}${diff}`, boxX + boxW - 115, midY);
+    ctx.fillText(`${diff > 0 ? '+' : ''}${diff}`, colDiffX, midY);
 
     ctx.fillStyle = '#FBBF24';
     ctx.font = '900 22px Inter, system-ui, sans-serif';
-    ctx.fillText(`${stat.pts}`, boxX + boxW - 48, midY);
+    ctx.fillText(`${stat.pts}`, colPtsX, midY);
   }
 }
 
