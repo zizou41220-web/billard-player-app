@@ -9,7 +9,6 @@ import {
   RTC_ICE_CONFIG,
   buildCameraVideoFilter,
   createCameraSignalingChannel,
-  getOverlayChannelForStudio,
   isVirtualScreenSource,
   loadDirectorState,
   saveDirectorState,
@@ -25,7 +24,6 @@ import MatchTimerBadge from './MatchTimerBadge';
 import { resolveMatchDurationMinutes } from '../utils/rules';
 
 interface DirectorTvOutputViewProps {
-  studioId?: string;
   onExitToAll?: () => void;
 }
 
@@ -485,14 +483,13 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
   );
 };
 
-export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ studioId, onExitToAll }) => {
+export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onExitToAll }) => {
   const { tournaments, currentClub } = useStore();
-  const overlayChannelId = getOverlayChannelForStudio(studioId);
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
-    loadDirectorState(currentClub.id, studioId)
+    loadDirectorState(currentClub.id)
   );
   const [overlayConfig, setOverlayConfig] = useState<LiveOverlayConfig>(() =>
-    loadLiveOverlayConfig(currentClub.id, overlayChannelId)
+    loadLiveOverlayConfig(currentClub.id, 'live')
   );
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream | null>>({});
   const [usbStreams, setUsbStreams] = useState<Record<string, MediaStream | null>>({});
@@ -504,15 +501,15 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ stud
   const usbRef = useRef<Record<string, { deviceId: string; stream: MediaStream }>>({});
 
   useEffect(() => {
-    setDirectorState(loadDirectorState(currentClub.id, studioId));
-    setOverlayConfig(loadLiveOverlayConfig(currentClub.id, overlayChannelId));
-    const u1 = subscribeToDirectorState(currentClub.id, setDirectorState, studioId);
-    const u2 = subscribeToLiveOverlayConfig(currentClub.id, overlayChannelId, setOverlayConfig);
+    setDirectorState(loadDirectorState(currentClub.id));
+    setOverlayConfig(loadLiveOverlayConfig(currentClub.id, 'live'));
+    const u1 = subscribeToDirectorState(currentClub.id, setDirectorState);
+    const u2 = subscribeToLiveOverlayConfig(currentClub.id, 'live', setOverlayConfig);
     return () => {
       u1();
       u2();
     };
-  }, [currentClub.id, studioId, overlayChannelId]);
+  }, [currentClub.id]);
 
   const webrtcIds = directorState.cameras
     .filter(c => c.enabled && c.sourceType === 'smartphone_webrtc')
@@ -577,10 +574,10 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ stud
             pendingIce.push(candidate);
           }
         }
-      }, studioId);
+      });
       signalingRef.current[camId] = sig;
     });
-  }, [webrtcIds, currentClub.id, studioId]);
+  }, [webrtcIds, currentClub.id]);
 
   const usbKey = directorState.cameras
     .filter(c => c.enabled && c.sourceType === 'usb')
@@ -637,7 +634,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ stud
 
   const updateState = (next: MultiCamDirectorState) => {
     setDirectorState(next);
-    saveDirectorState(currentClub.id, next, true, studioId);
+    saveDirectorState(currentClub.id, next, true);
   };
 
   const activeTournament = Object.values(tournaments).slice().reverse().find(t => t.status === 'ongoing') || null;

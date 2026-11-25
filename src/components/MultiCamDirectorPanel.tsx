@@ -55,7 +55,6 @@ import {
   DirectorCameraSourceType,
   DirectorLiveSituation,
   DirectorMosaicLayout,
-  DirectorStudioId,
   MosaicHeaderConfig,
   MultiCamDirectorState,
   RTC_ICE_CONFIG,
@@ -65,14 +64,11 @@ import {
   StreamQualityPreset,
   buildCameraVideoFilter,
   createCameraSignalingChannel,
-  getOverlayChannelForStudio,
   getShotClockRemainingMs,
-  getStudioDisplayLabel,
   hasCustomCameraImageGrading,
   isVirtualScreenSource,
   loadDirectorState,
   loadStreamDestinations,
-  normalizeStudioId,
   saveDirectorState,
   saveStreamDestinations,
   subscribeToDirectorState
@@ -106,8 +102,6 @@ import { parseRtmpStreamInput } from '../utils/video';
 
 interface MultiCamDirectorPanelProps {
   getAppBaseUrl: () => string;
-  studioId?: DirectorStudioId;
-  onStreamingChange?: (isStreaming: boolean) => void;
 }
 
 interface CameraTileCardProps {
@@ -1154,16 +1148,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   );
 };
 
-export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
-  getAppBaseUrl,
-  studioId: studioIdProp,
-  onStreamingChange
-}) => {
-  const studioId = normalizeStudioId(studioIdProp);
-  const studioLabel = getStudioDisplayLabel(studioId);
-  const overlayChannelId = getOverlayChannelForStudio(studioId);
-  const regieQuerySuffix = studioId === 'regie_1' ? '' : `&regie=${encodeURIComponent(studioId)}`;
-
+export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ getAppBaseUrl }) => {
   const {
     tables,
     matches,
@@ -1176,13 +1161,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
     launchMatchOnTable
   } = useStore();
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
-    loadDirectorState(currentClub.id, studioId)
+    loadDirectorState(currentClub.id)
   );
   const [destinations, setDestinations] = useState<StreamDestinationsConfig>(() =>
-    loadStreamDestinations(currentClub.id, studioId)
+    loadStreamDestinations(currentClub.id)
   );
   const [overlayConfig, setOverlayConfig] = useState<LiveOverlayConfig>(() =>
-    loadLiveOverlayConfig(currentClub.id, overlayChannelId)
+    loadLiveOverlayConfig(currentClub.id, 'live')
   );
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream | null>>({});
@@ -1260,12 +1245,12 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
   const viewerIdRef = useRef<string>(`pc_${Math.random().toString(36).slice(2, 8)}`);
 
   useEffect(() => {
-    setDirectorState(loadDirectorState(currentClub.id, studioId));
-    setDestinations(loadStreamDestinations(currentClub.id, studioId));
-    setOverlayConfig(loadLiveOverlayConfig(currentClub.id, overlayChannelId));
+    setDirectorState(loadDirectorState(currentClub.id));
+    setDestinations(loadStreamDestinations(currentClub.id));
+    setOverlayConfig(loadLiveOverlayConfig(currentClub.id, 'live'));
 
-    const unsubDir = subscribeToDirectorState(currentClub.id, setDirectorState, studioId);
-    const unsubOv = subscribeToLiveOverlayConfig(currentClub.id, overlayChannelId, setOverlayConfig);
+    const unsubDir = subscribeToDirectorState(currentClub.id, setDirectorState);
+    const unsubOv = subscribeToLiveOverlayConfig(currentClub.id, 'live', setOverlayConfig);
     setOverlayProjects(loadOverlayProjects(currentClub.id));
     setActiveOverlayProjectId(loadActiveOverlayProjectId(currentClub.id));
     fetchOverlayProjectsFromCloud(currentClub.id).then(res => {
@@ -1281,7 +1266,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
       unsubOv();
       unsubProj();
     };
-  }, [currentClub.id, studioId, overlayChannelId]);
+  }, [currentClub.id]);
 
   const refreshVideoDevices = async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -1313,7 +1298,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
     if (directorStateRef.current.isLiveStreaming) {
       const cleaned = { ...directorStateRef.current, isLiveStreaming: false, liveStartedAt: null };
       setDirectorState(cleaned);
-      saveDirectorState(currentClub.id, cleaned, true, studioId);
+      saveDirectorState(currentClub.id, cleaned, true);
     }
 
     return () => {
@@ -1321,19 +1306,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
       broadcasterRef.current = null;
     };
   }, []);
-
-  // Notify parent when streaming state changes & auto-detect Relay startup every 4s when offline
-  useEffect(() => {
-    onStreamingChange?.(broadcasterStatus.isStreaming);
-  }, [broadcasterStatus.isStreaming, onStreamingChange]);
-
-  useEffect(() => {
-    if (broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable) return;
-    const timer = window.setInterval(() => {
-      broadcasterRef.current?.checkRelayAvailability(destinations.relayWsUrl);
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, [broadcasterStatus.connectedToRelay, broadcasterStatus.ffmpegAvailable, destinations.relayWsUrl]);
 
   useEffect(() => {
     const mergedStreams: Record<string, MediaStream | null> = {};
@@ -1444,7 +1416,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
           pendingIce.push(candidate);
         }
       }
-    }, studioId);
+    });
     signalingMapRef.current[camId] = sig;
   };
 
@@ -1544,7 +1516,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
 
   const updateDirector = (next: MultiCamDirectorState) => {
     setDirectorState(next);
-    saveDirectorState(currentClub.id, next, true, studioId);
+    saveDirectorState(currentClub.id, next, true);
   };
 
   const updateRegionalMatch = (patch: Partial<RegionalMatchConfig>) => {
@@ -1571,7 +1543,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
   const updateDestinations = (patch: Partial<StreamDestinationsConfig>) => {
     const next = { ...destinations, ...patch };
     setDestinations(next);
-    saveStreamDestinations(currentClub.id, next, studioId);
+    saveStreamDestinations(currentClub.id, next);
   };
 
   const handleSelectFocus = (cameraId: string) => {
@@ -1872,7 +1844,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
       ticker: { ...curTicker, enabled: !curTicker.enabled }
     };
     setOverlayConfig(nextOv);
-    saveLiveOverlayConfig(currentClub.id, nextOv, overlayChannelId, true);
+    saveLiveOverlayConfig(currentClub.id, nextOv, 'live', true);
   };
 
   const handleQuickSelectOverlayProject = (projectId: string) => {
@@ -1884,7 +1856,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
         updatedAt: Date.now()
       };
       setOverlayConfig(blank);
-      saveLiveOverlayConfig(currentClub.id, blank, overlayChannelId, true);
+      saveLiveOverlayConfig(currentClub.id, blank, 'live', true);
       setActiveOverlayProjectId(null);
       saveActiveOverlayProjectId(currentClub.id, null);
       return;
@@ -1899,7 +1871,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
       updatedAt: Date.now()
     };
     setOverlayConfig(applied);
-    saveLiveOverlayConfig(currentClub.id, applied, overlayChannelId, true);
+    saveLiveOverlayConfig(currentClub.id, applied, 'live', true);
     setActiveOverlayProjectId(found.id);
     saveActiveOverlayProjectId(currentClub.id, found.id);
   };
@@ -1959,18 +1931,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
             activeAudioCameraId: keepMic ? cur.activeAudioCameraId : target.id
           };
           setDirectorState(next);
-          saveDirectorState(currentClub.id, next, true, studioId);
+          saveDirectorState(currentClub.id, next, true);
         }
       } else if (key === 'm') {
         e.preventDefault();
         const next: MultiCamDirectorState = { ...cur, isIntermission: false, broadcastMode: 'mosaic', focusedCameraId: null };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true, studioId);
+        saveDirectorState(currentClub.id, next, true);
       } else if (key === 'p') {
         e.preventDefault();
         const next: MultiCamDirectorState = { ...cur, isIntermission: !cur.isIntermission };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true, studioId);
+        saveDirectorState(currentClub.id, next, true);
       } else if (key === 'w') {
         e.preventDefault();
         if (broadcasterRef.current?.getStatus().isReplaying) {
@@ -1985,7 +1957,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
           : { ...curSc, enabled: true, running: false, remainingMs: curSc.durationSec * 1000, startedAt: null, extensionUsed: false };
         const next = { ...cur, shotClock: nextSc };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true, studioId);
+        saveDirectorState(currentClub.id, next, true);
       } else if (e.code === 'Space' && curSc.enabled) {
         e.preventDefault();
         const now = Date.now();
@@ -1994,13 +1966,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
           : { ...curSc, running: true, remainingMs: curSc.remainingMs > 0 ? curSc.remainingMs : curSc.durationSec * 1000, startedAt: now };
         const next = { ...cur, shotClock: nextSc };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true, studioId);
+        saveDirectorState(currentClub.id, next, true);
       } else if (key === 'r' && curSc.enabled) {
         e.preventDefault();
         const nextSc: ShotClockState = { ...curSc, running: false, remainingMs: curSc.durationSec * 1000, startedAt: null, extensionUsed: false };
         const next = { ...cur, shotClock: nextSc };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true, studioId);
+        saveDirectorState(currentClub.id, next, true);
       } else if (key === 'e' && curSc.enabled && !curSc.extensionUsed) {
         e.preventDefault();
         const now = Date.now();
@@ -2012,7 +1984,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
         };
         const next = { ...cur, shotClock: nextSc };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true, studioId);
+        saveDirectorState(currentClub.id, next, true);
       } else if (key === 'c' && isClub) {
         const standingsSlot = cur.cameras.find(c => c.sourceType === 'tournament_standings');
         if (standingsSlot) {
@@ -2024,13 +1996,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
             focusedCameraId: standingsSlot.id
           };
           setDirectorState(next);
-          saveDirectorState(currentClub.id, next, true, studioId);
+          saveDirectorState(currentClub.id, next, true);
         }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentClub.id, studioId]);
+  }, [currentClub.id]);
 
   const handleToggleLiveStream = async () => {
     if (broadcasterStatus.isStreaming) {
@@ -2077,7 +2049,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
 
   const qrCamObj = qrModalCamId ? directorState.cameras.find(c => c.id === qrModalCamId) : null;
   const qrCamUrl = qrModalCamId
-    ? `${getAppBaseUrl()}/?camera=${encodeURIComponent(qrModalCamId)}&club=${encodeURIComponent(currentClub.id)}${regieQuerySuffix}`
+    ? `${getAppBaseUrl()}/?camera=${encodeURIComponent(qrModalCamId)}&club=${encodeURIComponent(currentClub.id)}`
     : '';
 
   const renderPlatformStatusBadge = (id: string) => {
@@ -2591,7 +2563,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
             </button>
 
             <a
-              href={`${getAppBaseUrl()}/?overlay=director&club=${encodeURIComponent(currentClub.id)}${regieQuerySuffix}`}
+              href={`${getAppBaseUrl()}/?overlay=director&club=${encodeURIComponent(currentClub.id)}`}
               target="_blank"
               rel="noreferrer"
               className="btn btn-outline"
@@ -4710,22 +4682,11 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
-                <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Radio size={20} color="#ef4444" /> Diffusion YouTube & Facebook
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    background: 'rgba(16, 185, 129, 0.16)',
-                    border: '1px solid rgba(16, 185, 129, 0.45)',
-                    color: '#6EE7B7'
-                  }}>
-                    {studioLabel}
-                  </span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Choisissez la destination et collez votre clé de stream pour diffuser la mosaïque en direct ({studioLabel} est indépendante des autres PC).
+                  Choisissez la destination et collez votre clé de stream pour diffuser la mosaïque en direct.
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -5045,7 +5006,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 900, fontSize: '1.1rem', color: '#00ffaa' }}>
-              <Smartphone size={20} /> Connecter {qrCamObj.name} {studioId !== 'regie_1' ? `(${studioLabel})` : ''}
+              <Smartphone size={20} /> Connecter {qrCamObj.name}
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
               Flashez ce QR Code avec l'appareil photo du smartphone (vidéo + micro en direct sans application).

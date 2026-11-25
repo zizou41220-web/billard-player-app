@@ -34,13 +34,6 @@ import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
 import { getPlayerAvatar } from '../utils/avatar';
-import {
-  DIRECTOR_STUDIO_OPTIONS,
-  DirectorStudioId,
-  getOverlayChannelForStudio,
-  loadActiveStudioId,
-  saveActiveStudioId
-} from '../utils/multiCamDirector';
 
 const AdminView: React.FC = () => {
   const {
@@ -319,21 +312,6 @@ const AdminView: React.FC = () => {
 
   // Standalone Live Studio State ('live_studio' tab)
   const [liveStudioSubTab, setLiveStudioSubTab] = useState<'cameras' | 'overlay'>('cameras');
-  const [activeStudioId, setActiveStudioId] = useState<DirectorStudioId>(() => loadActiveStudioId(currentClub.id));
-  const [isDirectorStreaming, setIsDirectorStreaming] = useState<boolean>(false);
-
-  React.useEffect(() => {
-    setActiveStudioId(loadActiveStudioId(currentClub.id));
-  }, [currentClub.id]);
-
-  const handleChangeActiveStudio = (nextId: DirectorStudioId) => {
-    if (isDirectorStreaming && nextId !== activeStudioId) {
-      alert("Arrêtez d'abord le live en cours sur ce PC avant de changer de Régie.");
-      return;
-    }
-    setActiveStudioId(nextId);
-    saveActiveStudioId(currentClub.id, nextId);
-  };
 
   const readImageFile = (file: File, setter: (dataUrl: string) => void) => {
     const reader = new FileReader();
@@ -5161,66 +5139,20 @@ const AdminView: React.FC = () => {
                   Habillage TV (Logos, Sponsors & Textes)
                 </button>
               </div>
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}
-                title="Chaque PC choisit sa Régie (ex : PC 1 = Régie 1, PC 2 = Régie 2) pour lancer plusieurs lives totalement indépendants en même temps"
-              >
-                <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#94A3B8', letterSpacing: '0.35px' }}>
-                  POSTE MULTI-PC :
-                </span>
-                <div style={{
-                  display: 'inline-flex',
-                  background: '#050811',
-                  padding: '2px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  gap: '2px'
-                }}>
-                  {DIRECTOR_STUDIO_OPTIONS.map(opt => {
-                    const active = activeStudioId === opt.id;
-                    const locked = isDirectorStreaming && !active;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        disabled={locked}
-                        onClick={() => handleChangeActiveStudio(opt.id)}
-                        title={locked ? "Arrêtez le live en cours avant de changer de Régie" : `Utiliser ${opt.label} (flux, caméras et clés de stream indépendants)`}
-                        style={{
-                          padding: '0.26rem 0.6rem',
-                          borderRadius: '6px',
-                          fontSize: '0.7rem',
-                          fontWeight: 800,
-                          cursor: locked ? 'not-allowed' : 'pointer',
-                          opacity: locked ? 0.4 : 1,
-                          border: active ? '1px solid rgba(16, 185, 129, 0.65)' : '1px solid transparent',
-                          background: active ? 'rgba(16, 185, 129, 0.18)' : 'transparent',
-                          color: active ? '#6EE7B7' : '#94A3B8'
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', letterSpacing: '0.3px', paddingRight: '0.2rem' }}>
+                STUDIO DIFFUSION LIVE
+              </span>
             </div>
 
             {liveStudioSubTab === 'cameras' && (
-              <MultiCamDirectorPanel
-                key={`${currentClub.id}_${activeStudioId}`}
-                getAppBaseUrl={getAppBaseUrl}
-                studioId={activeStudioId}
-                onStreamingChange={setIsDirectorStreaming}
-              />
+              <MultiCamDirectorPanel getAppBaseUrl={getAppBaseUrl} />
             )}
 
             {liveStudioSubTab === 'overlay' && (
               <div style={{ maxWidth: '920px', width: '100%', margin: '0 auto' }}>
                 <LiveOverlayEditorPanel
-                  key={`${currentClub.id}_${activeStudioId}`}
                   clubId={currentClub.id}
-                  channelId={getOverlayChannelForStudio(activeStudioId)}
+                  channelId="live"
                   player1Name="Joueur 1"
                   player2Name="Joueur 2"
                   score1={0}

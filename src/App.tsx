@@ -22,7 +22,6 @@ function App() {
   const matchParam = urlParams.get('match');
   const tableParam = urlParams.get('table');
   const clubParam = urlParams.get('club');
-  const regieParam = urlParams.get('regie') || undefined;
 
   const isDesktop = window.innerWidth > 768;
   const [appMode, setAppMode] = useState<'player' | 'admin'>(() => {
@@ -81,20 +80,19 @@ function App() {
     }
   }, []);
 
-  // Dedicated Smartphone Camera Sender Mode (?camera=cam_1&club=...&regie=...)
+  // Dedicated Smartphone Camera Sender Mode (?camera=cam_1&club=...)
   if (cameraParam) {
     return (
       <SmartphoneCameraSenderView
         cameraId={cameraParam}
         clubId={clubParam || useStore.getState().currentClub.id}
-        studioId={regieParam}
       />
     );
   }
 
   // Dedicated Overlay Mode for OBS / Prism Live Studio / Facebook / YouTube streams
   if (overlayTableParam) {
-    return <StreamOverlayView tableParam={overlayTableParam} studioId={regieParam} />;
+    return <StreamOverlayView tableParam={overlayTableParam} />;
   }
 
   if (appMode === 'admin') {
