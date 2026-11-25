@@ -13,11 +13,12 @@ import { useStore } from '../store';
 interface SmartphoneCameraSenderViewProps {
   cameraId: string;
   clubId: string;
+  studioId?: string;
 }
 
-const SmartphoneCameraSenderView: React.FC<SmartphoneCameraSenderViewProps> = ({ cameraId, clubId }) => {
+const SmartphoneCameraSenderView: React.FC<SmartphoneCameraSenderViewProps> = ({ cameraId, clubId, studioId }) => {
   const { tables, currentClub } = useStore();
-  const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() => loadDirectorState(clubId));
+  const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() => loadDirectorState(clubId, studioId));
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
   const [batterySaver, setBatterySaver] = useState<boolean>(false);
@@ -102,11 +103,11 @@ const SmartphoneCameraSenderView: React.FC<SmartphoneCameraSenderViewProps> = ({
 
   // Subscribe to director state for real-time Tally lamp (ON AIR status & assignment)
   useEffect(() => {
-    setDirectorState(loadDirectorState(clubId));
+    setDirectorState(loadDirectorState(clubId, studioId));
     return subscribeToDirectorState(clubId, (next) => {
       setDirectorState(next);
-    });
-  }, [clubId]);
+    }, studioId);
+  }, [clubId, studioId]);
 
   const cameraSlot = directorState.cameras.find(c => c.id === cameraId);
   const isSingleFocused = directorState.broadcastMode === 'single' && directorState.focusedCameraId === cameraId;
@@ -299,7 +300,7 @@ const SmartphoneCameraSenderView: React.FC<SmartphoneCameraSenderViewProps> = ({
             entry.pendingIce.push(candidate);
           }
         }
-      });
+      }, studioId);
 
       signalingRef.current = sig;
     };
@@ -308,12 +309,10 @@ const SmartphoneCameraSenderView: React.FC<SmartphoneCameraSenderViewProps> = ({
 
     const onlineHeartbeat = window.setInterval(() => {
       if (signalingRef.current) {
-        const hasConnected = Array.from(peersRef.current.values()).some(p => p.pc.connectionState === 'connected');
-        if (!hasConnected) {
-          signalingRef.current.sendSenderOnline();
-        }
+        // Always announce availability periodically so additional TV/screen viewers can connect cleanly
+        signalingRef.current.sendSenderOnline();
       }
-    }, 4000);
+    }, 5000);
 
     return () => {
       cancelled = true;
@@ -328,7 +327,7 @@ const SmartphoneCameraSenderView: React.FC<SmartphoneCameraSenderViewProps> = ({
         localStreamRef.current = null;
       }
     };
-  }, [clubId, cameraId, facingMode]);
+  }, [clubId, cameraId, facingMode, studioId]);
 
   // Toggle mic track live without reconnecting WebRTC
   useEffect(() => {

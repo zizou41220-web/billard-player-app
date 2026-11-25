@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Download,
   ExternalLink,
   Eye,
   EyeOff,
@@ -55,6 +56,7 @@ import {
   DirectorCameraSourceType,
   DirectorLiveSituation,
   DirectorMosaicLayout,
+  DirectorStudioId,
   MosaicHeaderConfig,
   MultiCamDirectorState,
   RTC_ICE_CONFIG,
@@ -64,15 +66,19 @@ import {
   StreamQualityPreset,
   buildCameraVideoFilter,
   createCameraSignalingChannel,
+  getOverlayChannelForStudio,
   getShotClockRemainingMs,
+  getStudioDisplayLabel,
   hasCustomCameraImageGrading,
   isVirtualScreenSource,
   loadDirectorState,
   loadStreamDestinations,
+  normalizeStudioId,
   saveDirectorState,
   saveStreamDestinations,
   subscribeToDirectorState
 } from '../utils/multiCamDirector';
+import { downloadPortableRelayBat } from '../utils/relayInstaller';
 import {
   BroadcasterStatusSnapshot,
   LiveCompositeBroadcaster,
@@ -102,6 +108,8 @@ import { parseRtmpStreamInput } from '../utils/video';
 
 interface MultiCamDirectorPanelProps {
   getAppBaseUrl: () => string;
+  studioId?: DirectorStudioId;
+  onStreamingChange?: (isStreaming: boolean) => void;
 }
 
 interface CameraTileCardProps {
@@ -1148,7 +1156,16 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   );
 };
 
-export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ getAppBaseUrl }) => {
+export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
+  getAppBaseUrl,
+  studioId: studioIdProp,
+  onStreamingChange
+}) => {
+  const studioId = normalizeStudioId(studioIdProp);
+  const studioLabel = getStudioDisplayLabel(studioId);
+  const overlayChannelId = getOverlayChannelForStudio(studioId);
+  const regieQuerySuffix = studioId === 'regie_1' ? '' : `&regie=${encodeURIComponent(studioId)}`;
+
   const {
     tables,
     matches,
@@ -1161,13 +1178,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     launchMatchOnTable
   } = useStore();
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
-    loadDirectorState(currentClub.id)
+    loadDirectorState(currentClub.id, studioId)
   );
   const [destinations, setDestinations] = useState<StreamDestinationsConfig>(() =>
-    loadStreamDestinations(currentClub.id)
+    loadStreamDestinations(currentClub.id, studioId)
   );
   const [overlayConfig, setOverlayConfig] = useState<LiveOverlayConfig>(() =>
-    loadLiveOverlayConfig(currentClub.id, 'live')
+    loadLiveOverlayConfig(currentClub.id, overlayChannelId)
   );
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream | null>>({});
@@ -1178,7 +1195,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [showPlatformsModal, setShowPlatformsModal] = useState<boolean>(false);
   const [copiedCamUrl, setCopiedCamUrl] = useState<boolean>(false);
   const [showStreamKeys, setShowStreamKeys] = useState<boolean>(false);
-  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
   const [replaySpeedChoice, setReplaySpeedChoice] = useState<number>(0.6);
   const [, setShotClockUiTick] = useState<number>(0);
@@ -1245,12 +1261,12 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const viewerIdRef = useRef<string>(`pc_${Math.random().toString(36).slice(2, 8)}`);
 
   useEffect(() => {
-    setDirectorState(loadDirectorState(currentClub.id));
-    setDestinations(loadStreamDestinations(currentClub.id));
-    setOverlayConfig(loadLiveOverlayConfig(currentClub.id, 'live'));
+    setDirectorState(loadDirectorState(currentClub.id, studioId));
+    setDestinations(loadStreamDestinations(currentClub.id, studioId));
+    setOverlayConfig(loadLiveOverlayConfig(currentClub.id, overlayChannelId));
 
-    const unsubDir = subscribeToDirectorState(currentClub.id, setDirectorState);
-    const unsubOv = subscribeToLiveOverlayConfig(currentClub.id, 'live', setOverlayConfig);
+    const unsubDir = subscribeToDirectorState(currentClub.id, setDirectorState, studioId);
+    const unsubOv = subscribeToLiveOverlayConfig(currentClub.id, overlayChannelId, setOverlayConfig);
     setOverlayProjects(loadOverlayProjects(currentClub.id));
     setActiveOverlayProjectId(loadActiveOverlayProjectId(currentClub.id));
     fetchOverlayProjectsFromCloud(currentClub.id).then(res => {
@@ -1266,7 +1282,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       unsubOv();
       unsubProj();
     };
-  }, [currentClub.id]);
+  }, [currentClub.id, studioId, overlayChannelId]);
 
   const refreshVideoDevices = async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -1298,7 +1314,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     if (directorStateRef.current.isLiveStreaming) {
       const cleaned = { ...directorStateRef.current, isLiveStreaming: false, liveStartedAt: null };
       setDirectorState(cleaned);
-      saveDirectorState(currentClub.id, cleaned, true);
+      saveDirectorState(currentClub.id, cleaned, true, studioId);
     }
 
     return () => {
@@ -1306,6 +1322,19 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       broadcasterRef.current = null;
     };
   }, []);
+
+  // Notify parent when streaming state changes & auto-detect Relay startup every 4s when offline
+  useEffect(() => {
+    onStreamingChange?.(broadcasterStatus.isStreaming);
+  }, [broadcasterStatus.isStreaming, onStreamingChange]);
+
+  useEffect(() => {
+    if (broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable) return;
+    const timer = window.setInterval(() => {
+      broadcasterRef.current?.checkRelayAvailability(destinations.relayWsUrl);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [broadcasterStatus.connectedToRelay, broadcasterStatus.ffmpegAvailable, destinations.relayWsUrl]);
 
   useEffect(() => {
     const mergedStreams: Record<string, MediaStream | null> = {};
@@ -1416,7 +1445,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           pendingIce.push(candidate);
         }
       }
-    });
+    }, studioId);
     signalingMapRef.current[camId] = sig;
   };
 
@@ -1516,7 +1545,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const updateDirector = (next: MultiCamDirectorState) => {
     setDirectorState(next);
-    saveDirectorState(currentClub.id, next, true);
+    saveDirectorState(currentClub.id, next, true, studioId);
   };
 
   const updateRegionalMatch = (patch: Partial<RegionalMatchConfig>) => {
@@ -1543,7 +1572,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const updateDestinations = (patch: Partial<StreamDestinationsConfig>) => {
     const next = { ...destinations, ...patch };
     setDestinations(next);
-    saveStreamDestinations(currentClub.id, next);
+    saveStreamDestinations(currentClub.id, next, studioId);
   };
 
   const handleSelectFocus = (cameraId: string) => {
@@ -1844,7 +1873,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       ticker: { ...curTicker, enabled: !curTicker.enabled }
     };
     setOverlayConfig(nextOv);
-    saveLiveOverlayConfig(currentClub.id, nextOv, 'live', true);
+    saveLiveOverlayConfig(currentClub.id, nextOv, overlayChannelId, true);
   };
 
   const handleQuickSelectOverlayProject = (projectId: string) => {
@@ -1856,7 +1885,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         updatedAt: Date.now()
       };
       setOverlayConfig(blank);
-      saveLiveOverlayConfig(currentClub.id, blank, 'live', true);
+      saveLiveOverlayConfig(currentClub.id, blank, overlayChannelId, true);
       setActiveOverlayProjectId(null);
       saveActiveOverlayProjectId(currentClub.id, null);
       return;
@@ -1871,7 +1900,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       updatedAt: Date.now()
     };
     setOverlayConfig(applied);
-    saveLiveOverlayConfig(currentClub.id, applied, 'live', true);
+    saveLiveOverlayConfig(currentClub.id, applied, overlayChannelId, true);
     setActiveOverlayProjectId(found.id);
     saveActiveOverlayProjectId(currentClub.id, found.id);
   };
@@ -1931,18 +1960,18 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             activeAudioCameraId: keepMic ? cur.activeAudioCameraId : target.id
           };
           setDirectorState(next);
-          saveDirectorState(currentClub.id, next, true);
+          saveDirectorState(currentClub.id, next, true, studioId);
         }
       } else if (key === 'm') {
         e.preventDefault();
         const next: MultiCamDirectorState = { ...cur, isIntermission: false, broadcastMode: 'mosaic', focusedCameraId: null };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
+        saveDirectorState(currentClub.id, next, true, studioId);
       } else if (key === 'p') {
         e.preventDefault();
         const next: MultiCamDirectorState = { ...cur, isIntermission: !cur.isIntermission };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
+        saveDirectorState(currentClub.id, next, true, studioId);
       } else if (key === 'w') {
         e.preventDefault();
         if (broadcasterRef.current?.getStatus().isReplaying) {
@@ -1957,7 +1986,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           : { ...curSc, enabled: true, running: false, remainingMs: curSc.durationSec * 1000, startedAt: null, extensionUsed: false };
         const next = { ...cur, shotClock: nextSc };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
+        saveDirectorState(currentClub.id, next, true, studioId);
       } else if (e.code === 'Space' && curSc.enabled) {
         e.preventDefault();
         const now = Date.now();
@@ -1966,13 +1995,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           : { ...curSc, running: true, remainingMs: curSc.remainingMs > 0 ? curSc.remainingMs : curSc.durationSec * 1000, startedAt: now };
         const next = { ...cur, shotClock: nextSc };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
+        saveDirectorState(currentClub.id, next, true, studioId);
       } else if (key === 'r' && curSc.enabled) {
         e.preventDefault();
         const nextSc: ShotClockState = { ...curSc, running: false, remainingMs: curSc.durationSec * 1000, startedAt: null, extensionUsed: false };
         const next = { ...cur, shotClock: nextSc };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
+        saveDirectorState(currentClub.id, next, true, studioId);
       } else if (key === 'e' && curSc.enabled && !curSc.extensionUsed) {
         e.preventDefault();
         const now = Date.now();
@@ -1984,7 +2013,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         };
         const next = { ...cur, shotClock: nextSc };
         setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
+        saveDirectorState(currentClub.id, next, true, studioId);
       } else if (key === 'c' && isClub) {
         const standingsSlot = cur.cameras.find(c => c.sourceType === 'tournament_standings');
         if (standingsSlot) {
@@ -1996,13 +2025,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             focusedCameraId: standingsSlot.id
           };
           setDirectorState(next);
-          saveDirectorState(currentClub.id, next, true);
+          saveDirectorState(currentClub.id, next, true, studioId);
         }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentClub.id]);
+  }, [currentClub.id, studioId]);
 
   const handleToggleLiveStream = async () => {
     if (broadcasterStatus.isStreaming) {
@@ -2049,7 +2078,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const qrCamObj = qrModalCamId ? directorState.cameras.find(c => c.id === qrModalCamId) : null;
   const qrCamUrl = qrModalCamId
-    ? `${getAppBaseUrl()}/?camera=${encodeURIComponent(qrModalCamId)}&club=${encodeURIComponent(currentClub.id)}`
+    ? `${getAppBaseUrl()}/?camera=${encodeURIComponent(qrModalCamId)}&club=${encodeURIComponent(currentClub.id)}${regieQuerySuffix}`
     : '';
 
   const renderPlatformStatusBadge = (id: string) => {
@@ -2563,7 +2592,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             </button>
 
             <a
-              href={`${getAppBaseUrl()}/?overlay=director&club=${encodeURIComponent(currentClub.id)}`}
+              href={`${getAppBaseUrl()}/?overlay=director&club=${encodeURIComponent(currentClub.id)}${regieQuerySuffix}`}
               target="_blank"
               rel="noreferrer"
               className="btn btn-outline"
@@ -4179,14 +4208,26 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           gap: '0.5rem'
         }}>
           <span>⚠️ {broadcasterStatus.lastError}</span>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => setShowPlatformsModal(true)}
-            style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 8px' }}
-          >
-            Voir détails
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+            {!(broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable) && (
+              <button
+                type="button"
+                className="btn btn-neon"
+                onClick={() => downloadPortableRelayBat(getAppBaseUrl())}
+                style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 9px', fontWeight: 900, color: '#000' }}
+              >
+                <Download size={12} /> Relais PC (.bat)
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setShowPlatformsModal(true)}
+              style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 8px' }}
+            >
+              Voir détails
+            </button>
+          </div>
         </div>
       )}
 
@@ -4682,11 +4723,22 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
-                <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <Radio size={20} color="#ef4444" /> Diffusion YouTube & Facebook
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(16, 185, 129, 0.16)',
+                    border: '1px solid rgba(16, 185, 129, 0.45)',
+                    color: '#6EE7B7'
+                  }}>
+                    {studioLabel}
+                  </span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Choisissez la destination et collez votre clé de stream pour diffuser la mosaïque en direct.
+                  Choisissez la destination et collez votre clé de stream pour diffuser la mosaïque en direct ({studioLabel} est indépendante des autres PC).
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -4909,41 +4961,63 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             <div style={{
               background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
                 ? 'rgba(16, 185, 129, 0.08)'
-                : 'rgba(245, 158, 11, 0.08)',
-              border: `1px solid ${broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
-              borderRadius: '10px',
-              padding: '0.7rem 0.9rem',
-              fontSize: '0.74rem',
+                : 'rgba(245, 158, 11, 0.1)',
+              border: `1px solid ${broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.45)'}`,
+              borderRadius: '12px',
+              padding: '0.8rem 0.95rem',
+              fontSize: '0.75rem',
               color: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#d1fae5' : '#fef3c7',
               lineHeight: '1.45',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.5rem'
+              flexDirection: 'column',
+              gap: '0.6rem'
             }}>
-              <div>
-                {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? (
-                  <span><b>🟢 Relais PC prêt :</b> cliquez sur « Lancer le Live » pour diffuser la mosaïque directement (sans OBS).</span>
-                ) : (
-                  <>
-                    <b>Relais PC non démarré :</b> lancez <b>« Lancer le Relais Live.bat »</b> dans le dossier de l'appli sur ce PC.
-                  </>
-                )}
-              </div>
-              {!(broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable) && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem' }}>
+                <div style={{ flex: '1 1 280px' }}>
+                  {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? (
+                    <span><b>🟢 Relais PC prêt :</b> cliquez sur « Lancer le Live » pour diffuser la mosaïque directement (sans OBS).</span>
+                  ) : (
+                    <>
+                      <b>🟡 Relais PC non démarré sur cet ordinateur :</b>
+                      <div style={{ fontSize: '0.71rem', color: '#FDE68A', marginTop: '3px' }}>
+                        Pas besoin du dossier du projet : téléchargez le petit lanceur autonome ci-contre puis <b>double-cliquez dessus</b> (installe automatiquement Node.js & FFmpeg si absents, sans droits admin). Le voyant passera au vert tout seul !
+                      </div>
+                    </>
+                  )}
+                </div>
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    navigator.clipboard?.writeText('npm run relay');
-                    setCopiedLinkId('relay_cmd');
-                    setTimeout(() => setCopiedLinkId(null), 1800);
+                  className="btn btn-neon"
+                  onClick={() => downloadPortableRelayBat(getAppBaseUrl())}
+                  style={{
+                    width: 'auto',
+                    fontSize: '0.74rem',
+                    fontWeight: 900,
+                    padding: '0.5rem 0.9rem',
+                    color: '#000',
+                    flexShrink: 0
                   }}
-                  style={{ width: 'auto', fontSize: '0.7rem', padding: '3px 8px' }}
+                  title="Télécharger le fichier Lancer-Relais-Live-MonClubBillard.bat autonome pour n'importe quel PC Windows"
                 >
-                  {copiedLinkId === 'relay_cmd' ? '✅ Copié !' : '📋 Copier "npm run relay"'}
+                  <Download size={14} /> Télécharger le Relais PC (.bat)
                 </button>
+              </div>
+              {!(broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable) && (
+                <div style={{
+                  fontSize: '0.68rem',
+                  color: '#CBD5E1',
+                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  paddingTop: '0.45rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.4rem'
+                }}>
+                  <span>
+                    💡 <b>Astuce Multi-PC :</b> pour lancer 2 lives indépendants en même temps, choisissez <b>Régie 1</b> sur le PC 1 et <b>Régie 2</b> sur le PC 2 (en haut à droite).
+                  </span>
+                </div>
               )}
             </div>
 
@@ -5006,7 +5080,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 900, fontSize: '1.1rem', color: '#00ffaa' }}>
-              <Smartphone size={20} /> Connecter {qrCamObj.name}
+              <Smartphone size={20} /> Connecter {qrCamObj.name} {studioId !== 'regie_1' ? `(${studioLabel})` : ''}
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
               Flashez ce QR Code avec l'appareil photo du smartphone (vidéo + micro en direct sans application).

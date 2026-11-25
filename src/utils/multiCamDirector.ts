@@ -23,6 +23,57 @@ export type DirectorAssignmentType = 'table' | 'tournament_match' | 'live_match'
 export type DirectorBroadcastMode = 'mosaic' | 'single';
 export type DirectorMosaicLayout = 'auto' | 'side_by_side' | 'stacked' | 'grid_2x2';
 export type DirectorLiveSituation = 'club_tables' | 'regional_match' | 'cuescore_live';
+export type DirectorStudioId = 'regie_1' | 'regie_2' | 'regie_3' | 'regie_4';
+
+export const DIRECTOR_STUDIO_OPTIONS: { id: DirectorStudioId; label: string }[] = [
+  { id: 'regie_1', label: 'Régie 1' },
+  { id: 'regie_2', label: 'Régie 2' },
+  { id: 'regie_3', label: 'Régie 3' },
+  { id: 'regie_4', label: 'Régie 4' }
+];
+
+export function normalizeStudioId(studioId?: string | null): DirectorStudioId {
+  if (studioId === 'regie_2' || studioId === 'regie_3' || studioId === 'regie_4') {
+    return studioId;
+  }
+  return 'regie_1';
+}
+
+export function getStudioDisplayLabel(studioId?: string | null): string {
+  const norm = normalizeStudioId(studioId);
+  return DIRECTOR_STUDIO_OPTIONS.find(o => o.id === norm)?.label || 'Régie 1';
+}
+
+/**
+ * Scope key isolating independent multi-PC control rooms (Régie 1 keeps legacy clubId key for 100% compatibility).
+ */
+export function getDirectorScopeKey(clubId: string, studioId?: string | null): string {
+  const base = clubId || 'default';
+  const norm = normalizeStudioId(studioId);
+  return norm === 'regie_1' ? base : `${base}__${norm}`;
+}
+
+export function getOverlayChannelForStudio(studioId?: string | null): string {
+  const norm = normalizeStudioId(studioId);
+  return norm === 'regie_1' ? 'live' : `live__${norm}`;
+}
+
+export function loadActiveStudioId(clubId: string): DirectorStudioId {
+  if (typeof window === 'undefined') return 'regie_1';
+  try {
+    const raw = localStorage.getItem(`mb_active_studio_id_${clubId || 'default'}`);
+    return normalizeStudioId(raw);
+  } catch {
+    return 'regie_1';
+  }
+}
+
+export function saveActiveStudioId(clubId: string, studioId: DirectorStudioId): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(`mb_active_studio_id_${clubId || 'default'}`, normalizeStudioId(studioId));
+  } catch {}
+}
 
 export interface RegionalMatchConfig {
   eventTitle: string;
@@ -337,11 +388,11 @@ export const DEFAULT_DESTINATIONS_CONFIG: StreamDestinationsConfig = {
   qualityPreset: '720p'
 };
 
-const getDirectorStorageKey = (clubId: string) =>
-  `mb_director_state_${clubId || 'default'}`;
+const getDirectorStorageKey = (clubId: string, studioId?: string | null) =>
+  `mb_director_state_${getDirectorScopeKey(clubId, studioId)}`;
 
-const getDestinationsStorageKey = (clubId: string) =>
-  `mb_director_destinations_${clubId || 'default'}`;
+const getDestinationsStorageKey = (clubId: string, studioId?: string | null) =>
+  `mb_director_destinations_${getDirectorScopeKey(clubId, studioId)}`;
 
 let directorBc: BroadcastChannel | null = null;
 try {
@@ -350,13 +401,19 @@ try {
   }
 } catch {}
 
-let supabaseDirectorChannel: ReturnType<typeof supabase.channel> | null = null;
-let currentSubscribedClubKey = '';
+type DirectorListener = (state: MultiCamDirectorState) => void;
+const directorChannelsByScope = new Map<
+  string,
+  { channel: ReturnType<typeof supabase.channel>; listeners: Set<DirectorListener> }
+>();
 
-export const loadDirectorState = (clubId: string): MultiCamDirectorState => {
+export const loadDirectorState = (
+  clubId: string,
+  studioId?: string | null
+): MultiCamDirectorState => {
   if (typeof window === 'undefined') return DEFAULT_DIRECTOR_STATE;
   try {
-    const raw = localStorage.getItem(getDirectorStorageKey(clubId));
+    const raw = localStorage.getItem(getDirectorStorageKey(clubId, studioId));
     if (!raw) return DEFAULT_DIRECTOR_STATE;
     const parsed = JSON.parse(raw);
     return {
@@ -396,37 +453,39 @@ export const loadDirectorState = (clubId: string): MultiCamDirectorState => {
 export const saveDirectorState = (
   clubId: string,
   state: MultiCamDirectorState,
-  broadcast: boolean = true
+  broadcast: boolean = true,
+  studioId?: string | null
 ): MultiCamDirectorState => {
+  const scopeKey = getDirectorScopeKey(clubId, studioId);
   const stamped: MultiCamDirectorState = {
     ...state,
     updatedAt: Date.now()
   };
 
   if (typeof window !== 'undefined') {
-    const key = getDirectorStorageKey(clubId);
+    const key = getDirectorStorageKey(clubId, studioId);
     try {
       localStorage.setItem(key, JSON.stringify(stamped));
     } catch {}
 
     if (broadcast) {
       try {
-        directorBc?.postMessage({ clubId, state: stamped });
+        directorBc?.postMessage({ clubId, scopeKey, state: stamped });
       } catch {}
 
       try {
         window.dispatchEvent(
           new CustomEvent('mb-director-state-updated', {
-            detail: { clubId, state: stamped }
+            detail: { clubId, scopeKey, state: stamped }
           })
         );
       } catch {}
 
       try {
-        supabaseDirectorChannel?.send({
+        directorChannelsByScope.get(scopeKey)?.channel.send({
           type: 'broadcast',
           event: 'director_state',
-          payload: { clubId, state: stamped }
+          payload: { clubId, scopeKey, state: stamped }
         });
       } catch {}
     }
@@ -497,10 +556,12 @@ export const ensureTableWebRtcCameraSlot = (
 
 export const subscribeToDirectorState = (
   clubId: string,
-  onUpdate: (state: MultiCamDirectorState) => void
+  onUpdate: (state: MultiCamDirectorState) => void,
+  studioId?: string | null
 ): (() => void) => {
   if (typeof window === 'undefined') return () => {};
-  const storageKey = getDirectorStorageKey(clubId);
+  const scopeKey = getDirectorScopeKey(clubId, studioId);
+  const storageKey = getDirectorStorageKey(clubId, studioId);
 
   const normalize = (parsed: any): MultiCamDirectorState => ({
     ...DEFAULT_DIRECTOR_STATE,
@@ -514,6 +575,14 @@ export const subscribeToDirectorState = (
     regionalMatch: {
       ...DEFAULT_REGIONAL_MATCH,
       ...(parsed?.regionalMatch || {})
+    },
+    shotClock: {
+      ...DEFAULT_SHOT_CLOCK,
+      ...(parsed?.shotClock || {})
+    },
+    mosaicHeader: {
+      ...DEFAULT_MOSAIC_HEADER,
+      ...(parsed?.mosaicHeader || {})
     },
     cameras: Array.isArray(parsed?.cameras) && parsed.cameras.length > 0
       ? parsed.cameras
@@ -530,14 +599,16 @@ export const subscribeToDirectorState = (
 
   const handleCustomEvent = (e: Event) => {
     const detail = (e as CustomEvent)?.detail;
-    if (detail && detail.clubId === clubId && detail.state) {
+    const matchScope = detail?.scopeKey ? detail.scopeKey === scopeKey : (detail?.clubId === clubId && scopeKey === (clubId || 'default'));
+    if (detail && matchScope && detail.state) {
       onUpdate(normalize(detail.state));
     }
   };
 
   const handleBcMessage = (e: MessageEvent) => {
     const data = e.data;
-    if (data && data.clubId === clubId && data.state) {
+    const matchScope = data?.scopeKey ? data.scopeKey === scopeKey : (data?.clubId === clubId && scopeKey === (clubId || 'default'));
+    if (data && matchScope && data.state) {
       try {
         localStorage.setItem(storageKey, JSON.stringify(data.state));
       } catch {}
@@ -549,34 +620,34 @@ export const subscribeToDirectorState = (
   window.addEventListener('mb-director-state-updated', handleCustomEvent);
   directorBc?.addEventListener('message', handleBcMessage);
 
-  const subKey = `director_state_${clubId}`;
-  if (currentSubscribedClubKey !== subKey) {
-    if (supabaseDirectorChannel) {
-      try {
-        supabase.removeChannel(supabaseDirectorChannel);
-      } catch {}
-    }
-    currentSubscribedClubKey = subKey;
-    supabaseDirectorChannel = supabase
-      .channel(`public:${subKey}`)
+  let entry = directorChannelsByScope.get(scopeKey);
+  if (!entry) {
+    const listeners = new Set<DirectorListener>();
+    const channel = supabase
+      .channel(`public:director_state_${scopeKey}`)
       .on('broadcast', { event: 'director_state' }, (payload) => {
         const data = payload?.payload;
-        if (data && data.clubId === clubId && data.state) {
+        const matchScope = data?.scopeKey ? data.scopeKey === scopeKey : (data?.clubId === clubId && scopeKey === (clubId || 'default'));
+        if (data && matchScope && data.state) {
           try {
             localStorage.setItem(storageKey, JSON.stringify(data.state));
           } catch {}
-          onUpdate(normalize(data.state));
+          const normalized = normalize(data.state);
+          listeners.forEach(fn => {
+            try { fn(normalized); } catch {}
+          });
         }
       })
       .on('broadcast', { event: 'request_director_state' }, (payload) => {
         const req = payload?.payload;
-        if (req && req.clubId === clubId) {
-          const current = loadDirectorState(clubId);
+        const matchScope = req?.scopeKey ? req.scopeKey === scopeKey : (req?.clubId === clubId && scopeKey === (clubId || 'default'));
+        if (req && matchScope) {
+          const current = loadDirectorState(clubId, studioId);
           if (current.updatedAt > 0) {
-            supabaseDirectorChannel?.send({
+            channel.send({
               type: 'broadcast',
               event: 'director_state',
-              payload: { clubId, state: current }
+              payload: { clubId, scopeKey, state: current }
             });
           }
         }
@@ -584,35 +655,52 @@ export const subscribeToDirectorState = (
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           try {
-            supabaseDirectorChannel?.send({
+            channel.send({
               type: 'broadcast',
               event: 'request_director_state',
-              payload: { clubId }
+              payload: { clubId, scopeKey }
             });
           } catch {}
         }
       });
-  } else if (supabaseDirectorChannel) {
+    entry = { channel, listeners };
+    directorChannelsByScope.set(scopeKey, entry);
+  } else {
     try {
-      supabaseDirectorChannel.send({
+      entry.channel.send({
         type: 'broadcast',
         event: 'request_director_state',
-        payload: { clubId }
+        payload: { clubId, scopeKey }
       });
     } catch {}
   }
+
+  entry.listeners.add(onUpdate);
 
   return () => {
     window.removeEventListener('storage', handleStorage);
     window.removeEventListener('mb-director-state-updated', handleCustomEvent);
     directorBc?.removeEventListener('message', handleBcMessage);
+    const curEntry = directorChannelsByScope.get(scopeKey);
+    if (curEntry) {
+      curEntry.listeners.delete(onUpdate);
+      if (curEntry.listeners.size === 0) {
+        try {
+          supabase.removeChannel(curEntry.channel);
+        } catch {}
+        directorChannelsByScope.delete(scopeKey);
+      }
+    }
   };
 };
 
-export const loadStreamDestinations = (clubId: string): StreamDestinationsConfig => {
+export const loadStreamDestinations = (
+  clubId: string,
+  studioId?: string | null
+): StreamDestinationsConfig => {
   if (typeof window === 'undefined') return DEFAULT_DESTINATIONS_CONFIG;
   try {
-    const raw = localStorage.getItem(getDestinationsStorageKey(clubId));
+    const raw = localStorage.getItem(getDestinationsStorageKey(clubId, studioId));
     if (!raw) return DEFAULT_DESTINATIONS_CONFIG;
     return {
       ...DEFAULT_DESTINATIONS_CONFIG,
@@ -623,10 +711,14 @@ export const loadStreamDestinations = (clubId: string): StreamDestinationsConfig
   }
 };
 
-export const saveStreamDestinations = (clubId: string, config: StreamDestinationsConfig) => {
+export const saveStreamDestinations = (
+  clubId: string,
+  config: StreamDestinationsConfig,
+  studioId?: string | null
+) => {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(getDestinationsStorageKey(clubId), JSON.stringify(config));
+    localStorage.setItem(getDestinationsStorageKey(clubId, studioId), JSON.stringify(config));
   } catch {}
 };
 
@@ -664,9 +756,11 @@ export interface CameraSignalingCallbacks {
 export const createCameraSignalingChannel = (
   clubId: string,
   cameraId: string,
-  callbacks: CameraSignalingCallbacks
+  callbacks: CameraSignalingCallbacks,
+  studioId?: string | null
 ): CameraSignalingHandle => {
-  const topic = `mcb_cam_sig_${clubId || 'bc41'}_${cameraId}`;
+  const scopeKey = getDirectorScopeKey(clubId || 'bc41', studioId);
+  const topic = `mcb_cam_sig_${scopeKey}_${cameraId}`;
   const channel = supabase.channel(`public:${topic}`, {
     config: { broadcast: { self: false } }
   });

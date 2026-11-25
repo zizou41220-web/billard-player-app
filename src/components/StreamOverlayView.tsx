@@ -8,6 +8,7 @@ import MatchTimerBadge from './MatchTimerBadge';
 
 interface StreamOverlayViewProps {
   tableParam: string;
+  studioId?: string;
 }
 
 import { formatEmbedVideoUrl, extractExternalVideoFromStreamUrl, extractVdoRoomFromStreamUrl, extractWebRtcCamFromStreamUrl } from '../utils/video';
@@ -486,7 +487,7 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
   );
 };
 
-const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => {
+const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam, studioId }) => {
   const { tables, matches, players, tournaments, currentClub } = useStore();
   const [activeTableParam, setActiveTableParam] = useState<string>(tableParam);
   const [onlyLiveTables, setOnlyLiveTables] = useState<boolean>(false);
@@ -600,9 +601,9 @@ const StreamOverlayView: React.FC<StreamOverlayViewProps> = ({ tableParam }) => 
   const allTournaments = Object.values(tournaments);
   const activeTournament: Tournament | null = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
 
-  // MULTI-CAMERA DIRECTOR OUTPUT VIEW (?overlay=director)
+  // MULTI-CAMERA DIRECTOR OUTPUT VIEW (?overlay=director&regie=...)
   if (activeTableParam === 'director') {
-    return <DirectorTvOutputView onExitToAll={() => setActiveTableParam('all')} />;
+    return <DirectorTvOutputView studioId={studioId} onExitToAll={() => setActiveTableParam('all')} />;
   }
 
   // MULTI-TABLE MOSAIC VIEW (?overlay=all or toggled via button)
