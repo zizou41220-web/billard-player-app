@@ -7,6 +7,7 @@ import {
   DirectorCameraSlot,
   MultiCamDirectorState,
   RTC_ICE_CONFIG,
+  buildCameraVideoFilter,
   createCameraSignalingChannel,
   isVirtualScreenSource,
   loadDirectorState,
@@ -179,6 +180,8 @@ const DirectorVideoElement: React.FC<{
     );
   }
 
+  const videoFilter = buildCameraVideoFilter(slot);
+
   return (
     <video
       ref={videoRef}
@@ -193,6 +196,7 @@ const DirectorVideoElement: React.FC<{
         objectFit: slot.fillMode === 'contain' ? 'contain' : 'cover',
         transform: `rotate(${slot.rotation || 0}deg) scale(${slot.zoom || 1})`,
         transformOrigin: 'center center',
+        filter: videoFilter !== 'none' ? videoFilter : undefined,
         transition: 'transform 0.2s ease'
       }}
     />

@@ -15,6 +15,7 @@ import WebRtcCameraPlayer from './WebRtcCameraPlayer';
 import {
   DirectorCameraSlot,
   MultiCamDirectorState,
+  buildCameraVideoFilter,
   isVirtualScreenSource,
   loadDirectorState,
   subscribeToDirectorState
@@ -178,6 +179,7 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
             fill={fillTile}
             rotation={tileRotation}
             zoom={tileZoom}
+            videoFilter={buildCameraVideoFilter(directorCam)}
             title={`Caméra ${table.name || table.number}`}
           />
         </div>
@@ -221,6 +223,7 @@ const MultiTableVideoTile: React.FC<MultiTableTileProps> = ({
             objectFit: fillTile ? 'cover' : 'contain',
             transform: `rotate(${tileRotation}deg) scale(${tileZoom})`,
             transformOrigin: 'center center',
+            filter: buildCameraVideoFilter(directorCam) !== 'none' ? buildCameraVideoFilter(directorCam) : undefined,
             transition: 'transform 0.2s ease',
             zIndex: 0
           }}

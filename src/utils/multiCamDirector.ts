@@ -75,6 +75,49 @@ export interface DirectorCameraSlot {
   zoom: number; // 1..3
   fillMode: 'cover' | 'contain';
   forceMuted: boolean;
+  brightness?: number; // 50..180 (default 100%)
+  contrast?: number; // 50..180 (default 100%)
+  saturation?: number; // 0..200 (default 100%)
+}
+
+export interface CameraImagePreset {
+  id: string;
+  label: string;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+}
+
+export const CAMERA_IMAGE_PRESETS: CameraImagePreset[] = [
+  { id: 'normal', label: 'Normal', brightness: 100, contrast: 100, saturation: 100 },
+  { id: 'dark_room', label: 'Salle sombre', brightness: 128, contrast: 110, saturation: 108 },
+  { id: 'anti_glare', label: 'Anti-reflet', brightness: 86, contrast: 118, saturation: 112 },
+  { id: 'vivid', label: 'Tapis vif', brightness: 104, contrast: 112, saturation: 132 }
+];
+
+export function hasCustomCameraImageGrading(
+  slot?: Pick<DirectorCameraSlot, 'brightness' | 'contrast' | 'saturation'> | null
+): boolean {
+  if (!slot) return false;
+  const b = Math.round(slot.brightness ?? 100);
+  const c = Math.round(slot.contrast ?? 100);
+  const s = Math.round(slot.saturation ?? 100);
+  return b !== 100 || c !== 100 || s !== 100;
+}
+
+export function buildCameraVideoFilter(
+  slot?: Pick<DirectorCameraSlot, 'brightness' | 'contrast' | 'saturation'> | null
+): string {
+  if (!slot) return 'none';
+  const b = Math.max(50, Math.min(180, Math.round(slot.brightness ?? 100)));
+  const c = Math.max(50, Math.min(180, Math.round(slot.contrast ?? 100)));
+  const s = Math.max(0, Math.min(200, Math.round(slot.saturation ?? 100)));
+  if (b === 100 && c === 100 && s === 100) return 'none';
+  const parts: string[] = [];
+  if (b !== 100) parts.push(`brightness(${b}%)`);
+  if (c !== 100) parts.push(`contrast(${c}%)`);
+  if (s !== 100) parts.push(`saturate(${s}%)`);
+  return parts.join(' ');
 }
 
 export type StreamQualityPreset = '480p' | '720p' | '1080p';

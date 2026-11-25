@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Settings,
   Smartphone,
+  Sun,
   Trash2,
   Trophy,
   Tv,
@@ -43,6 +44,7 @@ import {
   fetchCueScoreTournament
 } from '../utils/cueScore';
 import {
+  CAMERA_IMAGE_PRESETS,
   CUSTOM_VIEW_PRESETS,
   CameraSignalingHandle,
   DEFAULT_MOSAIC_HEADER,
@@ -60,8 +62,10 @@ import {
   ShotClockState,
   StreamDestinationsConfig,
   StreamQualityPreset,
+  buildCameraVideoFilter,
   createCameraSignalingChannel,
   getShotClockRemainingMs,
+  hasCustomCameraImageGrading,
   isVirtualScreenSource,
   loadDirectorState,
   loadStreamDestinations,
@@ -117,6 +121,7 @@ interface CameraTileCardProps {
   onReconnectWebRtc: (cameraId: string) => void;
   onScoreClubMatch: (matchId: string, score1: number, score2: number) => void;
   onFinishClubMatch: (matchId: string) => void;
+  onApplyImageToAll?: (patch: { brightness: number; contrast: number; saturation: number }) => void;
   registerVideoEl: (cameraId: string, el: HTMLVideoElement | null) => void;
   canDelete: boolean;
 }
@@ -138,6 +143,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   onReconnectWebRtc,
   onScoreClubMatch,
   onFinishClubMatch,
+  onApplyImageToAll,
   registerVideoEl,
   canDelete
 }) => {
@@ -145,9 +151,15 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const virtualCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showImageAdjust, setShowImageAdjust] = useState(false);
   const [editingCustomTitle, setEditingCustomTitle] = useState(false);
 
   const isVirtual = isVirtualScreenSource(slot.sourceType);
+  const videoFilter = buildCameraVideoFilter(slot);
+  const hasCustomImage = hasCustomCameraImageGrading(slot);
+  const curBrightness = Math.round(slot.brightness ?? 100);
+  const curContrast = Math.round(slot.contrast ?? 100);
+  const curSaturation = Math.round(slot.saturation ?? 100);
   const isExternalLive =
     directorState.situation === 'regional_match' || directorState.situation === 'cuescore_live';
   const activeStream =
@@ -359,6 +371,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               objectFit: slot.fillMode === 'contain' ? 'contain' : 'cover',
               transform: `rotate(${slot.rotation || 0}deg) scale(${slot.zoom || 1})`,
               transformOrigin: 'center center',
+              filter: videoFilter !== 'none' ? videoFilter : undefined,
               transition: 'transform 0.2s ease',
               display: 'block'
             }}
@@ -803,10 +816,44 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
             </button>
           )}
 
+          {!isVirtual && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                setShowImageAdjust(v => {
+                  const next = !v;
+                  if (next) setShowAdvanced(false);
+                  return next;
+                });
+              }}
+              style={{
+                width: '28px',
+                height: '28px',
+                padding: 0,
+                justifyContent: 'center',
+                borderRadius: '6px',
+                fontSize: '0.68rem',
+                background: showImageAdjust || hasCustomImage ? 'rgba(212, 175, 55, 0.18)' : '#0E1525',
+                borderColor: showImageAdjust || hasCustomImage ? 'rgba(212, 175, 55, 0.65)' : 'rgba(255,255,255,0.14)',
+                color: showImageAdjust || hasCustomImage ? '#FDE68A' : '#CBD5E1'
+              }}
+              title="Régler la luminosité, le contraste et la saturation de cette caméra"
+            >
+              <Sun size={12} />
+            </button>
+          )}
+
           <button
             type="button"
             className="btn btn-outline"
-            onClick={() => setShowAdvanced(v => !v)}
+            onClick={() => {
+              setShowAdvanced(v => {
+                const next = !v;
+                if (next) setShowImageAdjust(false);
+                return next;
+              });
+            }}
             style={{
               width: '28px',
               height: '28px',
@@ -823,6 +870,158 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
             <Settings size={12} />
           </button>
         </div>
+
+        {!isVirtual && showImageAdjust && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.35rem',
+            padding: '0.45rem 0.5rem',
+            marginTop: '0.1rem',
+            borderRadius: '7px',
+            background: '#060A13',
+            border: '1px solid rgba(212, 175, 55, 0.28)',
+            fontSize: '0.67rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem', flexWrap: 'wrap' }}>
+              <span style={{ color: '#FDE68A', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Sun size={11} /> Image
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap' }}>
+                {CAMERA_IMAGE_PRESETS.map(p => {
+                  const isActive =
+                    curBrightness === p.brightness &&
+                    curContrast === p.contrast &&
+                    curSaturation === p.saturation;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() =>
+                        onUpdateSlot(slot.id, {
+                          brightness: p.brightness,
+                          contrast: p.contrast,
+                          saturation: p.saturation
+                        })
+                      }
+                      style={{
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: `1px solid ${isActive ? '#D4AF37' : 'rgba(255,255,255,0.14)'}`,
+                        background: isActive ? 'rgba(212,175,55,0.2)' : '#0E1525',
+                        color: isActive ? '#FDE68A' : '#CBD5E1'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Luminosité */}
+            <label style={{ display: 'grid', gridTemplateColumns: '64px 1fr 34px', alignItems: 'center', gap: '6px', color: '#CBD5E1' }}>
+              <span style={{ fontWeight: 700 }}>Luminosité</span>
+              <input
+                type="range"
+                min={50}
+                max={180}
+                step={2}
+                value={curBrightness}
+                onChange={(e) => onUpdateSlot(slot.id, { brightness: parseInt(e.target.value, 10) })}
+                style={{ width: '100%', accentColor: '#D4AF37', cursor: 'pointer' }}
+              />
+              <span style={{ textAlign: 'right', fontWeight: 800, color: curBrightness !== 100 ? '#FDE68A' : '#94A3B8' }}>
+                {curBrightness}%
+              </span>
+            </label>
+
+            {/* Contraste */}
+            <label style={{ display: 'grid', gridTemplateColumns: '64px 1fr 34px', alignItems: 'center', gap: '6px', color: '#CBD5E1' }}>
+              <span style={{ fontWeight: 700 }}>Contraste</span>
+              <input
+                type="range"
+                min={50}
+                max={180}
+                step={2}
+                value={curContrast}
+                onChange={(e) => onUpdateSlot(slot.id, { contrast: parseInt(e.target.value, 10) })}
+                style={{ width: '100%', accentColor: '#D4AF37', cursor: 'pointer' }}
+              />
+              <span style={{ textAlign: 'right', fontWeight: 800, color: curContrast !== 100 ? '#FDE68A' : '#94A3B8' }}>
+                {curContrast}%
+              </span>
+            </label>
+
+            {/* Saturation */}
+            <label style={{ display: 'grid', gridTemplateColumns: '64px 1fr 34px', alignItems: 'center', gap: '6px', color: '#CBD5E1' }}>
+              <span style={{ fontWeight: 700 }}>Couleurs</span>
+              <input
+                type="range"
+                min={0}
+                max={200}
+                step={2}
+                value={curSaturation}
+                onChange={(e) => onUpdateSlot(slot.id, { saturation: parseInt(e.target.value, 10) })}
+                style={{ width: '100%', accentColor: '#D4AF37', cursor: 'pointer' }}
+              />
+              <span style={{ textAlign: 'right', fontWeight: 800, color: curSaturation !== 100 ? '#FDE68A' : '#94A3B8' }}>
+                {curSaturation}%
+              </span>
+            </label>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', paddingTop: '2px' }}>
+              {hasCustomImage ? (
+                <button
+                  type="button"
+                  onClick={() => onUpdateSlot(slot.id, { brightness: 100, contrast: 100, saturation: 100 })}
+                  style={{
+                    padding: '2px 7px',
+                    borderRadius: '4px',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: '1px solid rgba(255,255,255,0.16)',
+                    background: '#0E1525',
+                    color: '#CBD5E1'
+                  }}
+                >
+                  ↺ Réinitialiser
+                </button>
+              ) : (
+                <span style={{ fontSize: '0.6rem', color: '#64748B' }}>Réglage en direct (Live + TV)</span>
+              )}
+              {onApplyImageToAll && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onApplyImageToAll({
+                      brightness: curBrightness,
+                      contrast: curContrast,
+                      saturation: curSaturation
+                    })
+                  }
+                  style={{
+                    padding: '2px 7px',
+                    borderRadius: '4px',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: '1px solid rgba(16, 185, 129, 0.45)',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    color: '#6EE7B7'
+                  }}
+                  title="Copier ces réglages de luminosité, contraste et couleurs sur toutes les caméras"
+                >
+                  Appliquer à toutes
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {!isVirtual && !isExternalLive && (editingCustomTitle || (slot.assignmentType === 'custom_view' && !CUSTOM_VIEW_PRESETS.includes(slot.customViewTitle || ''))) && (
           <input
@@ -4130,6 +4329,16 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                     onReconnectWebRtc={setupWebRtcForCamera}
                     onScoreClubMatch={updateMatchScore}
                     onFinishClubMatch={finishMatch}
+                    onApplyImageToAll={
+                      visibleCameras.filter(c => !isVirtualScreenSource(c.sourceType)).length > 1
+                        ? (imgPatch) => {
+                            const nextCams = directorState.cameras.map(c =>
+                              isVirtualScreenSource(c.sourceType) ? c : { ...c, ...imgPatch }
+                            );
+                            updateDirector({ ...directorState, cameras: nextCams });
+                          }
+                        : undefined
+                    }
                     registerVideoEl={registerVideoEl}
                     canDelete={directorState.cameras.length > 2}
                   />

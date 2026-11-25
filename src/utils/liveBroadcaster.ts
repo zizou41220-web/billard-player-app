@@ -7,6 +7,7 @@ import {
   MultiCamDirectorState,
   StreamDestinationsConfig,
   StreamQualityPreset,
+  buildCameraVideoFilter,
   getShotClockRemainingMs,
   isVirtualScreenSource
 } from './multiCamDirector';
@@ -1531,7 +1532,14 @@ export class LiveCompositeBroadcaster {
       ctx.translate(x + w / 2, y + h / 2);
       ctx.rotate((slot.rotation * Math.PI) / 180);
       ctx.scale(finalScale, finalScale);
+      const videoFilter = buildCameraVideoFilter(slot);
+      if (videoFilter !== 'none') {
+        ctx.filter = videoFilter;
+      }
       ctx.drawImage(video, -vw / 2, -vh / 2, vw, vh);
+      if (videoFilter !== 'none') {
+        ctx.filter = 'none';
+      }
     } else if ((slot.sourceType === 'external' && slot.externalUrl) || slot.sourceType === 'vdo') {
       const grad = ctx.createLinearGradient(x, y, x + w, y + h);
       grad.addColorStop(0, '#091529');

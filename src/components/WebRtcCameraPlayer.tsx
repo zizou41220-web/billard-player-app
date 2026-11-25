@@ -12,6 +12,7 @@ interface WebRtcCameraPlayerProps {
   fill?: boolean;
   rotation?: number;
   zoom?: number;
+  videoFilter?: string;
   title?: string;
 }
 
@@ -22,6 +23,7 @@ export const WebRtcCameraPlayer: React.FC<WebRtcCameraPlayerProps> = ({
   fill = true,
   rotation = 0,
   zoom = 1,
+  videoFilter,
   title = 'Caméra Smartphone Live'
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -156,6 +158,7 @@ export const WebRtcCameraPlayer: React.FC<WebRtcCameraPlayerProps> = ({
           objectFit: fill ? 'cover' : 'contain',
           transform: `rotate(${rotation}deg) scale(${zoom})`,
           transformOrigin: 'center center',
+          filter: videoFilter && videoFilter !== 'none' ? videoFilter : undefined,
           transition: 'transform 0.2s ease'
         }}
       />
