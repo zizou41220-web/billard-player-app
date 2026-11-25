@@ -3350,7 +3350,7 @@ export class LiveCompositeBroadcaster {
       let idx = 0;
       const tryNext = () => {
         if (idx >= endpoints.length) {
-          reject(new Error('Relais de diffusion local non démarré sur ce PC. Ouvrez "Destinations" puis cliquez sur "Télécharger le Relais PC (.bat)" et double-cliquez dessus (fonctionne sur n\'importe quel PC Windows sans installation).'));
+          reject(new Error('Relais de diffusion local non démarré sur ce PC. Double-cliquez sur "Lancer le Relais Live.bat" (ou "Lancer le tournoi.bat") dans le dossier de l\'application sur le PC.'));
           return;
         }
         const url = endpoints[idx++];

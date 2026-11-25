@@ -6,7 +6,6 @@ import {
   Check,
   CheckCircle2,
   Copy,
-  Download,
   ExternalLink,
   Eye,
   EyeOff,
@@ -78,7 +77,6 @@ import {
   saveStreamDestinations,
   subscribeToDirectorState
 } from '../utils/multiCamDirector';
-import { downloadPortableRelayBat } from '../utils/relayInstaller';
 import {
   BroadcasterStatusSnapshot,
   LiveCompositeBroadcaster,
@@ -1195,6 +1193,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
   const [showPlatformsModal, setShowPlatformsModal] = useState<boolean>(false);
   const [copiedCamUrl, setCopiedCamUrl] = useState<boolean>(false);
   const [showStreamKeys, setShowStreamKeys] = useState<boolean>(false);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
   const [replaySpeedChoice, setReplaySpeedChoice] = useState<number>(0.6);
   const [, setShotClockUiTick] = useState<number>(0);
@@ -4208,26 +4207,14 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
           gap: '0.5rem'
         }}>
           <span>⚠️ {broadcasterStatus.lastError}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
-            {!(broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable) && (
-              <button
-                type="button"
-                className="btn btn-neon"
-                onClick={() => downloadPortableRelayBat(getAppBaseUrl())}
-                style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 9px', fontWeight: 900, color: '#000' }}
-              >
-                <Download size={12} /> Relais PC (.bat)
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setShowPlatformsModal(true)}
-              style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 8px' }}
-            >
-              Voir détails
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => setShowPlatformsModal(true)}
+            style={{ width: 'auto', fontSize: '0.7rem', padding: '2px 8px' }}
+          >
+            Voir détails
+          </button>
         </div>
       )}
 
@@ -4961,63 +4948,41 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({
             <div style={{
               background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
                 ? 'rgba(16, 185, 129, 0.08)'
-                : 'rgba(245, 158, 11, 0.1)',
-              border: `1px solid ${broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.45)'}`,
-              borderRadius: '12px',
-              padding: '0.8rem 0.95rem',
-              fontSize: '0.75rem',
+                : 'rgba(245, 158, 11, 0.08)',
+              border: `1px solid ${broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
+              borderRadius: '10px',
+              padding: '0.7rem 0.9rem',
+              fontSize: '0.74rem',
               color: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#d1fae5' : '#fef3c7',
               lineHeight: '1.45',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '0.6rem'
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem' }}>
-                <div style={{ flex: '1 1 280px' }}>
-                  {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? (
-                    <span><b>🟢 Relais PC prêt :</b> cliquez sur « Lancer le Live » pour diffuser la mosaïque directement (sans OBS).</span>
-                  ) : (
-                    <>
-                      <b>🟡 Relais PC non démarré sur cet ordinateur :</b>
-                      <div style={{ fontSize: '0.71rem', color: '#FDE68A', marginTop: '3px' }}>
-                        Pas besoin du dossier du projet : téléchargez le petit lanceur autonome ci-contre puis <b>double-cliquez dessus</b> (installe automatiquement Node.js & FFmpeg si absents, sans droits admin). Le voyant passera au vert tout seul !
-                      </div>
-                    </>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-neon"
-                  onClick={() => downloadPortableRelayBat(getAppBaseUrl())}
-                  style={{
-                    width: 'auto',
-                    fontSize: '0.74rem',
-                    fontWeight: 900,
-                    padding: '0.5rem 0.9rem',
-                    color: '#000',
-                    flexShrink: 0
-                  }}
-                  title="Télécharger le fichier Lancer-Relais-Live-MonClubBillard.bat autonome pour n'importe quel PC Windows"
-                >
-                  <Download size={14} /> Télécharger le Relais PC (.bat)
-                </button>
+              <div>
+                {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? (
+                  <span><b>🟢 Relais PC prêt :</b> cliquez sur « Lancer le Live » pour diffuser la mosaïque directement (sans OBS).</span>
+                ) : (
+                  <>
+                    <b>Relais PC non démarré :</b> lancez <b>« Lancer le Relais Live.bat »</b> dans le dossier de l'appli sur ce PC.
+                  </>
+                )}
               </div>
               {!(broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable) && (
-                <div style={{
-                  fontSize: '0.68rem',
-                  color: '#CBD5E1',
-                  borderTop: '1px solid rgba(255,255,255,0.1)',
-                  paddingTop: '0.45rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '0.4rem'
-                }}>
-                  <span>
-                    💡 <b>Astuce Multi-PC :</b> pour lancer 2 lives indépendants en même temps, choisissez <b>Régie 1</b> sur le PC 1 et <b>Régie 2</b> sur le PC 2 (en haut à droite).
-                  </span>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    navigator.clipboard?.writeText('npm run relay');
+                    setCopiedLinkId('relay_cmd');
+                    setTimeout(() => setCopiedLinkId(null), 1800);
+                  }}
+                  style={{ width: 'auto', fontSize: '0.7rem', padding: '3px 8px' }}
+                >
+                  {copiedLinkId === 'relay_cmd' ? '✅ Copié !' : '📋 Copier "npm run relay"'}
+                </button>
               )}
             </div>
 
