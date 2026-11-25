@@ -121,8 +121,12 @@ export function buildCameraVideoFilter(
 }
 
 export type StreamQualityPreset = '480p' | '720p' | '1080p';
+export type BroadcastEngineMode = 'relay' | 'obs';
 
 export interface StreamDestinationsConfig {
+  broadcastEngine?: BroadcastEngineMode;
+  obsWsUrl?: string;
+  obsWsPassword?: string;
   facebookEnabled: boolean;
   facebookRtmpUrl: string;
   facebookStreamKey: string;
@@ -321,6 +325,9 @@ export const DEFAULT_DIRECTOR_STATE: MultiCamDirectorState = {
 };
 
 export const DEFAULT_DESTINATIONS_CONFIG: StreamDestinationsConfig = {
+  broadcastEngine: 'relay',
+  obsWsUrl: 'ws://127.0.0.1:4455',
+  obsWsPassword: '',
   facebookEnabled: true,
   facebookRtmpUrl: 'rtmps://live-api-s.facebook.com:443/rtmp/',
   facebookStreamKey: '',

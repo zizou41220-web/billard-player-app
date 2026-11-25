@@ -99,6 +99,7 @@ import {
   subscribeToOverlayProjects
 } from '../utils/liveOverlay';
 import { parseRtmpStreamInput } from '../utils/video';
+import { ObsStatusSnapshot, checkObsStatus, startObsStream, stopObsStream } from '../utils/obsControl';
 
 interface MultiCamDirectorPanelProps {
   getAppBaseUrl: () => string;
@@ -1229,6 +1230,21 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     targetStatuses: {},
     lastError: null
   });
+  const isObsMode = destinations.broadcastEngine === 'obs';
+  const [obsStatus, setObsStatus] = useState<ObsStatusSnapshot>({ connected: false, streaming: false });
+  const [obsBusy, setObsBusy] = useState<boolean>(false);
+  const isAnyLiveActive = isObsMode ? obsStatus.streaming : broadcasterStatus.isStreaming;
+
+  const refreshObsStatus = async (wsUrl?: string, pwd?: string) => {
+    setObsBusy(true);
+    try {
+      const res = await checkObsStatus(wsUrl ?? destinations.obsWsUrl, pwd ?? destinations.obsWsPassword);
+      setObsStatus(res);
+      return res;
+    } finally {
+      setObsBusy(false);
+    }
+  };
 
   const videoElementsRef = useRef<Record<string, HTMLVideoElement | null>>({});
   const broadcasterRef = useRef<LiveCompositeBroadcaster | null>(null);
@@ -1293,7 +1309,11 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     b.setQualityPreset(destinations.qualityPreset || '720p');
     b.startRenderLoop();
     b.setReplayArmed(true);
-    b.checkRelayAvailability(destinations.relayWsUrl);
+    if (destinations.broadcastEngine === 'obs') {
+      checkObsStatus(destinations.obsWsUrl, destinations.obsWsPassword).then(setObsStatus);
+    } else {
+      b.checkRelayAvailability(destinations.relayWsUrl);
+    }
 
     if (directorStateRef.current.isLiveStreaming) {
       const cleaned = { ...directorStateRef.current, isLiveStreaming: false, liveStartedAt: null };
@@ -1332,7 +1352,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   }, [directorState, remoteStreams, usbStreams, tables, matches, players, tournaments, currentClub, overlayConfig]);
 
   useEffect(() => {
-    if (!broadcasterStatus.isStreaming) {
+    if (!isAnyLiveActive) {
       setLiveElapsedSec(0);
       return;
     }
@@ -1341,7 +1361,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       setLiveElapsedSec(Math.floor((Date.now() - start) / 1000));
     }, 1000);
     return () => window.clearInterval(t);
-  }, [broadcasterStatus.isStreaming]);
+  }, [isAnyLiveActive]);
 
   const setupWebRtcForCamera = (camId: string) => {
     if (peersMapRef.current[camId]) {
@@ -2005,6 +2025,32 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   }, [currentClub.id]);
 
   const handleToggleLiveStream = async () => {
+    if (isObsMode) {
+      if (obsBusy) return;
+      setObsBusy(true);
+      try {
+        if (obsStatus.streaming) {
+          await stopObsStream(destinations.obsWsUrl, destinations.obsWsPassword);
+          setObsStatus({ connected: true, streaming: false });
+          updateDirector({ ...directorState, isLiveStreaming: false, liveStartedAt: null });
+        } else {
+          await startObsStream(destinations.obsWsUrl, destinations.obsWsPassword);
+          setObsStatus({ connected: true, streaming: true });
+          updateDirector({ ...directorState, isLiveStreaming: true, liveStartedAt: Date.now() });
+        }
+      } catch (err: any) {
+        setObsStatus({
+          connected: false,
+          streaming: false,
+          error: err?.message || 'OBS Studio non joignable via WebSocket.'
+        });
+        setShowPlatformsModal(true);
+      } finally {
+        setObsBusy(false);
+      }
+      return;
+    }
+
     if (broadcasterStatus.isStreaming) {
       broadcasterRef.current?.stopLiveStream();
       updateDirector({ ...directorState, isLiveStreaming: false, liveStartedAt: null });
@@ -2519,21 +2565,24 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 padding: '0 10px',
                 borderRadius: '7px',
                 background: '#111827',
-                borderColor: activePlatformsLabel.length > 0 ? 'rgba(59, 130, 246, 0.5)' : 'rgba(255,255,255,0.16)',
-                color: activePlatformsLabel.length > 0 ? '#93C5FD' : '#E2E8F0',
+                borderColor: isObsMode || activePlatformsLabel.length > 0 ? 'rgba(59, 130, 246, 0.5)' : 'rgba(255,255,255,0.16)',
+                color: isObsMode || activePlatformsLabel.length > 0 ? '#93C5FD' : '#E2E8F0',
                 fontWeight: 700
               }}
             >
               <Settings size={13} />
-              {activePlatformsLabel.length > 0
-                ? `Destinations (${activePlatformsLabel.join('+')})`
-                : 'Destinations'}
+              {isObsMode
+                ? 'Mode : OBS Studio'
+                : activePlatformsLabel.length > 0
+                  ? `Destinations (${activePlatformsLabel.join('+')})`
+                  : 'Destinations'}
             </button>
 
             <button
               type="button"
               className="btn"
               onClick={handleToggleLiveStream}
+              disabled={obsBusy}
               style={{
                 width: 'auto',
                 height: '30px',
@@ -2541,23 +2590,31 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 fontSize: '0.73rem',
                 fontWeight: 800,
                 borderRadius: '7px',
-                background: broadcasterStatus.isStreaming ? '#DC2626' : '#B91C1C',
+                background: isAnyLiveActive ? '#DC2626' : (isObsMode ? '#2563EB' : '#B91C1C'),
                 border: '1px solid rgba(255,255,255,0.16)',
                 color: '#fff',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                boxShadow: broadcasterStatus.isStreaming ? '0 0 14px rgba(220, 38, 38, 0.55)' : 'none'
+                boxShadow: isAnyLiveActive ? '0 0 14px rgba(220, 38, 38, 0.55)' : 'none',
+                opacity: obsBusy ? 0.7 : 1
               }}
+              title={
+                isObsMode
+                  ? 'Démarrer / Arrêter le stream dans OBS Studio (ou configurer le lien Source Navigateur OBS)'
+                  : undefined
+              }
             >
-              {broadcasterStatus.isStreaming ? (
-                <>ARRÊTER ({formatDuration(liveElapsedSec)})</>
+              {isAnyLiveActive ? (
+                <>ARRÊTER {isObsMode ? 'OBS ' : ''}({formatDuration(liveElapsedSec)})</>
               ) : (
                 <>
                   <Play size={13} />
-                  {activePlatformsLabel.length > 0
-                    ? `DÉMARRER LIVE (${activePlatformsLabel.join('+')})`
-                    : 'DÉMARRER LE LIVE'}
+                  {isObsMode
+                    ? 'DÉMARRER LIVE (OBS)'
+                    : activePlatformsLabel.length > 0
+                      ? `DÉMARRER LIVE (${activePlatformsLabel.join('+')})`
+                      : 'DÉMARRER LE LIVE'}
                 </>
               )}
             </button>
@@ -2917,23 +2974,41 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 alignItems: 'center',
                 gap: '5px',
                 cursor: 'pointer',
-                background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                  ? 'rgba(16, 185, 129, 0.12)'
-                  : 'rgba(245, 158, 11, 0.12)',
-                border: `1px solid ${broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
-                color: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#6EE7B7' : '#FCD34D'
+                background: isObsMode
+                  ? (obsStatus.connected ? 'rgba(16, 185, 129, 0.14)' : 'rgba(59, 130, 246, 0.14)')
+                  : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+                    ? 'rgba(16, 185, 129, 0.12)'
+                    : 'rgba(245, 158, 11, 0.12)',
+                border: `1px solid ${
+                  isObsMode
+                    ? (obsStatus.connected ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)')
+                    : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+                      ? 'rgba(16, 185, 129, 0.35)'
+                      : 'rgba(245, 158, 11, 0.35)'
+                }`,
+                color: isObsMode
+                  ? (obsStatus.connected ? '#6EE7B7' : '#93C5FD')
+                  : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+                    ? '#6EE7B7'
+                    : '#FCD34D'
               }}
-              title="Statut du Relais PC (cliquer pour configurer YouTube / Facebook)"
+              title={isObsMode ? 'Mode OBS Studio actif sur ce PC (cliquer pour configurer)' : 'Statut du Relais PC (cliquer pour configurer YouTube / Facebook ou basculer vers OBS)'}
             >
               <span style={{
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable ? '#10B981' : '#F59E0B'
+                background: isObsMode
+                  ? (obsStatus.connected ? '#10B981' : '#3B82F6')
+                  : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+                    ? '#10B981'
+                    : '#F59E0B'
               }} />
-              {broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                ? 'Relais PC prêt'
-                : 'Relais PC hors ligne'}
+              {isObsMode
+                ? (obsStatus.streaming ? 'OBS EN DIRECT' : obsStatus.connected ? 'OBS Studio prêt' : 'Mode OBS Studio')
+                : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
+                  ? 'Relais PC prêt'
+                  : 'Relais PC hors ligne'}
             </button>
           </div>
         </div>
@@ -4683,10 +4758,10 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
                 <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Radio size={20} color="#ef4444" /> Diffusion YouTube & Facebook
+                  <Radio size={20} color="#ef4444" /> Mode de Diffusion & Destinations
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Choisissez la destination et collez votre clé de stream pour diffuser la mosaïque en direct.
+                  Ce réglage s'applique uniquement sur cet ordinateur (sans modifier vos autres PC).
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -4695,29 +4770,256 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   className="btn btn-outline"
                   onClick={() => setShowStreamKeys(v => !v)}
                   style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 9px' }}
-                  title="Afficher ou masquer les clés de stream"
+                  title={isObsMode ? 'Afficher ou masquer le mot de passe OBS' : 'Afficher ou masquer les clés de stream'}
                 >
                   {showStreamKeys ? <EyeOff size={13} /> : <Eye size={13} />}
-                  {showStreamKeys ? 'Masquer clés' : 'Voir clés'}
+                  {showStreamKeys ? 'Masquer' : 'Voir'}
                 </button>
+                {isObsMode ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={obsBusy}
+                    onClick={() => refreshObsStatus()}
+                    style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px' }}
+                  >
+                    {obsStatus.connected ? <CheckCircle2 size={14} color="#34d399" /> : <RefreshCw size={14} />}
+                    {obsBusy ? 'Test OBS…' : obsStatus.connected ? 'OBS Connecté' : 'Tester OBS'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => broadcasterRef.current?.checkRelayAvailability(destinations.relayWsUrl)}
+                    style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px' }}
+                  >
+                    {broadcasterStatus.connectedToRelay ? (
+                      broadcasterStatus.ffmpegAvailable ? <CheckCircle2 size={14} color="#34d399" /> : <AlertTriangle size={14} color="#fbbf24" />
+                    ) : (
+                      <RefreshCw size={14} />
+                    )}
+                    {broadcasterStatus.connectedToRelay
+                      ? broadcasterStatus.ffmpegAvailable ? 'Relais + FFmpeg OK' : 'FFmpeg manquant'
+                      : 'Tester Relais PC'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* CHOIX DU MOTEUR DE DIFFUSION SUR CE PC : RELAIS PC vs OBS STUDIO */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#CBD5E1' }}>
+                Quel logiciel diffuse le live sur CE PC ?
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.55rem' }}>
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  onClick={() => broadcasterRef.current?.checkRelayAvailability(destinations.relayWsUrl)}
-                  style={{ width: 'auto', fontSize: '0.74rem', padding: '4px 10px' }}
+                  disabled={isAnyLiveActive && isObsMode}
+                  onClick={() => {
+                    updateDestinations({ broadcastEngine: 'relay' });
+                    broadcasterRef.current?.checkRelayAvailability(destinations.relayWsUrl);
+                  }}
+                  style={{
+                    textAlign: 'left',
+                    padding: '0.65rem 0.8rem',
+                    borderRadius: '10px',
+                    border: `1.5px solid ${!isObsMode ? '#10B981' : 'rgba(255,255,255,0.14)'}`,
+                    background: !isObsMode ? 'rgba(16, 185, 129, 0.14)' : 'rgba(255,255,255,0.03)',
+                    color: '#fff',
+                    cursor: isAnyLiveActive && isObsMode ? 'not-allowed' : 'pointer',
+                    opacity: isAnyLiveActive && isObsMode ? 0.5 : 1
+                  }}
                 >
-                  {broadcasterStatus.connectedToRelay ? (
-                    broadcasterStatus.ffmpegAvailable ? <CheckCircle2 size={14} color="#34d399" /> : <AlertTriangle size={14} color="#fbbf24" />
-                  ) : (
-                    <RefreshCw size={14} />
-                  )}
-                  {broadcasterStatus.connectedToRelay
-                    ? broadcasterStatus.ffmpegAvailable ? 'Relais + FFmpeg OK' : 'FFmpeg manquant'
-                    : 'Tester Relais PC'}
+                  <div style={{ fontWeight: 900, fontSize: '0.82rem', color: !isObsMode ? '#34D399' : '#E2E8F0' }}>
+                    {!isObsMode ? '✓ ' : ''}Relais PC intégré (Par défaut)
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.35' }}>
+                    Diffusion directe depuis ce navigateur avec « Lancer le Relais Live.bat » (aucun OBS requis).
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isAnyLiveActive && !isObsMode}
+                  onClick={() => {
+                    updateDestinations({ broadcastEngine: 'obs' });
+                    refreshObsStatus(destinations.obsWsUrl, destinations.obsWsPassword);
+                  }}
+                  style={{
+                    textAlign: 'left',
+                    padding: '0.65rem 0.8rem',
+                    borderRadius: '10px',
+                    border: `1.5px solid ${isObsMode ? '#3B82F6' : 'rgba(255,255,255,0.14)'}`,
+                    background: isObsMode ? 'rgba(59, 130, 246, 0.16)' : 'rgba(255,255,255,0.03)',
+                    color: '#fff',
+                    cursor: isAnyLiveActive && !isObsMode ? 'not-allowed' : 'pointer',
+                    opacity: isAnyLiveActive && !isObsMode ? 0.5 : 1
+                  }}
+                >
+                  <div style={{ fontWeight: 900, fontSize: '0.82rem', color: isObsMode ? '#60A5FA' : '#E2E8F0' }}>
+                    {isObsMode ? '✓ ' : ''}OBS Studio (installé sur ce PC)
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.35' }}>
+                    Utilise OBS Studio présent sur ce PC (Source Navigateur propre ou Capture Sortie TV + pilotage 1 clic).
+                  </div>
                 </button>
               </div>
             </div>
 
+            {isObsMode ? (
+              (() => {
+                const obsBrowserUrl = `${getAppBaseUrl()}/?overlay=director&club=${encodeURIComponent(currentClub.id)}&obs=1`;
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {/* 1. SOURCE NAVIGATEUR OBS / SORTIE TV */}
+                    <div style={{
+                      background: 'rgba(59, 130, 246, 0.08)',
+                      border: '1px solid rgba(59, 130, 246, 0.35)',
+                      borderRadius: '12px',
+                      padding: '0.9rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.55rem'
+                    }}>
+                      <div style={{ fontWeight: 900, fontSize: '0.86rem', color: '#93C5FD' }}>
+                        1. Envoyer votre régie dans OBS Studio (sans aucun script .bat)
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#E2E8F0', lineHeight: '1.45' }}>
+                        Dans OBS : cliquez sur <b>Sources → + → Navigateur</b>, collez le lien ci-dessous puis réglez <b>Largeur : 1920</b> et <b>Hauteur : 1080</b> (ou utilisez simplement <b>Capture de fenêtre</b> sur <b>Sortie TV</b>).
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                        <input
+                          type="text"
+                          readOnly
+                          className="input-field"
+                          value={obsBrowserUrl}
+                          style={{ flex: '1 1 260px', fontSize: '0.72rem', padding: '0.45rem 0.65rem' }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-neon"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(obsBrowserUrl);
+                            setCopiedLinkId('obs_browser_url');
+                            setTimeout(() => setCopiedLinkId(null), 2000);
+                          }}
+                          style={{ width: 'auto', padding: '0.45rem 0.85rem', fontSize: '0.74rem', fontWeight: 900, color: '#000' }}
+                        >
+                          {copiedLinkId === 'obs_browser_url' ? '✅ Lien copié !' : '📋 Copier lien OBS'}
+                        </button>
+                        <a
+                          href={`${getAppBaseUrl()}/?overlay=director&club=${encodeURIComponent(currentClub.id)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-outline"
+                          style={{ width: 'auto', padding: '0.45rem 0.8rem', fontSize: '0.74rem', textDecoration: 'none' }}
+                        >
+                          <Tv size={14} /> Ouvrir Sortie TV
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* 2. PILOTAGE OPTIONNEL OBS WEBSOCKET */}
+                    <div style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '12px',
+                      padding: '0.9rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.55rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        <span style={{ fontWeight: 900, fontSize: '0.84rem', color: '#F8FAFC' }}>
+                          2. Pilotage 1-clic depuis l'appli (OBS WebSocket intégré à OBS 28+)
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '999px',
+                          background: obsStatus.connected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.14)',
+                          color: obsStatus.connected ? '#6EE7B7' : '#CBD5E1'
+                        }}>
+                          {obsStatus.streaming ? '🔴 En direct dans OBS' : obsStatus.connected ? '🟢 Connecté à OBS' : 'Optionnel'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                        Si vous souhaitez lancer/arrêter OBS directement avec le bouton rouge de l'appli : dans OBS ouvrez <b>Outils → Paramètres du serveur WebSocket → Activer le serveur WebSocket</b> (port 4455). Sinon cliquez simplement sur « Démarrer le streaming » dans OBS.
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.55rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.7rem', color: '#CBD5E1', fontWeight: 700, display: 'block', marginBottom: '3px' }}>
+                            Adresse WebSocket OBS
+                          </label>
+                          <input
+                            type="text"
+                            className="input-field"
+                            value={destinations.obsWsUrl ?? 'ws://127.0.0.1:4455'}
+                            onChange={(e) => updateDestinations({ obsWsUrl: e.target.value })}
+                            placeholder="ws://127.0.0.1:4455"
+                            style={{ fontSize: '0.78rem', padding: '0.45rem 0.65rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.7rem', color: '#CBD5E1', fontWeight: 700, display: 'block', marginBottom: '3px' }}>
+                            Mot de passe OBS WebSocket (si activé)
+                          </label>
+                          <input
+                            type={showStreamKeys ? 'text' : 'password'}
+                            name="mcb-obs-ws-password"
+                            autoComplete="new-password"
+                            data-lpignore="true"
+                            className="input-field"
+                            value={destinations.obsWsPassword || ''}
+                            onChange={(e) => updateDestinations({ obsWsPassword: e.target.value })}
+                            placeholder="Laisser vide si sans mot de passe"
+                            style={{ fontSize: '0.78rem', padding: '0.45rem 0.65rem' }}
+                          />
+                        </div>
+                      </div>
+                      {obsStatus.error && (
+                        <div style={{ fontSize: '0.72rem', color: '#FCA5A5', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', padding: '0.45rem 0.65rem' }}>
+                          {obsStatus.error}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setShowPlatformsModal(false)}
+                        style={{ width: 'auto', padding: '0.55rem 1.1rem' }}
+                      >
+                        Fermer
+                      </button>
+                      {obsStatus.connected && (
+                        <button
+                          type="button"
+                          className="btn btn-neon"
+                          disabled={obsBusy}
+                          onClick={() => {
+                            setShowPlatformsModal(false);
+                            handleToggleLiveStream();
+                          }}
+                          style={{
+                            width: 'auto',
+                            padding: '0.55rem 1.2rem',
+                            fontWeight: 900,
+                            color: obsStatus.streaming ? '#fff' : '#000',
+                            background: obsStatus.streaming ? '#DC2626' : undefined
+                          }}
+                        >
+                          {obsStatus.streaming ? '⏹ Arrêter le Live dans OBS' : '🔴 Démarrer le Live dans OBS'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <>
             {/* SÉLECTEUR RAPIDE 1 CLIC : FACEBOOK / YOUTUBE / LES 2 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#CBD5E1' }}>
@@ -4970,6 +5272,8 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 </button>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -34,6 +34,7 @@ interface DirectorOutputTileProps {
   isAudioActive: boolean;
   isFocusedFullscreen?: boolean;
   isHiddenByOtherFullscreen?: boolean;
+  isObsClean?: boolean;
   overlayConfig?: LiveOverlayConfig;
   onClickTile?: () => void;
 }
@@ -210,6 +211,7 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
   isAudioActive,
   isFocusedFullscreen = false,
   isHiddenByOtherFullscreen = false,
+  isObsClean = false,
   overlayConfig,
   onClickTile
 }) => {
@@ -459,7 +461,7 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
         </div>
       ) : null}
 
-      {!isFocusedFullscreen && (
+      {!isFocusedFullscreen && !isObsClean && (
         <div style={{
           position: 'absolute',
           top: '8px',
@@ -485,6 +487,9 @@ const DirectorOutputTile: React.FC<DirectorOutputTileProps> = ({
 
 export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onExitToAll }) => {
   const { tournaments, currentClub } = useStore();
+  const isObsClean =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('obs') === '1';
   const [directorState, setDirectorState] = useState<MultiCamDirectorState>(() =>
     loadDirectorState(currentClub.id)
   );
@@ -786,34 +791,36 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
               )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <button
-                type="button"
-                onClick={() => setSoundAllowed(v => !v)}
-                style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
-              >
-                {soundAllowed ? '🔊 Son ON' : '🔇 Muet'}
-              </button>
-              {onExitToAll && (
+            {!isObsClean && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
                   type="button"
-                  onClick={onExitToAll}
-                  style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                  onClick={() => setSoundAllowed(v => !v)}
+                  style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
                 >
-                  🎱 Vue Billards
+                  {soundAllowed ? '🔊 Son ON' : '🔇 Muet'}
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
-                  else document.exitFullscreen?.();
-                }}
-                style={{ background: '#00ffaa', color: '#000', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '0.76rem', fontWeight: 900, cursor: 'pointer' }}
-              >
-                ⛶ PLEIN ÉCRAN
-              </button>
-            </div>
+                {onExitToAll && (
+                  <button
+                    type="button"
+                    onClick={onExitToAll}
+                    style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    🎱 Vue Billards
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+                    else document.exitFullscreen?.();
+                  }}
+                  style={{ background: '#00ffaa', color: '#000', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '0.76rem', fontWeight: 900, cursor: 'pointer' }}
+                >
+                  ⛶ PLEIN ÉCRAN
+                </button>
+              </div>
+            )}
           </div>
         );
       })()}
@@ -846,6 +853,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
               isAudioActive={isTileAudioActive}
               isFocusedFullscreen={isFocusedTile}
               isHiddenByOtherFullscreen={isHiddenByOther}
+              isObsClean={isObsClean}
               overlayConfig={overlayConfig}
               onClickTile={() => {
                 const keepMic = isVirtualScreenSource(slot.sourceType);
@@ -861,7 +869,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
         })}
       </div>
 
-      {focusedCam && (
+      {focusedCam && !isObsClean && (
         <div style={{
           position: 'fixed',
           bottom: '16px',
