@@ -814,7 +814,9 @@ const AdminView: React.FC = () => {
                 fontSize: '1.2rem',
                 margin: 0,
                 fontWeight: 900,
-                background: 'linear-gradient(90deg, #FBBF24 0%, #34D399 100%)',
+                background: theme === 'light'
+                  ? 'linear-gradient(90deg, #0F766E 0%, #B45309 100%)'
+                  : 'linear-gradient(90deg, #FBBF24 0%, #34D399 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 letterSpacing: '-0.3px',
@@ -823,13 +825,13 @@ const AdminView: React.FC = () => {
                 {currentClub.name}
               </h1>
               <span style={{
-                background: 'rgba(245, 158, 11, 0.14)',
-                color: '#FBBF24',
+                background: theme === 'light' ? '#FEF3C7' : 'rgba(251, 191, 36, 0.16)',
+                color: theme === 'light' ? '#92400E' : '#FDE68A',
                 padding: '1px 7px',
                 borderRadius: '7px',
                 fontSize: '0.7rem',
                 fontWeight: 800,
-                border: '1px solid rgba(245, 158, 11, 0.35)'
+                border: theme === 'light' ? '1px solid #D97706' : '1px solid rgba(251, 191, 36, 0.45)'
               }}>
                 {APP_VERSION}
               </span>
@@ -915,16 +917,22 @@ const AdminView: React.FC = () => {
               fontWeight: 700,
               padding: '0.48rem 0.85rem',
               fontSize: '0.82rem',
-              borderColor: showPrefsMenu ? 'var(--accent-primary)' : 'var(--border-color)',
-              color: showPrefsMenu ? 'var(--accent-primary)' : 'var(--text-primary)',
-              background: showPrefsMenu ? 'rgba(0, 255, 170, 0.08)' : 'transparent'
+              borderColor: showPrefsMenu
+                ? (theme === 'light' ? '#0F766E' : 'var(--accent-primary)')
+                : (theme === 'light' ? 'rgba(15, 23, 42, 0.25)' : 'var(--border-color)'),
+              color: showPrefsMenu
+                ? (theme === 'light' ? '#0F766E' : '#FDE68A')
+                : (theme === 'light' ? '#0F172A' : '#F8FAFC'),
+              background: showPrefsMenu
+                ? (theme === 'light' ? 'rgba(15, 118, 110, 0.1)' : 'rgba(0, 255, 170, 0.12)')
+                : (theme === 'light' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.05)')
             }}
             title="Voix du speaker, thème, ambiance néon et réglages tournoi"
           >
             <Settings size={15} />
             <span>Préférences</span>
             {voiceEnabled && (
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#00ffaa' }} title="Appel vocal actif" />
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: theme === 'light' ? '#059669' : '#00ffaa' }} title="Appel vocal actif" />
             )}
           </button>
 
@@ -964,9 +972,9 @@ const AdminView: React.FC = () => {
                 </div>
 
                 {/* Section 1 : Appel vocal */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingBottom: '0.7rem', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingBottom: '0.7rem', borderBottom: theme === 'light' ? '1px solid #E2E8F0' : '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>🎙️ Appel vocal ({getActiveFrenchVoiceLabel()})</span>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: theme === 'light' ? '#334155' : '#CCFBF1' }}>🎙️ Appel vocal ({getActiveFrenchVoiceLabel()})</span>
                     <button
                       type="button"
                       className={`btn ${voiceEnabled ? 'btn-neon' : 'btn-outline'}`}
@@ -975,7 +983,9 @@ const AdminView: React.FC = () => {
                         padding: '0.25rem 0.65rem',
                         fontSize: '0.74rem',
                         fontWeight: 800,
-                        color: voiceEnabled ? '#041210' : 'var(--text-muted)'
+                        color: voiceEnabled ? '#041210' : (theme === 'light' ? '#334155' : '#F8FAFC'),
+                        background: voiceEnabled ? undefined : (theme === 'light' ? '#F8FAFC' : 'rgba(255,255,255,0.06)'),
+                        borderColor: voiceEnabled ? undefined : (theme === 'light' ? '#CBD5E1' : 'rgba(255,255,255,0.22)')
                       }}
                     >
                       {voiceEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
@@ -992,7 +1002,13 @@ const AdminView: React.FC = () => {
                       setSelectedVoiceURIState(nextUri);
                       speakAnnouncement('Nouveau match sur le Billard 1, Julien Raiwet contre Yannick Maurice.', true);
                     }}
-                    style={{ fontSize: '0.76rem', padding: '0.4rem 0.55rem' }}
+                    style={{
+                      fontSize: '0.76rem',
+                      padding: '0.4rem 0.55rem',
+                      background: theme === 'light' ? '#F8FAFC' : '#081b18',
+                      color: theme === 'light' ? '#0F172A' : '#FFFFFF',
+                      borderColor: theme === 'light' ? '#CBD5E1' : 'rgba(45, 212, 191, 0.4)'
+                    }}
                   >
                     <option value="">✨ Automatique (meilleure voix naturelle)</option>
                     {availableFrenchVoices.map(v => (
@@ -1006,13 +1022,28 @@ const AdminView: React.FC = () => {
                     type="button"
                     className="btn btn-outline"
                     onClick={() => speakAnnouncement('Nouveau match sur le Billard 1, Julien Raiwet contre Yannick Maurice.', true)}
-                    style={{ fontSize: '0.76rem', padding: '0.38rem 0.65rem', justifyContent: 'center', fontWeight: 700 }}
+                    style={{
+                      fontSize: '0.76rem',
+                      padding: '0.38rem 0.65rem',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      color: theme === 'light' ? '#0F172A' : '#F8FAFC',
+                      background: theme === 'light' ? '#F8FAFC' : 'rgba(255,255,255,0.06)',
+                      borderColor: theme === 'light' ? '#CBD5E1' : 'rgba(255,255,255,0.22)'
+                    }}
                   >
                     <Volume2 size={13} /> Tester la voix
                   </button>
 
                   {!availableFrenchVoices.some(v => v.isNatural) && (
-                    <div style={{ fontSize: '0.68rem', color: '#fbbf24', lineHeight: 1.35 }}>
+                    <div style={{
+                      fontSize: '0.68rem',
+                      color: theme === 'light' ? '#92400E' : '#FDE68A',
+                      background: theme === 'light' ? '#FEF3C7' : 'rgba(251, 191, 36, 0.12)',
+                      padding: '0.4rem 0.55rem',
+                      borderRadius: '8px',
+                      lineHeight: 1.35
+                    }}>
                       Astuce : ouvrez l'appli dans <strong>Microsoft Edge</strong> (voix gratuites Denise / Vivienne / Henri Naturelles) pour une voix très réaliste.
                     </div>
                   )}
@@ -1020,13 +1051,21 @@ const AdminView: React.FC = () => {
 
                 {/* Section 2 : Apparence */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>Apparence</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: theme === 'light' ? '#334155' : '#CCFBF1' }}>Apparence</span>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
                     <button
                       type="button"
                       className="btn btn-outline"
                       onClick={toggleTheme}
-                      style={{ fontSize: '0.76rem', padding: '0.42rem 0.5rem', justifyContent: 'center', fontWeight: 700 }}
+                      style={{
+                        fontSize: '0.76rem',
+                        padding: '0.42rem 0.5rem',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        color: theme === 'light' ? '#0F172A' : '#F8FAFC',
+                        background: theme === 'light' ? '#F8FAFC' : 'rgba(255,255,255,0.06)',
+                        borderColor: theme === 'light' ? '#CBD5E1' : 'rgba(255,255,255,0.22)'
+                      }}
                     >
                       {theme === 'light' ? <Sun size={14} /> : <Moon size={14} />}
                       {theme === 'light' ? 'Mode Clair' : 'Mode Sombre'}
@@ -1040,8 +1079,9 @@ const AdminView: React.FC = () => {
                         padding: '0.42rem 0.5rem',
                         justifyContent: 'center',
                         fontWeight: 700,
-                        color: neonEnabled ? '#34D399' : 'var(--text-muted)',
-                        borderColor: neonEnabled ? 'rgba(52, 211, 153, 0.45)' : 'var(--border-color)'
+                        background: theme === 'light' ? '#F8FAFC' : 'rgba(255,255,255,0.06)',
+                        color: neonEnabled ? (theme === 'light' ? '#047857' : '#6EE7B7') : (theme === 'light' ? '#475569' : '#CBD5E1'),
+                        borderColor: neonEnabled ? (theme === 'light' ? '#10B981' : 'rgba(52, 211, 153, 0.55)') : (theme === 'light' ? '#CBD5E1' : 'rgba(255,255,255,0.2)')
                       }}
                     >
                       ✨ {neonEnabled ? 'Néon ON' : 'Néon OFF'}
@@ -1051,7 +1091,7 @@ const AdminView: React.FC = () => {
 
                 {/* Section 3 : Réglages tournoi si en cours */}
                 {activeTournament?.settings && (
-                  <div style={{ paddingTop: '0.7rem', borderTop: '1px solid var(--border-color)' }}>
+                  <div style={{ paddingTop: '0.7rem', borderTop: theme === 'light' ? '1px solid #E2E8F0' : '1px solid var(--border-color)' }}>
                     <button
                       type="button"
                       className="btn btn-outline"
@@ -1064,7 +1104,16 @@ const AdminView: React.FC = () => {
                         setShowEditRulesModal(true);
                         setShowPrefsMenu(false);
                       }}
-                      style={{ width: '100%', fontSize: '0.78rem', padding: '0.48rem 0.7rem', justifyContent: 'center', fontWeight: 700, color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.35)' }}
+                      style={{
+                        width: '100%',
+                        fontSize: '0.78rem',
+                        padding: '0.48rem 0.7rem',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        color: theme === 'light' ? '#92400E' : '#FDE68A',
+                        background: theme === 'light' ? '#FEF3C7' : 'rgba(251, 191, 36, 0.14)',
+                        borderColor: theme === 'light' ? '#D97706' : 'rgba(251, 191, 36, 0.45)'
+                      }}
                     >
                       <Clock size={14} /> Régler Temps, Qualifiés & Règles
                     </button>
@@ -1079,7 +1128,7 @@ const AdminView: React.FC = () => {
       {/* Barre fine de retour uniquement lorsqu'on consulte l'arbre des Phases Finales */}
       {activeTab === 'dashboard' && isTournamentActive && activeTournament && dashboardSubTab === 'bracket' && (
         <div style={{
-          background: 'rgba(255, 255, 255, 0.02)',
+          background: theme === 'light' ? '#F1F5F9' : 'rgba(4, 24, 21, 0.92)',
           borderBottom: '1px solid var(--border-color)',
           padding: '0.55rem 1.6rem',
           display: 'flex',
@@ -1093,11 +1142,18 @@ const AdminView: React.FC = () => {
               type="button"
               className="btn btn-outline"
               onClick={() => setDashboardSubTab('live')}
-              style={{ fontSize: '0.8rem', padding: '0.38rem 0.85rem', fontWeight: 700 }}
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.38rem 0.85rem',
+                fontWeight: 700,
+                color: theme === 'light' ? '#0F172A' : '#F8FAFC',
+                background: theme === 'light' ? '#FFFFFF' : 'rgba(255,255,255,0.06)',
+                borderColor: theme === 'light' ? '#94A3B8' : 'rgba(255,255,255,0.28)'
+              }}
             >
               ← Retour Vue d'ensemble
             </button>
-            <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--accent-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ fontWeight: 800, fontSize: '0.92rem', color: theme === 'light' ? '#0F766E' : '#FDE68A', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
               <Trophy size={16} /> Tableau des Phases Finales
             </span>
           </div>
@@ -1113,7 +1169,14 @@ const AdminView: React.FC = () => {
                 });
                 setShowEditRulesModal(true);
               }}
-              style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem', fontWeight: 700, color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.35)' }}
+              style={{
+                fontSize: '0.76rem',
+                padding: '0.35rem 0.75rem',
+                fontWeight: 700,
+                color: theme === 'light' ? '#92400E' : '#FDE68A',
+                background: theme === 'light' ? '#FEF3C7' : 'rgba(251, 191, 36, 0.14)',
+                borderColor: theme === 'light' ? '#D97706' : 'rgba(251, 191, 36, 0.45)'
+              }}
             >
               <Clock size={13} /> Temps & Règles
             </button>
@@ -3273,8 +3336,8 @@ const AdminView: React.FC = () => {
               {/* Alert banner if 1st vs 2nd anomaly detected in semi-finals */}
               {hasInvertedSemi && (
                 <div style={{
-                  background: 'rgba(255, 60, 60, 0.15)',
-                  border: '2px solid #ff4d4d',
+                  background: 'linear-gradient(135deg, #450A0A 0%, #7F1D1D 100%)',
+                  border: '2px solid #EF4444',
                   borderRadius: '16px',
                   padding: '1rem 1.5rem',
                   display: 'flex',
@@ -3286,23 +3349,23 @@ const AdminView: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{
                       width: '42px', height: '42px', borderRadius: '50%',
-                      background: 'rgba(255, 60, 60, 0.25)', border: '2px solid #ff4d4d',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff4d4d'
+                      background: 'rgba(239, 68, 68, 0.25)', border: '2px solid #FCA5A5',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FECACA'
                     }}>
                       <AlertTriangle size={22} />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#FFFFFF' }}>
                         Anomalie de croisement détectée : Le 1er affronte le 2ème !
                       </div>
-                      <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+                      <div style={{ fontSize: '0.85rem', color: '#FECACA' }}>
                         En tournoi officiel, le 1er doit jouer contre le 4ème et le 2ème contre le 3ème pour qu'ils ne se croisent qu'en finale.
                       </div>
                     </div>
                   </div>
                   <button
                     className="btn btn-neon"
-                    style={{ background: '#00ffaa', color: '#000', fontWeight: 800, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.7rem 1.2rem' }}
+                    style={{ background: '#34D399', color: '#041210', fontWeight: 800, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.7rem 1.2rem' }}
                     onClick={() => reseedFinalStage(activeTournament.id)}
                   >
                     <RefreshCw size={16} /> Rétablir 1er vs 4ème
@@ -3313,32 +3376,32 @@ const AdminView: React.FC = () => {
               {/* Alert banner if qualifiers are known but final stage not launched yet */}
               {areAllQualifiersKnown && !activeTournament.finalStageLaunched && (
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(0, 255, 170, 0.15), rgba(0, 200, 255, 0.1))',
-                  border: '2px solid var(--accent-primary)',
+                  background: 'linear-gradient(135deg, #064E3B 0%, #0D4A45 100%)',
+                  border: '2px solid #FBBF24',
                   borderRadius: '16px',
                   padding: '1rem 1.5rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '1rem',
-                  boxShadow: '0 0 25px rgba(0, 255, 170, 0.25)',
+                  boxShadow: '0 8px 25px rgba(0, 0, 0, 0.35)',
                   flexShrink: 0
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{
                       width: '42px', height: '42px', borderRadius: '50%',
-                      background: 'rgba(0, 255, 170, 0.2)', border: '2px solid var(--accent-primary)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)'
+                      background: 'rgba(251, 191, 36, 0.18)', border: '2px solid #FBBF24',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FDE68A'
                     }}>
                       <Trophy size={22} />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#FFFFFF' }}>
                         {qualifStatus.isQualifAllDone
                           ? "Tous les matchs de qualifications sont terminés !"
                           : `Les ${qualifStatus.numQualifiers} qualifiés sont connus !`}
                       </div>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '0.82rem', color: '#CCFBF1' }}>
                         {ranking.slice(0, qualifStatus.numQualifiers).map((p, idx) => `#${idx + 1} ${p.name}`).join(' • ')}
                       </div>
                     </div>
@@ -3346,7 +3409,7 @@ const AdminView: React.FC = () => {
                   <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
                     <button
                       className="btn btn-neon"
-                      style={{ padding: '0.65rem 1.3rem', fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#000' }}
+                      style={{ padding: '0.65rem 1.3rem', fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#041210' }}
                       onClick={() => {
                         launchFinalStage(activeTournament.id);
                         setDashboardSubTab('bracket');
@@ -3388,9 +3451,9 @@ const AdminView: React.FC = () => {
                         <>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexShrink: 0 }}>
                             <h3 style={{ fontSize: '1rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
-                              <Users size={16} style={{ color: 'var(--accent-secondary)' }} /> File d'attente
+                              <Users size={16} style={{ color: '#6EE7B7' }} /> File d'attente
                             </h3>
-                            <span style={{ fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.15)', color: 'var(--accent-secondary)', padding: '2px 7px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 229, 255, 0.3)' }}>
+                            <span style={{ fontSize: '0.75rem', background: 'rgba(6, 78, 59, 0.88)', color: '#A7F3D0', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(52, 211, 153, 0.5)' }}>
                               {filteredWaitingMatches.length}{playerSearchQuery.trim() ? ` / ${matchesWaiting.length}` : ''} {matchesWaiting.length > 1 ? 'matchs' : 'match'}
                             </span>
                           </div>
@@ -3458,11 +3521,11 @@ const AdminView: React.FC = () => {
                                     onClick={() => setExpandedQueueMatchId(prev => (prev === match.id ? null : match.id))}
                                     style={{
                                       background: isExpanded
-                                        ? 'rgba(0, 255, 170, 0.06)'
-                                        : (theme === 'light' ? 'rgba(15, 23, 42, 0.03)' : 'rgba(255,255,255,0.03)'),
+                                        ? 'rgba(6, 78, 59, 0.65)'
+                                        : 'rgba(3, 18, 16, 0.45)',
                                       border: isExpanded
-                                        ? '1px solid rgba(0, 255, 170, 0.35)'
-                                        : '1px solid var(--border-color)',
+                                        ? '1px solid #34D399'
+                                        : '1px solid rgba(45, 212, 191, 0.28)',
                                       borderRadius: '11px',
                                       padding: '0.6rem 0.75rem',
                                       display: 'flex',
@@ -3477,9 +3540,9 @@ const AdminView: React.FC = () => {
                                     {/* En-tête compact : numéro + poule + enjeu + bouton menu */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', minWidth: 0 }}>
-                                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800 }}>#{idx + 1}</span>
+                                        <span style={{ fontSize: '0.68rem', color: '#CCFBF1', fontWeight: 800 }}>#{idx + 1}</span>
                                         {match.poolName && (
-                                          <span style={{ fontSize: '0.64rem', color: 'var(--accent-primary)', fontWeight: 700, background: 'rgba(0, 255, 204, 0.12)', padding: '1px 5px', borderRadius: '4px' }}>
+                                          <span style={{ fontSize: '0.64rem', color: '#FDE68A', fontWeight: 700, background: 'rgba(3, 18, 16, 0.78)', border: '1px solid rgba(251, 191, 36, 0.42)', padding: '1px 5px', borderRadius: '4px' }}>
                                             {match.poolName}
                                           </span>
                                         )}
@@ -3501,7 +3564,7 @@ const AdminView: React.FC = () => {
                                         </span>
                                       </div>
                                       <span
-                                        style={{ color: isExpanded ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+                                        style={{ color: isExpanded ? '#FDE68A' : '#CCFBF1', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
                                         title={isExpanded ? 'Masquer les actions' : 'Cliquer pour afficher les actions'}
                                       >
                                         <MoreHorizontal size={15} />
@@ -3511,19 +3574,19 @@ const AdminView: React.FC = () => {
                                     {/* Joueurs (lisible et épuré sans encadré imbriqué) */}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--card-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: '#FFFFFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {players[match.player1Id]?.name || 'Attente...'}
                                         </span>
-                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}>
+                                        <span style={{ color: '#CCFBF1', fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}>
                                           {stakeInfo.p1Played}M
                                         </span>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--card-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, marginRight: '4px' }}>vs</span>
+                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: '#FFFFFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          <span style={{ fontSize: '0.68rem', color: '#CCFBF1', fontWeight: 600, marginRight: '4px' }}>vs</span>
                                           {players[match.player2Id]?.name || 'Attente...'}
                                         </span>
-                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}>
+                                        <span style={{ color: '#CCFBF1', fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}>
                                           {stakeInfo.p2Played}M
                                         </span>
                                       </div>
@@ -3531,7 +3594,7 @@ const AdminView: React.FC = () => {
 
                                     {/* Alerte si un joueur joue déjà */}
                                     {busyInfo.busy && (
-                                      <div style={{ fontSize: '0.66rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '2px 7px', borderRadius: '6px', border: '1px solid rgba(255, 183, 3, 0.25)' }}>
+                                      <div style={{ fontSize: '0.66rem', color: '#FEF3C7', background: 'rgba(120, 53, 15, 0.85)', padding: '2px 7px', borderRadius: '6px', border: '1px solid #F59E0B' }}>
                                         {busyInfo.playerName} joue sur {busyInfo.tableName}
                                       </div>
                                     )}
@@ -3555,9 +3618,9 @@ const AdminView: React.FC = () => {
                                               alignItems: 'center',
                                               justifyContent: 'center',
                                               gap: '4px',
-                                              color: '#ffd700',
-                                              borderColor: 'rgba(255, 215, 0, 0.35)',
-                                              background: 'rgba(255, 215, 0, 0.08)',
+                                              color: '#FEF08A',
+                                              borderColor: 'rgba(251, 191, 36, 0.55)',
+                                              background: 'rgba(120, 53, 15, 0.65)',
                                               width: '100%'
                                             }}
                                             onClick={() => announceWaitingMatchPrep({
@@ -3581,9 +3644,9 @@ const AdminView: React.FC = () => {
                                               alignItems: 'center',
                                               justifyContent: 'center',
                                               gap: '4px',
-                                              color: '#34D399',
-                                              borderColor: 'rgba(52, 211, 153, 0.4)',
-                                              background: 'rgba(16, 185, 129, 0.1)',
+                                              color: '#A7F3D0',
+                                              borderColor: 'rgba(52, 211, 153, 0.55)',
+                                              background: 'rgba(6, 78, 59, 0.8)',
                                               width: '100%'
                                             }}
                                             onClick={() => openDirectScoreModal(match)}
@@ -3619,10 +3682,10 @@ const AdminView: React.FC = () => {
                                                     height: '25px',
                                                     borderRadius: '7px',
                                                     fontWeight: canLaunch ? 800 : 600,
-                                                    color: isPlaying ? 'rgba(255,255,255,0.35)' : (busyInfo.busy ? 'rgba(255,183,3,0.55)' : '#041210'),
-                                                    background: isPlaying ? 'rgba(255,255,255,0.03)' : (busyInfo.busy ? 'rgba(255,183,3,0.08)' : undefined),
-                                                    borderColor: isPlaying ? 'rgba(255,255,255,0.08)' : (busyInfo.busy ? 'rgba(255,183,3,0.2)' : undefined),
-                                                    opacity: canLaunch ? 1 : 0.45,
+                                                    color: isPlaying ? '#CBD5E1' : (busyInfo.busy ? '#FDE68A' : '#041210'),
+                                                    background: isPlaying ? 'rgba(0,0,0,0.4)' : (busyInfo.busy ? 'rgba(120,53,15,0.5)' : undefined),
+                                                    borderColor: isPlaying ? 'rgba(255,255,255,0.22)' : (busyInfo.busy ? 'rgba(245,158,11,0.45)' : undefined),
+                                                    opacity: canLaunch ? 1 : 0.65,
                                                     cursor: canLaunch ? 'pointer' : 'not-allowed'
                                                   }}
                                                   title={
@@ -3677,7 +3740,7 @@ const AdminView: React.FC = () => {
                   <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.15rem 1.35rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '0.9rem', flexShrink: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <h2 style={{ fontSize: '1.22rem', color: 'var(--accent-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                        <h2 style={{ fontSize: '1.22rem', color: '#FDE68A', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
                           <Trophy size={19} /> Classement
                         </h2>
                         {qualifStatus.isMultiPool && qualifStatus.rankingsByPool && qualifStatus.poolNames && qualifStatus.poolNames.length > 1 && (
@@ -3690,9 +3753,9 @@ const AdminView: React.FC = () => {
                                 borderRadius: '6px',
                                 fontSize: '0.72rem',
                                 fontWeight: 700,
-                                border: activePoolRankingTab === 'all' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                                background: activePoolRankingTab === 'all' ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
-                                color: activePoolRankingTab === 'all' ? 'var(--accent-primary)' : 'var(--card-text)',
+                                border: activePoolRankingTab === 'all' ? '1px solid #FBBF24' : '1px solid rgba(255,255,255,0.22)',
+                                background: activePoolRankingTab === 'all' ? '#FBBF24' : 'rgba(3, 18, 16, 0.55)',
+                                color: activePoolRankingTab === 'all' ? '#041210' : '#F8FAFC',
                                 cursor: 'pointer'
                               }}
                             >
@@ -3708,9 +3771,9 @@ const AdminView: React.FC = () => {
                                   borderRadius: '6px',
                                   fontSize: '0.72rem',
                                   fontWeight: 700,
-                                  border: activePoolRankingTab === pName ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                                  background: activePoolRankingTab === pName ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
-                                  color: activePoolRankingTab === pName ? 'var(--accent-primary)' : 'var(--card-text)',
+                                  border: activePoolRankingTab === pName ? '1px solid #FBBF24' : '1px solid rgba(255,255,255,0.22)',
+                                  background: activePoolRankingTab === pName ? '#FBBF24' : 'rgba(3, 18, 16, 0.55)',
+                                  color: activePoolRankingTab === pName ? '#041210' : '#F8FAFC',
                                   cursor: 'pointer'
                                 }}
                               >
@@ -3723,7 +3786,7 @@ const AdminView: React.FC = () => {
 
                       {/* Métadonnées compactes du tournoi */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.74rem' }}>
-                        <span style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                        <span style={{ background: 'rgba(3, 18, 16, 0.6)', color: '#F1F5F9', padding: '2px 8px', borderRadius: '8px', fontWeight: 700, border: '1px solid rgba(255,255,255,0.18)' }}>
                           {finishedTourMatches.length} / {allTourMatches.length} matchs
                         </span>
                         {activeTournament.format !== 'direct_ko' && activeTournament.format !== 'double_ko_bracket' ? (
@@ -3739,13 +3802,13 @@ const AdminView: React.FC = () => {
                               }
                             }}
                             style={{
-                              background: 'rgba(16, 185, 129, 0.12)',
-                              color: 'var(--accent-primary)',
+                              background: 'rgba(6, 78, 59, 0.88)',
+                              color: '#A7F3D0',
                               padding: '2px 8px',
                               borderRadius: '8px',
                               fontWeight: 700,
                               fontSize: '0.74rem',
-                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              border: '1px solid rgba(52, 211, 153, 0.55)',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -3759,12 +3822,12 @@ const AdminView: React.FC = () => {
                             {!qualifStatus.isFinalLaunched && <span style={{ opacity: 0.9 }}>✎</span>}
                           </button>
                         ) : (
-                          <span style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                          <span style={{ background: 'rgba(6, 78, 59, 0.88)', color: '#A7F3D0', padding: '2px 8px', borderRadius: '8px', fontWeight: 700, border: '1px solid rgba(52, 211, 153, 0.55)' }}>
                             {activeTournament.participants.length} joueurs
                           </span>
                         )}
                         {(activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes) ? (
-                          <span style={{ background: 'rgba(255, 215, 0, 0.12)', color: '#ffd700', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                          <span style={{ background: 'rgba(120, 53, 15, 0.85)', color: '#FEF3C7', padding: '2px 8px', borderRadius: '8px', fontWeight: 700, border: '1px solid rgba(251, 191, 36, 0.55)' }}>
                             ⏱️ {activeTournament.settings.finalMatchDurationMinutes || activeTournament.settings.qualifMatchDurationMinutes || activeTournament.settings.matchDurationMinutes} min
                           </span>
                         ) : null}
@@ -3772,7 +3835,7 @@ const AdminView: React.FC = () => {
                           const latestFinished = finishedTourMatches.reduce((maxTs, m) => Math.max(maxTs, m.endTime || m.startTime || 0), 0);
                           if (!latestFinished) return null;
                           return (
-                            <span style={{ background: 'rgba(0, 229, 255, 0.09)', color: 'var(--accent-secondary)', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>
+                            <span style={{ background: 'rgba(12, 74, 110, 0.82)', color: '#E0F2FE', padding: '2px 8px', borderRadius: '8px', fontWeight: 600, border: '1px solid rgba(56, 189, 248, 0.45)' }}>
                               Dernier validé : {formatShortDateTime(latestFinished)}
                             </span>
                           );
@@ -3786,56 +3849,56 @@ const AdminView: React.FC = () => {
                           const qualPerPool = Math.max(1, Math.round(qualifStatus.numQualifiers / qualifStatus.poolNames.length));
 
                           return (
-                            <div key={pName} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.8rem' }}>
+                            <div key={pName} style={{ background: 'rgba(3, 18, 16, 0.42)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.8rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                                <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#FDE68A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   🎱 {pName}
                                 </span>
-                                <span style={{ fontSize: '0.72rem', background: 'rgba(0, 255, 204, 0.12)', color: 'var(--accent-primary)', padding: '2px 7px', borderRadius: '8px', fontWeight: 700 }}>
+                                <span style={{ fontSize: '0.72rem', background: 'rgba(6, 78, 59, 0.9)', color: '#A7F3D0', padding: '2px 7px', borderRadius: '8px', fontWeight: 700, border: '1px solid rgba(52, 211, 153, 0.5)' }}>
                                   Top {qualPerPool} qualifié{qualPerPool > 1 ? 's' : ''}
                                 </span>
                               </div>
                               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                                 <thead>
-                                  <tr style={{ color: 'var(--card-text-muted)', borderBottom: '1px solid var(--border-color)' }}>
+                                  <tr style={{ color: '#CCFBF1', borderBottom: '1px solid var(--border-color)' }}>
                                     <th style={{ padding: '0.45rem' }}>#</th>
                                     <th style={{ padding: '0.45rem' }}>Joueur</th>
                                     <th style={{ padding: '0.45rem', textAlign: 'center' }} title="Matchs Joués">J</th>
-                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: 'var(--accent-primary)' }} title="Matchs Gagnés">G</th>
-                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: '#ff6b6b' }} title="Matchs Perdus">P</th>
+                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: '#6EE7B7' }} title="Matchs Gagnés">G</th>
+                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: '#FCA5A5' }} title="Matchs Perdus">P</th>
                                     <th style={{ padding: '0.45rem', textAlign: 'center' }} title="Différence de manches">+/-</th>
-                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
+                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: '#FDE68A' }}>PTS</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {poolRank.map((p, i) => {
                                     const isQualifyingZone = i < qualPerPool;
                                     const isCutoff = i === qualPerPool - 1 && i < poolRank.length - 1;
-                                    const rankColor = i === 0 ? '#ffd700' : i === 1 ? '#cbd5e1' : i === 2 ? '#f59e0b' : (isQualifyingZone ? 'var(--accent-primary)' : 'inherit');
+                                    const rankColor = i === 0 ? '#FDE047' : i === 1 ? '#E2E8F0' : i === 2 ? '#FDBA74' : (isQualifyingZone ? '#6EE7B7' : '#FFFFFF');
                                     return (
                                       <tr
                                         key={p.id}
                                         style={{
-                                          borderBottom: isCutoff ? '2px dashed rgba(16, 185, 129, 0.5)' : '1px solid var(--border-color)',
-                                          background: isQualifyingZone ? 'rgba(16, 185, 129, 0.08)' : 'transparent'
+                                          borderBottom: isCutoff ? '2px dashed rgba(52, 211, 153, 0.65)' : '1px solid var(--border-color)',
+                                          background: isQualifyingZone ? 'rgba(16, 185, 129, 0.14)' : 'transparent'
                                         }}
                                       >
                                         <td style={{ padding: '0.52rem 0.45rem', fontWeight: 900, color: rankColor }}>{i + 1}</td>
-                                        <td style={{ padding: '0.52rem 0.45rem', fontWeight: 600 }}>
+                                        <td style={{ padding: '0.52rem 0.45rem', fontWeight: 600, color: '#FFFFFF' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <span>{p.name}</span>
                                             {p.isSure && (
-                                              <span style={{ fontSize: '0.62rem', background: 'rgba(16, 185, 129, 0.18)', color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(16, 185, 129, 0.3)' }} title="Mathématiquement qualifié">
+                                              <span style={{ fontSize: '0.62rem', background: '#10B981', color: '#041210', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }} title="Mathématiquement qualifié">
                                                 Qualifié
                                               </span>
                                             )}
                                           </div>
                                         </td>
-                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', color: 'var(--text-muted)' }}>{p.played}</td>
-                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', fontWeight: 700, color: 'var(--accent-primary)' }}>{p.won}</td>
-                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', color: p.lost > 0 ? '#ff6b6b' : 'var(--text-muted)' }}>{p.lost}</td>
-                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
-                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', color: '#CCFBF1' }}>{p.played}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', fontWeight: 700, color: '#6EE7B7' }}>{p.won}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', color: p.lost > 0 ? '#FCA5A5' : '#CCFBF1' }}>{p.lost}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', color: '#FFFFFF' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', fontWeight: 800, color: '#FDE68A' }}>{p.pts}</td>
                                       </tr>
                                     );
                                   })}
@@ -3846,15 +3909,15 @@ const AdminView: React.FC = () => {
                         })
                       ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.95rem' }}>
-                          <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', backdropFilter: 'blur(10px)', zIndex: 1 }}>
-                            <tr style={{ color: 'var(--card-text-muted)', borderBottom: '2px solid var(--border-color)', fontSize: '0.82rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, background: '#083833', zIndex: 1 }}>
+                            <tr style={{ color: '#CCFBF1', borderBottom: '2px solid var(--border-color)', fontSize: '0.82rem' }}>
                               <th style={{ padding: '0.55rem' }}>#</th>
                               <th style={{ padding: '0.55rem' }}>Joueur</th>
                               <th style={{ padding: '0.55rem', textAlign: 'center' }} title="Matchs Joués">J</th>
-                              <th style={{ padding: '0.55rem', textAlign: 'center', color: 'var(--accent-primary)' }} title="Matchs Gagnés">G</th>
-                              <th style={{ padding: '0.55rem', textAlign: 'center', color: '#ff6b6b' }} title="Matchs Perdus">P</th>
+                              <th style={{ padding: '0.55rem', textAlign: 'center', color: '#6EE7B7' }} title="Matchs Gagnés">G</th>
+                              <th style={{ padding: '0.55rem', textAlign: 'center', color: '#FCA5A5' }} title="Matchs Perdus">P</th>
                               <th style={{ padding: '0.55rem', textAlign: 'center' }} title="Différence de manches">+/-</th>
-                              <th style={{ padding: '0.55rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
+                              <th style={{ padding: '0.55rem', textAlign: 'center', color: '#FDE68A' }}>PTS</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -3862,31 +3925,31 @@ const AdminView: React.FC = () => {
                               const isSure = qualifStatus.sureQualifiers.includes(p.id);
                               const isQualifyingZone = i < qualifStatus.numQualifiers;
                               const isCutoff = i === qualifStatus.numQualifiers - 1 && i < ranking.length - 1;
-                              const rankColor = i === 0 ? '#ffd700' : i === 1 ? '#cbd5e1' : i === 2 ? '#f59e0b' : (isQualifyingZone ? 'var(--accent-primary)' : 'inherit');
+                              const rankColor = i === 0 ? '#FDE047' : i === 1 ? '#E2E8F0' : i === 2 ? '#FDBA74' : (isQualifyingZone ? '#6EE7B7' : '#FFFFFF');
                               return (
                                 <tr
                                   key={p.id}
                                   style={{
-                                    borderBottom: isCutoff ? '2px dashed rgba(16, 185, 129, 0.5)' : '1px solid var(--border-color)',
-                                    background: isQualifyingZone ? 'rgba(16, 185, 129, 0.08)' : 'transparent'
+                                    borderBottom: isCutoff ? '2px dashed rgba(52, 211, 153, 0.65)' : '1px solid var(--border-color)',
+                                    background: isQualifyingZone ? 'rgba(16, 185, 129, 0.14)' : 'transparent'
                                   }}
                                 >
                                   <td style={{ padding: '0.65rem 0.55rem', fontWeight: 900, color: rankColor }}>{i + 1}</td>
-                                  <td style={{ padding: '0.65rem 0.55rem', fontWeight: 600 }}>
+                                  <td style={{ padding: '0.65rem 0.55rem', fontWeight: 600, color: '#FFFFFF' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                       <span>{p.name}</span>
                                       {isSure && (
-                                        <span style={{ fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.18)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(16, 185, 129, 0.3)' }} title="Mathématiquement qualifié">
+                                        <span style={{ fontSize: '0.65rem', background: '#10B981', color: '#041210', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }} title="Mathématiquement qualifié">
                                           Qualifié
                                         </span>
                                       )}
                                     </div>
                                   </td>
-                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', color: 'var(--text-muted)' }}>{p.played}</td>
-                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', fontWeight: 700, color: 'var(--accent-primary)' }}>{p.won}</td>
-                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', color: p.lost > 0 ? '#ff6b6b' : 'var(--text-muted)' }}>{p.lost}</td>
-                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
-                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', color: '#CCFBF1' }}>{p.played}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', fontWeight: 700, color: '#6EE7B7' }}>{p.won}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', color: p.lost > 0 ? '#FCA5A5' : '#CCFBF1' }}>{p.lost}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', color: '#FFFFFF' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', fontWeight: 800, color: '#FDE68A' }}>{p.pts}</td>
                                 </tr>
                               );
                             })}
@@ -3907,9 +3970,9 @@ const AdminView: React.FC = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '0.45rem',
-                          color: '#ffd700',
-                          borderColor: 'rgba(255, 215, 0, 0.35)',
-                          background: 'rgba(255, 215, 0, 0.06)',
+                          color: '#FDE68A',
+                          borderColor: 'rgba(251, 191, 36, 0.55)',
+                          background: 'rgba(3, 18, 16, 0.58)',
                           fontSize: '0.84rem',
                           fontWeight: 700
                         }}
@@ -3927,8 +3990,9 @@ const AdminView: React.FC = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '0.45rem',
-                          color: (activeTournament.finalStageLaunched || hasSureQualifiers || qualifStatus.isQualifAllDone) ? 'var(--accent-primary)' : 'var(--text-muted)',
-                          borderColor: (activeTournament.finalStageLaunched || hasSureQualifiers) ? 'rgba(0, 255, 170, 0.35)' : 'var(--border-color)',
+                          color: '#FFFFFF',
+                          borderColor: (activeTournament.finalStageLaunched || hasSureQualifiers) ? 'rgba(52, 211, 153, 0.65)' : 'rgba(255,255,255,0.28)',
+                          background: 'rgba(3, 18, 16, 0.58)',
                           fontSize: '0.84rem',
                           fontWeight: 700
                         }}
@@ -3938,19 +4002,19 @@ const AdminView: React.FC = () => {
                         <span>Phases finales</span>
                         <span style={{
                           fontSize: '0.65rem',
-                          padding: '1px 5px',
+                          padding: '1px 6px',
                           borderRadius: '4px',
                           fontWeight: 800,
                           background: activeTournament.finalStageLaunched
-                            ? 'var(--accent-primary)'
+                            ? '#10B981'
                             : (hasSureQualifiers || qualifStatus.isQualifAllDone)
-                              ? 'rgba(0,255,170,0.18)'
-                              : 'rgba(255,255,255,0.08)',
+                              ? '#FBBF24'
+                              : 'rgba(255,255,255,0.18)',
                           color: activeTournament.finalStageLaunched
                             ? '#041210'
                             : (hasSureQualifiers || qualifStatus.isQualifAllDone)
-                              ? 'var(--accent-primary)'
-                              : '#fbbf24'
+                              ? '#041210'
+                              : '#F8FAFC'
                         }}>
                           {activeTournament.finalStageLaunched ? 'EN COURS' : (hasSureQualifiers || qualifStatus.isQualifAllDone) ? 'Prêt' : 'Provisoire'}
                         </span>
@@ -3965,8 +4029,9 @@ const AdminView: React.FC = () => {
                       onClick={() => { setShowResultsModal(false); setEditingFinishedMatchId(null); }}
                     >
                     <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.2rem 1.4rem', width: 'min(680px, 94vw)', height: 'min(82vh, 780px)', overflow: 'hidden', border: '1px solid rgba(255, 215, 0, 0.35)' }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <h2 style={{ fontSize: '1.2rem', color: 'var(--card-text-muted)', margin: 0 }}>Derniers Résultats</h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.5rem' }}>
+                      <h2 style={{ fontSize: '1.2rem', color: '#FFFFFF', margin: 0 }}>Derniers Résultats</h2>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <button
                         className="btn btn-outline"
                         style={{
@@ -3975,8 +4040,9 @@ const AdminView: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.35rem',
-                          borderColor: isAdminUnlocked ? 'rgba(0, 255, 170, 0.4)' : 'rgba(255, 255, 255, 0.15)',
-                          color: isAdminUnlocked ? 'var(--accent-primary)' : 'var(--text-muted)'
+                          background: 'rgba(3,18,16,0.55)',
+                          borderColor: isAdminUnlocked ? '#34D399' : 'rgba(255, 255, 255, 0.3)',
+                          color: isAdminUnlocked ? '#6EE7B7' : '#F8FAFC'
                         }}
                         onClick={() => {
                           if (isAdminUnlocked) {
@@ -3999,11 +4065,21 @@ const AdminView: React.FC = () => {
                         type="button"
                         className="btn btn-outline"
                         onClick={() => { setShowResultsModal(false); setEditingFinishedMatchId(null); }}
-                        style={{ fontSize: '0.7rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '0.25rem 0.55rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          background: 'rgba(3,18,16,0.55)',
+                          borderColor: 'rgba(255, 255, 255, 0.3)',
+                          color: '#F8FAFC'
+                        }}
                         title="Fermer"
                       >
                         <X size={13} /> Fermer
                       </button>
+                      </div>
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '0.5rem' }}>
@@ -4127,20 +4203,20 @@ const AdminView: React.FC = () => {
                           }
 
                           return (
-                            <div key={m.id} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', padding: '0.8rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div key={m.id} style={{ background: 'rgba(3, 18, 16, 0.5)', border: '1px solid var(--border-color)', padding: '0.8rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                               {(m.endTime || m.startTime) && (
-                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ fontSize: '0.68rem', color: '#CCFBF1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span>{m.poolName || (m.stage && m.stage !== 'qualif' ? m.stage.toUpperCase() : 'Poules')}</span>
                                   <span>Terminé : {formatShortDateTime(m.endTime || m.startTime)}</span>
                                 </div>
                               )}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score1 > m.score2 ? 1 : 0.5 }}>
-                                <span style={{ fontWeight: m.score1 > m.score2 ? 700 : 400, color: m.score1 > m.score2 ? 'var(--accent-primary)' : 'var(--card-text)' }}>{players[m.player1Id]?.name}</span>
-                                <span style={{ fontWeight: 800 }}>{m.score1}</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score1 > m.score2 ? 1 : 0.78 }}>
+                                <span style={{ fontWeight: m.score1 > m.score2 ? 700 : 500, color: m.score1 > m.score2 ? '#FDE68A' : '#E2E8F0' }}>{players[m.player1Id]?.name}</span>
+                                <span style={{ fontWeight: 800, color: m.score1 > m.score2 ? '#FDE68A' : '#E2E8F0' }}>{m.score1}</span>
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score2 > m.score1 ? 1 : 0.5 }}>
-                                <span style={{ fontWeight: m.score2 > m.score1 ? 700 : 400, color: m.score2 > m.score1 ? 'var(--accent-primary)' : 'var(--card-text)' }}>{players[m.player2Id]?.name}</span>
-                                <span style={{ fontWeight: 800 }}>{m.score2}</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score2 > m.score1 ? 1 : 0.78 }}>
+                                <span style={{ fontWeight: m.score2 > m.score1 ? 700 : 500, color: m.score2 > m.score1 ? '#FDE68A' : '#E2E8F0' }}>{players[m.player2Id]?.name}</span>
+                                <span style={{ fontWeight: 800, color: m.score2 > m.score1 ? '#FDE68A' : '#E2E8F0' }}>{m.score2}</span>
                               </div>
 
                               {isAdminUnlocked && (
@@ -4154,8 +4230,9 @@ const AdminView: React.FC = () => {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '0.3rem',
-                                    borderColor: 'rgba(255,255,255,0.15)',
-                                    color: 'var(--accent-primary)'
+                                    background: 'rgba(6, 78, 59, 0.55)',
+                                    borderColor: 'rgba(52, 211, 153, 0.45)',
+                                    color: '#A7F3D0'
                                   }}
                                   onClick={() => {
                                     setEditingFinishedMatchId(m.id);
@@ -4188,9 +4265,9 @@ const AdminView: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem', flexShrink: 0, flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <h2 style={{ fontSize: '1.1rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800 }}>
-                          <MonitorPlay size={18} style={{ color: 'var(--accent-primary)' }} /> Billards Live
+                          <MonitorPlay size={18} style={{ color: '#FDE68A' }} /> Billards Live
                         </h2>
-                        <span style={{ fontSize: '0.74rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.74rem', background: 'rgba(3, 18, 16, 0.65)', color: '#FFFFFF', padding: '2px 8px', borderRadius: '8px', fontWeight: 700, border: '1px solid rgba(255,255,255,0.22)' }}>
                           {tournamentTablesOrdered.length}
                         </span>
                       </div>
@@ -4206,9 +4283,9 @@ const AdminView: React.FC = () => {
                               alignItems: 'center',
                               gap: '4px',
                               fontWeight: 700,
-                              color: '#ffd700',
-                              borderColor: 'rgba(255, 215, 0, 0.35)',
-                              background: 'rgba(255, 215, 0, 0.08)'
+                              color: '#FEF3C7',
+                              borderColor: 'rgba(251, 191, 36, 0.65)',
+                              background: 'rgba(120, 53, 15, 0.8)'
                             }}
                             onClick={() => {
                               const pendingItems = matchesToPlay
@@ -4244,8 +4321,9 @@ const AdminView: React.FC = () => {
                             gap: '4px',
                             whiteSpace: 'nowrap',
                             fontWeight: 700,
-                            color: 'var(--accent-primary)',
-                            borderColor: 'rgba(0, 255, 170, 0.35)'
+                            background: 'rgba(6, 78, 59, 0.85)',
+                            color: '#A7F3D0',
+                            borderColor: 'rgba(52, 211, 153, 0.6)'
                           }}
                           title="Ouvrir la mosaïque Multi-Live Vidéo"
                         >
@@ -4267,8 +4345,8 @@ const AdminView: React.FC = () => {
                               style={{
                                 flex: '1 1 0',
                                 minHeight: '120px',
-                                background: 'rgba(255,255,255,0.025)',
-                                border: '1.5px dashed rgba(255,255,255,0.18)',
+                                background: 'rgba(3, 18, 16, 0.52)',
+                                border: '1.5px dashed rgba(204, 251, 241, 0.38)',
                                 borderRadius: '16px',
                                 padding: '1rem 1.2rem',
                                 display: 'flex',
@@ -4279,14 +4357,14 @@ const AdminView: React.FC = () => {
                                 boxSizing: 'border-box'
                               }}
                             >
-                              <div style={{ color: 'var(--card-text)', fontWeight: 900, fontSize: '1.2rem' }}>{tableName}</div>
-                              <div style={{ background: 'rgba(148,163,184,0.15)', color: '#94a3b8', fontWeight: 800, fontSize: '0.8rem', padding: '2px 11px', borderRadius: '999px', letterSpacing: '0.5px' }}>
+                              <div style={{ color: '#FFFFFF', fontWeight: 900, fontSize: '1.2rem' }}>{tableName}</div>
+                              <div style={{ background: 'rgba(30, 41, 59, 0.92)', color: '#F1F5F9', fontWeight: 800, fontSize: '0.8rem', padding: '2px 11px', borderRadius: '999px', letterSpacing: '0.5px', border: '1px solid rgba(148, 163, 184, 0.4)' }}>
                                 ○ LIBRE
                               </div>
-                              <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>En attente du prochain match</div>
+                              <div style={{ color: '#CCFBF1', fontSize: '0.82rem' }}>En attente du prochain match</div>
                               <button
                                 className="btn btn-outline"
-                                style={{ fontSize: '0.78rem', padding: '0.35rem 0.85rem', borderRadius: '8px' }}
+                                style={{ fontSize: '0.78rem', padding: '0.35rem 0.85rem', borderRadius: '8px', background: 'rgba(255,255,255,0.1)', color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.35)' }}
                                 onClick={() => setSelectedTableForQR(table.id)}
                               >
                                 Gérer ce billard
@@ -4300,18 +4378,28 @@ const AdminView: React.FC = () => {
                         const isPlayingMatch = match.status === 'playing';
                         const cardTheme = isPlayingMatch
                           ? {
-                              accent: '#00e5a0',
+                              accent: '#34D399',
                               label: '● MATCH EN COURS',
-                              bg: 'linear-gradient(155deg, rgba(0, 229, 160, 0.14) 0%, rgba(10, 28, 24, 0.65) 100%)',
-                              border: '2px solid rgba(0, 229, 160, 0.72)',
-                              band: 'rgba(0, 229, 160, 0.16)'
+                              badgeBg: '#10B981',
+                              badgeText: '#041210',
+                              btnBg: '#10B981',
+                              btnText: '#041210',
+                              bg: 'linear-gradient(155deg, rgba(6, 52, 42, 0.96) 0%, rgba(4, 24, 20, 0.98) 100%)',
+                              border: '2px solid #10B981',
+                              band: 'rgba(3, 20, 16, 0.88)',
+                              bandBorder: '1px solid rgba(16, 185, 129, 0.35)'
                             }
                           : {
-                              accent: '#ffb020',
+                              accent: '#FCD34D',
                               label: '⏳ MATCH À LANCER',
-                              bg: 'linear-gradient(155deg, rgba(255, 176, 32, 0.14) 0%, rgba(36, 24, 8, 0.65) 100%)',
-                              border: '2px solid rgba(255, 176, 32, 0.75)',
-                              band: 'rgba(255, 176, 32, 0.18)'
+                              badgeBg: '#F59E0B',
+                              badgeText: '#111827',
+                              btnBg: '#F59E0B',
+                              btnText: '#111827',
+                              bg: 'linear-gradient(155deg, rgba(46, 28, 6, 0.96) 0%, rgba(24, 15, 4, 0.98) 100%)',
+                              border: '2px solid #F59E0B',
+                              band: 'rgba(20, 12, 3, 0.90)',
+                              bandBorder: '1px solid rgba(245, 158, 11, 0.42)'
                             };
                         const matchUrl = getMatchShareUrl(match.id, effTableId || match.tableId, match.tournamentId || activeTournament.id);
                         const nameStyle: React.CSSProperties = { fontWeight: 800, fontSize: '1.12rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#fff' };
@@ -4336,14 +4424,14 @@ const AdminView: React.FC = () => {
                             }}
                           >
                             {/* Bandeau statut */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', background: cardTheme.band, borderRadius: '10px', padding: '0.32rem 0.7rem' }}>
-                              <span style={{ color: '#fff', fontWeight: 900, fontSize: '1.15rem' }}>{tableName}</span>
-                              <span style={{ color: cardTheme.accent, fontWeight: 900, fontSize: '0.9rem', letterSpacing: '0.4px' }}>{cardTheme.label}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', background: cardTheme.band, border: cardTheme.bandBorder, borderRadius: '10px', padding: '0.36rem 0.7rem' }}>
+                              <span style={{ color: '#FFFFFF', fontWeight: 900, fontSize: '1.15rem' }}>{tableName}</span>
+                              <span style={{ background: cardTheme.badgeBg, color: cardTheme.badgeText, fontWeight: 900, fontSize: '0.82rem', letterSpacing: '0.4px', padding: '3px 11px', borderRadius: '999px' }}>{cardTheme.label}</span>
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                               {match.poolName && (
-                                <span style={{ background: 'rgba(0, 255, 204, 0.14)', color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px' }}>
+                                <span style={{ background: 'rgba(3, 18, 16, 0.85)', color: '#FDE68A', border: '1px solid rgba(251, 191, 36, 0.45)', fontSize: '0.7rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px' }}>
                                   {match.poolName}
                                 </span>
                               )}
@@ -4354,7 +4442,7 @@ const AdminView: React.FC = () => {
                                 {stakeInfo.label}
                               </span>
                               {match.stage && match.stage !== 'qualif' && (
-                                <span style={{ background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', fontSize: '0.7rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px' }}>
+                                <span style={{ background: '#F59E0B', color: '#111827', fontSize: '0.7rem', fontWeight: 900, padding: '1px 7px', borderRadius: '4px' }}>
                                   {match.stage === 'final' ? '🏆 Finale' : match.stage === 'semi' ? '⚔️ 1/2 Finale' : '🎯 1/4 Finale'}
                                 </span>
                               )}
@@ -4386,12 +4474,12 @@ const AdminView: React.FC = () => {
                               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <div style={nameStyle}>
                                   {players[match.player1Id]?.name}
-                                  <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 500, marginLeft: '5px' }}>({stakeInfo.p1Played}M)</small>
+                                  <small style={{ color: '#CBD5E1', fontSize: '0.72rem', fontWeight: 500, marginLeft: '5px' }}>({stakeInfo.p1Played}M)</small>
                                 </div>
                                 <div style={{ fontSize: '0.72rem', color: cardTheme.accent, fontWeight: 900 }}>VS</div>
                                 <div style={nameStyle}>
                                   {players[match.player2Id]?.name}
-                                  <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 500, marginLeft: '5px' }}>({stakeInfo.p2Played}M)</small>
+                                  <small style={{ color: '#CBD5E1', fontSize: '0.72rem', fontWeight: 500, marginLeft: '5px' }}>({stakeInfo.p2Played}M)</small>
                                 </div>
                                 {isPlayingMatch && (
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.3rem' }}>
@@ -4413,7 +4501,7 @@ const AdminView: React.FC = () => {
                                 <button
                                   type="button"
                                   className="btn btn-neon"
-                                  style={{ fontSize: '0.88rem', padding: '0.5rem 0.7rem', width: '100%', justifyContent: 'center', fontWeight: 800, color: '#041210', borderRadius: '10px', background: cardTheme.accent }}
+                                  style={{ fontSize: '0.88rem', padding: '0.5rem 0.7rem', width: '100%', justifyContent: 'center', fontWeight: 800, color: cardTheme.btnText, borderRadius: '10px', background: cardTheme.btnBg, border: 'none' }}
                                   onClick={() => setSelectedTableForQR(effTableId)}
                                 >
                                   Score / Terminer
@@ -4424,7 +4512,7 @@ const AdminView: React.FC = () => {
                                 <button
                                   type="button"
                                   className="btn btn-neon"
-                                  style={{ flex: 1, fontSize: '0.88rem', padding: '0.52rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#041210', fontWeight: 900, borderRadius: '10px', background: cardTheme.accent }}
+                                  style={{ flex: 1, fontSize: '0.88rem', padding: '0.52rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: cardTheme.btnText, fontWeight: 900, borderRadius: '10px', background: cardTheme.btnBg, border: 'none' }}
                                   onClick={() => {
                                     startTournamentMatch(match.id, false);
                                     if (effTableId) setSelectedTableForQR(effTableId);
@@ -4435,7 +4523,7 @@ const AdminView: React.FC = () => {
                                 <button
                                   type="button"
                                   className="btn btn-outline"
-                                  style={{ padding: '0.52rem 0.75rem', borderRadius: '10px', color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.35)', background: 'rgba(255, 215, 0, 0.08)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                  style={{ padding: '0.52rem 0.75rem', borderRadius: '10px', color: '#FDE68A', borderColor: 'rgba(251, 191, 36, 0.55)', background: 'rgba(0, 0, 0, 0.45)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                                   title={`Appeler vocalement ${players[match.player1Id]?.name || 'Joueur 1'} et ${players[match.player2Id]?.name || 'Joueur 2'} sur ${tableName}`}
                                   onClick={() => announceMatchOnTable({
                                     match,
@@ -4451,7 +4539,7 @@ const AdminView: React.FC = () => {
                                 <button
                                   type="button"
                                   className="btn btn-outline"
-                                  style={{ padding: '0.52rem 0.7rem', borderRadius: '10px', color: isCardMenuOpen ? 'var(--accent-primary)' : '#fff', borderColor: isCardMenuOpen ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                  style={{ padding: '0.52rem 0.7rem', borderRadius: '10px', background: 'rgba(0, 0, 0, 0.45)', color: '#FFFFFF', borderColor: isCardMenuOpen ? '#FBBF24' : 'rgba(255, 255, 255, 0.35)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                                   title="Plus d'actions (saisir score, repousser)"
                                   onClick={() => setOpenBillardMenuId(prev => (prev === match.id ? null : match.id))}
                                 >
@@ -4466,7 +4554,7 @@ const AdminView: React.FC = () => {
                                       right: 0,
                                       minWidth: '215px',
                                       background: '#0b1222',
-                                      border: '1px solid rgba(255,255,255,0.18)',
+                                      border: '1px solid rgba(255,255,255,0.22)',
                                       borderRadius: '12px',
                                       padding: '0.45rem',
                                       boxShadow: '0 12px 30px rgba(0,0,0,0.65)',
@@ -4479,7 +4567,7 @@ const AdminView: React.FC = () => {
                                     <button
                                       type="button"
                                       className="btn btn-outline"
-                                      style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.45rem 0.65rem', color: '#34D399', borderColor: 'rgba(52, 211, 153, 0.3)' }}
+                                      style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.45rem 0.65rem', background: 'rgba(6, 78, 59, 0.55)', color: '#A7F3D0', borderColor: 'rgba(52, 211, 153, 0.45)' }}
                                       onClick={() => {
                                         setOpenBillardMenuId(null);
                                         openDirectScoreModal(match);
@@ -4490,7 +4578,7 @@ const AdminView: React.FC = () => {
                                     <button
                                       type="button"
                                       className="btn btn-outline"
-                                      style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.45rem 0.65rem', color: '#fff', borderColor: 'rgba(255,255,255,0.15)' }}
+                                      style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.45rem 0.65rem', background: 'rgba(255, 255, 255, 0.08)', color: '#F8FAFC', borderColor: 'rgba(255, 255, 255, 0.25)' }}
                                       onClick={() => {
                                         setOpenBillardMenuId(null);
                                         if (effTableId && matchesWaiting.length > 0) {
@@ -4511,21 +4599,21 @@ const AdminView: React.FC = () => {
                       })}
 
                         {unplayedQualifMatches.length > 0 && (
-                          <div style={{ width: '100%', maxWidth: '700px', marginTop: '0.8rem', padding: '0.8rem 1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ width: '100%', maxWidth: '700px', marginTop: '0.8rem', padding: '0.8rem 1rem', background: 'rgba(3, 18, 16, 0.55)', border: '1px solid rgba(255, 255, 255, 0.16)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                              <span style={{ fontSize: '0.8rem', color: '#CCFBF1', fontWeight: 700 }}>
                                 Matchs de poule restants (non disputés pour passage en phase finale)
                               </span>
-                              <span style={{ fontSize: '0.7rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '8px' }}>
+                              <span style={{ fontSize: '0.7rem', background: 'rgba(255, 255, 255, 0.12)', color: '#FFFFFF', padding: '1px 6px', borderRadius: '8px' }}>
                                 {unplayedQualifMatches.length} match{unplayedQualifMatches.length > 1 ? 's' : ''}
                               </span>
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                               {unplayedQualifMatches.map(m => (
-                                <div key={m.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                  <span style={{ color: '#fff', fontWeight: 600 }}>{players[m.player1Id]?.name || 'J1'}</span>
-                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>VS</span>
-                                  <span style={{ color: '#fff', fontWeight: 600 }}>{players[m.player2Id]?.name || 'J2'}</span>
+                                <div key={m.id} style={{ background: 'rgba(0,0,0,0.4)', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{players[m.player1Id]?.name || 'J1'}</span>
+                                  <span style={{ color: '#CCFBF1', fontSize: '0.65rem' }}>VS</span>
+                                  <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{players[m.player2Id]?.name || 'J2'}</span>
                                 </div>
                               ))}
                             </div>

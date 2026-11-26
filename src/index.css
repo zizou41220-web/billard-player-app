@@ -69,6 +69,8 @@ body.theme-light {
 
 [data-theme="light"] .glass-card,
 body.theme-light .glass-card {
+  --text-muted: #CCFBF1;
+  --text-primary: #FFFFFF;
   background: linear-gradient(155deg, rgba(14, 90, 82, 0.95) 0%, rgba(7, 46, 42, 0.98) 100%) !important;
   color: #FFFFFF !important;
   border: 1.5px solid rgba(45, 212, 191, 0.45) !important;
@@ -112,18 +114,33 @@ body.theme-light .glass-card select.input-field option {
   color: #FFFFFF !important;
 }
 
+[data-theme="light"] .btn-outline,
+body.theme-light .btn-outline {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0F172A;
+}
+
+[data-theme="light"] .btn-outline:hover:not(:disabled),
+body.theme-light .btn-outline:hover:not(:disabled) {
+  background: #E2E8F0;
+  border-color: #0F766E;
+  color: #0F766E;
+}
+
 [data-theme="light"] .glass-card .btn-outline,
 body.theme-light .glass-card .btn-outline {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(45, 212, 191, 0.45) !important;
-  color: #FBBF24 !important;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #F8FAFC;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 [data-theme="light"] .glass-card .btn-outline:hover:not(:disabled),
 body.theme-light .glass-card .btn-outline:hover:not(:disabled) {
-  background: rgba(251, 191, 36, 0.15) !important;
-  border-color: #FBBF24 !important;
+  background: rgba(251, 191, 36, 0.16);
+  border-color: #FBBF24;
+  color: #FDE68A;
 }
 
 [data-theme="light"] .mobile-container,
@@ -280,8 +297,9 @@ body {
 
 .btn-neon {
   background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 45%, #10B981 100%);
-  color: #041311;
+  color: #041311 !important;
   font-weight: 800;
+  text-shadow: none;
   box-shadow: var(--shadow-neon), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
@@ -760,11 +778,16 @@ body.fx-neon #root div[style*="#050816"] {
 }
 
 body.fx-neon .glass-card {
-  background: linear-gradient(155deg, rgba(14, 90, 82, 0.55) 0%, rgba(7, 46, 42, 0.68) 100%) !important;
+  background: linear-gradient(155deg, rgba(14, 90, 82, 0.80) 0%, rgba(7, 46, 42, 0.90) 100%) !important;
   backdrop-filter: blur(16px) saturate(150%);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   border: 1.5px solid rgba(52, 211, 153, 0.5) !important;
   box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 0 22px rgba(16, 185, 129, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+body.theme-light.fx-neon .glass-card,
+[data-theme="light"] body.fx-neon .glass-card {
+  background: linear-gradient(155deg, rgba(14, 90, 82, 0.94) 0%, rgba(7, 46, 42, 0.98) 100%) !important;
 }
 
 body.fx-neon header {

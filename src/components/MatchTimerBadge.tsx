@@ -69,9 +69,9 @@ export const MatchTimerBadge: React.FC<MatchTimerBadgeProps> = ({
           display: 'inline-flex',
           alignItems: 'center',
           gap: '5px',
-          background: 'rgba(245, 158, 11, 0.14)',
-          border: '1px solid rgba(245, 158, 11, 0.38)',
-          color: '#FBBF24',
+          background: 'rgba(120, 53, 15, 0.88)',
+          border: '1px solid #F59E0B',
+          color: '#FEF3C7',
           padding: paddings[size],
           borderRadius: '999px',
           fontSize: fontSizes[size],
@@ -101,9 +101,9 @@ export const MatchTimerBadge: React.FC<MatchTimerBadgeProps> = ({
           display: 'inline-flex',
           alignItems: 'center',
           gap: '5px',
-          background: 'rgba(255, 255, 255, 0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.18)',
-          color: '#E2E8F0',
+          background: 'rgba(15, 23, 42, 0.82)',
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          color: '#F8FAFC',
           padding: paddings[size],
           borderRadius: '999px',
           fontSize: fontSizes[size],
@@ -126,24 +126,24 @@ export const MatchTimerBadge: React.FC<MatchTimerBadgeProps> = ({
   const isWarning = !isOvertime && !isCritical && remainingSec <= 180;
 
   const bg = isOvertime
-    ? 'rgba(239, 68, 68, 0.28)'
+    ? 'rgba(127, 29, 29, 0.92)'
     : isCritical
-      ? 'rgba(239, 68, 68, 0.2)'
+      ? 'rgba(127, 29, 29, 0.85)'
       : isWarning
-        ? 'rgba(245, 158, 11, 0.22)'
-        : 'rgba(16, 185, 129, 0.18)';
+        ? 'rgba(120, 53, 15, 0.90)'
+        : 'rgba(6, 78, 59, 0.88)';
 
   const border = isOvertime || isCritical
     ? '1.5px solid #EF4444'
     : isWarning
       ? '1.5px solid #F59E0B'
-      : '1px solid rgba(52, 211, 153, 0.45)';
+      : '1px solid rgba(52, 211, 153, 0.55)';
 
   const color = isOvertime || isCritical
-    ? '#FCA5A5'
+    ? '#FEE2E2'
     : isWarning
-      ? '#FDE68A'
-      : '#6EE7B7';
+      ? '#FEF3C7'
+      : '#A7F3D0';
 
   return (
     <span
