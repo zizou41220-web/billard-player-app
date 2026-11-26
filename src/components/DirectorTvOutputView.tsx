@@ -739,6 +739,34 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
         const logoH = Math.max(28, Math.min(72, Math.round((mh.logoHeightPx || 56) * 0.65)));
         const bgMode = mh.logoBg || 'circle';
         const isCircle = bgMode === 'circle';
+        const isLogoRight = mh.logoPosition === 'right';
+        const logoNode = logoSrc ? (
+          <div style={{
+            background: isCircle || bgMode === 'white' ? '#fff' : bgMode === 'dark_gold' ? 'rgba(10,14,22,0.95)' : 'transparent',
+            border: isCircle || bgMode === 'dark_gold' ? '1.5px solid #D4AF37' : 'none',
+            padding: isCircle || bgMode === 'transparent' ? 0 : '3px 7px',
+            borderRadius: isCircle ? '50%' : '8px',
+            overflow: 'hidden',
+            width: isCircle ? `${logoH}px` : undefined,
+            height: isCircle ? `${logoH}px` : undefined,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <img
+              src={logoSrc}
+              alt={currentClub.name}
+              style={{
+                height: `${logoH}px`,
+                width: isCircle ? `${logoH}px` : undefined,
+                maxWidth: isCircle ? undefined : '140px',
+                objectFit: isCircle ? 'cover' : 'contain'
+              }}
+              onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
+            />
+          </div>
+        ) : null;
         return (
           <div style={{
             display: 'flex',
@@ -754,32 +782,7 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
             flexWrap: 'wrap'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-              {logoSrc && (
-                <div style={{
-                  background: isCircle || bgMode === 'white' ? '#fff' : bgMode === 'dark_gold' ? 'rgba(10,14,22,0.95)' : 'transparent',
-                  border: isCircle || bgMode === 'dark_gold' ? '1.5px solid #D4AF37' : 'none',
-                  padding: isCircle || bgMode === 'transparent' ? 0 : '3px 7px',
-                  borderRadius: isCircle ? '50%' : '8px',
-                  overflow: 'hidden',
-                  width: isCircle ? `${logoH}px` : undefined,
-                  height: isCircle ? `${logoH}px` : undefined,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <img
-                    src={logoSrc}
-                    alt={currentClub.name}
-                    style={{
-                      height: `${logoH}px`,
-                      width: isCircle ? `${logoH}px` : undefined,
-                      maxWidth: isCircle ? undefined : '140px',
-                      objectFit: isCircle ? 'cover' : 'contain'
-                    }}
-                    onError={(e) => { e.currentTarget.src = defaultClubLogo; }}
-                  />
-                </div>
-              )}
+              {!isLogoRight && logoNode}
               <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#F8FAFC', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#EF4444' }} />
                 MULTI-CAMÉRAS • {directorState.situation === 'cuescore_live' ? ((directorState.regionalMatch.cueScoreInput?.trim() && directorState.regionalMatch.cueScoreTournamentId?.trim() && directorState.regionalMatch.cueScoreTournamentName?.trim()) ? directorState.regionalMatch.cueScoreTournamentName : 'Live CueScore') : directorState.situation === 'regional_match' ? (directorState.regionalMatch.eventTitle || 'Tournoi Régional') : currentClub.name}
@@ -791,34 +794,39 @@ export const DirectorTvOutputView: React.FC<DirectorTvOutputViewProps> = ({ onEx
               )}
             </div>
 
-            {!isObsClean && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setSoundAllowed(v => !v)}
-                  style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
-                >
-                  {soundAllowed ? '🔊 Son ON' : '🔇 Muet'}
-                </button>
-                {onExitToAll && (
-                  <button
-                    type="button"
-                    onClick={onExitToAll}
-                    style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    🎱 Vue Billards
-                  </button>
+            {(!isObsClean || isLogoRight) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                {!isObsClean && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSoundAllowed(v => !v)}
+                      style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      {soundAllowed ? '🔊 Son ON' : '🔇 Muet'}
+                    </button>
+                    {onExitToAll && (
+                      <button
+                        type="button"
+                        onClick={onExitToAll}
+                        style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        🎱 Vue Billards
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+                        else document.exitFullscreen?.();
+                      }}
+                      style={{ background: '#00ffaa', color: '#000', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '0.76rem', fontWeight: 900, cursor: 'pointer' }}
+                    >
+                      ⛶ PLEIN ÉCRAN
+                    </button>
+                  </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
-                    else document.exitFullscreen?.();
-                  }}
-                  style={{ background: '#00ffaa', color: '#000', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '0.76rem', fontWeight: 900, cursor: 'pointer' }}
-                >
-                  ⛶ PLEIN ÉCRAN
-                </button>
+                {isLogoRight && logoNode}
               </div>
             )}
           </div>

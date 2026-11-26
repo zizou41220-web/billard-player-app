@@ -177,6 +177,7 @@ export interface MosaicHeaderConfig {
   customLogoUrl?: string;
   logoHeightPx?: number; // 36..115 px
   logoBg?: 'circle' | 'transparent' | 'white' | 'dark_gold';
+  logoPosition?: 'left' | 'right';
   showPlayerAvatars?: boolean;
 }
 
@@ -186,6 +187,7 @@ export const DEFAULT_MOSAIC_HEADER: MosaicHeaderConfig = {
   customLogoUrl: '',
   logoHeightPx: 62,
   logoBg: 'circle',
+  logoPosition: 'left',
   showPlayerAvatars: true
 };
 

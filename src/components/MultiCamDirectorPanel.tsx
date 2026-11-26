@@ -4424,6 +4424,31 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                           </button>
                         ))}
                       </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                        <span style={{ color: '#94A3B8' }}>Position :</span>
+                        {([
+                          { id: 'left' as const, label: '↖ Haut Gauche' },
+                          { id: 'right' as const, label: '↗ Haut Droite' }
+                        ]).map(pos => (
+                          <button
+                            key={pos.id}
+                            type="button"
+                            onClick={() => updateMosaicHeader({ logoPosition: pos.id })}
+                            style={{
+                              padding: '2px 7px',
+                              borderRadius: '5px',
+                              fontSize: '0.66rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: `1px solid ${(mosaicHeader.logoPosition || 'left') === pos.id ? '#D4AF37' : 'rgba(255,255,255,0.14)'}`,
+                              background: (mosaicHeader.logoPosition || 'left') === pos.id ? 'rgba(212,175,55,0.2)' : '#0E1525',
+                              color: (mosaicHeader.logoPosition || 'left') === pos.id ? '#FDE68A' : '#CBD5E1'
+                            }}
+                          >
+                            {pos.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

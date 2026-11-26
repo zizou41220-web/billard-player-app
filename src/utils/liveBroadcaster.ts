@@ -2358,12 +2358,14 @@ export class LiveCompositeBroadcaster {
 
     const bgMode = mh.logoBg || 'circle';
     const isCircle = bgMode === 'circle';
+    const isRight = mh.logoPosition === 'right';
     const logoBoxH = Math.max(34, Math.min(115, Number(mh.logoHeightPx) || 62));
     const logoAspect = isCircle
       ? 1
       : Math.max(0.5, Math.min(3.2, headerLogoImg.naturalWidth / Math.max(1, headerLogoImg.naturalHeight)));
     const logoBoxW = Math.round(logoBoxH * logoAspect);
-    const lx = showBar ? 14 : 18;
+    const marginX = showBar ? 14 : 18;
+    const lx = isRight ? (1280 - marginX - logoBoxW) : marginX;
     const ly = showBar ? (logoBoxH <= headerH - 6 ? Math.round((headerH - logoBoxH) / 2) : 6) : 16;
     const pad = bgMode === 'transparent' || isCircle ? 0 : 5;
     const ctx = this.ctx;
@@ -2504,10 +2506,14 @@ export class LiveCompositeBroadcaster {
             ? (mh.customLogoUrl || '')
             : (getClubLogoUrl(currentClub.logoUrl) || defaultClubLogo);
       const headerLogoImg = activeLogoUrl ? this.getCachedImage(activeLogoUrl) : null;
+      const isCircle = (mh.logoBg || 'circle') === 'circle';
+      const isLogoRight = mh.logoPosition === 'right';
       const logoBoxH = Math.max(34, Math.min(115, Number(mh.logoHeightPx) || 56));
-      const logoAspect = headerLogoImg
-        ? Math.max(0.5, Math.min(3.2, headerLogoImg.naturalWidth / Math.max(1, headerLogoImg.naturalHeight)))
-        : 1;
+      const logoAspect = isCircle
+        ? 1
+        : headerLogoImg
+          ? Math.max(0.5, Math.min(3.2, headerLogoImg.naturalWidth / Math.max(1, headerLogoImg.naturalHeight)))
+          : 1;
       const logoBoxW = Math.round(logoBoxH * logoAspect);
       const hasVisibleLogo = Boolean(headerLogoImg);
 
@@ -2517,7 +2523,7 @@ export class LiveCompositeBroadcaster {
         ctx.fillStyle = 'rgba(212, 175, 55, 0.35)';
         ctx.fillRect(0, headerH - 1.5, W, 1.5);
 
-        const textStartX = hasVisibleLogo ? (16 + logoBoxW + 18) : 20;
+        const textStartX = hasVisibleLogo && !isLogoRight ? (16 + logoBoxW + 18) : 20;
 
         ctx.beginPath();
         ctx.arc(textStartX, headerH / 2, 5, 0, Math.PI * 2);
@@ -2547,7 +2553,8 @@ export class LiveCompositeBroadcaster {
         ctx.font = '700 13px Outfit, Inter, sans-serif';
         ctx.textAlign = 'right';
         const mosaicTime = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        ctx.fillText(mosaicTime, W - 16, headerH / 2);
+        const clockX = hasVisibleLogo && isLogoRight ? (W - 14 - logoBoxW - 14) : (W - 16);
+        ctx.fillText(mosaicTime, clockX, headerH / 2);
       }
 
       const list = enabledCams.length > 0
