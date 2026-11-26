@@ -52,7 +52,6 @@ import {
   CameraSignalingHandle,
   DEFAULT_MOSAIC_HEADER,
   DEFAULT_REGIONAL_MATCH,
-  DEFAULT_SHOT_CLOCK,
   DirectorAssignmentType,
   DirectorCameraSlot,
   DirectorCameraSourceType,
@@ -62,12 +61,10 @@ import {
   MultiCamDirectorState,
   RTC_ICE_CONFIG,
   RegionalMatchConfig,
-  ShotClockState,
   StreamDestinationsConfig,
   StreamQualityPreset,
   buildCameraVideoFilter,
   createCameraSignalingChannel,
-  getShotClockRemainingMs,
   hasCustomCameraImageGrading,
   isVirtualScreenSource,
   loadDirectorState,
@@ -1173,7 +1170,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
   const [replaySpeedChoice, setReplaySpeedChoice] = useState<number>(0.6);
-  const [, setShotClockUiTick] = useState<number>(0);
   const [showHeaderSettings, setShowHeaderSettings] = useState<boolean>(false);
   const [showStudioTools, setShowStudioTools] = useState<boolean>(false);
   const [showTournamentDrawer, setShowTournamentDrawer] = useState<boolean>(false);
@@ -1778,79 +1774,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     await broadcasterRef.current?.setCommentatorMicEnabled(!broadcasterStatus.commentatorMicActive);
   };
 
-  // Shot Clock helpers & 200ms UI countdown refresh
-  const shotClock: ShotClockState = { ...DEFAULT_SHOT_CLOCK, ...(directorState.shotClock || {}) };
-  const shotClockRemainingSec = Math.ceil(getShotClockRemainingMs(shotClock) / 1000);
-
-  useEffect(() => {
-    if (!shotClock.enabled || !shotClock.running) return;
-    const t = window.setInterval(() => setShotClockUiTick(v => v + 1), 200);
-    return () => window.clearInterval(t);
-  }, [shotClock.enabled, shotClock.running]);
-
-  const updateShotClock = (patch: Partial<ShotClockState>, baseState?: MultiCamDirectorState) => {
-    const src = baseState || directorStateRef.current;
-    const curSc: ShotClockState = { ...DEFAULT_SHOT_CLOCK, ...(src.shotClock || {}) };
-    const next: MultiCamDirectorState = {
-      ...src,
-      shotClock: { ...curSc, ...patch }
-    };
-    setDirectorState(next);
-    saveDirectorState(currentClub.id, next, true);
-  };
-
-  const handleToggleShotClockEnabled = () => {
-    const curSc: ShotClockState = { ...DEFAULT_SHOT_CLOCK, ...(directorStateRef.current.shotClock || {}) };
-    if (curSc.enabled) {
-      updateShotClock({ enabled: false, running: false, startedAt: null });
-    } else {
-      updateShotClock({
-        enabled: true,
-        running: false,
-        remainingMs: curSc.durationSec * 1000,
-        startedAt: null,
-        extensionUsed: false
-      });
-    }
-  };
-
-  const handleToggleShotClockRunning = () => {
-    const curSc: ShotClockState = { ...DEFAULT_SHOT_CLOCK, ...(directorStateRef.current.shotClock || {}) };
-    const now = Date.now();
-    if (curSc.running) {
-      const rem = getShotClockRemainingMs(curSc, now);
-      updateShotClock({ running: false, remainingMs: rem, startedAt: null });
-    } else {
-      const baseRem = curSc.remainingMs > 0 ? curSc.remainingMs : curSc.durationSec * 1000;
-      updateShotClock({ enabled: true, running: true, remainingMs: baseRem, startedAt: now });
-    }
-  };
-
-  const handleResetShotClock = (newDurationSec?: number) => {
-    const curSc: ShotClockState = { ...DEFAULT_SHOT_CLOCK, ...(directorStateRef.current.shotClock || {}) };
-    const dur = newDurationSec ?? curSc.durationSec;
-    updateShotClock({
-      durationSec: dur,
-      running: false,
-      remainingMs: dur * 1000,
-      startedAt: null,
-      extensionUsed: false
-    });
-  };
-
-  const handleShotClockExtension = () => {
-    const curSc: ShotClockState = { ...DEFAULT_SHOT_CLOCK, ...(directorStateRef.current.shotClock || {}) };
-    if (curSc.extensionUsed) return;
-    const now = Date.now();
-    const curRem = getShotClockRemainingMs(curSc, now);
-    const added = (curSc.extensionSec || 30) * 1000;
-    updateShotClock({
-      remainingMs: curRem + added,
-      startedAt: curSc.running ? now : null,
-      extensionUsed: true
-    });
-  };
-
   const handleToggleTickerQuick = () => {
     const curTicker = { ...DEFAULT_TICKER_CONFIG, ...(overlayConfig.ticker || {}) };
     const nextOv: LiveOverlayConfig = {
@@ -1916,7 +1839,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const replaySpeedRef = useRef(replaySpeedChoice);
   replaySpeedRef.current = replaySpeedChoice;
 
-  // Broadcast keyboard shortcuts: 1-4 cameras, M mosaic, P pause, C standings, W replay, S shot clock, Space/R/E clock
+  // Broadcast keyboard shortcuts: 1-4 cameras, M mosaic, P pause, C standings, W replay
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
@@ -1929,7 +1852,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
       const isClub = cur.situation === 'club_tables';
       const activeList = cur.cameras.filter(c => c.enabled && (isClub || !isVirtualScreenSource(c.sourceType)));
       const key = e.key.toLowerCase();
-      const curSc: ShotClockState = { ...DEFAULT_SHOT_CLOCK, ...(cur.shotClock || {}) };
 
       if (key >= '1' && key <= '4') {
         const idx = Number(key) - 1;
@@ -1964,41 +1886,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         } else {
           broadcasterRef.current?.triggerInstantReplay(10, replaySpeedRef.current);
         }
-      } else if (key === 's') {
-        e.preventDefault();
-        const nextSc: ShotClockState = curSc.enabled
-          ? { ...curSc, enabled: false, running: false, startedAt: null }
-          : { ...curSc, enabled: true, running: false, remainingMs: curSc.durationSec * 1000, startedAt: null, extensionUsed: false };
-        const next = { ...cur, shotClock: nextSc };
-        setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
-      } else if (e.code === 'Space' && curSc.enabled) {
-        e.preventDefault();
-        const now = Date.now();
-        const nextSc: ShotClockState = curSc.running
-          ? { ...curSc, running: false, remainingMs: getShotClockRemainingMs(curSc, now), startedAt: null }
-          : { ...curSc, running: true, remainingMs: curSc.remainingMs > 0 ? curSc.remainingMs : curSc.durationSec * 1000, startedAt: now };
-        const next = { ...cur, shotClock: nextSc };
-        setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
-      } else if (key === 'r' && curSc.enabled) {
-        e.preventDefault();
-        const nextSc: ShotClockState = { ...curSc, running: false, remainingMs: curSc.durationSec * 1000, startedAt: null, extensionUsed: false };
-        const next = { ...cur, shotClock: nextSc };
-        setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
-      } else if (key === 'e' && curSc.enabled && !curSc.extensionUsed) {
-        e.preventDefault();
-        const now = Date.now();
-        const nextSc: ShotClockState = {
-          ...curSc,
-          remainingMs: getShotClockRemainingMs(curSc, now) + (curSc.extensionSec || 30) * 1000,
-          startedAt: curSc.running ? now : null,
-          extensionUsed: true
-        };
-        const next = { ...cur, shotClock: nextSc };
-        setDirectorState(next);
-        saveDirectorState(currentClub.id, next, true);
       } else if (key === 'c' && isClub) {
         const standingsSlot = cur.cameras.find(c => c.sourceType === 'tournament_standings');
         if (standingsSlot) {
@@ -2362,7 +2249,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const isStudioToolActive = Boolean(
     directorState.isIntermission ||
     broadcasterStatus.isReplaying ||
-    shotClock.enabled ||
     overlayConfig.ticker?.enabled ||
     broadcasterStatus.isRecordingLocal ||
     broadcasterStatus.commentatorMicActive ||
@@ -2584,7 +2470,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title="Afficher / masquer les outils de production (Pause, Replay, Shot Clock, Ticker, Enregistrement, Audio, Qualité)"
+              title="Afficher / masquer les outils de production (Pause, Replay, Ticker, Enregistrement, Audio, Qualité)"
             >
               <SlidersHorizontal size={13} />
               <span>Outils Live</span>
@@ -2807,27 +2693,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   </button>
                 )}
               </div>
-
-              {/* SHOT CLOCK TOGGLE */}
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={handleToggleShotClockEnabled}
-                style={{
-                  width: 'auto',
-                  height: '28px',
-                  padding: '0 9px',
-                  borderRadius: '6px',
-                  fontSize: '0.71rem',
-                  fontWeight: 700,
-                  background: shotClock.enabled ? 'rgba(212, 175, 55, 0.2)' : '#111827',
-                  borderColor: shotClock.enabled ? '#D4AF37' : 'rgba(255,255,255,0.14)',
-                  color: shotClock.enabled ? '#FDE68A' : '#E2E8F0'
-                }}
-                title="Afficher / Masquer le Shot Clock TV (30s / 45s / 60s + Extension) — Raccourci [S]"
-              >
-                ⏱️ Shot Clock {shotClock.enabled ? `(${shotClockRemainingSec}s)` : '(S)'}
-              </button>
 
               {/* TICKER QUICK TOGGLE */}
               <button
@@ -3070,113 +2935,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           </div>
         )}
       </div>
-
-      {/* 1.25 BARRE PILOTAGE SHOT CLOCK TV (VISIBLE QUAND SHOT CLOCK ACTIVÉ) */}
-      {shotClock.enabled && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          background: shotClockRemainingSec <= 5 ? 'rgba(185, 28, 28, 0.2)' : '#0B0F17',
-          border: `1.5px solid ${shotClockRemainingSec <= 5 ? '#EF4444' : shotClockRemainingSec <= 10 ? '#F59E0B' : 'rgba(212, 175, 55, 0.45)'}`,
-          borderRadius: '9px',
-          padding: '0.4rem 0.8rem',
-          fontSize: '0.74rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 900, color: '#FDE68A' }}>⏱️ SHOT CLOCK TV</span>
-            <span style={{
-              fontWeight: 900,
-              fontSize: '0.96rem',
-              padding: '1px 10px',
-              borderRadius: '6px',
-              background: shotClockRemainingSec <= 5 ? '#EF4444' : shotClockRemainingSec <= 10 ? '#F59E0B' : '#1E293B',
-              color: shotClockRemainingSec <= 10 && shotClockRemainingSec > 5 ? '#000' : '#fff',
-              minWidth: '46px',
-              textAlign: 'center'
-            }}>
-              {String(shotClockRemainingSec).padStart(2, '0')}s
-            </span>
-            <div style={{ display: 'inline-flex', gap: '3px' }}>
-              {[30, 45, 60].map(sec => (
-                <button
-                  key={sec}
-                  type="button"
-                  onClick={() => handleResetShotClock(sec)}
-                  style={{
-                    padding: '2px 7px',
-                    borderRadius: '5px',
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    border: `1px solid ${shotClock.durationSec === sec ? '#D4AF37' : 'rgba(255,255,255,0.16)'}`,
-                    background: shotClock.durationSec === sec ? 'rgba(212,175,55,0.22)' : 'transparent',
-                    color: shotClock.durationSec === sec ? '#FDE68A' : '#CBD5E1'
-                  }}
-                >
-                  {sec}s
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn btn-neon"
-              onClick={handleToggleShotClockRunning}
-              style={{ width: 'auto', padding: '4px 11px', fontSize: '0.72rem', fontWeight: 900, color: '#000' }}
-              title="Démarrer ou mettre en pause le chrono — Raccourci [Espace]"
-            >
-              {shotClock.running ? '⏸ Pause (Espace)' : '▶ Lancer (Espace)'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => handleResetShotClock()}
-              style={{ width: 'auto', padding: '4px 9px', fontSize: '0.72rem', fontWeight: 700 }}
-              title="Réinitialiser pour le coup suivant — Raccourci [R]"
-            >
-              ↺ Reset (R)
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={shotClock.extensionUsed}
-              onClick={handleShotClockExtension}
-              style={{
-                width: 'auto',
-                padding: '4px 9px',
-                fontSize: '0.72rem',
-                fontWeight: 800,
-                borderColor: shotClock.extensionUsed ? 'rgba(255,255,255,0.1)' : '#D4AF37',
-                color: shotClock.extensionUsed ? '#64748B' : '#FDE68A',
-                opacity: shotClock.extensionUsed ? 0.55 : 1
-              }}
-              title="Ajouter +30 secondes (1 fois par coup) — Raccourci [E]"
-            >
-              {shotClock.extensionUsed ? '✓ Ext utilisée' : `+${shotClock.extensionSec}s Ext (E)`}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => updateShotClock({ soundEnabled: !shotClock.soundEnabled })}
-              style={{
-                width: 'auto',
-                padding: '4px 8px',
-                fontSize: '0.7rem',
-                borderColor: shotClock.soundEnabled ? '#10B981' : 'rgba(255,255,255,0.16)',
-                color: shotClock.soundEnabled ? '#6EE7B7' : '#94A3B8'
-              }}
-              title="Bips sonores sur les 5 dernières secondes et buzzer à 0"
-            >
-              {shotClock.soundEnabled ? '🔔 Bips ON' : '🔕 Bips OFF'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 1A. 🏆 TOURNOI DE L'APPLI EN DIRECT (BARRE COMPACTE + TIROIR PLIABLE) */}
       {directorState.situation === 'club_tables' && appTournament && (
@@ -4799,7 +4557,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 gap: '0.4rem'
               }}>
                 <span>
-                  Raccourcis : <b style={{ color: '#94A3B8' }}>[1–4]</b> Caméras • <b style={{ color: '#94A3B8' }}>[M]</b> Mosaïque • <b style={{ color: '#94A3B8' }}>[P]</b> Pause • <b style={{ color: '#94A3B8' }}>[W]</b> Replay • <b style={{ color: '#94A3B8' }}>[S]</b> Shot Clock{shotClock.enabled ? ' • [Espace/R/E] Chrono' : ''}{isClubSituation ? ' • [C] Classement' : ''}
+                  Raccourcis : <b style={{ color: '#94A3B8' }}>[1–4]</b> Caméras • <b style={{ color: '#94A3B8' }}>[M]</b> Mosaïque • <b style={{ color: '#94A3B8' }}>[P]</b> Pause • <b style={{ color: '#94A3B8' }}>[W]</b> Replay{isClubSituation ? ' • [C] Classement' : ''}
                 </span>
               </div>
             </div>

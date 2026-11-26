@@ -8,7 +8,6 @@ import {
   StreamDestinationsConfig,
   StreamQualityPreset,
   buildCameraVideoFilter,
-  getShotClockRemainingMs,
   isVirtualScreenSource
 } from './multiCamDirector';
 import { getMatchScoringRules } from './rules';
@@ -951,9 +950,6 @@ export class LiveCompositeBroadcaster {
   private lastSceneKey = '';
   private transitionStartAt = 0;
   private readonly transitionDurationMs = 320;
-
-  // Shot Clock audio beep state
-  private lastShotClockBeepSec = -1;
 
   // Instant Replay staggered dual-recorder ring buffer (10s stagger / 20s cycle)
   private replayArmed = false;
@@ -2113,119 +2109,6 @@ export class LiveCompositeBroadcaster {
     }
   }
 
-  private playShotClockTone(freqHz: number, durationSec: number, volume: number) {
-    try {
-      this.ensureAudioMixer();
-      if (!this.audioCtx) return;
-      if (this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {});
-      }
-      const now = this.audioCtx.currentTime;
-      const osc = this.audioCtx.createOscillator();
-      const gain = this.audioCtx.createGain();
-      osc.type = freqHz < 450 ? 'sawtooth' : 'sine';
-      osc.frequency.setValueAtTime(freqHz, now);
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec);
-      osc.connect(gain);
-      if (this.masterGain) {
-        gain.connect(this.masterGain);
-      }
-      gain.connect(this.audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + durationSec + 0.02);
-    } catch {}
-  }
-
-  private drawShotClockOverlay(data: LiveCompositeContext) {
-    const sc = data.directorState.shotClock;
-    if (!sc || !sc.enabled) return;
-
-    const ctx = this.ctx;
-    const W = 1280;
-    const remMs = getShotClockRemainingMs(sc, Date.now());
-    const secLeft = Math.ceil(remMs / 1000);
-    const maxSec = Math.max(1, sc.durationSec + (sc.extensionUsed ? sc.extensionSec : 0));
-    const ratio = Math.max(0, Math.min(1, remMs / (maxSec * 1000)));
-
-    // Audio countdown beeps (5..1s) & buzzer (0s)
-    if (sc.running && sc.soundEnabled) {
-      if (secLeft <= 5 && secLeft >= 1 && secLeft !== this.lastShotClockBeepSec) {
-        this.lastShotClockBeepSec = secLeft;
-        this.playShotClockTone(880, 0.075, 0.14);
-      } else if (secLeft === 0 && this.lastShotClockBeepSec !== 0) {
-        this.lastShotClockBeepSec = 0;
-        this.playShotClockTone(310, 0.4, 0.22);
-      } else if (secLeft > 5) {
-        this.lastShotClockBeepSec = -1;
-      }
-    } else if (!sc.running) {
-      this.lastShotClockBeepSec = -1;
-    }
-
-    const isCritical = secLeft <= 5;
-    const isWarn = secLeft > 5 && secLeft <= 10;
-    const isZero = secLeft === 0;
-    const pulseOn = Math.floor(Date.now() / 260) % 2 === 0;
-
-    const boxW = 148;
-    const boxH = 58;
-    const x = W - boxW - 18;
-    const y = 54;
-
-    ctx.save();
-    drawRoundedRect(ctx, x, y, boxW, boxH, 7);
-    ctx.fillStyle = isZero
-      ? (pulseOn ? 'rgba(185, 28, 28, 0.96)' : 'rgba(127, 29, 29, 0.95)')
-      : isCritical
-        ? (pulseOn ? 'rgba(185, 28, 28, 0.93)' : 'rgba(12, 16, 26, 0.94)')
-        : 'rgba(10, 14, 22, 0.94)';
-    ctx.fill();
-
-    ctx.lineWidth = isCritical ? 2 : 1.5;
-    ctx.strokeStyle = isCritical ? '#EF4444' : isWarn ? '#F59E0B' : 'rgba(212, 175, 55, 0.75)';
-    ctx.stroke();
-
-    // Top micro label
-    ctx.fillStyle = isCritical ? '#FECACA' : 'rgba(255,255,255,0.68)';
-    ctx.font = '800 9px Outfit, Inter, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(isZero ? 'TEMPS ÉCOULÉ' : 'SHOT CLOCK', x + 10, y + 12);
-
-    if (sc.extensionUsed) {
-      drawRoundedRect(ctx, x + boxW - 42, y + 5, 34, 14, 3);
-      ctx.fillStyle = '#D4AF37';
-      ctx.fill();
-      ctx.fillStyle = '#090D16';
-      ctx.font = '900 8px Outfit, Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`+${sc.extensionSec}S`, x + boxW - 25, y + 12.5);
-    }
-
-    // Countdown digits
-    ctx.fillStyle = isCritical ? '#FFFFFF' : isWarn ? '#FDE68A' : '#F8FAFC';
-    ctx.font = '900 28px Outfit, Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(secLeft).padStart(2, '0'), x + boxW / 2, y + 34);
-
-    // Animated bottom progress bar
-    const barX = x + 8;
-    const barY = y + boxH - 8;
-    const barW = boxW - 16;
-    drawRoundedRect(ctx, barX, barY, barW, 4, 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
-    ctx.fill();
-    if (ratio > 0) {
-      drawRoundedRect(ctx, barX, barY, Math.max(4, barW * ratio), 4, 2);
-      ctx.fillStyle = isCritical ? '#EF4444' : isWarn ? '#F59E0B' : '#D4AF37';
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
   private drawSponsorCarousel(_data: LiveCompositeContext, overlayCfg: LiveOverlayConfig) {
     const car = overlayCfg.sponsorCarousel;
     if (!car || !car.enabled || !car.logos || car.logos.length === 0) return;
@@ -2877,7 +2760,6 @@ export class LiveCompositeBroadcaster {
         }
         this.drawBroadcastHeaderLogo(data, false, 0);
         this.drawCustomOverlays(overlayCfg);
-        this.drawShotClockOverlay(data);
         this.drawSponsorCarousel(data, overlayCfg);
         this.drawTickerBar(data, overlayCfg);
       }
@@ -3158,9 +3040,8 @@ export class LiveCompositeBroadcaster {
       // Crisp high-res broadcast header logo medallion drawn on top (never clipped, aspect preserved)
       this.drawBroadcastHeaderLogo(data, showBar, headerH);
 
-      // Render custom TV logos, sponsors, shot clock & scrolling ticker over the mosaic broadcast
+      // Render custom TV logos, sponsors & scrolling ticker over the mosaic broadcast
       this.drawCustomOverlays(overlayCfg);
-      this.drawShotClockOverlay(data);
       this.drawSponsorCarousel(data, overlayCfg);
       this.drawTickerBar(data, overlayCfg);
     }
