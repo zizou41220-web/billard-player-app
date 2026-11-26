@@ -7,6 +7,8 @@ import FeedView from './components/FeedView';
 import AdminView from './components/AdminView';
 import StreamOverlayView from './components/StreamOverlayView';
 import SmartphoneCameraSenderView from './components/SmartphoneCameraSenderView';
+import PrismMobileOverlayView from './components/PrismMobileOverlayView';
+import PrismMobileControlView from './components/PrismMobileControlView';
 import { NeonBackdrop, NeonToggleButton } from './components/NeonBackdrop';
 import { QrCode, User, Activity, Settings, Sun, Moon } from 'lucide-react';
 import { initSync, fetchFreshMatchForLaunch } from './sync';
@@ -18,6 +20,8 @@ export type Tab = 'scan' | 'feed' | 'profile';
 function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const cameraParam = urlParams.get('camera');
+  const prismParam = urlParams.get('prism');
+  const prismRemoteParam = urlParams.get('prism_remote');
   const overlayTableParam = urlParams.get('overlay') || urlParams.get('stream');
   const matchParam = urlParams.get('match');
   const tableParam = urlParams.get('table');
@@ -65,6 +69,27 @@ function App() {
     return (
       <SmartphoneCameraSenderView
         cameraId={cameraParam}
+        clubId={clubParam || useStore.getState().currentClub.id}
+      />
+    );
+  }
+
+  // Dedicated Transparent Overlay for PRISM Live Studio Mobile (?prism=table|quick&club=...)
+  if (prismParam) {
+    return (
+      <PrismMobileOverlayView
+        mode={prismParam}
+        clubId={clubParam || useStore.getState().currentClub.id}
+      />
+    );
+  }
+
+  // Dedicated Mobile Score Remote Control for PRISM Live (?prism_remote=live1&club=...)
+  if (prismRemoteParam) {
+    return (
+      <PrismMobileControlView
+        standalone
+        roomId={prismRemoteParam}
         clubId={clubParam || useStore.getState().currentClub.id}
       />
     );

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Activity, Clock, Trophy, Lock, Award, Radio, ExternalLink, Play, Edit3, Users, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Activity, Clock, Trophy, Lock, Award, Radio, ExternalLink, Play, Edit3, Users, ChevronDown, ChevronUp, Loader2, Smartphone } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
 import MatchTimerBadge from './MatchTimerBadge';
+import PrismMobileControlView from './PrismMobileControlView';
 import { getTournamentQualificationStatus } from '../utils/qualifiers';
 import { isByeMatch, isFinalStageMatch, isRealFinishedMatch } from '../utils/bracket';
 import { computeTournamentScheduleContext, getMatchStakeInfo, sortTournamentMatchesForScheduling } from '../utils/matchScheduler';
@@ -31,6 +32,7 @@ const FeedView: React.FC = () => {
   const [subTab, setSubTab] = useState<'live' | 'bracket' | 'leaderboard'>('live');
   const [launchingMatchId, setLaunchingMatchId] = useState<string | null>(null);
   const [showAllQueue, setShowAllQueue] = useState(false);
+  const [showPrismModal, setShowPrismModal] = useState(false);
 
   const allTournaments = Object.values(tournaments);
   const activeTournament = allTournaments.slice().reverse().find(t => t.status === 'ongoing') || null;
@@ -168,19 +170,42 @@ const FeedView: React.FC = () => {
           </div>
         </div>
 
-        {activeTournament && (
-          <span style={{
-            background: 'rgba(0, 255, 170, 0.1)',
-            color: 'var(--accent-primary)',
-            padding: '4px 10px',
-            borderRadius: '12px',
-            fontSize: '0.75rem',
-            fontWeight: 800,
-            border: '1px solid rgba(0, 255, 170, 0.3)'
-          }}>
-            {activeTournament.name}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowPrismModal(true)}
+            style={{
+              background: 'rgba(24, 119, 242, 0.18)',
+              color: '#93C5FD',
+              padding: '4px 10px',
+              borderRadius: '12px',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              border: '1px solid rgba(59, 130, 246, 0.45)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title="Préparer l'incrustation score & logo pour diffuser sur Facebook avec PRISM Live Studio"
+          >
+            <Smartphone size={13} /> Live Facebook
+          </button>
+
+          {activeTournament && (
+            <span style={{
+              background: 'rgba(0, 255, 170, 0.1)',
+              color: 'var(--accent-primary)',
+              padding: '4px 10px',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              border: '1px solid rgba(0, 255, 170, 0.3)'
+            }}>
+              {activeTournament.name}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* View Switcher: Live vs Bracket */}
@@ -667,6 +692,10 @@ const FeedView: React.FC = () => {
         </div>
       </div>
       </>
+      )}
+
+      {showPrismModal && (
+        <PrismMobileControlView onClose={() => setShowPrismModal(false)} />
       )}
     </div>
   );
