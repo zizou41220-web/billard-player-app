@@ -8,7 +8,7 @@ import {
   XCircle, Minus, Plus, Edit2, ArrowUpDown, Sparkles, RefreshCw,
   Radio, Tv, Trash2, Shuffle,
   Search, X, Volume2, VolumeX, Clock, UserPlus,
-  Sun, Moon
+  Sun, Moon, MoreHorizontal
 } from 'lucide-react';
 import TournamentBracketView from './TournamentBracketView';
 import LeaderboardView from './LeaderboardView';
@@ -33,7 +33,7 @@ import {
 } from '../utils/voiceAnnouncer';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
-import { NeonToggleButton } from './NeonBackdrop';
+import { useNeonFx } from '../utils/neonFx';
 import { useTheme } from '../utils/theme';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
@@ -232,7 +232,10 @@ const AdminView: React.FC = () => {
   const [dismissedQualifAlertTourId, setDismissedQualifAlertTourId] = useState<string | null>(null);
   const [playerSearchQuery, setPlayerSearchQuery] = useState('');
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => isVoiceAnnouncerEnabled());
-  const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const [showPrefsMenu, setShowPrefsMenu] = useState(false);
+  const [neonEnabled, toggleNeonFx] = useNeonFx();
+  const [expandedQueueMatchId, setExpandedQueueMatchId] = useState<string | null>(null);
+  const [openBillardMenuId, setOpenBillardMenuId] = useState<string | null>(null);
   const [selectedVoiceURI, setSelectedVoiceURIState] = useState<string | null>(() => getSelectedVoiceURI());
   const [availableFrenchVoices, setAvailableFrenchVoices] = useState<FrenchVoiceOption[]>(() => listAvailableFrenchVoices());
   const matchStatusAtOpenRef = React.useRef<string | null>(null);
@@ -1073,471 +1076,345 @@ const AdminView: React.FC = () => {
       overflow: 'hidden'
     }}>
 
-      {/* Main Header */}
+      {/* Main Header Unifié */}
       <header style={{
-        padding: '0.95rem 2rem',
+        padding: '0.6rem 1.6rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderBottom: theme === 'light' ? '1px solid var(--border-color)' : '2px solid rgba(45, 212, 191, 0.4)',
+        borderBottom: '1px solid var(--border-color)',
         background: 'var(--bg-header)',
         backdropFilter: 'blur(16px)',
-        boxShadow: theme === 'light' ? '0 2px 12px rgba(15, 23, 42, 0.06)' : '0 8px 30px rgba(0, 0, 0, 0.7), 0 0 16px rgba(16, 185, 129, 0.2)',
+        boxShadow: theme === 'light' ? '0 2px 10px rgba(15, 23, 42, 0.05)' : '0 4px 20px rgba(0, 0, 0, 0.45)',
         position: 'relative',
-        zIndex: 20,
-        gap: '1rem',
+        zIndex: 30,
+        gap: '0.85rem',
         flexWrap: 'wrap'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        {/* Club + Version + Tournoi actif */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: 0 }}>
           <div style={{
             background: '#ffffff',
-            padding: '4px 9px',
-            borderRadius: '12px',
+            padding: '3px 7px',
+            borderRadius: '10px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4), 0 0 0 2px rgba(245, 158, 11, 0.35)',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
             flexShrink: 0
           }}>
-            <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '42px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
+            <img src={getClubLogoUrl(currentClub.logoUrl)} alt={currentClub.name} style={{ height: '36px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
           </div>
-          <div>
-            <h1 style={{
-              fontSize: '1.45rem',
-              margin: 0,
-              fontWeight: 900,
-              background: 'linear-gradient(90deg, #FBBF24 0%, #34D399 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.5px'
-            }}>
-              {currentClub.name}
-            </h1>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.55rem', marginTop: '2px' }}>
-              <span>Espace Gérant & Tournois</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <h1 style={{
+                fontSize: '1.2rem',
+                margin: 0,
+                fontWeight: 900,
+                background: 'linear-gradient(90deg, #FBBF24 0%, #34D399 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.3px',
+                whiteSpace: 'nowrap'
+              }}>
+                {currentClub.name}
+              </h1>
               <span style={{
-                background: 'rgba(245, 158, 11, 0.16)',
+                background: 'rgba(245, 158, 11, 0.14)',
                 color: '#FBBF24',
-                padding: '2px 8px',
-                borderRadius: '8px',
-                fontSize: '0.72rem',
+                padding: '1px 7px',
+                borderRadius: '7px',
+                fontSize: '0.7rem',
                 fontWeight: 800,
-                border: '1px solid rgba(245, 158, 11, 0.4)',
-                boxShadow: '0 0 10px rgba(245, 158, 11, 0.15)'
+                border: '1px solid rgba(245, 158, 11, 0.35)'
               }}>
                 {APP_VERSION}
               </span>
-              {activeTournament && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(16, 185, 129, 0.15)', color: '#34D399', padding: '2px 9px', borderRadius: '12px', fontSize: '0.73rem', fontWeight: 700, border: '1px solid rgba(52, 211, 153, 0.35)' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34D399', boxShadow: '0 0 8px #34D399' }} />
+            </div>
+            {activeTournament && (
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '1px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34D399', flexShrink: 0 }} />
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px', fontWeight: 600 }}>
                   {activeTournament.name}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            className={`btn ${activeTab === 'launcher' ? 'btn-neon' : 'btn-outline'}`}
-            onClick={() => setActiveTab('launcher')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, padding: '0.55rem 0.95rem', fontSize: '0.84rem' }}
-          >
-            <Rocket size={16} /> Lanceur de tournoi
-          </button>
+        {/* Navigation Tabs (barre segmentée unique et épurée) */}
+        <nav style={{
+          display: 'flex',
+          gap: '3px',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          background: theme === 'light' ? 'rgba(15, 23, 42, 0.06)' : 'rgba(0, 0, 0, 0.34)',
+          padding: '4px',
+          borderRadius: '12px',
+          border: '1px solid var(--border-color)'
+        }}>
+          {[
+            { id: 'dashboard' as const, label: "Vue d'ensemble", icon: <MonitorPlay size={15} />, dotColor: isTournamentActive ? '#00ffaa' : undefined },
+            { id: 'launcher' as const, label: 'Lanceur', icon: <Rocket size={15} /> },
+            { id: 'live_studio' as const, label: 'Match Live', icon: <Radio size={15} />, dotColor: '#ff3b5c', title: "Lancer un match en direct (hors tournoi ou amical) avec régie vidéo" },
+            { id: 'leaderboard' as const, label: 'Classement Club', icon: <Trophy size={15} /> },
+            { id: 'admin' as const, label: 'Administration', icon: <Settings size={15} /> }
+          ].map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                title={tab.title}
+                style={{
+                  background: isActive ? 'var(--accent-primary)' : 'transparent',
+                  color: isActive ? '#041210' : 'var(--text-muted)',
+                  border: 'none',
+                  borderRadius: '9px',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: isActive ? 800 : 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {tab.dotColor ? (
+                  <span style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    background: isActive ? '#041210' : tab.dotColor
+                  }} />
+                ) : tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
+        {/* Menu Préférences unifié */}
+        <div style={{ position: 'relative' }}>
           <button
-            className={`btn ${activeTab === 'dashboard' ? 'btn-neon' : 'btn-outline'}`}
-            onClick={() => setActiveTab('dashboard')}
+            type="button"
+            className="btn btn-outline"
+            onClick={() => {
+              setAvailableFrenchVoices(listAvailableFrenchVoices());
+              setShowPrefsMenu(v => !v);
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.45rem',
               fontWeight: 700,
-              padding: '0.55rem 0.95rem',
-              fontSize: '0.84rem',
-              position: 'relative'
+              padding: '0.48rem 0.85rem',
+              fontSize: '0.82rem',
+              borderColor: showPrefsMenu ? 'var(--accent-primary)' : 'var(--border-color)',
+              color: showPrefsMenu ? 'var(--accent-primary)' : 'var(--text-primary)',
+              background: showPrefsMenu ? 'rgba(0, 255, 170, 0.08)' : 'transparent'
             }}
+            title="Voix du speaker, thème, ambiance néon et réglages tournoi"
           >
-            {isTournamentActive ? (
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeTab === 'dashboard' ? '#041210' : '#00ffaa', boxShadow: activeTab === 'dashboard' ? 'none' : '0 0 8px #00ffaa' }} />
-            ) : (
-              <MonitorPlay size={16} />
+            <Settings size={15} />
+            <span>Préférences</span>
+            {voiceEnabled && (
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#00ffaa' }} title="Appel vocal actif" />
             )}
-            Vue d'ensemble
           </button>
 
-          <button
-            className={`btn ${activeTab === 'live_studio' ? 'btn-neon' : 'btn-outline'}`}
-            onClick={() => setActiveTab('live_studio')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              fontWeight: 800,
-              padding: '0.55rem 0.95rem',
-              fontSize: '0.84rem',
-              borderColor: activeTab === 'live_studio' ? undefined : 'rgba(255, 59, 92, 0.5)',
-              background: activeTab === 'live_studio' ? undefined : 'rgba(255, 59, 92, 0.14)',
-              color: activeTab === 'live_studio' ? undefined : '#ff9aa4'
-            }}
-            title="Lancer un match en direct (hors tournoi ou amical) avec choix/création des joueurs, photo, club, logo et régie vidéo"
-          >
-            <Radio size={16} style={{ color: activeTab === 'live_studio' ? '#000' : '#ff3b5c' }} /> Match Live
-          </button>
-
-          <button
-            className={`btn ${activeTab === 'admin' ? 'btn-neon' : 'btn-outline'}`}
-            onClick={() => setActiveTab('admin')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, padding: '0.55rem 0.95rem', fontSize: '0.84rem' }}
-          >
-            <Settings size={16} /> Administration
-          </button>
-
-          <button
-            className={`btn ${activeTab === 'leaderboard' ? 'btn-neon' : 'btn-outline'}`}
-            onClick={() => setActiveTab('leaderboard')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, padding: '0.55rem 0.95rem', fontSize: '0.84rem' }}
-          >
-            <Trophy size={16} /> Classement Club
-          </button>
-
-          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <button
-              className={`btn ${voiceEnabled ? 'btn-neon' : 'btn-outline'}`}
-              onClick={toggleVoiceAnnouncer}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                fontWeight: 800,
-                padding: '0.55rem 0.9rem',
-                fontSize: '0.82rem',
-                color: voiceEnabled ? '#041210' : 'var(--text-muted)',
-                borderColor: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)',
-                background: voiceEnabled ? undefined : 'rgba(255,255,255,0.04)'
-              }}
-              title={voiceEnabled
-                ? "Appel vocal automatique des matchs activé (cliquez pour couper)"
-                : "Appel vocal automatique des matchs coupé (cliquez pour activer)"}
-            >
-              {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-              {voiceEnabled ? 'Appel Vocal ON' : 'Appel Vocal OFF'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => {
-                setAvailableFrenchVoices(listAvailableFrenchVoices());
-                setShowVoicePicker(v => !v);
-              }}
-              style={{
-                padding: '0.55rem 0.6rem',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: showVoicePicker ? 'var(--accent-primary)' : 'var(--text-muted)',
-                borderColor: showVoicePicker ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)'
-              }}
-              title={`Choisir la voix du speaker (${getActiveFrenchVoiceLabel()})`}
-            >
-              🎙️
-            </button>
-
-            {showVoicePicker && (
+          {showPrefsMenu && (
+            <>
+              <div
+                style={{ position: 'fixed', inset: 0, zIndex: 8400 }}
+                onClick={() => setShowPrefsMenu(false)}
+              />
               <div
                 style={{
                   position: 'absolute',
                   top: 'calc(100% + 8px)',
                   right: 0,
-                  width: '310px',
-                  background: '#0b1222',
+                  width: '320px',
+                  background: theme === 'light' ? '#ffffff' : '#0b1222',
+                  color: theme === 'light' ? '#0f172a' : '#fff',
                   border: '1px solid rgba(0, 255, 170, 0.35)',
                   borderRadius: '14px',
-                  padding: '0.85rem',
-                  boxShadow: '0 14px 36px rgba(0,0,0,0.65)',
-                  zIndex: 8000,
+                  padding: '0.95rem',
+                  boxShadow: '0 16px 40px rgba(0,0,0,0.55)',
+                  zIndex: 8500,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.55rem'
+                  gap: '0.85rem'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#fff' }}>🎙️ Voix du speaker</span>
+                  <span style={{ fontWeight: 800, fontSize: '0.86rem' }}>Préférences</span>
                   <button
                     type="button"
-                    onClick={() => setShowVoicePicker(false)}
+                    onClick={() => setShowPrefsMenu(false)}
                     style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
                   >
                     <X size={15} />
                   </button>
                 </div>
 
-                <select
-                  className="input-field"
-                  value={selectedVoiceURI || ''}
-                  onChange={(e) => {
-                    const nextUri = e.target.value || null;
-                    setSelectedVoiceURI(nextUri);
-                    setSelectedVoiceURIState(nextUri);
-                    speakAnnouncement('Nouveau match sur le Billard 1, Julien Raiwet contre Yannick Maurice.', true);
-                  }}
-                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.6rem' }}
-                >
-                  <option value="">✨ Automatique (meilleure voix naturelle)</option>
-                  {availableFrenchVoices.map(v => (
-                    <option key={v.voiceURI} value={v.voiceURI}>
-                      {v.isNatural ? '⭐ ' : ''}{v.name} ({v.lang})
-                    </option>
-                  ))}
-                </select>
+                {/* Section 1 : Appel vocal */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingBottom: '0.7rem', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>🎙️ Appel vocal ({getActiveFrenchVoiceLabel()})</span>
+                    <button
+                      type="button"
+                      className={`btn ${voiceEnabled ? 'btn-neon' : 'btn-outline'}`}
+                      onClick={toggleVoiceAnnouncer}
+                      style={{
+                        padding: '0.25rem 0.65rem',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        color: voiceEnabled ? '#041210' : 'var(--text-muted)'
+                      }}
+                    >
+                      {voiceEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                      {voiceEnabled ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
 
-                <button
-                  type="button"
-                  className="btn btn-neon"
-                  onClick={() => speakAnnouncement('Nouveau match sur le Billard 1, Julien Raiwet contre Yannick Maurice.', true)}
-                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.7rem', justifyContent: 'center', color: '#041210', fontWeight: 800 }}
-                >
-                  <Volume2 size={14} /> Tester la voix
-                </button>
+                  <select
+                    className="input-field"
+                    value={selectedVoiceURI || ''}
+                    onChange={(e) => {
+                      const nextUri = e.target.value || null;
+                      setSelectedVoiceURI(nextUri);
+                      setSelectedVoiceURIState(nextUri);
+                      speakAnnouncement('Nouveau match sur le Billard 1, Julien Raiwet contre Yannick Maurice.', true);
+                    }}
+                    style={{ fontSize: '0.76rem', padding: '0.4rem 0.55rem' }}
+                  >
+                    <option value="">✨ Automatique (meilleure voix naturelle)</option>
+                    {availableFrenchVoices.map(v => (
+                      <option key={v.voiceURI} value={v.voiceURI}>
+                        {v.isNatural ? '⭐ ' : ''}{v.name} ({v.lang})
+                      </option>
+                    ))}
+                  </select>
 
-                {!availableFrenchVoices.some(v => v.isNatural) && (
-                  <div style={{ fontSize: '0.7rem', color: '#fbbf24', lineHeight: 1.35 }}>
-                    Astuce : ouvrez l'appli dans <strong>Microsoft Edge</strong> (voix gratuites Denise / Vivienne / Henri Naturelles) pour une voix très réaliste.
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => speakAnnouncement('Nouveau match sur le Billard 1, Julien Raiwet contre Yannick Maurice.', true)}
+                    style={{ fontSize: '0.76rem', padding: '0.38rem 0.65rem', justifyContent: 'center', fontWeight: 700 }}
+                  >
+                    <Volume2 size={13} /> Tester la voix
+                  </button>
+
+                  {!availableFrenchVoices.some(v => v.isNatural) && (
+                    <div style={{ fontSize: '0.68rem', color: '#fbbf24', lineHeight: 1.35 }}>
+                      Astuce : ouvrez l'appli dans <strong>Microsoft Edge</strong> (voix gratuites Denise / Vivienne / Henri Naturelles) pour une voix très réaliste.
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2 : Apparence */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>Apparence</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={toggleTheme}
+                      style={{ fontSize: '0.76rem', padding: '0.42rem 0.5rem', justifyContent: 'center', fontWeight: 700 }}
+                    >
+                      {theme === 'light' ? <Sun size={14} /> : <Moon size={14} />}
+                      {theme === 'light' ? 'Mode Clair' : 'Mode Sombre'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={toggleNeonFx}
+                      style={{
+                        fontSize: '0.76rem',
+                        padding: '0.42rem 0.5rem',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        color: neonEnabled ? '#34D399' : 'var(--text-muted)',
+                        borderColor: neonEnabled ? 'rgba(52, 211, 153, 0.45)' : 'var(--border-color)'
+                      }}
+                    >
+                      ✨ {neonEnabled ? 'Néon ON' : 'Néon OFF'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 3 : Réglages tournoi si en cours */}
+                {activeTournament?.settings && (
+                  <div style={{ paddingTop: '0.7rem', borderTop: '1px solid var(--border-color)' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => {
+                        if (!activeTournament?.settings) return;
+                        setEditTourSettings({
+                          ...activeTournament.settings,
+                          qualifNbQualifiers: activeTournament.settings.qualifNbQualifiers || qualifStatus.numQualifiers || 4
+                        });
+                        setShowEditRulesModal(true);
+                        setShowPrefsMenu(false);
+                      }}
+                      style={{ width: '100%', fontSize: '0.78rem', padding: '0.48rem 0.7rem', justifyContent: 'center', fontWeight: 700, color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.35)' }}
+                    >
+                      <Clock size={14} /> Régler Temps, Qualifiés & Règles
+                    </button>
                   </div>
                 )}
               </div>
-            )}
-          </div>
-
-          {/* Bouton Commutateur Mode Clair / Mode Sombre */}
-          <button
-            className="btn btn-outline"
-            onClick={toggleTheme}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              fontWeight: 800,
-              padding: '0.55rem 0.95rem',
-              fontSize: '0.84rem',
-              color: theme === 'light' ? '#D97706' : '#FBBF24',
-              borderColor: theme === 'light' ? 'rgba(217, 119, 6, 0.5)' : 'rgba(251, 191, 36, 0.35)',
-              background: theme === 'light' ? 'rgba(217, 119, 6, 0.12)' : 'rgba(255, 255, 255, 0.04)'
-            }}
-            title={theme === 'light' ? "Basculer en Mode Sombre 🌙" : "Basculer en Mode Clair ☀️ (plus lumineux)"}
-          >
-            {theme === 'light' ? <Sun size={16} /> : <Moon size={16} />}
-            {theme === 'light' ? 'Mode Clair ☀️' : 'Mode Sombre 🌙'}
-          </button>
-
-          <NeonToggleButton />
+            </>
+          )}
         </div>
       </header>
 
-      {/* Dashboard Sub-navigation Header (Live Matches vs Final Phases Bracket) */}
-      {activeTab === 'dashboard' && isTournamentActive && activeTournament && (
+      {/* Barre fine de retour uniquement lorsqu'on consulte l'arbre des Phases Finales */}
+      {activeTab === 'dashboard' && isTournamentActive && activeTournament && dashboardSubTab === 'bracket' && (
         <div style={{
           background: 'rgba(255, 255, 255, 0.02)',
           borderBottom: '1px solid var(--border-color)',
-          padding: '0.75rem 2.5rem',
+          padding: '0.55rem 1.6rem',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: '0.75rem',
           zIndex: 10
         }}>
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.4)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-            <button
-              onClick={() => setDashboardSubTab('live')}
-              style={{
-                background: dashboardSubTab === 'live' ? 'var(--accent-primary)' : 'transparent',
-                color: dashboardSubTab === 'live' ? '#000' : 'var(--text-muted)',
-                fontWeight: 700,
-                border: 'none',
-                padding: '0.5rem 1.2rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.85rem',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <MonitorPlay size={16} /> Direct & Billards en Salle
-            </button>
-
-            <button
-              onClick={() => setDashboardSubTab('bracket')}
-              style={{
-                background: dashboardSubTab === 'bracket' ? 'var(--accent-primary)' : 'transparent',
-                color: dashboardSubTab === 'bracket' ? '#000' : 'var(--text-muted)',
-                fontWeight: 700,
-                border: 'none',
-                padding: '0.5rem 1.2rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.85rem',
-                transition: 'all 0.2s ease'
-              }}
-              title="Voir le tableau des phases finales"
-            >
-              <Trophy size={16} />
-              Tableau des Phases Finales
-              {activeTournament.finalStageLaunched ? (
-                <span style={{ fontSize: '0.7rem', background: 'var(--accent-primary)', color: '#000', padding: '1px 8px', borderRadius: '4px', fontWeight: 800 }}>
-                  EN COURS
-                </span>
-              ) : hasSureQualifiers || qualifStatus.isQualifAllDone ? (
-                <span style={{ fontSize: '0.7rem', background: 'rgba(0,255,170,0.2)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                  Prêt
-                </span>
-              ) : (
-                <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '4px', color: '#ffcc00' }}>
-                  Provisoire
-                </span>
-              )}
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-            <span>Tournoi : <b style={{ color: '#fff' }}>{activeTournament.name}</b></span>
-            {activeTournament.format !== 'direct_ko' && activeTournament.format !== 'double_ko_bracket' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeTournament.settings) {
-                    setEditTourSettings({
-                      ...activeTournament.settings,
-                      qualifNbQualifiers: qualifStatus.numQualifiers
-                    });
-                    setShowEditRulesModal(true);
-                  }
-                }}
-                style={{
-                  background: 'rgba(0, 255, 170, 0.12)',
-                  color: 'var(--accent-primary)',
-                  padding: '3px 10px',
-                  borderRadius: '12px',
-                  fontWeight: 700,
-                  fontSize: '0.75rem',
-                  border: '1px solid rgba(0, 255, 170, 0.35)',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-                title={qualifStatus.isFinalLaunched
-                  ? 'Phase finale déjà lancée : nombre de sortants verrouillé'
-                  : 'Cliquer pour modifier le nombre de sortants / qualifiés'}
-              >
-                {qualifStatus.numQualifiers} qualifiés
-                {!qualifStatus.isFinalLaunched && <span style={{ fontSize: '0.7rem', opacity: 0.9 }}>✎</span>}
-              </button>
-            ) : (
-              <span style={{
-                background: 'rgba(0, 255, 170, 0.1)',
-                color: 'var(--accent-primary)',
-                padding: '3px 10px',
-                borderRadius: '12px',
-                fontWeight: 700,
-                fontSize: '0.75rem',
-                border: '1px solid rgba(0, 255, 170, 0.25)'
-              }}>
-                {activeTournament.participants.length} joueurs
-              </span>
-            )}
-
-            {/* Match Duration Badge on Dashboard */}
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              background: (activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
-                ? 'rgba(255, 215, 0, 0.18)'
-                : 'rgba(255, 255, 255, 0.06)',
-              color: (activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
-                ? '#ffd700'
-                : 'var(--text-muted)',
-              padding: '3px 10px',
-              borderRadius: '12px',
-              fontWeight: 800,
-              fontSize: '0.75rem',
-              border: (activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
-                ? '1px solid rgba(255, 215, 0, 0.45)'
-                : '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <Clock size={13} />
-              {(activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes)
-                ? `⏱️ ${activeTournament.settings.finalMatchDurationMinutes || activeTournament.settings.qualifMatchDurationMinutes || activeTournament.settings.matchDurationMinutes} min / match`
-                : '⏱️ Temps illimité'}
-            </span>
-
-            {(() => {
-              const latestFinished = finishedTourMatches.reduce(
-                (maxTs, m) => Math.max(maxTs, m.endTime || m.startTime || 0),
-                0
-              );
-              const latestPlaying = activeMatches.reduce(
-                (maxTs, m) => Math.max(maxTs, m.startTime || 0),
-                0
-              );
-              const lastTs = latestFinished || latestPlaying;
-              if (!lastTs) return null;
-              const label = formatShortDateTime(lastTs);
-              return (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    background: 'rgba(0, 229, 255, 0.1)',
-                    color: 'var(--accent-secondary)',
-                    padding: '3px 10px',
-                    borderRadius: '12px',
-                    fontWeight: 700,
-                    fontSize: '0.75rem',
-                    border: '1px solid rgba(0, 229, 255, 0.3)'
-                  }}
-                  title={latestFinished ? 'Heure de validation du dernier match terminé' : 'Heure de début du dernier match lancé'}
-                >
-                  {latestFinished ? `Dernier validé : ${label}` : `Dernier lancé : ${label}`}
-                </span>
-              );
-            })()}
-
-            {/* Quick Button to Edit Rules & Time directly from Dashboard */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
               type="button"
               className="btn btn-outline"
-              style={{
-                fontSize: '0.75rem',
-                padding: '3px 9px',
-                color: '#ffd700',
-                borderColor: 'rgba(255, 215, 0, 0.45)',
-                background: 'rgba(255, 215, 0, 0.1)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontWeight: 700
-              }}
-              onClick={() => {
-                if (activeTournament.settings) {
-                  setEditTourSettings({
-                    ...activeTournament.settings,
-                    qualifNbQualifiers: activeTournament.settings.qualifNbQualifiers || qualifStatus.numQualifiers || 4
-                  });
-                  setShowEditRulesModal(true);
-                }
-              }}
-              title="Modifier le nombre de qualifiés, les règles, la durée des matchs et les handicaps du tournoi en cours"
+              onClick={() => setDashboardSubTab('live')}
+              style={{ fontSize: '0.8rem', padding: '0.38rem 0.85rem', fontWeight: 700 }}
             >
-              <Clock size={13} /> Régler Temps & Règles
+              ← Retour Vue d'ensemble
             </button>
+            <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--accent-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Trophy size={16} /> Tableau des Phases Finales
+            </span>
           </div>
+          {activeTournament.settings && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                if (!activeTournament?.settings) return;
+                setEditTourSettings({
+                  ...activeTournament.settings,
+                  qualifNbQualifiers: activeTournament.settings.qualifNbQualifiers || qualifStatus.numQualifiers || 4
+                });
+                setShowEditRulesModal(true);
+              }}
+              style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem', fontWeight: 700, color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.35)' }}
+            >
+              <Clock size={13} /> Temps & Règles
+            </button>
+          )}
         </div>
       )}
 
@@ -3930,42 +3807,48 @@ const AdminView: React.FC = () => {
                               filteredWaitingMatches.map((match, idx) => {
                                 const busyInfo = getBusyPlayerInfo(match);
                                 const stakeInfo = getMatchStakeInfo(match, scheduleContext);
+                                const isExpanded = expandedQueueMatchId === match.id;
 
                                 return (
                                   <div
                                     key={match.id}
-                                    className="queue-card-anim"
+                                    onClick={() => setExpandedQueueMatchId(prev => (prev === match.id ? null : match.id))}
                                     style={{
-                                      background: 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.24) 100%)',
-                                      border: '1px solid rgba(255,255,255,0.12)',
-                                      boxShadow: '0 4px 12px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
-                                      borderRadius: '12px',
-                                      padding: '0.7rem 0.8rem',
+                                      background: isExpanded
+                                        ? 'rgba(0, 255, 170, 0.06)'
+                                        : (theme === 'light' ? 'rgba(15, 23, 42, 0.03)' : 'rgba(255,255,255,0.03)'),
+                                      border: isExpanded
+                                        ? '1px solid rgba(0, 255, 170, 0.35)'
+                                        : '1px solid var(--border-color)',
+                                      borderRadius: '11px',
+                                      padding: '0.6rem 0.75rem',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '0.45rem',
+                                      gap: '0.35rem',
                                       boxSizing: 'border-box',
-                                      width: '100%'
+                                      width: '100%',
+                                      cursor: 'pointer',
+                                      transition: 'border-color 0.15s ease, background 0.15s ease'
                                     }}
                                   >
-                                    {/* En-tête de carte : numéro + poule + enjeu */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                    {/* En-tête compact : numéro + poule + enjeu + bouton menu */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', minWidth: 0 }}>
                                         <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800 }}>#{idx + 1}</span>
                                         {match.poolName && (
-                                          <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 700, background: 'rgba(0, 255, 204, 0.12)', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(0, 255, 204, 0.25)' }}>
+                                          <span style={{ fontSize: '0.64rem', color: 'var(--accent-primary)', fontWeight: 700, background: 'rgba(0, 255, 204, 0.12)', padding: '1px 5px', borderRadius: '4px' }}>
                                             {match.poolName}
                                           </span>
                                         )}
                                         <span
                                           title={stakeInfo.description}
                                           style={{
-                                            fontSize: '0.65rem',
+                                            fontSize: '0.64rem',
                                             fontWeight: 700,
                                             background: stakeInfo.badgeBg,
                                             border: `1px solid ${stakeInfo.badgeBorder}`,
                                             color: stakeInfo.badgeColor,
-                                            padding: '1px 6px',
+                                            padding: '1px 5px',
                                             borderRadius: '4px',
                                             display: 'inline-flex',
                                             alignItems: 'center'
@@ -3974,38 +3857,27 @@ const AdminView: React.FC = () => {
                                           {stakeInfo.label}
                                         </span>
                                       </div>
-                                      {match.stage && match.stage !== 'qualif' && (
-                                        <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-                                          {match.stage}
-                                        </span>
-                                      )}
+                                      <span
+                                        style={{ color: isExpanded ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+                                        title={isExpanded ? 'Masquer les actions' : 'Cliquer pour afficher les actions'}
+                                      >
+                                        <MoreHorizontal size={15} />
+                                      </span>
                                     </div>
 
-                                    {/* Joueurs empilés proprement pour une lisibilité parfaite sans coupure */}
-                                    <div style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '0.22rem',
-                                      background: 'rgba(0,0,0,0.22)',
-                                      padding: '0.45rem 0.6rem',
-                                      borderRadius: '8px',
-                                      border: '1px solid rgba(255,255,255,0.06)'
-                                    }}>
+                                    {/* Joueurs (lisible et épuré sans encadré imbriqué) */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--card-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {players[match.player1Id]?.name || 'Attente...'}
                                         </span>
                                         <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}>
                                           {stakeInfo.p1Played}M
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
-                                        <span style={{ fontSize: '0.6rem', color: 'var(--accent-primary)', fontWeight: 800, letterSpacing: '0.5px' }}>VS</span>
-                                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
-                                      </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--card-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, marginRight: '4px' }}>vs</span>
                                           {players[match.player2Id]?.name || 'Attente...'}
                                         </span>
                                         <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}>
@@ -4014,135 +3886,137 @@ const AdminView: React.FC = () => {
                                       </div>
                                     </div>
 
-                                    {/* Warning badge if player is busy on another table (ACTUALLY PLAYING) */}
+                                    {/* Alerte si un joueur joue déjà */}
                                     {busyInfo.busy && (
-                                      <div style={{ fontSize: '0.66rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '3px 7px', borderRadius: '6px', border: '1px solid rgba(255, 183, 3, 0.3)' }}>
+                                      <div style={{ fontSize: '0.66rem', color: '#ffb703', background: 'rgba(255, 183, 3, 0.12)', padding: '2px 7px', borderRadius: '6px', border: '1px solid rgba(255, 183, 3, 0.25)' }}>
                                         {busyInfo.playerName} joue sur {busyInfo.tableName}
                                       </div>
                                     )}
 
-                                    {/* Actions : Pré-appel + Score sur une ligne, Billards sur la ligne suivante */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingTop: '0.2rem' }}>
-                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
-                                        <button
-                                          type="button"
-                                          className="btn btn-outline"
-                                          style={{
-                                            fontSize: '0.68rem',
-                                            padding: '4px 6px',
-                                            height: '25px',
-                                            borderRadius: '7px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '4px',
-                                            color: '#ffd700',
-                                            borderColor: 'rgba(255, 215, 0, 0.35)',
-                                            background: 'rgba(255, 215, 0, 0.08)',
-                                            width: '100%'
-                                          }}
-                                          onClick={() => announceWaitingMatchPrep({
-                                            player1Name: players[match.player1Id]?.name || 'Joueur 1',
-                                            player2Name: players[match.player2Id]?.name || 'Joueur 2',
-                                            rankIndex: idx + 1
-                                          })}
-                                          title="Pré-appeler ces deux joueurs au micro pour qu'ils se tiennent prêts"
-                                        >
-                                          <div className="soundwave-container" style={{ height: '11px', gap: '2px', display: 'inline-flex' }}>
-                                            <span className="soundwave-bar" style={{ width: '2px', height: '6px' }} />
-                                            <span className="soundwave-bar" style={{ width: '2px', height: '11px' }} />
-                                            <span className="soundwave-bar" style={{ width: '2px', height: '8px' }} />
-                                          </div>
-                                          <span>Pré-appel</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="btn btn-outline"
-                                          style={{
-                                            fontSize: '0.68rem',
-                                            padding: '4px 6px',
-                                            height: '25px',
-                                            borderRadius: '7px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '4px',
-                                            color: '#34D399',
-                                            borderColor: 'rgba(52, 211, 153, 0.4)',
-                                            background: 'rgba(16, 185, 129, 0.1)',
-                                            width: '100%'
-                                          }}
-                                          onClick={() => openDirectScoreModal(match)}
-                                          title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
-                                        >
-                                          <Edit2 size={11} /> Saisir score
-                                        </button>
-                                      </div>
-
-                                      {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
-                                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-                                          {activeTournament.settings.tableIds.map(tId => {
-                                            const tObj = tables[tId];
-                                            const label = tObj ? `T.${tObj.number}` : tId;
-                                            const curM = (tObj?.currentMatchId && matches[tObj.currentMatchId])
-                                              ? matches[tObj.currentMatchId]
-                                              : Object.values(matches).find(m => m.tableId === tId && m.status !== 'finished') || null;
-                                            const isPlaying = curM && curM.status === 'playing';
-                                            const isPending = curM && curM.status === 'pending';
-                                            const isFree = !curM || tObj?.status === 'free';
-                                            const canLaunch = !isPlaying && !busyInfo.busy;
-
-                                            return (
-                                              <button
-                                                key={tId}
-                                                type="button"
-                                                className={canLaunch ? "btn btn-neon" : "btn btn-outline"}
-                                                disabled={!canLaunch}
-                                                style={{
-                                                  flex: '1 1 auto',
-                                                  fontSize: '0.68rem',
-                                                  padding: '3px 8px',
-                                                  height: '24px',
-                                                  borderRadius: '7px',
-                                                  fontWeight: canLaunch ? 800 : 600,
-                                                  color: isPlaying ? 'rgba(255,255,255,0.35)' : (busyInfo.busy ? 'rgba(255,183,3,0.55)' : '#041210'),
-                                                  background: isPlaying ? 'rgba(255,255,255,0.03)' : (busyInfo.busy ? 'rgba(255,183,3,0.08)' : undefined),
-                                                  borderColor: isPlaying ? 'rgba(255,255,255,0.08)' : (busyInfo.busy ? 'rgba(255,183,3,0.2)' : undefined),
-                                                  opacity: canLaunch ? 1 : 0.45,
-                                                  cursor: canLaunch ? 'pointer' : 'not-allowed'
-                                                }}
-                                                title={
-                                                  busyInfo.busy ? `Impossible : ${busyInfo.playerName} joue actuellement sur ${busyInfo.tableName}` :
-                                                    isPlaying ? `Occupé : un match est déjà en cours de jeu sur ${tObj?.name || label}` :
-                                                      isPending ? `Table ${label} : un match est en attente. Cliquez pour remplacer et lancer immédiatement ce match.` :
-                                                        `Lancer immédiatement ce match sur ${tObj?.name || label}`
-                                                }
-                                                onClick={() => {
-                                                  if (busyInfo.busy) {
-                                                    return alert(`Impossible : ${busyInfo.playerName} joue actuellement sur ${busyInfo.tableName}`);
-                                                  }
-                                                  if (isPlaying) {
-                                                    return alert(`Un match est déjà en cours de jeu sur ${tObj?.name || label}.`);
-                                                  }
-                                                  if (isPending) {
-                                                    const confirmReplace = window.confirm(
-                                                      `Le billard ${tObj?.name || label} a un match programmé en attente de démarrage.\n\nVoulez-vous remplacer ce match et lancer immédiatement celui-ci ?`
-                                                    );
-                                                    if (!confirmReplace) return;
-                                                  }
-                                                  const res = launchMatchOnTable(match.id, tId);
-                                                  if (!res.success && res.reason) {
-                                                    alert(res.reason);
-                                                  }
-                                                }}
-                                              >
-                                                {label} {isFree ? '(Libre)' : (isPending ? '(Prêt)' : '')}
-                                              </button>
-                                            );
-                                          })}
+                                    {/* Actions dépliées au clic sur la carte */}
+                                    {isExpanded && (
+                                      <div
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingTop: '0.4rem', marginTop: '0.2rem', borderTop: '1px solid var(--border-color)' }}
+                                      >
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline"
+                                            style={{
+                                              fontSize: '0.68rem',
+                                              padding: '4px 6px',
+                                              height: '26px',
+                                              borderRadius: '7px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              gap: '4px',
+                                              color: '#ffd700',
+                                              borderColor: 'rgba(255, 215, 0, 0.35)',
+                                              background: 'rgba(255, 215, 0, 0.08)',
+                                              width: '100%'
+                                            }}
+                                            onClick={() => announceWaitingMatchPrep({
+                                              player1Name: players[match.player1Id]?.name || 'Joueur 1',
+                                              player2Name: players[match.player2Id]?.name || 'Joueur 2',
+                                              rankIndex: idx + 1
+                                            })}
+                                            title="Pré-appeler ces deux joueurs au micro pour qu'ils se tiennent prêts"
+                                          >
+                                            <Volume2 size={11} /> Pré-appel
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline"
+                                            style={{
+                                              fontSize: '0.68rem',
+                                              padding: '4px 6px',
+                                              height: '26px',
+                                              borderRadius: '7px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              gap: '4px',
+                                              color: '#34D399',
+                                              borderColor: 'rgba(52, 211, 153, 0.4)',
+                                              background: 'rgba(16, 185, 129, 0.1)',
+                                              width: '100%'
+                                            }}
+                                            onClick={() => openDirectScoreModal(match)}
+                                            title="Marquer le score si ce match a été joué sans être lancé officiellement sur un billard"
+                                          >
+                                            <Edit2 size={11} /> Saisir score
+                                          </button>
                                         </div>
-                                      )}
-                                    </div>
+
+                                        {activeTournament.settings?.tableIds && activeTournament.settings.tableIds.length > 0 && (
+                                          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                                            {activeTournament.settings.tableIds.map(tId => {
+                                              const tObj = tables[tId];
+                                              const label = tObj ? `T.${tObj.number}` : tId;
+                                              const curM = (tObj?.currentMatchId && matches[tObj.currentMatchId])
+                                                ? matches[tObj.currentMatchId]
+                                                : Object.values(matches).find(m => m.tableId === tId && m.status !== 'finished') || null;
+                                              const isPlaying = curM && curM.status === 'playing';
+                                              const isPending = curM && curM.status === 'pending';
+                                              const isFree = !curM || tObj?.status === 'free';
+                                              const canLaunch = !isPlaying && !busyInfo.busy;
+
+                                              return (
+                                                <button
+                                                  key={tId}
+                                                  type="button"
+                                                  className={canLaunch ? 'btn btn-neon' : 'btn btn-outline'}
+                                                  disabled={!canLaunch}
+                                                  style={{
+                                                    flex: '1 1 auto',
+                                                    fontSize: '0.68rem',
+                                                    padding: '3px 8px',
+                                                    height: '25px',
+                                                    borderRadius: '7px',
+                                                    fontWeight: canLaunch ? 800 : 600,
+                                                    color: isPlaying ? 'rgba(255,255,255,0.35)' : (busyInfo.busy ? 'rgba(255,183,3,0.55)' : '#041210'),
+                                                    background: isPlaying ? 'rgba(255,255,255,0.03)' : (busyInfo.busy ? 'rgba(255,183,3,0.08)' : undefined),
+                                                    borderColor: isPlaying ? 'rgba(255,255,255,0.08)' : (busyInfo.busy ? 'rgba(255,183,3,0.2)' : undefined),
+                                                    opacity: canLaunch ? 1 : 0.45,
+                                                    cursor: canLaunch ? 'pointer' : 'not-allowed'
+                                                  }}
+                                                  title={
+                                                    busyInfo.busy ? `Impossible : ${busyInfo.playerName} joue actuellement sur ${busyInfo.tableName}` :
+                                                      isPlaying ? `Occupé : un match est déjà en cours de jeu sur ${tObj?.name || label}` :
+                                                        isPending ? `Table ${label} : un match est en attente. Cliquez pour remplacer et lancer immédiatement ce match.` :
+                                                          `Lancer immédiatement ce match sur ${tObj?.name || label}`
+                                                  }
+                                                  onClick={() => {
+                                                    if (busyInfo.busy) {
+                                                      return alert(`Impossible : ${busyInfo.playerName} joue actuellement sur ${busyInfo.tableName}`);
+                                                    }
+                                                    if (isPlaying) {
+                                                      return alert(`Un match est déjà en cours de jeu sur ${tObj?.name || label}.`);
+                                                    }
+                                                    if (isPending) {
+                                                      const confirmReplace = window.confirm(
+                                                        `Le billard ${tObj?.name || label} a un match programmé en attente de démarrage.\n\nVoulez-vous remplacer ce match et lancer immédiatement celui-ci ?`
+                                                      );
+                                                      if (!confirmReplace) return;
+                                                    }
+                                                    const res = launchMatchOnTable(match.id, tId);
+                                                    if (!res.success && res.reason) {
+                                                      alert(res.reason);
+                                                    } else {
+                                                      setExpandedQueueMatchId(null);
+                                                    }
+                                                  }}
+                                                >
+                                                  {label} {isFree ? '(Libre)' : (isPending ? '(Prêt)' : '')}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })
@@ -4154,53 +4028,113 @@ const AdminView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* CENTER: Classement (mis en avant) + accès aux derniers résultats */}
+                {/* CENTER: Classement (mis en avant) + métadonnées + 2 boutons bas */}
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
                   {/* Ranking */}
-                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.2rem 1.4rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <h2 style={{ fontSize: '1.2rem', color: 'var(--accent-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Trophy size={18} /> Classement Actuel
-                      </h2>
-                      {qualifStatus.isMultiPool && qualifStatus.rankingsByPool && qualifStatus.poolNames && qualifStatus.poolNames.length > 1 && (
-                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => setActivePoolRankingTab('all')}
-                            style={{
-                              padding: '2px 7px',
-                              borderRadius: '6px',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              border: activePoolRankingTab === 'all' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                              background: activePoolRankingTab === 'all' ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
-                              color: activePoolRankingTab === 'all' ? 'var(--accent-primary)' : '#fff',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Toutes
-                          </button>
-                          {qualifStatus.poolNames.map(pName => (
+                  <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1.15rem 1.35rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '0.9rem', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <h2 style={{ fontSize: '1.22rem', color: 'var(--accent-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                          <Trophy size={19} /> Classement
+                        </h2>
+                        {qualifStatus.isMultiPool && qualifStatus.rankingsByPool && qualifStatus.poolNames && qualifStatus.poolNames.length > 1 && (
+                          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                             <button
-                              key={pName}
                               type="button"
-                              onClick={() => setActivePoolRankingTab(pName)}
+                              onClick={() => setActivePoolRankingTab('all')}
                               style={{
                                 padding: '2px 7px',
                                 borderRadius: '6px',
                                 fontSize: '0.72rem',
                                 fontWeight: 700,
-                                border: activePoolRankingTab === pName ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                                background: activePoolRankingTab === pName ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
-                                color: activePoolRankingTab === pName ? 'var(--accent-primary)' : '#fff',
+                                border: activePoolRankingTab === 'all' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                                background: activePoolRankingTab === 'all' ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
+                                color: activePoolRankingTab === 'all' ? 'var(--accent-primary)' : 'var(--card-text)',
                                 cursor: 'pointer'
                               }}
                             >
-                              {pName}
+                              Toutes
                             </button>
-                          ))}
-                        </div>
-                      )}
+                            {qualifStatus.poolNames.map(pName => (
+                              <button
+                                key={pName}
+                                type="button"
+                                onClick={() => setActivePoolRankingTab(pName)}
+                                style={{
+                                  padding: '2px 7px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  border: activePoolRankingTab === pName ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                                  background: activePoolRankingTab === pName ? 'rgba(0, 255, 204, 0.22)' : 'rgba(255,255,255,0.03)',
+                                  color: activePoolRankingTab === pName ? 'var(--accent-primary)' : 'var(--card-text)',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {pName}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Métadonnées compactes du tournoi */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.74rem' }}>
+                        <span style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                          {finishedTourMatches.length} / {allTourMatches.length} matchs
+                        </span>
+                        {activeTournament.format !== 'direct_ko' && activeTournament.format !== 'double_ko_bracket' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (activeTournament.settings) {
+                                setEditTourSettings({
+                                  ...activeTournament.settings,
+                                  qualifNbQualifiers: qualifStatus.numQualifiers
+                                });
+                                setShowEditRulesModal(true);
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(16, 185, 129, 0.12)',
+                              color: 'var(--accent-primary)',
+                              padding: '2px 8px',
+                              borderRadius: '8px',
+                              fontWeight: 700,
+                              fontSize: '0.74rem',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title={qualifStatus.isFinalLaunched
+                              ? 'Phase finale déjà lancée : nombre de sortants verrouillé'
+                              : 'Cliquer pour modifier le nombre de sortants / qualifiés'}
+                          >
+                            {qualifStatus.numQualifiers} qualifiés
+                            {!qualifStatus.isFinalLaunched && <span style={{ opacity: 0.9 }}>✎</span>}
+                          </button>
+                        ) : (
+                          <span style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                            {activeTournament.participants.length} joueurs
+                          </span>
+                        )}
+                        {(activeTournament.settings?.finalMatchDurationMinutes || activeTournament.settings?.qualifMatchDurationMinutes || activeTournament.settings?.matchDurationMinutes) ? (
+                          <span style={{ background: 'rgba(255, 215, 0, 0.12)', color: '#ffd700', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                            ⏱️ {activeTournament.settings.finalMatchDurationMinutes || activeTournament.settings.qualifMatchDurationMinutes || activeTournament.settings.matchDurationMinutes} min
+                          </span>
+                        ) : null}
+                        {(() => {
+                          const latestFinished = finishedTourMatches.reduce((maxTs, m) => Math.max(maxTs, m.endTime || m.startTime || 0), 0);
+                          if (!latestFinished) return null;
+                          return (
+                            <span style={{ background: 'rgba(0, 229, 255, 0.09)', color: 'var(--accent-secondary)', padding: '2px 8px', borderRadius: '8px', fontWeight: 600 }}>
+                              Dernier validé : {formatShortDateTime(latestFinished)}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </div>
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       {qualifStatus.isMultiPool && qualifStatus.rankingsByPool && qualifStatus.poolNames && qualifStatus.poolNames.length > 1 ? (
@@ -4209,7 +4143,7 @@ const AdminView: React.FC = () => {
                           const qualPerPool = Math.max(1, Math.round(qualifStatus.numQualifiers / qualifStatus.poolNames.length));
 
                           return (
-                            <div key={pName} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '0.8rem' }}>
+                            <div key={pName} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.8rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
                                 <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   🎱 {pName}
@@ -4218,46 +4152,47 @@ const AdminView: React.FC = () => {
                                   Top {qualPerPool} qualifié{qualPerPool > 1 ? 's' : ''}
                                 </span>
                               </div>
-                              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                                 <thead>
                                   <tr style={{ color: 'var(--card-text-muted)', borderBottom: '1px solid var(--border-color)' }}>
-                                    <th style={{ padding: '0.4rem' }}>#</th>
-                                    <th style={{ padding: '0.4rem' }}>Joueur</th>
-                                    <th style={{ padding: '0.4rem', textAlign: 'center' }} title="Matchs Joués">J</th>
-                                    <th style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--accent-primary)' }} title="Matchs Gagnés">G</th>
-                                    <th style={{ padding: '0.4rem', textAlign: 'center', color: '#ff6b6b' }} title="Matchs Perdus">P</th>
-                                    <th style={{ padding: '0.4rem', textAlign: 'center' }} title="Différence de manches">+/-</th>
-                                    <th style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
+                                    <th style={{ padding: '0.45rem' }}>#</th>
+                                    <th style={{ padding: '0.45rem' }}>Joueur</th>
+                                    <th style={{ padding: '0.45rem', textAlign: 'center' }} title="Matchs Joués">J</th>
+                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: 'var(--accent-primary)' }} title="Matchs Gagnés">G</th>
+                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: '#ff6b6b' }} title="Matchs Perdus">P</th>
+                                    <th style={{ padding: '0.45rem', textAlign: 'center' }} title="Différence de manches">+/-</th>
+                                    <th style={{ padding: '0.45rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {poolRank.map((p, i) => {
                                     const isQualifyingZone = i < qualPerPool;
                                     const isCutoff = i === qualPerPool - 1 && i < poolRank.length - 1;
+                                    const rankColor = i === 0 ? '#ffd700' : i === 1 ? '#cbd5e1' : i === 2 ? '#f59e0b' : (isQualifyingZone ? 'var(--accent-primary)' : 'inherit');
                                     return (
                                       <tr
                                         key={p.id}
                                         style={{
-                                          borderBottom: isCutoff ? '2px dashed rgba(0, 255, 170, 0.4)' : '1px solid var(--border-color)',
-                                          background: isQualifyingZone ? 'rgba(0, 255, 170, 0.05)' : 'transparent'
+                                          borderBottom: isCutoff ? '2px dashed rgba(16, 185, 129, 0.5)' : '1px solid var(--border-color)',
+                                          background: isQualifyingZone ? 'rgba(16, 185, 129, 0.08)' : 'transparent'
                                         }}
                                       >
-                                        <td style={{ padding: '0.4rem', fontWeight: 800, color: isQualifyingZone ? 'var(--accent-primary)' : 'inherit' }}>{i + 1}</td>
-                                        <td style={{ padding: '0.4rem', fontWeight: 600 }}>
+                                        <td style={{ padding: '0.52rem 0.45rem', fontWeight: 900, color: rankColor }}>{i + 1}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', fontWeight: 600 }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <span>{p.name}</span>
                                             {p.isSure && (
-                                              <span style={{ fontSize: '0.62rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(0, 255, 170, 0.3)' }} title="Mathématiquement qualifié">
+                                              <span style={{ fontSize: '0.62rem', background: 'rgba(16, 185, 129, 0.18)', color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(16, 185, 129, 0.3)' }} title="Mathématiquement qualifié">
                                                 Qualifié
                                               </span>
                                             )}
                                           </div>
                                         </td>
-                                        <td style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--text-muted)' }}>{p.played}</td>
-                                        <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: 700, color: 'var(--accent-primary)' }}>{p.won}</td>
-                                        <td style={{ padding: '0.4rem', textAlign: 'center', color: p.lost > 0 ? '#ff6b6b' : 'var(--text-muted)' }}>{p.lost}</td>
-                                        <td style={{ padding: '0.4rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
-                                        <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', color: 'var(--text-muted)' }}>{p.played}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', fontWeight: 700, color: 'var(--accent-primary)' }}>{p.won}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', color: p.lost > 0 ? '#ff6b6b' : 'var(--text-muted)' }}>{p.lost}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
+                                        <td style={{ padding: '0.52rem 0.45rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
                                       </tr>
                                     );
                                   })}
@@ -4267,16 +4202,16 @@ const AdminView: React.FC = () => {
                           );
                         })
                       ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.95rem' }}>
                           <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', backdropFilter: 'blur(10px)', zIndex: 1 }}>
-                            <tr style={{ color: 'var(--card-text-muted)', borderBottom: '2px solid var(--border-color)' }}>
-                              <th style={{ padding: '0.5rem' }}>#</th>
-                              <th style={{ padding: '0.5rem' }}>Joueur</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'center' }} title="Matchs Joués">J</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }} title="Matchs Gagnés">G</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'center', color: '#ff6b6b' }} title="Matchs Perdus">P</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'center' }} title="Différence de manches">+/-</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
+                            <tr style={{ color: 'var(--card-text-muted)', borderBottom: '2px solid var(--border-color)', fontSize: '0.82rem' }}>
+                              <th style={{ padding: '0.55rem' }}>#</th>
+                              <th style={{ padding: '0.55rem' }}>Joueur</th>
+                              <th style={{ padding: '0.55rem', textAlign: 'center' }} title="Matchs Joués">J</th>
+                              <th style={{ padding: '0.55rem', textAlign: 'center', color: 'var(--accent-primary)' }} title="Matchs Gagnés">G</th>
+                              <th style={{ padding: '0.55rem', textAlign: 'center', color: '#ff6b6b' }} title="Matchs Perdus">P</th>
+                              <th style={{ padding: '0.55rem', textAlign: 'center' }} title="Différence de manches">+/-</th>
+                              <th style={{ padding: '0.55rem', textAlign: 'center', color: 'var(--accent-primary)' }}>PTS</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -4284,30 +4219,31 @@ const AdminView: React.FC = () => {
                               const isSure = qualifStatus.sureQualifiers.includes(p.id);
                               const isQualifyingZone = i < qualifStatus.numQualifiers;
                               const isCutoff = i === qualifStatus.numQualifiers - 1 && i < ranking.length - 1;
+                              const rankColor = i === 0 ? '#ffd700' : i === 1 ? '#cbd5e1' : i === 2 ? '#f59e0b' : (isQualifyingZone ? 'var(--accent-primary)' : 'inherit');
                               return (
                                 <tr
                                   key={p.id}
                                   style={{
-                                    borderBottom: isCutoff ? '2px dashed rgba(0, 255, 170, 0.4)' : '1px solid var(--border-color)',
-                                    background: isQualifyingZone ? 'rgba(0, 255, 170, 0.05)' : 'transparent'
+                                    borderBottom: isCutoff ? '2px dashed rgba(16, 185, 129, 0.5)' : '1px solid var(--border-color)',
+                                    background: isQualifyingZone ? 'rgba(16, 185, 129, 0.08)' : 'transparent'
                                   }}
                                 >
-                                  <td style={{ padding: '0.5rem', fontWeight: 800, color: isQualifyingZone ? 'var(--accent-primary)' : 'inherit' }}>{i + 1}</td>
-                                  <td style={{ padding: '0.5rem', fontWeight: 600 }}>
+                                  <td style={{ padding: '0.65rem 0.55rem', fontWeight: 900, color: rankColor }}>{i + 1}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', fontWeight: 600 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                       <span>{p.name}</span>
                                       {isSure && (
-                                        <span style={{ fontSize: '0.65rem', background: 'rgba(0, 255, 170, 0.2)', color: 'var(--accent-primary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(0, 255, 170, 0.3)' }} title="Mathématiquement qualifié">
+                                        <span style={{ fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.18)', color: 'var(--accent-primary)', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: '1px solid rgba(16, 185, 129, 0.3)' }} title="Mathématiquement qualifié">
                                           Qualifié
                                         </span>
                                       )}
                                     </div>
                                   </td>
-                                  <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>{p.played}</td>
-                                  <td style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 700, color: 'var(--accent-primary)' }}>{p.won}</td>
-                                  <td style={{ padding: '0.5rem', textAlign: 'center', color: p.lost > 0 ? '#ff6b6b' : 'var(--text-muted)' }}>{p.lost}</td>
-                                  <td style={{ padding: '0.5rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
-                                  <td style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', color: 'var(--text-muted)' }}>{p.played}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', fontWeight: 700, color: 'var(--accent-primary)' }}>{p.won}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', color: p.lost > 0 ? '#ff6b6b' : 'var(--text-muted)' }}>{p.lost}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center' }}>{p.sf - p.sa > 0 ? `+${p.sf - p.sa}` : p.sf - p.sa}</td>
+                                  <td style={{ padding: '0.65rem 0.55rem', textAlign: 'center', fontWeight: 800, color: 'var(--accent-primary)' }}>{p.pts}</td>
                                 </tr>
                               );
                             })}
@@ -4316,55 +4252,67 @@ const AdminView: React.FC = () => {
                       )}
                     </div>
 
-                    <button
-                      className="btn btn-outline"
-                      disabled={!hasSureQualifiers}
-                      style={{
-                        marginTop: '0.8rem',
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        color: hasSureQualifiers ? 'var(--accent-primary)' : 'var(--text-muted)',
-                        borderColor: hasSureQualifiers ? 'rgba(0, 255, 170, 0.4)' : 'rgba(255, 255, 255, 0.1)',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        opacity: hasSureQualifiers ? 1 : 0.5,
-                        cursor: hasSureQualifiers ? 'pointer' : 'not-allowed'
-                      }}
-                      onClick={() => {
-                        if (!hasSureQualifiers) {
-                          alert("L'arbre des phases finales n'est pas encore accessible : aucun joueur n'est mathématiquement qualifié pour le moment.");
-                          return;
-                        }
-                        setDashboardSubTab('bracket');
-                      }}
-                    >
-                      {hasSureQualifiers ? <Trophy size={15} /> : <Lock size={15} />}
-                      {hasSureQualifiers ? "Voir l'arbre des Phases Finales" : "Arbre verrouillé (0 qualifié sûr)"}
-                    </button>
+                    {/* Pied du classement : 2 boutons sobres côte à côte */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.85rem', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setShowResultsModal(true)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.45rem',
+                          color: '#ffd700',
+                          borderColor: 'rgba(255, 215, 0, 0.35)',
+                          background: 'rgba(255, 215, 0, 0.06)',
+                          fontSize: '0.84rem',
+                          fontWeight: 700
+                        }}
+                      >
+                        <Clock size={15} /> Derniers résultats ({finishedMatches.length})
+                      </button>
 
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => setShowResultsModal(true)}
-                      style={{
-                        marginTop: '0.6rem',
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        color: '#ffd700',
-                        borderColor: 'rgba(255, 215, 0, 0.45)',
-                        background: 'rgba(255, 215, 0, 0.08)',
-                        fontSize: '0.88rem',
-                        fontWeight: 800
-                      }}
-                    >
-                      <Clock size={15} /> Derniers résultats ({finishedMatches.length})
-                    </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setDashboardSubTab('bracket')}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.45rem',
+                          color: (activeTournament.finalStageLaunched || hasSureQualifiers || qualifStatus.isQualifAllDone) ? 'var(--accent-primary)' : 'var(--text-muted)',
+                          borderColor: (activeTournament.finalStageLaunched || hasSureQualifiers) ? 'rgba(0, 255, 170, 0.35)' : 'var(--border-color)',
+                          fontSize: '0.84rem',
+                          fontWeight: 700
+                        }}
+                        title="Voir le tableau des phases finales"
+                      >
+                        <Trophy size={15} />
+                        <span>Phases finales</span>
+                        <span style={{
+                          fontSize: '0.65rem',
+                          padding: '1px 5px',
+                          borderRadius: '4px',
+                          fontWeight: 800,
+                          background: activeTournament.finalStageLaunched
+                            ? 'var(--accent-primary)'
+                            : (hasSureQualifiers || qualifStatus.isQualifAllDone)
+                              ? 'rgba(0,255,170,0.18)'
+                              : 'rgba(255,255,255,0.08)',
+                          color: activeTournament.finalStageLaunched
+                            ? '#041210'
+                            : (hasSureQualifiers || qualifStatus.isQualifAllDone)
+                              ? 'var(--accent-primary)'
+                              : '#fbbf24'
+                        }}>
+                          {activeTournament.finalStageLaunched ? 'EN COURS' : (hasSureQualifiers || qualifStatus.isQualifAllDone) ? 'Prêt' : 'Provisoire'}
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Pop-up : vérification et modification des derniers résultats */}
@@ -4585,33 +4533,39 @@ const AdminView: React.FC = () => {
                   )}
                 </div>
 
-                {/* RIGHT: Billards du tournoi en live (fusion avec "Matchs à démarrer") */}
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                {/* RIGHT: Billards du tournoi en live (hiérarchisé : 1 action principale + appel + menu ⋯) */}
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+                  {openBillardMenuId && (
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 45 }}
+                      onClick={() => setOpenBillardMenuId(null)}
+                    />
+                  )}
                   <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1rem 1.1rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '0.8rem', flexShrink: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem', flexShrink: 0, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <h2 style={{ fontSize: '1.1rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800 }}>
-                          <MonitorPlay size={19} style={{ color: 'var(--accent-primary)' }} /> Billards du Tournoi en Live
+                          <MonitorPlay size={18} style={{ color: 'var(--accent-primary)' }} /> Billards Live
                         </h2>
-                        <span style={{ fontSize: '0.75rem', background: 'rgba(0, 255, 170, 0.12)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, border: '1px solid rgba(0, 255, 170, 0.3)' }}>
-                          {tournamentTablesOrdered.length} billards · {matchesToPlay.length} {matchesToPlay.length > 1 ? 'matchs prêts' : 'match prêt'}
+                        <span style={{ fontSize: '0.74rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                          {tournamentTablesOrdered.length}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         {matchesToPlay.some(m => m.status === 'pending') && (
                           <button
                             type="button"
                             className="btn btn-outline"
                             style={{
                               fontSize: '0.73rem',
-                              padding: '3px 10px',
+                              padding: '4px 9px',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '5px',
-                              fontWeight: 800,
+                              gap: '4px',
+                              fontWeight: 700,
                               color: '#ffd700',
-                              borderColor: 'rgba(255, 215, 0, 0.45)',
-                              background: 'rgba(255, 215, 0, 0.1)'
+                              borderColor: 'rgba(255, 215, 0, 0.35)',
+                              background: 'rgba(255, 215, 0, 0.08)'
                             }}
                             onClick={() => {
                               const pendingItems = matchesToPlay
@@ -4628,30 +4582,31 @@ const AdminView: React.FC = () => {
                                 });
                               announceAllReadyMatches(pendingItems);
                             }}
-                            title="Appeler vocalement au micro tous les matchs en attente de démarrage sur les billards"
+                            title="Appeler vocalement tous les matchs prêts à démarrer"
                           >
-                            <Volume2 size={14} /> Appeler tous les matchs
+                            <Volume2 size={14} /> Appeler tous
                           </button>
                         )}
                         <a
                           href={`${getAppBaseUrl()}/?overlay=all&club=${currentClub.id}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="btn btn-neon"
+                          className="btn btn-outline"
                           style={{
-                            fontSize: '0.74rem',
-                            padding: '4px 10px',
+                            fontSize: '0.73rem',
+                            padding: '4px 9px',
                             textDecoration: 'none',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '5px',
+                            gap: '4px',
                             whiteSpace: 'nowrap',
-                            fontWeight: 800,
-                            flexShrink: 0
+                            fontWeight: 700,
+                            color: 'var(--accent-primary)',
+                            borderColor: 'rgba(0, 255, 170, 0.35)'
                           }}
-                          title="Afficher les vidéos en direct de tous les billards sur un seul écran"
+                          title="Ouvrir la mosaïque Multi-Live Vidéo"
                         >
-                          <Tv size={14} /> 📺 Multi-Live Vidéo
+                          <Tv size={14} /> Multi-Live
                         </a>
                       </div>
                     </div>
@@ -4669,8 +4624,8 @@ const AdminView: React.FC = () => {
                               style={{
                                 flex: '1 1 0',
                                 minHeight: '120px',
-                                background: 'rgba(255,255,255,0.03)',
-                                border: '2px dashed rgba(255,255,255,0.2)',
+                                background: 'rgba(255,255,255,0.025)',
+                                border: '1.5px dashed rgba(255,255,255,0.18)',
                                 borderRadius: '16px',
                                 padding: '1rem 1.2rem',
                                 display: 'flex',
@@ -4681,14 +4636,14 @@ const AdminView: React.FC = () => {
                                 boxSizing: 'border-box'
                               }}
                             >
-                              <div style={{ color: '#cbd5e1', fontWeight: 900, fontSize: '1.25rem' }}>{tableName}</div>
-                              <div style={{ background: 'rgba(148,163,184,0.18)', color: '#94a3b8', fontWeight: 800, fontSize: '0.85rem', padding: '3px 12px', borderRadius: '999px', letterSpacing: '0.5px' }}>
+                              <div style={{ color: 'var(--card-text)', fontWeight: 900, fontSize: '1.2rem' }}>{tableName}</div>
+                              <div style={{ background: 'rgba(148,163,184,0.15)', color: '#94a3b8', fontWeight: 800, fontSize: '0.8rem', padding: '2px 11px', borderRadius: '999px', letterSpacing: '0.5px' }}>
                                 ○ LIBRE
                               </div>
-                              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>En attente du prochain match</div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>En attente du prochain match</div>
                               <button
                                 className="btn btn-outline"
-                                style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem', borderRadius: '8px' }}
+                                style={{ fontSize: '0.78rem', padding: '0.35rem 0.85rem', borderRadius: '8px' }}
                                 onClick={() => setSelectedTableForQR(table.id)}
                               >
                                 Gérer ce billard
@@ -4700,63 +4655,63 @@ const AdminView: React.FC = () => {
                         const effTableId = table.id;
                         const stakeInfo = getMatchStakeInfo(match, scheduleContext);
                         const isPlayingMatch = match.status === 'playing';
-                        const theme = isPlayingMatch
+                        const cardTheme = isPlayingMatch
                           ? {
                               accent: '#00e5a0',
                               label: '● MATCH EN COURS',
-                              bg: 'linear-gradient(150deg, rgba(0, 229, 160, 0.20) 0%, rgba(0, 40, 30, 0.55) 100%)',
-                              border: '2px solid rgba(0, 229, 160, 0.8)',
-                              glow: '0 0 22px rgba(0, 229, 160, 0.28)',
-                              band: 'rgba(0, 229, 160, 0.22)'
+                              bg: 'linear-gradient(155deg, rgba(0, 229, 160, 0.14) 0%, rgba(10, 28, 24, 0.65) 100%)',
+                              border: '2px solid rgba(0, 229, 160, 0.72)',
+                              band: 'rgba(0, 229, 160, 0.16)'
                             }
                           : {
                               accent: '#ffb020',
                               label: '⏳ MATCH À LANCER',
-                              bg: 'linear-gradient(150deg, rgba(255, 176, 32, 0.20) 0%, rgba(50, 30, 0, 0.55) 100%)',
-                              border: '2px solid rgba(255, 176, 32, 0.85)',
-                              glow: '0 0 22px rgba(255, 176, 32, 0.28)',
-                              band: 'rgba(255, 176, 32, 0.24)'
+                              bg: 'linear-gradient(155deg, rgba(255, 176, 32, 0.14) 0%, rgba(36, 24, 8, 0.65) 100%)',
+                              border: '2px solid rgba(255, 176, 32, 0.75)',
+                              band: 'rgba(255, 176, 32, 0.18)'
                             };
                         const matchUrl = getMatchShareUrl(match.id, effTableId || match.tableId, match.tournamentId || activeTournament.id);
-                        const nameStyle: React.CSSProperties = { fontWeight: 800, fontSize: '1.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#fff' };
+                        const nameStyle: React.CSSProperties = { fontWeight: 800, fontSize: '1.12rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#fff' };
+                        const isCardMenuOpen = openBillardMenuId === match.id;
 
                         return (
                           <div
                             key={match.id}
                             style={{
                               flex: '1 1 0',
-                              minHeight: '215px',
-                              background: theme.bg,
-                              border: theme.border,
-                              boxShadow: theme.glow,
+                              minHeight: '200px',
+                              position: 'relative',
+                              overflow: 'visible',
+                              background: cardTheme.bg,
+                              border: cardTheme.border,
                               borderRadius: '16px',
                               padding: '0.8rem 1rem',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '0.6rem',
+                              gap: '0.55rem',
                               boxSizing: 'border-box'
                             }}
                           >
                             {/* Bandeau statut */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', background: theme.band, borderRadius: '10px', padding: '0.35rem 0.7rem' }}>
-                              <span style={{ color: '#fff', fontWeight: 900, fontSize: '1.2rem' }}>{tableName}</span>
-                              <span style={{ color: theme.accent, fontWeight: 900, fontSize: '0.95rem', letterSpacing: '0.5px' }}>{theme.label}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', background: cardTheme.band, borderRadius: '10px', padding: '0.32rem 0.7rem' }}>
+                              <span style={{ color: '#fff', fontWeight: 900, fontSize: '1.15rem' }}>{tableName}</span>
+                              <span style={{ color: cardTheme.accent, fontWeight: 900, fontSize: '0.9rem', letterSpacing: '0.4px' }}>{cardTheme.label}</span>
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                               {match.poolName && (
-                                <span style={{ background: 'rgba(0, 255, 204, 0.15)', color: 'var(--accent-primary)', fontSize: '0.72rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px', border: '1px solid rgba(0, 255, 204, 0.3)' }}>
+                                <span style={{ background: 'rgba(0, 255, 204, 0.14)', color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px' }}>
                                   {match.poolName}
                                 </span>
                               )}
                               <span
                                 title={stakeInfo.description}
-                                style={{ fontSize: '0.72rem', fontWeight: 800, background: stakeInfo.badgeBg, border: `1px solid ${stakeInfo.badgeBorder}`, color: stakeInfo.badgeColor, padding: '1px 7px', borderRadius: '4px' }}
+                                style={{ fontSize: '0.7rem', fontWeight: 800, background: stakeInfo.badgeBg, border: `1px solid ${stakeInfo.badgeBorder}`, color: stakeInfo.badgeColor, padding: '1px 7px', borderRadius: '4px' }}
                               >
                                 {stakeInfo.label}
                               </span>
                               {match.stage && match.stage !== 'qualif' && (
-                                <span style={{ background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', fontSize: '0.72rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px', border: '1px solid rgba(255, 215, 0, 0.4)' }}>
+                                <span style={{ background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', fontSize: '0.7rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px' }}>
                                   {match.stage === 'final' ? '🏆 Finale' : match.stage === 'semi' ? '⚔️ 1/2 Finale' : '🎯 1/4 Finale'}
                                 </span>
                               )}
@@ -4770,14 +4725,14 @@ const AdminView: React.FC = () => {
                                 onClick={() => setQrZoom({
                                   url: matchUrl,
                                   title: `${tableName} — ${players[match.player1Id]?.name || ''} vs ${players[match.player2Id]?.name || ''}`,
-                                  accent: theme.accent
+                                  accent: cardTheme.accent
                                 })}
                                 style={{
                                   background: '#fff',
                                   padding: '0.45rem',
                                   borderRadius: '12px',
-                                  boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
-                                  opacity: isPlayingMatch ? 0.6 : 1,
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+                                  opacity: isPlayingMatch ? 0.65 : 1,
                                   cursor: 'zoom-in',
                                   flexShrink: 0,
                                   lineHeight: 0
@@ -4790,14 +4745,14 @@ const AdminView: React.FC = () => {
                                   {players[match.player1Id]?.name}
                                   <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 500, marginLeft: '5px' }}>({stakeInfo.p1Played}M)</small>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: theme.accent, fontWeight: 900 }}>VS</div>
+                                <div style={{ fontSize: '0.72rem', color: cardTheme.accent, fontWeight: 900 }}>VS</div>
                                 <div style={nameStyle}>
                                   {players[match.player2Id]?.name}
                                   <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 500, marginLeft: '5px' }}>({stakeInfo.p2Played}M)</small>
                                 </div>
                                 {isPlayingMatch && (
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.3rem' }}>
-                                    <span style={{ color: theme.accent, fontWeight: 900, fontSize: '1.9rem', lineHeight: 1 }}>{match.score1} - {match.score2}</span>
+                                    <span style={{ color: cardTheme.accent, fontWeight: 900, fontSize: '1.9rem', lineHeight: 1 }}>{match.score1} - {match.score2}</span>
                                     <MatchTimerBadge
                                       startTime={match.startTime}
                                       durationMinutes={match.durationMinutes ?? resolveMatchDurationMinutes(match, activeTournament)}
@@ -4809,32 +4764,35 @@ const AdminView: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Actions */}
+                            {/* Actions hiérarchisées */}
                             {isPlayingMatch ? (
                               effTableId && (
                                 <button
+                                  type="button"
                                   className="btn btn-neon"
-                                  style={{ fontSize: '0.9rem', padding: '0.55rem 0.7rem', width: '100%', justifyContent: 'center', fontWeight: 800, color: '#041210', borderRadius: '10px' }}
+                                  style={{ fontSize: '0.88rem', padding: '0.5rem 0.7rem', width: '100%', justifyContent: 'center', fontWeight: 800, color: '#041210', borderRadius: '10px', background: cardTheme.accent }}
                                   onClick={() => setSelectedTableForQR(effTableId)}
                                 >
-                                  Modifier le score / Terminer
+                                  Score / Terminer
                                 </button>
                               )
                             ) : (
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', position: 'relative' }}>
                                 <button
+                                  type="button"
                                   className="btn btn-neon"
-                                  style={{ fontSize: '0.85rem', padding: '0.5rem 0.55rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#041210', fontWeight: 900, borderRadius: '10px', width: '100%', background: theme.accent }}
+                                  style={{ flex: 1, fontSize: '0.88rem', padding: '0.52rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#041210', fontWeight: 900, borderRadius: '10px', background: cardTheme.accent }}
                                   onClick={() => {
                                     startTournamentMatch(match.id, false);
                                     if (effTableId) setSelectedTableForQR(effTableId);
                                   }}
                                 >
-                                  <Play size={14} /> Démarrer
+                                  <Play size={15} /> Démarrer
                                 </button>
                                 <button
+                                  type="button"
                                   className="btn btn-outline"
-                                  style={{ fontSize: '0.85rem', padding: '0.5rem 0.55rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.4)', background: 'rgba(255, 215, 0, 0.1)', borderRadius: '10px', width: '100%' }}
+                                  style={{ padding: '0.52rem 0.75rem', borderRadius: '10px', color: '#ffd700', borderColor: 'rgba(255, 215, 0, 0.35)', background: 'rgba(255, 215, 0, 0.08)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                                   title={`Appeler vocalement ${players[match.player1Id]?.name || 'Joueur 1'} et ${players[match.player2Id]?.name || 'Joueur 2'} sur ${tableName}`}
                                   onClick={() => announceMatchOnTable({
                                     match,
@@ -4845,29 +4803,64 @@ const AdminView: React.FC = () => {
                                     isReminder: true
                                   })}
                                 >
-                                  <Volume2 size={14} /> Appeler
+                                  <Volume2 size={16} />
                                 </button>
                                 <button
+                                  type="button"
                                   className="btn btn-outline"
-                                  style={{ fontSize: '0.85rem', padding: '0.5rem 0.55rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', color: '#34D399', borderColor: 'rgba(52, 211, 153, 0.4)', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '10px', width: '100%' }}
-                                  title="Marquer le score directement si ce match a été joué sans utiliser l'application"
-                                  onClick={() => openDirectScoreModal(match)}
+                                  style={{ padding: '0.52rem 0.7rem', borderRadius: '10px', color: isCardMenuOpen ? 'var(--accent-primary)' : '#fff', borderColor: isCardMenuOpen ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Plus d'actions (saisir score, repousser)"
+                                  onClick={() => setOpenBillardMenuId(prev => (prev === match.id ? null : match.id))}
                                 >
-                                  <Edit2 size={14} /> Score
+                                  <MoreHorizontal size={16} />
                                 </button>
-                                <button
-                                  className="btn btn-outline"
-                                  style={{ fontSize: '0.85rem', padding: '0.5rem 0.55rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', borderRadius: '10px', width: '100%' }}
-                                  onClick={() => {
-                                    if (effTableId && matchesWaiting.length > 0) {
-                                      setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
-                                    } else {
-                                      postponeMatch(match.id);
-                                    }
-                                  }}
-                                >
-                                  <ArrowUpDown size={14} /> Repousser
-                                </button>
+
+                                {isCardMenuOpen && (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      bottom: 'calc(100% + 6px)',
+                                      right: 0,
+                                      minWidth: '215px',
+                                      background: '#0b1222',
+                                      border: '1px solid rgba(255,255,255,0.18)',
+                                      borderRadius: '12px',
+                                      padding: '0.45rem',
+                                      boxShadow: '0 12px 30px rgba(0,0,0,0.65)',
+                                      zIndex: 60,
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '0.35rem'
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline"
+                                      style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.45rem 0.65rem', color: '#34D399', borderColor: 'rgba(52, 211, 153, 0.3)' }}
+                                      onClick={() => {
+                                        setOpenBillardMenuId(null);
+                                        openDirectScoreModal(match);
+                                      }}
+                                    >
+                                      <Edit2 size={14} /> Saisir le score
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline"
+                                      style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.45rem 0.65rem', color: '#fff', borderColor: 'rgba(255,255,255,0.15)' }}
+                                      onClick={() => {
+                                        setOpenBillardMenuId(null);
+                                        if (effTableId && matchesWaiting.length > 0) {
+                                          setPostponingMatchModal({ matchId: match.id, tableId: effTableId });
+                                        } else {
+                                          postponeMatch(match.id);
+                                        }
+                                      }}
+                                    >
+                                      <ArrowUpDown size={14} /> Repousser / Remplacer
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
