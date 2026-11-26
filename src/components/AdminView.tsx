@@ -5342,72 +5342,70 @@ const AdminView: React.FC = () => {
         {/* 5. STANDALONE LIVE MATCH STUDIO TAB ('live_studio')                       */}
         {/* ========================================================================= */}
         {activeTab === 'live_studio' && (
-          <div style={{
-            maxWidth: '1480px',
-            width: '100%',
-            margin: '0 auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.65rem',
-            paddingBottom: '1.5rem'
-          }}>
-            <div style={{
+          <div
+            className="live-studio-surface"
+            style={{
+              maxWidth: '1480px',
+              width: '100%',
+              margin: '0 auto',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              flexDirection: 'column',
+              gap: '0.65rem',
+              paddingBottom: '1.5rem'
+            }}
+          >
+            <div style={{
+              display: 'inline-flex',
+              width: 'fit-content',
+              gap: '0.3rem',
               flexWrap: 'wrap',
-              gap: '0.6rem',
+              alignItems: 'center',
               background: '#0B0F17',
-              padding: '0.42rem 0.65rem',
-              borderRadius: '12px',
+              padding: '0.32rem',
+              borderRadius: '10px',
               border: '1px solid rgba(255,255,255,0.12)',
               boxShadow: '0 6px 20px rgba(0,0,0,0.26)'
             }}>
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => setLiveStudioSubTab('cameras')}
-                  style={{
-                    background: liveStudioSubTab === 'cameras' ? '#1E293B' : 'transparent',
-                    color: liveStudioSubTab === 'cameras' ? '#F8FAFC' : 'rgba(255,255,255,0.62)',
-                    fontWeight: 700,
-                    border: liveStudioSubTab === 'cameras' ? '1px solid rgba(212, 175, 55, 0.65)' : '1px solid transparent',
-                    padding: '0.4rem 0.9rem',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.78rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.45rem'
-                  }}
-                >
-                  <MonitorPlay size={14} color={liveStudioSubTab === 'cameras' ? '#D4AF37' : 'currentColor'} />
-                  Régie Live Multi-Caméras
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLiveStudioSubTab('overlay')}
-                  style={{
-                    background: liveStudioSubTab === 'overlay' ? '#1E293B' : 'transparent',
-                    color: liveStudioSubTab === 'overlay' ? '#F8FAFC' : 'rgba(255,255,255,0.62)',
-                    fontWeight: 700,
-                    border: liveStudioSubTab === 'overlay' ? '1px solid rgba(212, 175, 55, 0.65)' : '1px solid transparent',
-                    padding: '0.4rem 0.9rem',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.78rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.45rem'
-                  }}
-                >
-                  <Edit2 size={14} color={liveStudioSubTab === 'overlay' ? '#D4AF37' : 'currentColor'} />
-                  Habillage TV (Logos, Sponsors & Textes)
-                </button>
-              </div>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', letterSpacing: '0.3px', paddingRight: '0.2rem' }}>
-                STUDIO DIFFUSION LIVE
-              </span>
+              <button
+                type="button"
+                onClick={() => setLiveStudioSubTab('cameras')}
+                style={{
+                  background: liveStudioSubTab === 'cameras' ? '#1E293B' : 'transparent',
+                  color: liveStudioSubTab === 'cameras' ? '#F8FAFC' : 'rgba(255,255,255,0.65)',
+                  fontWeight: 700,
+                  border: liveStudioSubTab === 'cameras' ? '1px solid rgba(212, 175, 55, 0.65)' : '1px solid transparent',
+                  padding: '0.36rem 0.85rem',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <MonitorPlay size={14} color={liveStudioSubTab === 'cameras' ? '#D4AF37' : 'currentColor'} />
+                Régie Live
+              </button>
+              <button
+                type="button"
+                onClick={() => setLiveStudioSubTab('overlay')}
+                style={{
+                  background: liveStudioSubTab === 'overlay' ? '#1E293B' : 'transparent',
+                  color: liveStudioSubTab === 'overlay' ? '#F8FAFC' : 'rgba(255,255,255,0.65)',
+                  fontWeight: 700,
+                  border: liveStudioSubTab === 'overlay' ? '1px solid rgba(212, 175, 55, 0.65)' : '1px solid transparent',
+                  padding: '0.36rem 0.85rem',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <Edit2 size={14} color={liveStudioSubTab === 'overlay' ? '#D4AF37' : 'currentColor'} />
+                Habillage TV
+              </button>
             </div>
 
             {liveStudioSubTab === 'cameras' && (

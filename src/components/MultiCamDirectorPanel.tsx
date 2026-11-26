@@ -5,6 +5,8 @@ import {
   Camera,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Copy,
   ExternalLink,
   Eye,
@@ -23,6 +25,7 @@ import {
   RefreshCw,
   RotateCcw,
   Settings,
+  SlidersHorizontal,
   Smartphone,
   Sun,
   Trash2,
@@ -486,7 +489,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
           right: '6px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           gap: '0.3rem',
           pointerEvents: 'none'
         }}>
@@ -501,7 +504,7 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            maxWidth: '70%'
+            maxWidth: '100%'
           }}>
             {!isVirtual && assignment.isMatchView && assignment.p1Name && assignment.p2Name && assignment.score1 !== undefined && assignment.score2 !== undefined ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
@@ -529,18 +532,6 @@ const CameraTileCard: React.FC<CameraTileCardProps> = ({
               <span>{isExternalLive ? slot.name : assignment.subtitle}</span>
             )}
           </div>
-
-          <span style={{
-            background: isFocused ? 'rgba(239,68,68,0.92)' : 'rgba(10,14,22,0.82)',
-            border: `1px solid ${isFocused ? '#EF4444' : 'rgba(255,255,255,0.14)'}`,
-            color: '#F8FAFC',
-            padding: '2px 7px',
-            borderRadius: '4px',
-            fontSize: '0.6rem',
-            fontWeight: 700
-          }}>
-            {isFocused ? 'Retour Mosaïque' : 'Diffuser seul'}
-          </span>
         </div>
       </div>
 
@@ -1184,6 +1175,9 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [replaySpeedChoice, setReplaySpeedChoice] = useState<number>(0.6);
   const [, setShotClockUiTick] = useState<number>(0);
   const [showHeaderSettings, setShowHeaderSettings] = useState<boolean>(false);
+  const [showStudioTools, setShowStudioTools] = useState<boolean>(false);
+  const [showTournamentDrawer, setShowTournamentDrawer] = useState<boolean>(false);
+  const [showAddSourceMenu, setShowAddSourceMenu] = useState<boolean>(false);
   const headerLogoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [overlayProjects, setOverlayProjects] = useState<LiveOverlayProject[]>(() =>
     loadOverlayProjects(currentClub.id)
@@ -2365,6 +2359,27 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     ? pendingLaunchTableId
     : (firstFreeTable?.id || sortedTables[0]?.id || '');
 
+  const isStudioToolActive = Boolean(
+    directorState.isIntermission ||
+    broadcasterStatus.isReplaying ||
+    shotClock.enabled ||
+    overlayConfig.ticker?.enabled ||
+    broadcasterStatus.isRecordingLocal ||
+    broadcasterStatus.commentatorMicActive ||
+    !monitorAudioOnPc
+  );
+  const showCompactStatusRibbon = Boolean(
+    !showStudioTools &&
+    (isAnyLiveActive ||
+      directorState.isIntermission ||
+      broadcasterStatus.isReplaying ||
+      broadcasterStatus.isRecordingLocal ||
+      broadcasterStatus.commentatorMicActive)
+  );
+  const relayReady = isObsMode
+    ? obsStatus.connected
+    : Boolean(broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable);
+
   return (
     <div
       ref={panelRootRef}
@@ -2379,7 +2394,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         gap: '0.75rem'
       }}
     >
-      {/* 1. CONSOLE DE RÉGIE UNIFIÉE (DIFFUSION + PRODUCTION STUDIO) */}
+      {/* 1. CONSOLE DE RÉGIE UNIFIÉE (1 BARRE PRINCIPALE + TIROIR OUTILS PLIABLE) */}
       <div style={{
         background: '#0B0F17',
         border: `1px solid ${directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(255, 255, 255, 0.12)'}`,
@@ -2387,16 +2402,16 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
         overflow: 'hidden'
       }}>
-        {/* LIGNE 1 : SITUATION, MODE ANTENNE & ACTIONS DIFFUSION */}
+        {/* BARRE PRINCIPALE ÉPURÉE */}
         <div style={{
-          padding: '0.55rem 0.8rem',
+          padding: '0.5rem 0.75rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '0.55rem'
+          gap: '0.5rem'
         }}>
-          {/* Left: Situation Switcher + Mode Indicator */}
+          {/* Gauche : Sélecteur de situation sobre */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             {(() => {
               const isLiveLocked = broadcasterStatus.isStreaming;
@@ -2457,7 +2472,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                     }}
                   >
                     <Trophy size={13} color={directorState.situation === 'regional_match' ? '#D4AF37' : 'currentColor'} />
-                    Tournoi Régional / Match
+                    Match Régional
                   </button>
                   <button
                     type="button"
@@ -2486,74 +2501,14 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 </div>
               );
             })()}
-
-            <span style={{
-              background: directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(255, 255, 255, 0.05)',
-              color: directorState.broadcastMode === 'single' ? '#FCA5A5' : '#CBD5E1',
-              border: `1px solid ${directorState.broadcastMode === 'single' ? 'rgba(239, 68, 68, 0.45)' : 'rgba(255, 255, 255, 0.12)'}`,
-              height: '30px',
-              padding: '0 10px',
-              borderRadius: '7px',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              boxSizing: 'border-box'
-            }}>
-              <Radio size={12} color={directorState.broadcastMode === 'single' ? '#EF4444' : '#94A3B8'} />
-              {directorState.broadcastMode === 'single'
-                ? `PGM : ${focusedCam?.name || ''}`
-                : `MOSAÏQUE (${enabledCount})`}
-            </span>
-
-            {directorState.broadcastMode === 'single' && (
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={handleReturnToMosaic}
-                style={{
-                  width: 'auto',
-                  height: '30px',
-                  padding: '0 10px',
-                  borderRadius: '7px',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  borderColor: 'rgba(212, 175, 55, 0.5)',
-                  color: '#FDE68A'
-                }}
-              >
-                Retour Mosaïque
-              </button>
-            )}
           </div>
 
-          {/* Right: Audio, Destinations, Start Live, TV Out */}
+          {/* Droite : Diffusion unifiée + Outils Live + Démarrer Live + Sortie TV */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
             {renderPlatformStatusBadge('facebook')}
             {renderPlatformStatusBadge('youtube')}
 
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setMonitorAudioOnPc(v => !v)}
-              style={{
-                width: 'auto',
-                height: '30px',
-                fontSize: '0.72rem',
-                padding: '0 10px',
-                borderRadius: '7px',
-                fontWeight: 700,
-                background: monitorAudioOnPc ? 'rgba(16, 185, 129, 0.14)' : '#111827',
-                borderColor: monitorAudioOnPc ? 'rgba(16, 185, 129, 0.55)' : 'rgba(255,255,255,0.16)',
-                color: monitorAudioOnPc ? '#6EE7B7' : '#CBD5E1'
-              }}
-              title="Haut-parleurs de votre PC uniquement (coupe votre retour local sans couper le son envoyé sur YouTube/Facebook)"
-            >
-              {monitorAudioOnPc ? <Volume2 size={13} /> : <VolumeX size={13} />}
-              {monitorAudioOnPc ? 'Haut-parleurs PC' : 'Haut-parleurs OFF'}
-            </button>
-
+            {/* Bouton unifié Diffusion + Statut Relais/OBS */}
             <button
               type="button"
               className="btn btn-outline"
@@ -2565,17 +2520,78 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 padding: '0 10px',
                 borderRadius: '7px',
                 background: '#111827',
-                borderColor: isObsMode || activePlatformsLabel.length > 0 ? 'rgba(59, 130, 246, 0.5)' : 'rgba(255,255,255,0.16)',
-                color: isObsMode || activePlatformsLabel.length > 0 ? '#93C5FD' : '#E2E8F0',
-                fontWeight: 700
+                borderColor: relayReady
+                  ? 'rgba(16, 185, 129, 0.45)'
+                  : isObsMode
+                    ? 'rgba(59, 130, 246, 0.5)'
+                    : 'rgba(245, 158, 11, 0.45)',
+                color: relayReady
+                  ? '#6EE7B7'
+                  : isObsMode
+                    ? '#93C5FD'
+                    : '#FCD34D',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
+              title={
+                isObsMode
+                  ? 'Mode OBS Studio actif sur ce PC (cliquer pour configurer)'
+                  : relayReady
+                    ? 'Relais PC prêt — Cliquer pour configurer YouTube / Facebook ou basculer vers OBS'
+                    : 'Relais PC hors ligne — Cliquer pour configurer YouTube / Facebook ou OBS'
+              }
             >
-              <Settings size={13} />
-              {isObsMode
-                ? 'Mode : OBS Studio'
-                : activePlatformsLabel.length > 0
-                  ? `Destinations (${activePlatformsLabel.join('+')})`
-                  : 'Destinations'}
+              <span style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: isObsMode
+                  ? (obsStatus.connected ? '#10B981' : '#3B82F6')
+                  : relayReady
+                    ? '#10B981'
+                    : '#F59E0B',
+                flexShrink: 0
+              }} />
+              <span>
+                {isObsMode
+                  ? (obsStatus.streaming ? 'OBS EN DIRECT' : obsStatus.connected ? 'OBS prêt' : 'Mode OBS')
+                  : (activePlatformsLabel.length > 0 ? activePlatformsLabel.join('+') : 'Diffusion')}
+              </span>
+            </button>
+
+            {/* Bouton tiroir Outils Live */}
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setShowStudioTools(v => !v)}
+              style={{
+                width: 'auto',
+                height: '30px',
+                fontSize: '0.72rem',
+                padding: '0 10px',
+                borderRadius: '7px',
+                fontWeight: 700,
+                background: showStudioTools ? '#1E293B' : '#111827',
+                borderColor: showStudioTools
+                  ? 'rgba(212, 175, 55, 0.65)'
+                  : isStudioToolActive
+                    ? 'rgba(16, 185, 129, 0.45)'
+                    : 'rgba(255,255,255,0.16)',
+                color: showStudioTools ? '#FDE68A' : '#E2E8F0',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="Afficher / masquer les outils de production (Pause, Replay, Shot Clock, Ticker, Enregistrement, Audio, Qualité)"
+            >
+              <SlidersHorizontal size={13} />
+              <span>Outils Live</span>
+              {isStudioToolActive && (
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981' }} />
+              )}
+              {showStudioTools ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             </button>
 
             <button
@@ -2613,7 +2629,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   {isObsMode
                     ? 'DÉMARRER LIVE (OBS)'
                     : activePlatformsLabel.length > 0
-                      ? `DÉMARRER LIVE (${activePlatformsLabel.join('+')})`
+                      ? `DÉMARRER (${activePlatformsLabel.join('+')})`
                       : 'DÉMARRER LE LIVE'}
                 </>
               )}
@@ -2643,46 +2659,160 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           </div>
         </div>
 
-        {/* LIGNE 2 : OUTILS DE PRODUCTION, AUDIO & TÉLÉMÉTRIE */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.45rem',
-          background: '#070A11',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          padding: '0.45rem 0.8rem',
-          fontSize: '0.72rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={handleToggleIntermission}
-              style={{
-                width: 'auto',
-                height: '28px',
-                padding: '0 10px',
-                borderRadius: '6px',
-                fontSize: '0.71rem',
+        {/* RUBAN D'ÉTAT COMPACT (UNIQUEMENT SI TIROIR FERMÉ + UN ÉTAT ACTIF) */}
+        {showCompactStatusRibbon && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            flexWrap: 'wrap',
+            background: '#070A11',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            padding: '0.34rem 0.75rem',
+            fontSize: '0.7rem'
+          }}>
+            {isAnyLiveActive && (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                color: '#6EE7B7',
                 fontWeight: 700,
-                background: directorState.isIntermission ? 'rgba(212, 175, 55, 0.2)' : '#111827',
-                borderColor: directorState.isIntermission ? '#D4AF37' : 'rgba(255,255,255,0.14)',
-                color: directorState.isIntermission ? '#FDE68A' : '#E2E8F0'
-              }}
-              title="Afficher l'écran Pause (logo club + prochain match) sans couper le direct — Raccourci [P]"
-            >
-              {directorState.isIntermission ? 'Reprendre Direct (P)' : 'Pause (P)'}
-            </button>
-
-            {/* INSTANT REPLAY 10s + SPEED */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '5px',
+                padding: '2px 7px'
+              }}>
+                {broadcasterStatus.currentFps || 0} FPS • {(broadcasterStatus.bitrateKbps || 0) >= 100
+                  ? `${((broadcasterStatus.bitrateKbps || 0) / 1000).toFixed(1)} Mbps`
+                  : `${broadcasterStatus.bitrateKbps || 0} kbps`}
+              </span>
+            )}
+            {directorState.isIntermission && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleToggleIntermission}
+                style={{ width: 'auto', height: '24px', padding: '0 8px', fontSize: '0.68rem', fontWeight: 800, background: 'rgba(212, 175, 55, 0.2)', borderColor: '#D4AF37', color: '#FDE68A' }}
+              >
+                ⏸ Pause active — Reprendre Direct (P)
+              </button>
+            )}
+            {broadcasterStatus.isRecordingLocal && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleToggleLocalRecording}
+                style={{ width: 'auto', height: '24px', padding: '0 8px', fontSize: '0.68rem', fontWeight: 800, background: 'rgba(220, 38, 38, 0.22)', borderColor: '#EF4444', color: '#FCA5A5' }}
+              >
+                ● REC {formatDuration(broadcasterStatus.localRecordingSec || 0)}
+              </button>
+            )}
+            {broadcasterStatus.isReplaying && (
               <button
                 type="button"
                 className="btn btn-outline"
                 onClick={() => handleTriggerReplay()}
-                disabled={!broadcasterStatus.isReplaying && (broadcasterStatus.replayReadySec || 0) < 2}
+                style={{ width: 'auto', height: '24px', padding: '0 8px', fontSize: '0.68rem', fontWeight: 800, background: 'rgba(239, 68, 68, 0.24)', borderColor: '#EF4444', color: '#FCA5A5' }}
+              >
+                ⏹ Fin Replay ({Math.round((broadcasterStatus.replayProgress || 0) * 100)}%)
+              </button>
+            )}
+            {broadcasterStatus.commentatorMicActive && (
+              <span style={{ color: '#6EE7B7', fontWeight: 700, padding: '2px 7px', background: 'rgba(16,185,129,0.12)', borderRadius: '5px', border: '1px solid rgba(16,185,129,0.3)' }}>
+                🎙️ Micro commentateur ON
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* TIROIR PLIABLE OUTILS LIVE (PAUSE, REPLAY, SHOT CLOCK, TICKER, HABILLAGE, REC, AUDIO, QUALITÉ) */}
+        {showStudioTools && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.45rem',
+            background: '#070A11',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            padding: '0.48rem 0.75rem',
+            fontSize: '0.72rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleToggleIntermission}
+                style={{
+                  width: 'auto',
+                  height: '28px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  fontSize: '0.71rem',
+                  fontWeight: 700,
+                  background: directorState.isIntermission ? 'rgba(212, 175, 55, 0.2)' : '#111827',
+                  borderColor: directorState.isIntermission ? '#D4AF37' : 'rgba(255,255,255,0.14)',
+                  color: directorState.isIntermission ? '#FDE68A' : '#E2E8F0'
+                }}
+                title="Afficher l'écran Pause (logo club + prochain match) sans couper le direct — Raccourci [P]"
+              >
+                {directorState.isIntermission ? 'Reprendre Direct (P)' : 'Pause (P)'}
+              </button>
+
+              {/* INSTANT REPLAY 10s + SPEED */}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => handleTriggerReplay()}
+                  disabled={!broadcasterStatus.isReplaying && (broadcasterStatus.replayReadySec || 0) < 2}
+                  style={{
+                    width: 'auto',
+                    height: '28px',
+                    padding: '0 9px',
+                    borderRadius: '6px',
+                    fontSize: '0.71rem',
+                    fontWeight: 700,
+                    background: broadcasterStatus.isReplaying ? 'rgba(239, 68, 68, 0.24)' : '#111827',
+                    borderColor: broadcasterStatus.isReplaying ? '#EF4444' : 'rgba(255,255,255,0.14)',
+                    color: broadcasterStatus.isReplaying ? '#FCA5A5' : '#FDE68A',
+                    opacity: !broadcasterStatus.isReplaying && (broadcasterStatus.replayReadySec || 0) < 2 ? 0.55 : 1
+                  }}
+                  title="Rediffuser les 10 dernières secondes en ralenti ou vitesse normale — Raccourci [W]"
+                >
+                  {broadcasterStatus.isReplaying
+                    ? `⏹ Fin Replay (${Math.round((broadcasterStatus.replayProgress || 0) * 100)}%)`
+                    : `↺ Replay ${(broadcasterStatus.replayReadySec || 0) >= 10 ? '10s' : `${broadcasterStatus.replayReadySec || 0}s`} (W)`}
+                </button>
+                {!broadcasterStatus.isReplaying && (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setReplaySpeedChoice(v => (v < 0.9 ? 1.0 : 0.6))}
+                    style={{
+                      width: 'auto',
+                      height: '28px',
+                      padding: '0 7px',
+                      borderRadius: '6px',
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      background: '#0E1525',
+                      borderColor: 'rgba(255,255,255,0.14)',
+                      color: '#CBD5E1'
+                    }}
+                    title="Basculer la vitesse du Replay : Ralenti 0.6× ou Vitesse normale 1×"
+                  >
+                    {replaySpeedChoice < 0.9 ? '0.6×' : '1×'}
+                  </button>
+                )}
+              </div>
+
+              {/* SHOT CLOCK TOGGLE */}
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleToggleShotClockEnabled}
                 style={{
                   width: 'auto',
                   height: '28px',
@@ -2690,328 +2820,255 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   borderRadius: '6px',
                   fontSize: '0.71rem',
                   fontWeight: 700,
-                  background: broadcasterStatus.isReplaying ? 'rgba(239, 68, 68, 0.24)' : '#111827',
-                  borderColor: broadcasterStatus.isReplaying ? '#EF4444' : 'rgba(255,255,255,0.14)',
-                  color: broadcasterStatus.isReplaying ? '#FCA5A5' : '#FDE68A',
-                  opacity: !broadcasterStatus.isReplaying && (broadcasterStatus.replayReadySec || 0) < 2 ? 0.55 : 1
+                  background: shotClock.enabled ? 'rgba(212, 175, 55, 0.2)' : '#111827',
+                  borderColor: shotClock.enabled ? '#D4AF37' : 'rgba(255,255,255,0.14)',
+                  color: shotClock.enabled ? '#FDE68A' : '#E2E8F0'
                 }}
-                title="Rediffuser les 10 dernières secondes en ralenti ou vitesse normale — Raccourci [W]"
+                title="Afficher / Masquer le Shot Clock TV (30s / 45s / 60s + Extension) — Raccourci [S]"
               >
-                {broadcasterStatus.isReplaying
-                  ? `⏹ Fin Replay (${Math.round((broadcasterStatus.replayProgress || 0) * 100)}%)`
-                  : `↺ Replay ${(broadcasterStatus.replayReadySec || 0) >= 10 ? '10s' : `${broadcasterStatus.replayReadySec || 0}s`} (W)`}
+                ⏱️ Shot Clock {shotClock.enabled ? `(${shotClockRemainingSec}s)` : '(S)'}
               </button>
-              {!broadcasterStatus.isReplaying && (
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setReplaySpeedChoice(v => (v < 0.9 ? 1.0 : 0.6))}
-                  style={{
-                    width: 'auto',
-                    height: '28px',
-                    padding: '0 7px',
-                    borderRadius: '6px',
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    background: '#0E1525',
-                    borderColor: 'rgba(255,255,255,0.14)',
-                    color: '#CBD5E1'
-                  }}
-                  title="Basculer la vitesse du Replay : Ralenti 0.6× ou Vitesse normale 1×"
-                >
-                  {replaySpeedChoice < 0.9 ? '0.6×' : '1×'}
-                </button>
-              )}
-            </div>
 
-            {/* SHOT CLOCK TOGGLE */}
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={handleToggleShotClockEnabled}
-              style={{
-                width: 'auto',
-                height: '28px',
-                padding: '0 9px',
-                borderRadius: '6px',
-                fontSize: '0.71rem',
-                fontWeight: 700,
-                background: shotClock.enabled ? 'rgba(212, 175, 55, 0.2)' : '#111827',
-                borderColor: shotClock.enabled ? '#D4AF37' : 'rgba(255,255,255,0.14)',
-                color: shotClock.enabled ? '#FDE68A' : '#E2E8F0'
-              }}
-              title="Afficher / Masquer le Shot Clock TV (30s / 45s / 60s + Extension) — Raccourci [S]"
-            >
-              ⏱️ Shot Clock {shotClock.enabled ? `(${shotClockRemainingSec}s)` : '(S)'}
-            </button>
-
-            {/* TICKER QUICK TOGGLE */}
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={handleToggleTickerQuick}
-              style={{
-                width: 'auto',
-                height: '28px',
-                padding: '0 9px',
-                borderRadius: '6px',
-                fontSize: '0.71rem',
-                fontWeight: 700,
-                background: overlayConfig.ticker?.enabled ? 'rgba(239, 68, 68, 0.2)' : '#111827',
-                borderColor: overlayConfig.ticker?.enabled ? '#EF4444' : 'rgba(255,255,255,0.14)',
-                color: overlayConfig.ticker?.enabled ? '#FCA5A5' : '#E2E8F0'
-              }}
-              title="Activer / Couper le bandeau défilant en bas de l'écran (paramétrable dans Habillage TV)"
-            >
-              📺 Ticker {overlayConfig.ticker?.enabled ? 'ON' : 'OFF'}
-            </button>
-
-            {/* SÉLECTEUR RAPIDE PROJET D'HABILLAGE TV EN PLEIN DIRECT */}
-            {overlayProjects.length > 0 && (
-              <select
-                className="input-field"
-                value={
-                  activeOverlayProjectId && overlayProjects.some(p => p.id === activeOverlayProjectId)
-                    ? activeOverlayProjectId
-                    : (overlayConfig.images.length === 0 && overlayConfig.texts.length === 0 && !overlayConfig.ticker?.enabled && !overlayConfig.sponsorCarousel?.enabled)
-                      ? '__none__'
-                      : '__custom__'
-                }
-                onChange={(e) => {
-                  if (e.target.value !== '__custom__') {
-                    handleQuickSelectOverlayProject(e.target.value);
-                  }
-                }}
-                title="Changer de Projet d'Habillage TV en 1 clic sans quitter vos caméras"
+              {/* TICKER QUICK TOGGLE */}
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleToggleTickerQuick}
                 style={{
                   width: 'auto',
-                  maxWidth: '175px',
+                  height: '28px',
+                  padding: '0 9px',
+                  borderRadius: '6px',
+                  fontSize: '0.71rem',
+                  fontWeight: 700,
+                  background: overlayConfig.ticker?.enabled ? 'rgba(239, 68, 68, 0.2)' : '#111827',
+                  borderColor: overlayConfig.ticker?.enabled ? '#EF4444' : 'rgba(255,255,255,0.14)',
+                  color: overlayConfig.ticker?.enabled ? '#FCA5A5' : '#E2E8F0'
+                }}
+                title="Activer / Couper le bandeau défilant en bas de l'écran (paramétrable dans Habillage TV)"
+              >
+                📺 Ticker {overlayConfig.ticker?.enabled ? 'ON' : 'OFF'}
+              </button>
+
+              {/* SÉLECTEUR RAPIDE PROJET D'HABILLAGE TV EN PLEIN DIRECT */}
+              {overlayProjects.length > 0 && (
+                <select
+                  className="input-field"
+                  value={
+                    activeOverlayProjectId && overlayProjects.some(p => p.id === activeOverlayProjectId)
+                      ? activeOverlayProjectId
+                      : (overlayConfig.images.length === 0 && overlayConfig.texts.length === 0 && !overlayConfig.ticker?.enabled && !overlayConfig.sponsorCarousel?.enabled)
+                        ? '__none__'
+                        : '__custom__'
+                  }
+                  onChange={(e) => {
+                    if (e.target.value !== '__custom__') {
+                      handleQuickSelectOverlayProject(e.target.value);
+                    }
+                  }}
+                  title="Changer de Projet d'Habillage TV en 1 clic sans quitter vos caméras"
+                  style={{
+                    width: 'auto',
+                    maxWidth: '175px',
+                    height: '28px',
+                    borderRadius: '6px',
+                    fontSize: '0.7rem',
+                    padding: '0 8px',
+                    background: '#111827',
+                    borderColor: activeOverlayProjectId ? 'rgba(212, 175, 55, 0.5)' : 'rgba(255,255,255,0.14)',
+                    color: activeOverlayProjectId ? '#FDE68A' : '#E2E8F0',
+                    fontWeight: 700
+                  }}
+                >
+                  <option value="__none__">🎨 Habillage : Aucun</option>
+                  {!activeOverlayProjectId && (overlayConfig.images.length > 0 || overlayConfig.texts.length > 0 || overlayConfig.ticker?.enabled || overlayConfig.sponsorCarousel?.enabled) && (
+                    <option value="__custom__">🎨 Habillage : Actuel</option>
+                  )}
+                  {overlayProjects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      🎨 {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleToggleLocalRecording}
+                style={{
+                  width: 'auto',
+                  height: '28px',
+                  padding: '0 9px',
+                  borderRadius: '6px',
+                  fontSize: '0.71rem',
+                  fontWeight: 700,
+                  background: broadcasterStatus.isRecordingLocal ? 'rgba(220, 38, 38, 0.22)' : '#111827',
+                  borderColor: broadcasterStatus.isRecordingLocal ? '#EF4444' : 'rgba(255,255,255,0.14)',
+                  color: broadcasterStatus.isRecordingLocal ? '#FCA5A5' : '#E2E8F0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="Enregistrer une copie vidéo locale (.webm) sur ce PC"
+              >
+                <span style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  background: broadcasterStatus.isRecordingLocal ? '#EF4444' : '#64748B'
+                }} />
+                {broadcasterStatus.isRecordingLocal
+                  ? `REC ${formatDuration(broadcasterStatus.localRecordingSec || 0)}`
+                  : 'Enregistrer (.webm)'}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleToggleCommentatorMic}
+                style={{
+                  width: 'auto',
+                  height: '28px',
+                  padding: '0 9px',
+                  borderRadius: '6px',
+                  fontSize: '0.71rem',
+                  fontWeight: 700,
+                  background: broadcasterStatus.commentatorMicActive ? 'rgba(16, 185, 129, 0.16)' : '#111827',
+                  borderColor: broadcasterStatus.commentatorMicActive ? 'rgba(16, 185, 129, 0.55)' : 'rgba(255,255,255,0.14)',
+                  color: broadcasterStatus.commentatorMicActive ? '#6EE7B7' : '#E2E8F0'
+                }}
+                title="Activer le microphone du PC (commentateur) dans le mix audio du live"
+              >
+                {broadcasterStatus.commentatorMicActive ? <Mic size={12} /> : <MicOff size={12} />}
+                {broadcasterStatus.commentatorMicActive ? 'Micro PC ON' : 'Micro PC OFF'}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setMonitorAudioOnPc(v => !v)}
+                style={{
+                  width: 'auto',
+                  height: '28px',
+                  fontSize: '0.71rem',
+                  padding: '0 9px',
+                  borderRadius: '6px',
+                  fontWeight: 700,
+                  background: monitorAudioOnPc ? 'rgba(16, 185, 129, 0.14)' : '#111827',
+                  borderColor: monitorAudioOnPc ? 'rgba(16, 185, 129, 0.55)' : 'rgba(255,255,255,0.14)',
+                  color: monitorAudioOnPc ? '#6EE7B7' : '#CBD5E1'
+                }}
+                title="Haut-parleurs de votre PC uniquement (coupe votre retour local sans couper le son envoyé sur YouTube/Facebook)"
+              >
+                {monitorAudioOnPc ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                {monitorAudioOnPc ? 'HP PC ON' : 'HP PC OFF'}
+              </button>
+
+              {/* Real-time Audio VU-Meter */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  height: '28px',
+                  background: '#050811',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  padding: '0 8px',
+                  borderRadius: '6px',
+                  boxSizing: 'border-box'
+                }}
+                title="Niveau audio diffusé (VU-mètre temps réel)"
+              >
+                <span style={{ fontSize: '0.62rem', color: '#94A3B8', fontWeight: 700, marginRight: '3px' }}>VU</span>
+                {Array.from({ length: 10 }).map((_, idx) => {
+                  const threshold = (idx + 1) * 10;
+                  const active = (broadcasterStatus.audioLevel || 0) >= threshold;
+                  const color = idx >= 8 ? '#EF4444' : idx >= 6 ? '#F59E0B' : '#10B981';
+                  return (
+                    <span
+                      key={idx}
+                      style={{
+                        width: '4px',
+                        height: '11px',
+                        borderRadius: '1px',
+                        background: active ? color : 'rgba(255,255,255,0.12)',
+                        transition: 'background 0.08s linear'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Droite tiroir : Profil Qualité + FPS / Bitrate */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <select
+                className="input-field"
+                disabled={broadcasterStatus.isStreaming}
+                value={destinations.qualityPreset || '720p'}
+                onChange={(e) => {
+                  const nextPreset = e.target.value as StreamQualityPreset;
+                  updateDestinations({ qualityPreset: nextPreset });
+                  broadcasterRef.current?.setQualityPreset(nextPreset);
+                }}
+                style={{
+                  width: 'auto',
                   height: '28px',
                   borderRadius: '6px',
                   fontSize: '0.7rem',
                   padding: '0 8px',
                   background: '#111827',
-                  borderColor: activeOverlayProjectId ? 'rgba(212, 175, 55, 0.5)' : 'rgba(255,255,255,0.14)',
-                  color: activeOverlayProjectId ? '#FDE68A' : '#E2E8F0',
+                  borderColor: 'rgba(255,255,255,0.14)',
+                  color: '#E2E8F0',
                   fontWeight: 700
                 }}
+                title="Profil de qualité vidéo du direct (modifiable hors antenne)"
               >
-                <option value="__none__">🎨 Habillage : Aucun</option>
-                {!activeOverlayProjectId && (overlayConfig.images.length > 0 || overlayConfig.texts.length > 0 || overlayConfig.ticker?.enabled || overlayConfig.sponsorCarousel?.enabled) && (
-                  <option value="__custom__">🎨 Habillage : Actuel</option>
-                )}
-                {overlayProjects.map(p => (
-                  <option key={p.id} value={p.id}>
-                    🎨 {p.name}
+                {(Object.keys(STREAM_QUALITY_PROFILES) as StreamQualityPreset[]).map(k => (
+                  <option key={k} value={k}>
+                    {STREAM_QUALITY_PROFILES[k].label}
                   </option>
                 ))}
               </select>
-            )}
 
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={handleToggleLocalRecording}
-              style={{
-                width: 'auto',
-                height: '28px',
-                padding: '0 9px',
-                borderRadius: '6px',
-                fontSize: '0.71rem',
-                fontWeight: 700,
-                background: broadcasterStatus.isRecordingLocal ? 'rgba(220, 38, 38, 0.22)' : '#111827',
-                borderColor: broadcasterStatus.isRecordingLocal ? '#EF4444' : 'rgba(255,255,255,0.14)',
-                color: broadcasterStatus.isRecordingLocal ? '#FCA5A5' : '#E2E8F0',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-              title="Enregistrer une copie vidéo locale (.webm) sur ce PC"
-            >
               <span style={{
-                width: '7px',
-                height: '7px',
-                borderRadius: '50%',
-                background: broadcasterStatus.isRecordingLocal ? '#EF4444' : '#64748B'
-              }} />
-              {broadcasterStatus.isRecordingLocal
-                ? `REC ${formatDuration(broadcasterStatus.localRecordingSec || 0)}`
-                : 'Enregistrer (.webm)'}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={handleToggleCommentatorMic}
-              style={{
-                width: 'auto',
-                height: '28px',
-                padding: '0 9px',
-                borderRadius: '6px',
-                fontSize: '0.71rem',
-                fontWeight: 700,
-                background: broadcasterStatus.commentatorMicActive ? 'rgba(16, 185, 129, 0.16)' : '#111827',
-                borderColor: broadcasterStatus.commentatorMicActive ? 'rgba(16, 185, 129, 0.55)' : 'rgba(255,255,255,0.14)',
-                color: broadcasterStatus.commentatorMicActive ? '#6EE7B7' : '#E2E8F0'
-              }}
-              title="Activer le microphone du PC (commentateur) dans le mix audio du live"
-            >
-              {broadcasterStatus.commentatorMicActive ? <Mic size={12} /> : <MicOff size={12} />}
-              {broadcasterStatus.commentatorMicActive ? 'Micro Commentateur ON' : 'Micro PC OFF'}
-            </button>
-
-            {/* Real-time Audio VU-Meter */}
-            <div
-              style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '3px',
+                gap: '6px',
                 height: '28px',
                 background: '#050811',
                 border: '1px solid rgba(255,255,255,0.1)',
-                padding: '0 8px',
                 borderRadius: '6px',
-                boxSizing: 'border-box'
-              }}
-              title="Niveau audio diffusé (VU-mètre temps réel)"
-            >
-              <span style={{ fontSize: '0.62rem', color: '#94A3B8', fontWeight: 700, marginRight: '3px' }}>VU</span>
-              {Array.from({ length: 10 }).map((_, idx) => {
-                const threshold = (idx + 1) * 10;
-                const active = (broadcasterStatus.audioLevel || 0) >= threshold;
-                const color = idx >= 8 ? '#EF4444' : idx >= 6 ? '#F59E0B' : '#10B981';
-                return (
-                  <span
-                    key={idx}
-                    style={{
-                      width: '4px',
-                      height: '11px',
-                      borderRadius: '1px',
-                      background: active ? color : 'rgba(255,255,255,0.12)',
-                      transition: 'background 0.08s linear'
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right: Quality Profile + Real-time Stream Health Telemetry */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <select
-              className="input-field"
-              disabled={broadcasterStatus.isStreaming}
-              value={destinations.qualityPreset || '720p'}
-              onChange={(e) => {
-                const nextPreset = e.target.value as StreamQualityPreset;
-                updateDestinations({ qualityPreset: nextPreset });
-                broadcasterRef.current?.setQualityPreset(nextPreset);
-              }}
-              style={{
-                width: 'auto',
-                height: '28px',
-                borderRadius: '6px',
-                fontSize: '0.7rem',
                 padding: '0 8px',
-                background: '#111827',
-                borderColor: 'rgba(255,255,255,0.14)',
-                color: '#E2E8F0',
-                fontWeight: 700
-              }}
-              title="Profil de qualité vidéo du direct (modifiable hors antenne)"
-            >
-              {(Object.keys(STREAM_QUALITY_PROFILES) as StreamQualityPreset[]).map(k => (
-                <option key={k} value={k}>
-                  {STREAM_QUALITY_PROFILES[k].label}
-                </option>
-              ))}
-            </select>
-
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              height: '28px',
-              background: '#050811',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '6px',
-              padding: '0 8px',
-              fontSize: '0.68rem',
-              fontWeight: 700,
-              boxSizing: 'border-box',
-              color: broadcasterStatus.isStreaming ? '#6EE7B7' : '#94A3B8'
-            }}>
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: !broadcasterStatus.isStreaming
-                  ? '#475569'
-                  : (broadcasterStatus.currentFps || 0) >= 24
-                    ? '#10B981'
-                    : '#F59E0B'
-              }} />
-              {broadcasterStatus.currentFps || 0} FPS
-              {broadcasterStatus.isStreaming && (
-                <>
-                  <span style={{ color: 'rgba(255,255,255,0.25)' }}>|</span>
-                  {(broadcasterStatus.bitrateKbps || 0) >= 100
-                    ? `${((broadcasterStatus.bitrateKbps || 0) / 1000).toFixed(1)} Mbps`
-                    : `${broadcasterStatus.bitrateKbps || 0} kbps`}
-                </>
-              )}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowPlatformsModal(true)}
-              style={{
-                height: '28px',
                 fontSize: '0.68rem',
                 fontWeight: 700,
-                padding: '0 9px',
-                borderRadius: '6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                cursor: 'pointer',
-                background: isObsMode
-                  ? (obsStatus.connected ? 'rgba(16, 185, 129, 0.14)' : 'rgba(59, 130, 246, 0.14)')
-                  : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                    ? 'rgba(16, 185, 129, 0.12)'
-                    : 'rgba(245, 158, 11, 0.12)',
-                border: `1px solid ${
-                  isObsMode
-                    ? (obsStatus.connected ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)')
-                    : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                      ? 'rgba(16, 185, 129, 0.35)'
-                      : 'rgba(245, 158, 11, 0.35)'
-                }`,
-                color: isObsMode
-                  ? (obsStatus.connected ? '#6EE7B7' : '#93C5FD')
-                  : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                    ? '#6EE7B7'
-                    : '#FCD34D'
-              }}
-              title={isObsMode ? 'Mode OBS Studio actif sur ce PC (cliquer pour configurer)' : 'Statut du Relais PC (cliquer pour configurer YouTube / Facebook ou basculer vers OBS)'}
-            >
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: isObsMode
-                  ? (obsStatus.connected ? '#10B981' : '#3B82F6')
-                  : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                    ? '#10B981'
-                    : '#F59E0B'
-              }} />
-              {isObsMode
-                ? (obsStatus.streaming ? 'OBS EN DIRECT' : obsStatus.connected ? 'OBS Studio prêt' : 'Mode OBS Studio')
-                : broadcasterStatus.connectedToRelay && broadcasterStatus.ffmpegAvailable
-                  ? 'Relais PC prêt'
-                  : 'Relais PC hors ligne'}
-            </button>
+                boxSizing: 'border-box',
+                color: broadcasterStatus.isStreaming ? '#6EE7B7' : '#94A3B8'
+              }}>
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: !broadcasterStatus.isStreaming
+                    ? '#475569'
+                    : (broadcasterStatus.currentFps || 0) >= 24
+                      ? '#10B981'
+                      : '#F59E0B'
+                }} />
+                {broadcasterStatus.currentFps || 0} FPS
+                {broadcasterStatus.isStreaming && (
+                  <>
+                    <span style={{ color: 'rgba(255,255,255,0.25)' }}>|</span>
+                    {(broadcasterStatus.bitrateKbps || 0) >= 100
+                      ? `${((broadcasterStatus.bitrateKbps || 0) / 1000).toFixed(1)} Mbps`
+                      : `${broadcasterStatus.bitrateKbps || 0} kbps`}
+                  </>
+                )}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 1.25 BARRE PILOTAGE SHOT CLOCK TV (VISIBLE QUAND SHOT CLOCK ACTIVÉ) */}
@@ -3121,22 +3178,22 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         </div>
       )}
 
-      {/* 1A. 🏆 TOURNOI DE L'APPLI EN DIRECT (PILOTAGE & DIFFUSION SANS QUITTER LE LIVE) */}
+      {/* 1A. 🏆 TOURNOI DE L'APPLI EN DIRECT (BARRE COMPACTE + TIROIR PLIABLE) */}
       {directorState.situation === 'club_tables' && appTournament && (
         <div style={{
           background: '#0B0F17',
           border: '1px solid rgba(16, 185, 129, 0.35)',
           borderRadius: '12px',
-          padding: '0.75rem 0.9rem',
+          padding: '0.62rem 0.85rem',
           boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.65rem'
+          gap: '0.6rem'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#34D399', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                <Trophy size={15} /> Tournoi Appli : {appTournament.name}
+                <Trophy size={15} /> {appTournament.name}
               </span>
               <span style={{
                 fontSize: '0.68rem',
@@ -3150,43 +3207,39 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 {appTournament.finalStageLaunched
                   ? 'Phase Finale'
                   : appTournament.status === 'ongoing'
-                    ? 'Qualifications / En cours'
+                    ? 'En cours'
                     : 'Terminé'}
               </span>
-              <span style={{ fontSize: '0.71rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.71rem', color: '#CBD5E1', fontWeight: 700 }}>
                 {activeTableTourMatches.length} sur billard • {pendingReadyTourMatches.length} en attente • {finishedTourMatchesCount} terminé(s)
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => handleAddVirtualScreen('tournament_standings', 'Classement Tournoi', 'Classement du Tournoi')}
-                style={{ width: 'auto', padding: '3px 8px', fontSize: '0.7rem', fontWeight: 800, color: '#FBBF24', borderColor: 'rgba(245,158,11,0.45)' }}
-              >
-                + 🏆 Écran Classement
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => handleAddVirtualScreen('tournament_bracket', 'Tableau Final', 'Tableau Phases Finales')}
-                style={{ width: 'auto', padding: '3px 8px', fontSize: '0.7rem', fontWeight: 800, color: '#38BDF8', borderColor: 'rgba(56,189,248,0.45)' }}
-              >
-                + 🌳 Écran Tableau Final
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => handleAddVirtualScreen('matches_live_board', 'Scores Billards', 'Scores en Direct')}
-                style={{ width: 'auto', padding: '3px 8px', fontSize: '0.7rem', fontWeight: 800, color: '#34D399', borderColor: 'rgba(16,185,129,0.45)' }}
-              >
-                + 🎱 Écran Scores
-              </button>
-            </div>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setShowTournamentDrawer(v => !v)}
+              style={{
+                width: 'auto',
+                height: '28px',
+                padding: '0 10px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                borderRadius: '7px',
+                background: showTournamentDrawer ? '#1E293B' : '#111827',
+                borderColor: showTournamentDrawer ? 'rgba(16, 185, 129, 0.55)' : 'rgba(255,255,255,0.18)',
+                color: showTournamentDrawer ? '#6EE7B7' : '#F8FAFC',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <span>Gérer les matchs</span>
+              {showTournamentDrawer ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
           </div>
 
-          {activeTableTourMatches.length > 0 && (
+          {showTournamentDrawer && activeTableTourMatches.length > 0 && (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))',
@@ -3340,7 +3393,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             </div>
           )}
 
-          {pendingReadyTourMatches.length > 0 && (
+          {showTournamentDrawer && pendingReadyTourMatches.length > 0 && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -3547,28 +3600,58 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               borderRadius: '10px',
               padding: '0.6rem 0.75rem'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{
-                  fontSize: '0.76rem',
-                  fontWeight: 900,
-                  color: '#34D399',
-                  background: 'rgba(16, 185, 129, 0.14)',
-                  border: '1px solid rgba(16, 185, 129, 0.35)',
-                  padding: '3px 9px',
-                  borderRadius: '7px'
-                }}>
-                  ✅ Tournoi CueScore : {cueScoreTitleDisplay}
-                </span>
-
-                {cueScoreVenueDisplay && (
-                  <span style={{ fontSize: '0.73rem', color: '#E2E8F0', background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                    📍 {cueScoreVenueDisplay}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '0.76rem',
+                    fontWeight: 900,
+                    color: '#34D399',
+                    background: 'rgba(16, 185, 129, 0.14)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    padding: '3px 9px',
+                    borderRadius: '7px'
+                  }}>
+                    ✅ Tournoi CueScore : {cueScoreTitleDisplay}
                   </span>
-                )}
 
-                <span style={{ fontSize: '0.73rem', color: '#93C5FD', background: 'rgba(59,130,246,0.14)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                  👥 {cueScorePlayersTotal} joueur(s) • 🎱 {cueScoreMatchesTotal} match(s) ({cueScorePlayingTotal} en cours)
-                </span>
+                  {cueScoreVenueDisplay && (
+                    <span style={{ fontSize: '0.73rem', color: '#E2E8F0', background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                      📍 {cueScoreVenueDisplay}
+                    </span>
+                  )}
+
+                  <span style={{ fontSize: '0.73rem', color: '#93C5FD', background: 'rgba(59,130,246,0.14)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                    👥 {cueScorePlayersTotal} joueur(s) • 🎱 {cueScoreMatchesTotal} match(s) ({cueScorePlayingTotal} en cours)
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (rm.cueScoreShowCustomPrompt) {
+                      updateRegionalMatch({
+                        cueScoreShowCustomPrompt: false,
+                        cueScoreCustomSubtitle: '',
+                        ...(!rm.cueScoreMatchId ? { cueScoreHasActiveMatch: false } : {})
+                      });
+                    } else {
+                      updateRegionalMatch({ cueScoreShowCustomPrompt: true });
+                    }
+                  }}
+                  style={{
+                    background: rm.cueScoreShowCustomPrompt ? '#F59E0B' : 'rgba(255,255,255,0.06)',
+                    color: rm.cueScoreShowCustomPrompt ? '#041210' : '#E2E8F0',
+                    border: `1px solid ${rm.cueScoreShowCustomPrompt ? '#F59E0B' : 'rgba(255,255,255,0.18)'}`,
+                    borderRadius: '7px',
+                    padding: '4px 10px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                  title="Afficher ou masquer les champs d'informations complémentaires (sous-titre, duel manuel)"
+                >
+                  {rm.cueScoreShowCustomPrompt ? '✓ Infos complémentaires' : '✏️ Infos complémentaires'}
+                </button>
               </div>
 
               {cueScorePlayingTotal === 0 && !rm.cueScoreHasActiveMatch && (
@@ -3676,66 +3759,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             </div>
           )}
 
-          {/* Ligne 3 : Question à l'utilisateur pour informations complémentaires */}
-          {cueScoreTitleDisplay && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.6rem',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.14)',
-              borderRadius: '10px',
-              padding: '0.55rem 0.8rem'
-            }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff' }}>
-                💬 Voulez-vous renseigner d'autres informations à afficher sur le live ?
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateRegionalMatch({
-                      cueScoreShowCustomPrompt: false,
-                      cueScoreCustomSubtitle: '',
-                      ...(!rm.cueScoreMatchId ? { cueScoreHasActiveMatch: false } : {})
-                    })
-                  }
-                  style={{
-                    background: !rm.cueScoreShowCustomPrompt ? '#10B981' : 'rgba(255,255,255,0.08)',
-                    color: !rm.cueScoreShowCustomPrompt ? '#000' : '#E2E8F0',
-                    border: 'none',
-                    borderRadius: '7px',
-                    padding: '5px 10px',
-                    fontSize: '0.73rem',
-                    fontWeight: 900,
-                    cursor: 'pointer'
-                  }}
-                >
-                  ✅ Garder uniquement les infos CueScore
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateRegionalMatch({ cueScoreShowCustomPrompt: true })}
-                  style={{
-                    background: rm.cueScoreShowCustomPrompt ? '#F59E0B' : 'rgba(245, 158, 11, 0.18)',
-                    color: rm.cueScoreShowCustomPrompt ? '#000' : '#FBBF24',
-                    border: '1px solid rgba(245, 158, 11, 0.5)',
-                    borderRadius: '7px',
-                    padding: '5px 10px',
-                    fontSize: '0.73rem',
-                    fontWeight: 900,
-                    cursor: 'pointer'
-                  }}
-                >
-                  ✏️ Oui, renseigner d'autres informations
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Ligne 4 : Champs optionnels si l'utilisateur a choisi d'ajouter d'autres infos */}
+          {/* Champs optionnels si l'utilisateur a activé Infos complémentaires */}
           {rm.cueScoreShowCustomPrompt && (
             <div style={{
               display: 'flex',
@@ -4309,7 +4333,13 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                   SOURCES & CAMÉRAS ({visibleCameras.length})
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', position: 'relative' }}>
+                  {showAddSourceMenu && (
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 45 }}
+                      onClick={() => setShowAddSourceMenu(false)}
+                    />
+                  )}
                   {directorState.broadcastMode === 'mosaic' && enabledCount === 2 && (
                     <button
                       type="button"
@@ -4336,46 +4366,99 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={handleAddCamera}
-                    style={{
-                      width: 'auto',
-                      height: '26px',
-                      padding: '0 8px',
-                      borderRadius: '6px',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      background: '#111827',
-                      color: '#E2E8F0',
-                      borderColor: 'rgba(255,255,255,0.16)'
-                    }}
-                  >
-                    <Plus size={12} /> Caméra
-                  </button>
-
-                  {directorState.situation === 'club_tables' && (
+                  <div style={{ position: 'relative' }}>
                     <button
                       type="button"
                       className="btn btn-outline"
-                      onClick={handleAddStandingsScreen}
+                      onClick={() => setShowAddSourceMenu(v => !v)}
                       style={{
                         width: 'auto',
                         height: '26px',
-                        padding: '0 8px',
+                        padding: '0 9px',
                         borderRadius: '6px',
                         fontSize: '0.68rem',
                         fontWeight: 700,
-                        background: '#111827',
-                        color: '#FDE68A',
-                        borderColor: 'rgba(212, 175, 55, 0.4)'
+                        background: showAddSourceMenu ? '#1E293B' : '#111827',
+                        color: showAddSourceMenu ? '#FDE68A' : '#E2E8F0',
+                        borderColor: showAddSourceMenu ? 'rgba(212, 175, 55, 0.55)' : 'rgba(255,255,255,0.16)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}
-                      title="Ajouter l'écran Classement du Tournoi en direct sans quitter le live"
+                      title="Ajouter une caméra ou un écran live dans la régie"
                     >
-                      <Trophy size={12} /> Classement
+                      <Plus size={12} /> Ajouter
                     </button>
-                  )}
+
+                    {showAddSourceMenu && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 6px)',
+                          right: 0,
+                          minWidth: '215px',
+                          background: '#0E1525',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '10px',
+                          padding: '0.38rem',
+                          boxShadow: '0 12px 30px rgba(0,0,0,0.65)',
+                          zIndex: 60,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.28rem'
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => {
+                            setShowAddSourceMenu(false);
+                            handleAddCamera();
+                          }}
+                          style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.4rem 0.65rem', background: 'rgba(255,255,255,0.04)', color: '#F8FAFC', borderColor: 'rgba(255,255,255,0.14)' }}
+                        >
+                          📷 Caméra (Smartphone / USB)
+                        </button>
+                        {directorState.situation === 'club_tables' && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() => {
+                                setShowAddSourceMenu(false);
+                                handleAddStandingsScreen();
+                              }}
+                              style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.4rem 0.65rem', background: 'rgba(212, 175, 55, 0.08)', color: '#FDE68A', borderColor: 'rgba(212, 175, 55, 0.35)' }}
+                            >
+                              🏆 Écran Classement
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() => {
+                                setShowAddSourceMenu(false);
+                                handleAddVirtualScreen('tournament_bracket', 'Tableau Final', 'Tableau Phases Finales');
+                              }}
+                              style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.4rem 0.65rem', background: 'rgba(56, 189, 248, 0.08)', color: '#BAE6FD', borderColor: 'rgba(56, 189, 248, 0.35)' }}
+                            >
+                              🌳 Écran Tableau Final
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() => {
+                                setShowAddSourceMenu(false);
+                                handleAddVirtualScreen('matches_live_board', 'Scores Billards', 'Scores en Direct');
+                              }}
+                              style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.4rem 0.65rem', background: 'rgba(16, 185, 129, 0.08)', color: '#A7F3D0', borderColor: 'rgba(16, 185, 129, 0.35)' }}
+                            >
+                              🎱 Écran Scores Billards
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -4452,7 +4535,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.76rem', fontWeight: 800, color: '#F8FAFC', letterSpacing: '0.4px' }}>
                   <MonitorPlay size={15} color="#D4AF37" />
-                  PROGRAMME LIVE ({directorState.isIntermission ? 'Pause' : directorState.broadcastMode === 'single' ? 'Plein Écran' : 'Mosaïque'})
+                  PROGRAMME LIVE ({directorState.isIntermission ? 'Pause' : directorState.broadcastMode === 'single' ? `Plein Écran — ${focusedCam?.name || ''}` : `Mosaïque (${enabledCount})`})
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>

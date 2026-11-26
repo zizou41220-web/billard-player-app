@@ -143,6 +143,26 @@ body.theme-light .glass-card .btn-outline:hover:not(:disabled) {
   color: #FDE68A;
 }
 
+.live-studio-surface {
+  --text-primary: #F8FAFC;
+  --text-muted: #94A3B8;
+  color: #F8FAFC;
+}
+
+[data-theme="light"] .live-studio-surface .btn-outline,
+body.theme-light .live-studio-surface .btn-outline {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #E2E8F0;
+}
+
+[data-theme="light"] .live-studio-surface .btn-outline:hover:not(:disabled),
+body.theme-light .live-studio-surface .btn-outline:hover:not(:disabled) {
+  background: rgba(251, 191, 36, 0.16);
+  border-color: #FBBF24;
+  color: #FDE68A;
+}
+
 [data-theme="light"] .mobile-container,
 body.theme-light .mobile-container {
   background: #F8FAFC !important;
