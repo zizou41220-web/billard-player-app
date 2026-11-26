@@ -100,7 +100,6 @@ import {
 } from '../utils/liveOverlay';
 import { parseRtmpStreamInput } from '../utils/video';
 import { ObsStatusSnapshot, checkObsStatus, startObsStream, stopObsStream } from '../utils/obsControl';
-import PrismMobileControlView from './PrismMobileControlView';
 
 interface MultiCamDirectorPanelProps {
   getAppBaseUrl: () => string;
@@ -1166,7 +1165,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [monitorAudioOnPc, setMonitorAudioOnPc] = useState<boolean>(true);
   const [qrModalCamId, setQrModalCamId] = useState<string | null>(null);
   const [showPlatformsModal, setShowPlatformsModal] = useState<boolean>(false);
-  const [showPrismModal, setShowPrismModal] = useState<boolean>(false);
   const [copiedCamUrl, setCopiedCamUrl] = useState<boolean>(false);
   const [showStreamKeys, setShowStreamKeys] = useState<boolean>(false);
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
@@ -2519,29 +2517,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             >
               <Tv size={13} /> Sortie TV
             </a>
-
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setShowPrismModal(true)}
-              style={{
-                width: 'auto',
-                height: '30px',
-                fontSize: '0.72rem',
-                padding: '0 10px',
-                borderRadius: '7px',
-                background: '#111827',
-                borderColor: 'rgba(59, 130, 246, 0.45)',
-                color: '#93C5FD',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-              title="Configurer un Live Facebook depuis votre smartphone avec PRISM Live Studio (widget transparent + télécommande score)"
-            >
-              <Smartphone size={13} /> PRISM Mobile
-            </button>
           </div>
         </div>
 
@@ -5157,10 +5132,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
             </button>
           </div>
         </div>
-      )}
-
-      {showPrismModal && (
-        <PrismMobileControlView onClose={() => setShowPrismModal(false)} />
       )}
     </div>
   );
