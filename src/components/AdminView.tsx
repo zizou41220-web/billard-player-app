@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import QRCode from 'react-qr-code';
 import {
@@ -31,7 +31,7 @@ import {
   getActiveFrenchVoiceLabel,
   FrenchVoiceOption
 } from '../utils/voiceAnnouncer';
-import BilliardTableVisual from './BilliardTableVisual';
+import { PlayerStatsModal } from './PlayerStatsDashboard';
 import { APP_VERSION } from '../version';
 import { useNeonFx } from '../utils/neonFx';
 import { useTheme } from '../utils/theme';
@@ -39,7 +39,7 @@ import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
 import { formatShortDateTime } from '../utils/timeFormat';
-import { getPlayerAvatar } from '../utils/avatar';
+import { getPlayerAvatar, isCustomPlayerPhoto } from '../utils/avatar';
 
 interface QualifiersCountSelectorProps {
   value: number;
@@ -199,7 +199,7 @@ const AdminView: React.FC = () => {
   const {
     tournaments, matches, players, tables, currentClub, setClub,
     createTournament, addPlayer, updatePlayer, deletePlayer,
-    updateTablePosition, addTable, removeTable, postponeMatch,
+    addTable, removeTable, postponeMatch,
     endTournament, finishMatch, freeTable, updateMatchScore,
     launchMatchOnTable, updateFinishedMatchScore, startTournamentMatch,
     launchFinalStage, reseedFinalStage, setTableLiveStream, setMatchLiveStream,
@@ -223,7 +223,12 @@ const AdminView: React.FC = () => {
   }, [isTournamentActive]);
 
   const [dashboardSubTab, setDashboardSubTab] = useState<'live' | 'bracket'>('live');
-  const [adminSubTab, setAdminSubTab] = useState<'map' | 'players' | 'club'>('map');
+  const [adminSubTab, setAdminSubTab] = useState<'players' | 'club'>('players');
+  const [adminPlayerSearch, setAdminPlayerSearch] = useState('');
+  const [adminPlayerLevelFilter, setAdminPlayerLevelFilter] = useState<'all' | 'Prestige' | 'Amateur'>('all');
+  const [showCreatePlayerModal, setShowCreatePlayerModal] = useState(false);
+  const [showPlayerOptionalFields, setShowPlayerOptionalFields] = useState(false);
+  const [viewingPlayerStatsId, setViewingPlayerStatsId] = useState<string | null>(null);
   const [showNewTourForm, setShowNewTourForm] = useState(false);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [selectedTableForQR, setSelectedTableForQR] = useState<string | null>(null);
@@ -554,40 +559,6 @@ const AdminView: React.FC = () => {
     setDirectScore2(m.score2 || rules.minScore2 || 0);
   };
 
-  // Measure live tournament tables deck container height dynamically
-  const [deckHeight, setDeckHeight] = useState<number>(0);
-  const deckRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!deckRef.current) return;
-    const updateSize = () => {
-      if (deckRef.current && deckRef.current.clientHeight > 0) {
-        setDeckHeight(deckRef.current.clientHeight);
-      }
-    };
-    updateSize();
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        if (entry.contentRect.height > 0) {
-          setDeckHeight(entry.contentRect.height);
-        }
-      }
-    });
-    ro.observe(deckRef.current);
-    return () => ro.disconnect();
-  }, [activeTab, dashboardSubTab, activeTournament?.id, Object.keys(tables).length]);
-
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewPlayerPhoto(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const togglePlayerSelection = (id: string) => {
     setSelectedPlayers(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
@@ -795,274 +766,6 @@ const AdminView: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [selectedTableForQR, tables, matches]);
-
-  const renderMap = (isEditable: boolean, scaleOverride?: number, showOnlyTournamentTables = false) => {
-    const tournamentTables = Object.values(tables)
-      .filter(t => !showOnlyTournamentTables || !activeTournament || activeTournament.settings?.tableIds.includes(t.id))
-      .sort((a, b) => a.number - b.number);
-    const tablesCount = tournamentTables.length;
-
-    // Compact centered deck for live tournament dashboard
-    if (showOnlyTournamentTables) {
-      const baseW = 248;
-      const baseH = 208; // BilliardTableVisual large base height
-
-      // Tables per row and estimated rows
-      const estimatedRows = tablesCount <= 3 ? 1 : (tablesCount <= 6 ? 2 : Math.ceil(tablesCount / 3));
-      const availableH = deckHeight > 0 ? deckHeight : 300;
-      const heightPadding = estimatedRows * 16;
-      const maxScaleFitHeight = (availableH - heightPadding) / (estimatedRows * baseH);
-
-      // Base target scales according to number of tournament tables
-      const getPreferredScale = (count: number) => {
-        if (count <= 1) return 1.28;
-        if (count === 2) return 1.18;
-        if (count === 3) return 0.98;
-        if (count === 4) return 0.85;
-        if (count <= 6) return 0.74;
-        return 0.64;
-      };
-
-      // Table scale adapts to both table count AND strictly fits within container height
-      const tableScale = Math.max(0.55, Math.min(getPreferredScale(tablesCount), maxScaleFitHeight));
-
-      const scaledW = Math.round(baseW * tableScale);
-      const scaledH = Math.round(baseH * tableScale);
-      const dynamicGap = tablesCount <= 1 ? '0rem' : tablesCount === 2 ? '2.8rem' : tablesCount <= 4 ? '1.5rem' : '1rem';
-
-      return (
-        <div
-          ref={deckRef}
-          style={{
-            flex: 1,
-            width: '100%',
-            height: '100%',
-            minHeight: 0,
-            backgroundColor: '#050814',
-            backgroundImage: 'radial-gradient(circle at center, rgba(18, 32, 60, 0.7) 0%, rgba(4, 7, 16, 0.98) 100%), repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 20px, transparent 20px, transparent 40px)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '16px',
-            position: 'relative',
-            padding: '0.4rem 0.8rem',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            alignContent: tablesCount <= 3 ? 'center' : 'start',
-            gap: dynamicGap,
-            flexWrap: 'wrap',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            boxShadow: 'inset 0 0 35px rgba(0,0,0,0.85)'
-          }}
-        >
-          {/* Subtle Room Watermark Floor Crest */}
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none',
-            opacity: 0.04,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '0.5rem',
-            userSelect: 'none'
-          }}>
-            <img src={getClubLogoUrl(currentClub.logoUrl)} alt="Club Crest" style={{ width: '180px', filter: 'grayscale(1)' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
-          </div>
-
-          {tournamentTables.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              Aucun billard assigné à ce tournoi.
-            </div>
-          ) : (
-            tournamentTables.map(table => {
-              // Ensure match strictly belongs to active tournament and respects final stage
-              const candidateMatch = (table.currentMatchId && matches[table.currentMatchId]?.tournamentId === activeTournament?.id && matches[table.currentMatchId]?.status !== 'finished')
-                ? matches[table.currentMatchId]
-                : Object.values(matches).find(m => m.tournamentId === activeTournament?.id && m.tableId === table.id && m.status !== 'finished');
-              const currentMatch = (candidateMatch && isFinalStageActive && !isFinalStageMatch(candidateMatch))
-                ? undefined
-                : candidateMatch;
-
-              const p1 = currentMatch ? players[currentMatch.player1Id] : undefined;
-              const p2 = currentMatch ? players[currentMatch.player2Id] : undefined;
-              const isPlaying = currentMatch?.status === 'playing';
-              const isAssigned = Boolean(currentMatch);
-
-              return (
-                <div
-                  key={table.id}
-                  style={{
-                    width: `${scaledW}px`,
-                    height: `${scaledH}px`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    cursor: 'pointer',
-                    zIndex: isPlaying ? 10 : (isAssigned ? 5 : 1),
-                    margin: tablesCount <= 2 ? '0.2rem 0.4rem' : '0.15rem 0.3rem'
-                  }}
-                  onClick={() => setSelectedTableForQR(table.id)}
-                  title={`Cliquer pour voir le match de ${table.name || `Table ${table.number}`}`}
-                >
-                  <div
-                    style={{
-                      width: `${baseW}px`,
-                      height: `${baseH}px`,
-                      transform: `scale(${tableScale})`,
-                      transformOrigin: 'center center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <BilliardTableVisual
-                      number={table.number}
-                      name={table.name}
-                      status={isAssigned ? 'occupied' : 'free'}
-                      match={currentMatch}
-                      player1={p1}
-                      player2={p2}
-                      size="large"
-                      hasLiveStream={Boolean(table.liveStreamUrl || currentMatch?.liveStreamUrl)}
-                    />
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      );
-    }
-
-    const scale = scaleOverride !== undefined ? scaleOverride : Math.max(0.5, Math.min(1.8, 2.0 - (tablesCount * 0.08)));
-
-    return (
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: '#050814',
-          backgroundImage: isEditable
-            ? 'radial-gradient(circle at center, rgba(16, 28, 54, 0.75) 0%, rgba(5, 8, 18, 0.95) 100%), linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px)'
-            : 'radial-gradient(circle at center, rgba(18, 32, 60, 0.7) 0%, rgba(4, 7, 16, 0.98) 100%), repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 20px, transparent 20px, transparent 40px)',
-          backgroundSize: isEditable ? 'auto, 40px 40px, 40px 40px' : 'auto, auto',
-          border: isEditable ? '2px dashed rgba(0, 255, 170, 0.4)' : '1px solid var(--border-color)',
-          borderRadius: '16px',
-          position: 'relative',
-          minHeight: isEditable ? '600px' : '100%',
-          overflow: 'hidden',
-          boxShadow: 'inset 0 0 50px rgba(0,0,0,0.85)'
-        }}
-        onDragOver={(e) => isEditable && e.preventDefault()}
-        onDrop={(e) => {
-          if (!isEditable) return;
-          const tableId = e.dataTransfer.getData('tableId');
-          if (!tableId) return;
-          const rect = e.currentTarget.getBoundingClientRect();
-          let x = Math.round(Math.max(5, Math.min(95, ((e.clientX - rect.left) / rect.width) * 100)));
-          let y = Math.round(Math.max(5, Math.min(95, ((e.clientY - rect.top) / rect.height) * 100)));
-
-          // Magnet snap to other tables (3% threshold)
-          const SNAP_THRESHOLD = 3;
-          Object.values(tables).forEach(t => {
-            if (t.id === tableId) return;
-            if (t.x !== undefined && Math.abs(t.x - x) < SNAP_THRESHOLD) x = t.x;
-            if (t.y !== undefined && Math.abs(t.y - y) < SNAP_THRESHOLD) y = t.y;
-          });
-
-          updateTablePosition(tableId, x, y);
-        }}
-      >
-        {/* Subtle Room Watermark Floor Crest */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          pointerEvents: 'none',
-          opacity: 0.045,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '1rem',
-          userSelect: 'none'
-        }}>
-          <img src={getClubLogoUrl(currentClub.logoUrl)} alt="Club Crest" style={{ width: '220px', filter: 'grayscale(1)' }} onError={(e) => { e.currentTarget.src = defaultClubLogo; }} />
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, letterSpacing: '6px', color: '#fff', textTransform: 'uppercase' }}>
-            {currentClub.name}
-          </div>
-        </div>
-
-        {Object.values(tables)
-          .filter(t => !showOnlyTournamentTables || !activeTournament || activeTournament.settings?.tableIds.includes(t.id))
-          .map(table => {
-            const currentMatch = (table.currentMatchId && matches[table.currentMatchId]?.status !== 'finished') ? matches[table.currentMatchId] : undefined;
-            const p1 = currentMatch ? players[currentMatch.player1Id] : undefined;
-            const p2 = currentMatch ? players[currentMatch.player2Id] : undefined;
-
-            return (
-              <div
-                key={table.id}
-                draggable={isEditable}
-                onDragStart={(e) => {
-                  if (isEditable) e.dataTransfer.setData('tableId', table.id);
-                }}
-                style={{
-                  position: 'absolute',
-                  left: `${table.x || 10}%`,
-                  top: `${table.y || 10}%`,
-                  transform: `translate(-50%, -50%) scale(${scale})`,
-                  cursor: isEditable ? 'grab' : 'pointer',
-                  zIndex: table.status === 'occupied' ? 10 : 1
-                }}
-                onClick={() => {
-                  if (!isEditable) setSelectedTableForQR(table.id);
-                }}
-              >
-                <BilliardTableVisual
-                  number={table.number}
-                  name={table.name}
-                  status={table.status}
-                  match={currentMatch}
-                  player1={p1}
-                  player2={p2}
-                />
-
-                {isEditable && (
-                  <div
-                    onClick={(e) => { e.stopPropagation(); removeTable(table.id); }}
-                    style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      right: '-6px',
-                      background: '#ff2244',
-                      color: 'white',
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: 900,
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                      zIndex: 100
-                    }}
-                    title="Supprimer ce billard"
-                  >
-                    ✕
-                  </div>
-                )}
-              </div>
-            );
-          })}
-      </div>
-    );
-  };
 
   return (
     <div style={{
@@ -1423,117 +1126,55 @@ const AdminView: React.FC = () => {
         <div style={{
           background: 'rgba(255, 255, 255, 0.02)',
           borderBottom: '1px solid var(--border-color)',
-          padding: '0.75rem 2.5rem',
+          padding: '0.65rem 1.8rem',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           zIndex: 10
         }}>
-          {/* Sub tabs: Plan de salle & Joueurs */}
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.4)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+          {/* Sub tabs: Joueurs & Club & Billards */}
+          <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(0,0,0,0.35)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
             <button
-              onClick={() => setAdminSubTab('map')}
-              style={{
-                background: adminSubTab === 'map' ? 'var(--accent-primary)' : 'transparent',
-                color: adminSubTab === 'map' ? '#000' : 'var(--text-muted)',
-                fontWeight: 700,
-                border: 'none',
-                padding: '0.5rem 1.2rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.85rem',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Trophy size={16} /> Plan de Salle ({Object.keys(tables).length} billards)
-            </button>
-
-            <button
+              type="button"
               onClick={() => setAdminSubTab('players')}
               style={{
                 background: adminSubTab === 'players' ? 'var(--accent-primary)' : 'transparent',
-                color: adminSubTab === 'players' ? '#000' : 'var(--text-muted)',
-                fontWeight: 700,
+                color: adminSubTab === 'players' ? '#041210' : 'var(--text-muted)',
+                fontWeight: adminSubTab === 'players' ? 800 : 600,
                 border: 'none',
-                padding: '0.5rem 1.2rem',
+                padding: '0.45rem 1.1rem',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.85rem',
-                transition: 'all 0.2s ease'
+                gap: '0.45rem',
+                fontSize: '0.84rem',
+                transition: 'all 0.15s ease'
               }}
             >
-              <Users size={16} /> Pédigré des Joueurs ({Object.keys(players).length})
+              <Users size={15} /> Joueurs ({Object.keys(players).length})
             </button>
 
             <button
+              type="button"
               onClick={() => setAdminSubTab('club')}
               style={{
                 background: adminSubTab === 'club' ? 'var(--accent-primary)' : 'transparent',
-                color: adminSubTab === 'club' ? '#000' : 'var(--text-muted)',
-                fontWeight: 700,
+                color: adminSubTab === 'club' ? '#041210' : 'var(--text-muted)',
+                fontWeight: adminSubTab === 'club' ? 800 : 600,
                 border: 'none',
-                padding: '0.5rem 1.2rem',
+                padding: '0.45rem 1.1rem',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.85rem',
-                transition: 'all 0.2s ease'
+                gap: '0.45rem',
+                fontSize: '0.84rem',
+                transition: 'all 0.15s ease'
               }}
             >
-              <Building2 size={16} /> Club ({currentClub.name})
+              <Building2 size={15} /> Club & Billards ({Object.keys(tables).length})
             </button>
-          </div>
-
-          {/* Master PIN Lock Controls for Club Admin */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {!isAdminUnlocked ? (
-              <button
-                className="btn btn-outline"
-                style={{ borderColor: 'rgba(255, 255, 255, 0.15)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}
-                onClick={() => {
-                  const pin = prompt("Code PIN de direction (essayez 1234) :");
-                  if (pin === "1234") setIsAdminUnlocked(true);
-                  else if (pin) alert("Code PIN incorrect.");
-                }}
-              >
-                <Lock size={15} style={{ color: 'var(--accent-secondary)' }} />
-                Mode Consultation
-                <span style={{ fontSize: '0.75rem', opacity: 0.7, background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>Déverrouiller PIN</span>
-              </button>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Unlock size={15} /> Mode Édition Déverrouillé
-                </span>
-                {adminSubTab === 'map' && (
-                  <button
-                    className="btn btn-neon"
-                    onClick={() => addTable('')}
-                    style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
-                  >
-                    + Ajouter un billard
-                  </button>
-                )}
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setIsAdminUnlocked(false);
-                    setEditingPlayerId(null);
-                  }}
-                  style={{ background: 'rgba(255,255,255,0.08)', fontSize: '0.85rem', padding: '0.4rem 1rem' }}
-                >
-                  Verrouiller
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1794,10 +1435,10 @@ const AdminView: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Launcher Card 2: Floor Plan */}
+                  {/* Launcher Card 2: Club & Billards */}
                   <div
                     className="glass-card"
-                    onClick={() => { setActiveTab('admin'); setAdminSubTab('map'); }}
+                    onClick={() => { setActiveTab('admin'); setAdminSubTab('club'); }}
                     style={{
                       padding: '2.5rem',
                       display: 'flex',
@@ -1815,20 +1456,20 @@ const AdminView: React.FC = () => {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                         <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(0, 220, 255, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-secondary)' }}>
-                          <Trophy size={28} />
+                          <Building2 size={28} />
                         </div>
                         <span style={{ fontSize: '0.8rem', color: 'var(--accent-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
                           ADMINISTRATION <ArrowRight size={14} />
                         </span>
                       </div>
-                      <h3 style={{ fontSize: '1.6rem', margin: '0 0 0.5rem 0', fontWeight: 800 }}>Consulter le Plan de Salle</h3>
+                      <h3 style={{ fontSize: '1.6rem', margin: '0 0 0.5rem 0', fontWeight: 800 }}>Gérer le Club & Billards</h3>
                       <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: 0, lineHeight: '1.5' }}>
-                        Voir l'agencement physique des {Object.keys(tables).length} billards du club, l'occupation en salle et les QR codes individuels de chaque table.
+                        Ajoutez ou supprimez les {Object.keys(tables).length} billards du club, personnalisez le logo et récupérez le QR code d'accès.
                       </p>
                     </div>
 
                     <button className="btn btn-outline" style={{ width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1rem' }}>
-                      Voir le Plan de Salle complet
+                      Ouvrir Club & Billards
                     </button>
                   </div>
 
@@ -3075,9 +2716,9 @@ const AdminView: React.FC = () => {
                         <button
                           className="btn"
                           style={{ fontSize: '0.8rem', padding: '0.3rem 0.8rem', background: 'rgba(255,255,255,0.06)' }}
-                          onClick={() => { setActiveTab('admin'); setAdminSubTab('map'); }}
+                          onClick={() => { setActiveTab('admin'); setAdminSubTab('club'); }}
                         >
-                          🗺️ Gérer le plan de salle
+                          🎱 Gérer les billards
                         </button>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.8rem' }}>
@@ -3456,12 +3097,14 @@ const AdminView: React.FC = () => {
                                     e.stopPropagation();
                                     setActiveTab('admin');
                                     setAdminSubTab('players');
+                                    setShowCreatePlayerModal(false);
                                     setEditingPlayerId(p.id);
                                     setEditPlayerName(p.name);
                                     setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
-                                    setEditPlayerPhoto(null);
+                                    setEditPlayerPhoto(isCustomPlayerPhoto(p.avatarUrl) ? (p.avatarUrl || null) : null);
                                     setEditPlayerClubName(p.clubName || p.stats?.clubName || '');
                                     setEditPlayerClubLogo(p.clubLogoUrl || p.stats?.clubLogoUrl || null);
+                                    setShowPlayerOptionalFields(Boolean(isCustomPlayerPhoto(p.avatarUrl) || p.clubName || p.stats?.clubName || p.clubLogoUrl || p.stats?.clubLogoUrl));
                                   }}
                                   style={{
                                     background: 'transparent',
@@ -4917,344 +4560,466 @@ const AdminView: React.FC = () => {
         })()}
 
         {/* ========================================================================= */}
-        {/* 3. ADMINISTRATION TAB (SUB-MENUS: PLAN DE SALLE & JOUEURS)               */}
+        {/* 3. ADMINISTRATION TAB (JOUEURS & CLUB / BILLARDS)                         */}
         {/* ========================================================================= */}
         {activeTab === 'admin' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0 }}>
 
-            {/* Sub-menu 1: Plan de Salle */}
-            {adminSubTab === 'map' && (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.8rem', margin: '0 0 0.3rem 0' }}>Plan de la Salle ({Object.keys(tables).length} billards)</h2>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                      {isAdminUnlocked ? "Mode Édition: Glissez-déposez les billards pour réorganiser l'espace du club." : "Mode Lecture: Vue d'ensemble de la salle. Déverrouillez ci-dessus pour déplacer ou ajouter des tables."}
-                    </span>
-                  </div>
-                </div>
-                {renderMap(isAdminUnlocked, undefined, false)}
-              </div>
-            )}
+            {/* Sub-menu 1: Joueurs (Option A : liste épurée + pop-up création/édition) */}
+            {adminSubTab === 'players' && (() => {
+              const sortedPlayers = Object.values(players)
+                .filter(p => {
+                  const lvl = p.level === 'Confirmé' ? 'Prestige' : p.level;
+                  if (adminPlayerLevelFilter !== 'all' && lvl !== adminPlayerLevelFilter) return false;
+                  if (adminPlayerSearch.trim()) {
+                    const q = adminPlayerSearch.trim().toLowerCase();
+                    const clubLabel = (p.clubName || p.stats?.clubName || '').toLowerCase();
+                    return p.name.toLowerCase().includes(q) || clubLabel.includes(q);
+                  }
+                  return true;
+                })
+                .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
-            {/* Sub-menu 2: Joueurs */}
-            {adminSubTab === 'players' && (
-              <div style={{ display: 'grid', gridTemplateColumns: isNarrowScreen ? '1fr' : 'minmax(0, 1fr) minmax(260px, 340px)', gap: isSmallDesktop ? '1.25rem' : '2rem', height: isNarrowScreen ? 'auto' : '100%', maxWidth: '1280px', width: '100%', margin: '0 auto' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div>
-                      <h2 style={{ fontSize: '1.8rem', margin: '0 0 0.3rem 0' }}>Pédigré des Joueurs ({Object.keys(players).length})</h2>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        Gérez les membres du club : modifiez les fiches, ajoutez de nouveaux joueurs ou supprimez les profils inutilisés.
+              const openCreatePlayer = () => {
+                setEditingPlayerId(null);
+                setNewPlayerName('');
+                setNewPlayerLevel('Amateur');
+                setNewPlayerPhoto(null);
+                setNewPlayerClubName('');
+                setNewPlayerClubLogo(null);
+                setShowPlayerOptionalFields(false);
+                setShowCreatePlayerModal(true);
+              };
+
+              const openEditPlayer = (p: any) => {
+                setShowCreatePlayerModal(false);
+                setEditingPlayerId(p.id);
+                setEditPlayerName(p.name);
+                setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
+                setEditPlayerPhoto(isCustomPlayerPhoto(p.avatarUrl) ? (p.avatarUrl || null) : null);
+                setEditPlayerClubName(p.clubName || p.stats?.clubName || '');
+                setEditPlayerClubLogo(p.clubLogoUrl || p.stats?.clubLogoUrl || null);
+                setShowPlayerOptionalFields(Boolean(isCustomPlayerPhoto(p.avatarUrl) || p.clubName || p.stats?.clubName || p.clubLogoUrl || p.stats?.clubLogoUrl));
+              };
+
+              return (
+                <div style={{ maxWidth: '1120px', width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                  {/* En-tête compact sur une ligne */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.7rem', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                      <h2 style={{ fontSize: '1.35rem', margin: 0, fontWeight: 800 }}>Joueurs</h2>
+                      <span style={{ fontSize: '0.78rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', padding: '2px 9px', borderRadius: '10px', fontWeight: 700 }}>
+                        {sortedPlayers.length}{sortedPlayers.length !== Object.keys(players).length ? ` / ${Object.keys(players).length}` : ''}
                       </span>
                     </div>
-                    <button
-                      className="btn btn-outline"
-                      id="btn-recompute-stats"
-                      onClick={() => {
-                        recomputePlayerStats();
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.85rem',
-                        borderColor: 'var(--accent-primary)',
-                        color: 'var(--accent-primary)',
-                        padding: '0.5rem 1rem',
-                        cursor: 'pointer'
-                      }}
-                      title="Recalculer et synchroniser les statistiques depuis l'ensemble des matchs terminés"
-                    >
-                      <RefreshCw size={15} /> Actualiser les stats
-                    </button>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+                      {/* Recherche */}
+                      <div style={{ position: 'relative', minWidth: '190px', flex: '0 1 240px' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input
+                          type="text"
+                          placeholder="Rechercher un joueur..."
+                          value={adminPlayerSearch}
+                          onChange={e => setAdminPlayerSearch(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.45rem 1.8rem 0.45rem 2rem',
+                            borderRadius: '9px',
+                            border: '1px solid var(--border-color)',
+                            background: 'rgba(0,0,0,0.28)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.82rem',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                        {adminPlayerSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setAdminPlayerSearch('')}
+                            style={{ position: 'absolute', right: '7px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Filtre niveau segmenté */}
+                      <div style={{ display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.32)', padding: '3px', borderRadius: '9px', border: '1px solid var(--border-color)' }}>
+                        {(['all', 'Prestige', 'Amateur'] as const).map(lvl => {
+                          const active = adminPlayerLevelFilter === lvl;
+                          return (
+                            <button
+                              key={lvl}
+                              type="button"
+                              onClick={() => setAdminPlayerLevelFilter(lvl)}
+                              style={{
+                                background: active ? 'var(--accent-primary)' : 'transparent',
+                                color: active ? '#041210' : 'var(--text-muted)',
+                                border: 'none',
+                                borderRadius: '7px',
+                                padding: '0.35rem 0.7rem',
+                                fontSize: '0.78rem',
+                                fontWeight: active ? 800 : 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {lvl === 'all' ? 'Tous' : lvl === 'Prestige' ? '👑 Prestige' : 'Amateur'}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        id="btn-recompute-stats"
+                        onClick={() => recomputePlayerStats()}
+                        style={{ padding: '0.45rem 0.65rem', fontSize: '0.8rem' }}
+                        title="Recalculer les statistiques depuis les matchs terminés"
+                      >
+                        <RefreshCw size={15} />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-neon"
+                        onClick={openCreatePlayer}
+                        style={{ padding: '0.48rem 0.95rem', fontSize: '0.84rem', fontWeight: 800, color: '#041210', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                      >
+                        <UserPlus size={16} /> Nouveau joueur
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem', overflowY: 'auto' }}>
-                    {Object.values(players).map(p => (
-                      <div key={p.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', position: 'relative' }}>
-
-                        {editingPlayerId === p.id ? (
-                          // Edit Mode
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            <input type="text" className="input-field" placeholder="Nom du joueur" value={editPlayerName} onChange={e => setEditPlayerName(e.target.value)} />
-                            <select className="input-field" value={editPlayerLevel === 'Confirmé' ? 'Prestige' : editPlayerLevel} onChange={e => setEditPlayerLevel(e.target.value)} style={{ appearance: 'none', background: 'rgba(255,255,255,0.05)', color: '#fff' }}>
-                              <option value="Amateur" style={{ color: '#000' }}>Amateur</option>
-                              <option value="Prestige" style={{ color: '#000' }}>👑 Prestige</option>
-                            </select>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Photo du joueur :</div>
-                            <input type="file" accept="image/*" onChange={e => {
-                              const file = e.target.files?.[0];
-                              if (file) readImageFile(file, (url) => setEditPlayerPhoto(url));
-                            }} style={{ fontSize: '0.78rem' }} />
-                            <input
-                              type="text"
-                              className="input-field"
-                              placeholder="Club (optionnel)"
-                              value={editPlayerClubName}
-                              onChange={e => setEditPlayerClubName(e.target.value)}
-                              style={{ fontSize: '0.82rem', padding: '0.45rem 0.7rem' }}
+                  {/* Liste pleine largeur épurée */}
+                  <div className="glass-card" style={{ padding: 0, flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                    {sortedPlayers.length === 0 ? (
+                      <div style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                        {Object.keys(players).length === 0
+                          ? 'Aucun joueur enregistré dans le club. Cliquez sur « + Nouveau joueur » pour commencer.'
+                          : 'Aucun joueur ne correspond à cette recherche.'}
+                      </div>
+                    ) : (
+                      sortedPlayers.map(p => {
+                        const isPrestige = p.level === 'Prestige' || p.level === 'Confirmé';
+                        const extClub = p.clubName || p.stats?.clubName;
+                        const extLogo = p.clubLogoUrl || p.stats?.clubLogoUrl;
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => setViewingPlayerStatsId(p.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.9rem',
+                              padding: '0.72rem 1.05rem',
+                              borderBottom: '1px solid var(--border-color)',
+                              cursor: 'pointer',
+                              transition: 'background 0.12s ease'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.035)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <img
+                              src={getPlayerAvatar(p)}
+                              alt={p.name}
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                objectFit: 'cover',
+                                flexShrink: 0,
+                                border: `2px solid ${isPrestige ? '#ffd700' : 'var(--border-color)'}`
+                              }}
                             />
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Logo du club (optionnel) :</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <input type="file" accept="image/*" onChange={e => {
-                                const file = e.target.files?.[0];
-                                if (file) readImageFile(file, (url) => setEditPlayerClubLogo(url));
-                              }} style={{ fontSize: '0.76rem', flex: 1 }} />
-                              {editPlayerClubLogo && <img src={editPlayerClubLogo} alt="Logo" style={{ width: '26px', height: '26px', borderRadius: '4px', objectFit: 'contain', background: '#fff', padding: '1px' }} />}
+
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--card-text)' }}>{p.name}</span>
+                              {extClub && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '6px' }}>
+                                  {extLogo && <img src={extLogo} alt="" style={{ width: '13px', height: '13px', borderRadius: '3px', objectFit: 'contain', background: '#fff' }} />}
+                                  {extClub}
+                                </span>
+                              )}
                             </div>
-                            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
-                              <button className="btn" style={{ background: 'var(--accent-primary)', color: '#000', flex: 1, padding: '0.5rem', fontSize: '0.8rem' }} onClick={() => {
-                                updatePlayer(p.id, editPlayerName, editPlayerLevel, editPlayerPhoto || undefined, editPlayerClubName.trim(), editPlayerClubLogo || '');
-                                setEditingPlayerId(null);
-                              }}>Sauvegarder</button>
-                              <button className="btn btn-outline" style={{ flex: 1, padding: '0.5rem', fontSize: '0.8rem' }} onClick={() => setEditingPlayerId(null)}>Annuler</button>
+
+                            <span style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              flexShrink: 0,
+                              color: isPrestige ? '#ffd700' : 'var(--text-muted)',
+                              background: isPrestige ? 'rgba(255, 215, 0, 0.14)' : 'rgba(255,255,255,0.06)'
+                            }}>
+                              {isPrestige ? '👑 Prestige' : 'Amateur'}
+                            </span>
+
+                            {!isNarrowScreen && (
+                              <div style={{ minWidth: '175px', textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                <b style={{ color: 'var(--card-text)' }}>{p.stats.matchesPlayed}</b> m. ·{' '}
+                                <span style={{ fontWeight: 700, color: p.stats.winRate >= 55 ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                                  {p.stats.winRate}% vict.
+                                </span>
+                                {Boolean(p.stats.tournamentsWon && p.stats.tournamentsWon > 0) && (
+                                  <span style={{ marginLeft: '6px', color: '#ffd700', fontWeight: 800 }}>🏆 {p.stats.tournamentsWon}</span>
+                                )}
+                              </div>
+                            )}
+
+                            <div
+                              onClick={e => e.stopPropagation()}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}
+                            >
                               <button
+                                type="button"
                                 className="btn btn-outline"
-                                style={{ width: '100%', borderColor: 'rgba(255, 68, 68, 0.4)', color: '#ff6b81', padding: '0.45rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                                title={`Modifier ${p.name}`}
+                                onClick={() => openEditPlayer(p)}
+                                style={{ padding: '0.35rem 0.5rem', borderRadius: '7px' }}
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                title={`Supprimer ${p.name}`}
                                 onClick={() => {
-                                  if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
+                                  if (window.confirm(`Supprimer définitivement "${p.name}" du club ?`)) {
                                     deletePlayer(p.id);
-                                    setEditingPlayerId(null);
+                                    if (editingPlayerId === p.id) setEditingPlayerId(null);
                                   }
                                 }}
+                                style={{ padding: '0.35rem 0.5rem', borderRadius: '7px', color: '#ff6b81', borderColor: 'rgba(255, 107, 129, 0.3)' }}
                               >
-                                <Trash2 size={13} /> Supprimer ce joueur
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </div>
-                        ) : (
-                          // View Mode
-                          <>
-                            <img src={getPlayerAvatar(p)} alt={p.name} style={{ width: '70px', height: '70px', borderRadius: '50%', border: `3px solid ${(p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : 'var(--border-color)'}`, objectFit: 'cover' }} />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                <span>{p.name}</span>
-                                {(p.clubLogoUrl || p.stats?.clubLogoUrl || p.clubName || p.stats?.clubName) && (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--accent-primary)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '6px' }}>
-                                    {(p.clubLogoUrl || p.stats?.clubLogoUrl) && <img src={p.clubLogoUrl || p.stats?.clubLogoUrl} alt="" style={{ width: '14px', height: '14px', borderRadius: '3px', objectFit: 'contain', background: '#fff' }} />}
-                                    {p.clubName || p.stats?.clubName}
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                color: (p.level === 'Prestige' || p.level === 'Confirmé') ? '#ffd700' : '#CCFBF1',
-                                background: (p.level === 'Prestige' || p.level === 'Confirmé') ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 255, 255, 0.12)',
-                                padding: '2px 8px',
-                                borderRadius: '6px',
-                                fontSize: '0.85rem',
-                                marginBottom: '0.4rem',
-                                fontWeight: 700
-                              }}>
-                                {(p.level === 'Prestige' || p.level === 'Confirmé') ? '👑 Prestige' : 'Amateur'}
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', marginTop: '0.3rem' }}>
-                                {/* Row 1: Matchs & Victoires */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.08)', padding: '0.35rem 0.6rem', borderRadius: '6px' }}>
-                                  <div>
-                                    <span style={{ color: '#CCFBF1', fontWeight: 600 }}>Matchs:</span> <b style={{ color: '#fff' }}>{p.stats.matchesPlayed}</b>
-                                    <span style={{ color: '#CCFBF1', fontSize: '0.75rem', marginLeft: '5px' }}>
-                                      ({p.stats.wins}V - {p.stats.losses ?? (p.stats.matchesPlayed - p.stats.wins)}D)
-                                    </span>
-                                  </div>
-                                  <div style={{
-                                    fontWeight: 800,
-                                    fontSize: '0.85rem',
-                                    color: p.stats.winRate >= 60 ? 'var(--accent-primary)' : (p.stats.winRate >= 45 ? '#ffcc00' : '#ff9999'),
-                                    background: p.stats.winRate >= 60 ? 'rgba(0,255,170,0.18)' : 'rgba(255,255,255,0.1)',
-                                    padding: '2px 8px',
-                                    borderRadius: '6px'
-                                  }}>
-                                    {p.stats.winRate}% vict.
-                                  </div>
-                                </div>
-
-                                {/* Row 2: Manches & Titres */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#CCFBF1' }}>
-                                  <div>
-                                    <span style={{ color: '#CCFBF1' }}>Manches:</span> <b style={{ color: '#fff' }}>{p.stats.setsWon ?? 0}</b>/<b style={{ color: '#fff' }}>{p.stats.setsLost ?? 0}</b>
-                                    <span style={{ color: (p.stats.setDiff ?? 0) >= 0 ? '#00ffaa' : '#ff7777', fontWeight: 700, marginLeft: '4px' }}>
-                                      ({(p.stats.setDiff ?? 0) >= 0 ? `+${p.stats.setDiff ?? 0}` : p.stats.setDiff})
-                                    </span>
-                                  </div>
-                                  {Boolean(p.stats.tournamentsWon && p.stats.tournamentsWon > 0) && (
-                                    <span style={{ color: '#ffd700', fontWeight: 800 }}>
-                                      🏆 {p.stats.tournamentsWon} {(p.stats.tournamentsWon ?? 0) > 1 ? 'titres' : 'titre'}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Row 3: Bête Noire & Rival habituel si existant */}
-                                {(p.stats.nemesisId || p.stats.bestFriendId) && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.72rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.35rem' }}>
-                                    {p.stats.nemesisId && players[p.stats.nemesisId] && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#CCFBF1' }}>
-                                        <span>Bête noire: <span style={{ color: '#ffa4a4', fontWeight: 700 }}>{players[p.stats.nemesisId].name}</span></span>
-                                        <span style={{ color: '#ffa4a4', fontWeight: 700 }}>
-                                          {p.stats.nemesisLosses ? `${p.stats.nemesisLosses} déf.` : `${p.stats.nemesisLossRate}%`}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {p.stats.bestFriendId && players[p.stats.bestFriendId] && p.stats.bestFriendId !== p.stats.nemesisId && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#CCFBF1' }}>
-                                        <span>Rival habituel: <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{players[p.stats.bestFriendId].name}</span></span>
-                                        <span style={{ fontWeight: 700, color: '#fff' }}>{p.stats.bestFriendMatches} m.</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Row 4: Mini badges Forme récente */}
-                                {p.stats.recentForm && p.stats.recentForm.length > 0 && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                                    <span style={{ fontSize: '0.72rem', color: '#CCFBF1', fontWeight: 600 }}>Forme:</span>
-                                    {p.stats.recentForm.map((f, i) => (
-                                      <span key={i} style={{
-                                        width: '16px',
-                                        height: '16px',
-                                        borderRadius: '50%',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.62rem',
-                                        fontWeight: 900,
-                                        background: f === 'W' ? 'rgba(0, 255, 170, 0.2)' : 'rgba(255, 68, 68, 0.2)',
-                                        color: f === 'W' ? 'var(--accent-primary)' : '#ff4444',
-                                        border: `1px solid ${f === 'W' ? 'rgba(0, 255, 170, 0.5)' : 'rgba(255, 68, 68, 0.5)'}`
-                                      }}>
-                                        {f === 'W' ? 'V' : 'D'}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '0.4rem' }}>
-                              <button
-                                title={`Modifier ${p.name}`}
-                                onClick={() => {
-                                  setEditingPlayerId(p.id);
-                                  setEditPlayerName(p.name);
-                                  setEditPlayerLevel(p.level === 'Confirmé' ? 'Prestige' : p.level);
-                                  setEditPlayerPhoto(null);
-                                  setEditPlayerClubName(p.clubName || p.stats?.clubName || '');
-                                  setEditPlayerClubLogo(p.clubLogoUrl || p.stats?.clubLogoUrl || null);
-                                }}
-                                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              >
-                                <Edit2 size={13} />
-                              </button>
-                              <button
-                                title={`Supprimer définitivement ${p.name}`}
-                                onClick={() => {
-                                  if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le joueur "${p.name}" du club ?`)) {
-                                    deletePlayer(p.id);
-                                  }
-                                }}
-                                style={{ background: 'rgba(255,68,68,0.15)', border: '1px solid rgba(255,68,68,0.35)', color: '#ff6b81', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Add Player Sidebar */}
-                <div className="glass-card" style={{ padding: '2rem', height: 'fit-content' }}>
-                  <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Users size={18} /> Nouveau Joueur
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nom & Prénom</label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        placeholder="Ex: John Doe"
-                        value={newPlayerName}
-                        onChange={e => setNewPlayerName(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Niveau</label>
-                      <select
-                        className="input-field"
-                        value={newPlayerLevel === 'Confirmé' ? 'Prestige' : newPlayerLevel}
-                        onChange={e => setNewPlayerLevel(e.target.value)}
-                        style={{ appearance: 'none', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                      >
-                        <option value="Amateur" style={{ color: '#000' }}>Amateur</option>
-                        <option value="Prestige" style={{ color: '#000' }}>👑 Prestige</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Photo (depuis l'ordinateur)</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoUpload}
-                          style={{ fontSize: '0.8rem' }}
-                        />
-                        {newPlayerPhoto && <img src={newPlayerPhoto} alt="Aperçu" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />}
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Club (optionnel)</label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        placeholder={`Ex: ${currentClub.name}`}
-                        value={newPlayerClubName}
-                        onChange={e => setNewPlayerClubName(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Logo du Club (optionnel)</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={e => {
-                            const f = e.target.files?.[0];
-                            if (f) readImageFile(f, (url) => setNewPlayerClubLogo(url));
-                          }}
-                          style={{ fontSize: '0.8rem', flex: 1 }}
-                        />
-                        {newPlayerClubLogo && <img src={newPlayerClubLogo} alt="Aperçu logo" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '2px' }} />}
-                      </div>
-                    </div>
-                    <button
-                      className="btn btn-neon"
-                      style={{ marginTop: '1rem', justifyContent: 'center' }}
-                      onClick={() => {
-                        if (!newPlayerName.trim()) return alert('Veuillez entrer un nom.');
-                        addPlayer(
-                          newPlayerName.trim(),
-                          newPlayerLevel,
-                          newPlayerPhoto || undefined,
-                          newPlayerClubName.trim() || undefined,
-                          newPlayerClubLogo || undefined
                         );
-                        setNewPlayerName('');
-                        setNewPlayerPhoto(null);
-                        setNewPlayerClubName('');
-                        setNewPlayerClubLogo(null);
-                      }}
-                    >
-                      Ajouter au club
-                    </button>
+                      })
+                    )}
                   </div>
                 </div>
-              </div>
+              );
+            })()}
+
+            {/* Pop-up stats détaillées du joueur */}
+            {viewingPlayerStatsId && (
+              <PlayerStatsModal playerId={viewingPlayerStatsId} onClose={() => setViewingPlayerStatsId(null)} />
             )}
+
+            {/* Pop-up unifiée Création / Modification Joueur */}
+            {(showCreatePlayerModal || Boolean(editingPlayerId)) && (() => {
+              const isEdit = Boolean(editingPlayerId);
+              const nameVal = isEdit ? editPlayerName : newPlayerName;
+              const setNameVal = isEdit ? setEditPlayerName : setNewPlayerName;
+              const rawLvl = isEdit ? editPlayerLevel : newPlayerLevel;
+              const levelVal = rawLvl === 'Confirmé' ? 'Prestige' : rawLvl;
+              const setLevelVal = isEdit ? setEditPlayerLevel : setNewPlayerLevel;
+              const photoVal = isEdit ? editPlayerPhoto : newPlayerPhoto;
+              const setPhotoVal = isEdit ? setEditPlayerPhoto : setNewPlayerPhoto;
+              const clubVal = isEdit ? editPlayerClubName : newPlayerClubName;
+              const setClubVal = isEdit ? setEditPlayerClubName : setNewPlayerClubName;
+              const logoVal = isEdit ? editPlayerClubLogo : newPlayerClubLogo;
+              const setLogoVal = isEdit ? setEditPlayerClubLogo : setNewPlayerClubLogo;
+
+              const closePlayerModal = () => {
+                setShowCreatePlayerModal(false);
+                setEditingPlayerId(null);
+              };
+
+              const submitPlayerModal = () => {
+                if (!nameVal.trim()) return alert('Veuillez entrer un nom.');
+                if (isEdit && editingPlayerId) {
+                  updatePlayer(
+                    editingPlayerId,
+                    nameVal.trim(),
+                    levelVal,
+                    photoVal === null ? undefined : photoVal,
+                    clubVal.trim(),
+                    logoVal || ''
+                  );
+                } else {
+                  addPlayer(
+                    nameVal.trim(),
+                    levelVal,
+                    photoVal || undefined,
+                    clubVal.trim() || undefined,
+                    logoVal || undefined
+                  );
+                }
+                closePlayerModal();
+              };
+
+              return (
+                <div
+                  style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', zIndex: 9200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+                  onClick={closePlayerModal}
+                >
+                  <div
+                    className="glass-card"
+                    style={{ width: 'min(450px, 94vw)', padding: '1.4rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid rgba(0, 255, 170, 0.35)' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <UserPlus size={18} color="var(--accent-primary)" />
+                        {isEdit ? 'Modifier la fiche joueur' : 'Nouveau joueur'}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={closePlayerModal}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.35rem', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 600 }}>Nom & Prénom</label>
+                      <input
+                        type="text"
+                        autoFocus
+                        className="input-field"
+                        placeholder="Ex: Julien Raiwet"
+                        value={nameVal}
+                        onChange={e => setNameVal(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') submitPlayerModal(); }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.35rem', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 600 }}>Niveau</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        {(['Amateur', 'Prestige'] as const).map(lvl => {
+                          const selected = levelVal === lvl;
+                          return (
+                            <button
+                              key={lvl}
+                              type="button"
+                              onClick={() => setLevelVal(lvl)}
+                              style={{
+                                padding: '0.6rem',
+                                borderRadius: '10px',
+                                fontWeight: 800,
+                                fontSize: '0.88rem',
+                                cursor: 'pointer',
+                                border: selected
+                                  ? `2px solid ${lvl === 'Prestige' ? '#ffd700' : 'var(--accent-primary)'}`
+                                  : '1px solid var(--border-color)',
+                                background: selected
+                                  ? (lvl === 'Prestige' ? 'rgba(255, 215, 0, 0.16)' : 'rgba(0, 255, 170, 0.14)')
+                                  : 'rgba(255,255,255,0.03)',
+                                color: selected ? (lvl === 'Prestige' ? '#ffd700' : 'var(--accent-primary)') : 'var(--text-muted)'
+                              }}
+                            >
+                              {lvl === 'Prestige' ? '👑 Prestige' : 'Amateur'}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Section optionnelle repliable */}
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowPlayerOptionalFields(v => !v)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--accent-secondary)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                      >
+                        {showPlayerOptionalFields ? '▾ Masquer photo & club externe' : '+ Photo & club externe (optionnel)'}
+                      </button>
+
+                      {showPlayerOptionalFields && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            {photoVal && (
+                              <img src={photoVal} alt="Aperçu" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                            )}
+                            <label className="btn btn-outline" style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem', cursor: 'pointer' }}>
+                              📷 Choisir une photo
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={e => {
+                                  const f = e.target.files?.[0];
+                                  if (f) readImageFile(f, url => setPhotoVal(url));
+                                }}
+                              />
+                            </label>
+                            {photoVal && (
+                              <button type="button" className="btn btn-outline" style={{ fontSize: '0.74rem', padding: '0.35rem 0.6rem' }} onClick={() => setPhotoVal(null)}>
+                                Retirer
+                              </button>
+                            )}
+                          </div>
+
+                          <input
+                            type="text"
+                            className="input-field"
+                            placeholder={`Club externe (optionnel, ex: ${currentClub.name})`}
+                            value={clubVal}
+                            onChange={e => setClubVal(e.target.value)}
+                            style={{ fontSize: '0.84rem' }}
+                          />
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            {logoVal && (
+                              <img src={logoVal} alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '2px', flexShrink: 0 }} />
+                            )}
+                            <label className="btn btn-outline" style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem', cursor: 'pointer' }}>
+                              🏷️ Choisir un logo club
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={e => {
+                                  const f = e.target.files?.[0];
+                                  if (f) readImageFile(f, url => setLogoVal(url));
+                                }}
+                              />
+                            </label>
+                            {logoVal && (
+                              <button type="button" className="btn btn-outline" style={{ fontSize: '0.74rem', padding: '0.35rem 0.6rem' }} onClick={() => setLogoVal(null)}>
+                                Retirer
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.55rem', marginTop: '0.25rem' }}>
+                      {isEdit && editingPlayerId && (
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => {
+                            if (window.confirm(`Supprimer définitivement "${nameVal}" du club ?`)) {
+                              deletePlayer(editingPlayerId);
+                              closePlayerModal();
+                            }
+                          }}
+                          style={{ color: '#ff6b81', borderColor: 'rgba(255, 107, 129, 0.35)', padding: '0.55rem 0.85rem' }}
+                          title="Supprimer ce joueur"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                      <button type="button" className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={closePlayerModal}>
+                        Annuler
+                      </button>
+                      <button type="button" className="btn btn-neon" style={{ flex: 1.5, justifyContent: 'center', fontWeight: 800, color: '#041210' }} onClick={submitPlayerModal}>
+                        {isEdit ? 'Enregistrer' : 'Ajouter au club'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Sub-menu 3: Configuration Club & Multi-Club */}
             {adminSubTab === 'club' && (
@@ -5389,6 +5154,86 @@ const AdminView: React.FC = () => {
                     <b style={{ color: '#fff' }}>Utiliser dans un autre club :</b><br />
                     Ouvrez simplement l'application sur le PC de l'autre club via le navigateur web, et créez ou sélectionnez son identifiant (ex: <code>?club=bc-blois</code>). Chaque club gère ses propres tables, joueurs et tournois !
                   </div>
+                </div>
+
+                {/* FULL WIDTH: Billards du club (remplace l'ancien Plan de salle) */}
+                <div className="glass-card" style={{ gridColumn: isNarrowScreen ? undefined : '1 / -1', padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
+                    <div>
+                      <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>
+                        Billards du club ({Object.keys(tables).length})
+                      </h2>
+                      <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        Ajoutez ou supprimez les tables disponibles pour vos tournois.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-neon"
+                      onClick={() => addTable('')}
+                      style={{ fontSize: '0.84rem', padding: '0.5rem 1rem', fontWeight: 800, color: '#041210' }}
+                    >
+                      + Ajouter un billard
+                    </button>
+                  </div>
+
+                  {Object.keys(tables).length === 0 ? (
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem', padding: '0.8rem 0' }}>
+                      Aucun billard configuré. Cliquez sur « + Ajouter un billard » pour créer votre première table.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '0.8rem' }}>
+                      {Object.values(tables)
+                        .sort((a, b) => a.number - b.number)
+                        .map(t => {
+                          const hasActiveMatch = Boolean(t.currentMatchId && matches[t.currentMatchId]?.status === 'playing');
+                          const label = t.name || `Billard ${t.number}`;
+                          return (
+                            <div
+                              key={t.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.6rem',
+                                padding: '0.75rem 0.95rem',
+                                borderRadius: '11px',
+                                background: 'rgba(255,255,255,0.03)',
+                                border: '1px solid var(--border-color)'
+                              }}
+                            >
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--card-text)' }}>{label}</div>
+                                <div style={{ fontSize: '0.74rem', color: hasActiveMatch ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                  {hasActiveMatch ? '● Match en cours' : (t.status === 'occupied' ? '⏳ Match assigné' : '○ Libre')}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                disabled={hasActiveMatch}
+                                title={hasActiveMatch ? 'Impossible de supprimer pendant un match en cours' : `Supprimer ${label}`}
+                                onClick={() => {
+                                  if (window.confirm(`Supprimer définitivement "${label}" du club ?`)) {
+                                    removeTable(t.id);
+                                  }
+                                }}
+                                style={{
+                                  padding: '0.38rem 0.55rem',
+                                  borderRadius: '8px',
+                                  color: hasActiveMatch ? 'var(--text-muted)' : '#ff6b81',
+                                  borderColor: hasActiveMatch ? 'var(--border-color)' : 'rgba(255, 107, 129, 0.35)',
+                                  opacity: hasActiveMatch ? 0.4 : 1,
+                                  cursor: hasActiveMatch ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
 
               </div>
