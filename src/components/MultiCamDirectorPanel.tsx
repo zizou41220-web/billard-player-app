@@ -1169,7 +1169,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
   const [showStreamKeys, setShowStreamKeys] = useState<boolean>(false);
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
-  const [replaySpeedChoice, setReplaySpeedChoice] = useState<number>(0.6);
   const [showHeaderSettings, setShowHeaderSettings] = useState<boolean>(false);
   const [showStudioTools, setShowStudioTools] = useState<boolean>(false);
   const [showTournamentDrawer, setShowTournamentDrawer] = useState<boolean>(false);
@@ -1298,7 +1297,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     }
     b.setQualityPreset(destinations.qualityPreset || '720p');
     b.startRenderLoop();
-    b.setReplayArmed(true);
     if (destinations.broadcastEngine === 'obs') {
       checkObsStatus(destinations.obsWsUrl, destinations.obsWsPassword).then(setObsStatus);
     } else {
@@ -1825,21 +1823,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     });
   };
 
-  const handleTriggerReplay = (speed?: number) => {
-    if (broadcasterStatus.isReplaying) {
-      broadcasterRef.current?.stopInstantReplay();
-      return;
-    }
-    const ok = broadcasterRef.current?.triggerInstantReplay(10, speed ?? replaySpeedChoice);
-    if (!ok) {
-      alert("Tampon Replay en cours d'initialisation (patientez 2–3 secondes puis réessayez).");
-    }
-  };
-
-  const replaySpeedRef = useRef(replaySpeedChoice);
-  replaySpeedRef.current = replaySpeedChoice;
-
-  // Broadcast keyboard shortcuts: 1-4 cameras, M mosaic, P pause, C standings, W replay
+  // Broadcast keyboard shortcuts: 1-4 cameras, M mosaic, P pause, C standings
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
@@ -1879,13 +1863,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
         const next: MultiCamDirectorState = { ...cur, isIntermission: !cur.isIntermission };
         setDirectorState(next);
         saveDirectorState(currentClub.id, next, true);
-      } else if (key === 'w') {
-        e.preventDefault();
-        if (broadcasterRef.current?.getStatus().isReplaying) {
-          broadcasterRef.current.stopInstantReplay();
-        } else {
-          broadcasterRef.current?.triggerInstantReplay(10, replaySpeedRef.current);
-        }
       } else if (key === 'c' && isClub) {
         const standingsSlot = cur.cameras.find(c => c.sourceType === 'tournament_standings');
         if (standingsSlot) {
@@ -2248,7 +2225,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
 
   const isStudioToolActive = Boolean(
     directorState.isIntermission ||
-    broadcasterStatus.isReplaying ||
     overlayConfig.ticker?.enabled ||
     broadcasterStatus.isRecordingLocal ||
     broadcasterStatus.commentatorMicActive ||
@@ -2258,7 +2234,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
     !showStudioTools &&
     (isAnyLiveActive ||
       directorState.isIntermission ||
-      broadcasterStatus.isReplaying ||
       broadcasterStatus.isRecordingLocal ||
       broadcasterStatus.commentatorMicActive)
   );
@@ -2470,7 +2445,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title="Afficher / masquer les outils de production (Pause, Replay, Ticker, Enregistrement, Audio, Qualité)"
+              title="Afficher / masquer les outils de production (Pause, Ticker, Enregistrement, Audio, Qualité)"
             >
               <SlidersHorizontal size={13} />
               <span>Outils Live</span>
@@ -2594,16 +2569,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 ● REC {formatDuration(broadcasterStatus.localRecordingSec || 0)}
               </button>
             )}
-            {broadcasterStatus.isReplaying && (
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => handleTriggerReplay()}
-                style={{ width: 'auto', height: '24px', padding: '0 8px', fontSize: '0.68rem', fontWeight: 800, background: 'rgba(239, 68, 68, 0.24)', borderColor: '#EF4444', color: '#FCA5A5' }}
-              >
-                ⏹ Fin Replay ({Math.round((broadcasterStatus.replayProgress || 0) * 100)}%)
-              </button>
-            )}
             {broadcasterStatus.commentatorMicActive && (
               <span style={{ color: '#6EE7B7', fontWeight: 700, padding: '2px 7px', background: 'rgba(16,185,129,0.12)', borderRadius: '5px', border: '1px solid rgba(16,185,129,0.3)' }}>
                 🎙️ Micro commentateur ON
@@ -2612,7 +2577,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
           </div>
         )}
 
-        {/* TIROIR PLIABLE OUTILS LIVE (PAUSE, REPLAY, SHOT CLOCK, TICKER, HABILLAGE, REC, AUDIO, QUALITÉ) */}
+        {/* TIROIR PLIABLE OUTILS LIVE (PAUSE, TICKER, HABILLAGE, REC, AUDIO, QUALITÉ) */}
         {showStudioTools && (
           <div style={{
             display: 'flex',
@@ -2645,54 +2610,6 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
               >
                 {directorState.isIntermission ? 'Reprendre Direct (P)' : 'Pause (P)'}
               </button>
-
-              {/* INSTANT REPLAY 10s + SPEED */}
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => handleTriggerReplay()}
-                  disabled={!broadcasterStatus.isReplaying && (broadcasterStatus.replayReadySec || 0) < 2}
-                  style={{
-                    width: 'auto',
-                    height: '28px',
-                    padding: '0 9px',
-                    borderRadius: '6px',
-                    fontSize: '0.71rem',
-                    fontWeight: 700,
-                    background: broadcasterStatus.isReplaying ? 'rgba(239, 68, 68, 0.24)' : '#111827',
-                    borderColor: broadcasterStatus.isReplaying ? '#EF4444' : 'rgba(255,255,255,0.14)',
-                    color: broadcasterStatus.isReplaying ? '#FCA5A5' : '#FDE68A',
-                    opacity: !broadcasterStatus.isReplaying && (broadcasterStatus.replayReadySec || 0) < 2 ? 0.55 : 1
-                  }}
-                  title="Rediffuser les 10 dernières secondes en ralenti ou vitesse normale — Raccourci [W]"
-                >
-                  {broadcasterStatus.isReplaying
-                    ? `⏹ Fin Replay (${Math.round((broadcasterStatus.replayProgress || 0) * 100)}%)`
-                    : `↺ Replay ${(broadcasterStatus.replayReadySec || 0) >= 10 ? '10s' : `${broadcasterStatus.replayReadySec || 0}s`} (W)`}
-                </button>
-                {!broadcasterStatus.isReplaying && (
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setReplaySpeedChoice(v => (v < 0.9 ? 1.0 : 0.6))}
-                    style={{
-                      width: 'auto',
-                      height: '28px',
-                      padding: '0 7px',
-                      borderRadius: '6px',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      background: '#0E1525',
-                      borderColor: 'rgba(255,255,255,0.14)',
-                      color: '#CBD5E1'
-                    }}
-                    title="Basculer la vitesse du Replay : Ralenti 0.6× ou Vitesse normale 1×"
-                  >
-                    {replaySpeedChoice < 0.9 ? '0.6×' : '1×'}
-                  </button>
-                )}
-              </div>
 
               {/* TICKER QUICK TOGGLE */}
               <button
@@ -4557,7 +4474,7 @@ export const MultiCamDirectorPanel: React.FC<MultiCamDirectorPanelProps> = ({ ge
                 gap: '0.4rem'
               }}>
                 <span>
-                  Raccourcis : <b style={{ color: '#94A3B8' }}>[1–4]</b> Caméras • <b style={{ color: '#94A3B8' }}>[M]</b> Mosaïque • <b style={{ color: '#94A3B8' }}>[P]</b> Pause • <b style={{ color: '#94A3B8' }}>[W]</b> Replay{isClubSituation ? ' • [C] Classement' : ''}
+                  Raccourcis : <b style={{ color: '#94A3B8' }}>[1–4]</b> Caméras • <b style={{ color: '#94A3B8' }}>[M]</b> Mosaïque • <b style={{ color: '#94A3B8' }}>[P]</b> Pause{isClubSituation ? ' • [C] Classement' : ''}
                 </span>
               </div>
             </div>
