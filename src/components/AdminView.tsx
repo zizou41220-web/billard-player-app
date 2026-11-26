@@ -24,7 +24,12 @@ import {
   announceWaitingMatchPrep,
   announceAllReadyMatches,
   processAutoVoiceAnnouncements,
-  speakAnnouncement
+  speakAnnouncement,
+  listAvailableFrenchVoices,
+  getSelectedVoiceURI,
+  setSelectedVoiceURI,
+  getActiveFrenchVoiceLabel,
+  FrenchVoiceOption
 } from '../utils/voiceAnnouncer';
 import BilliardTableVisual from './BilliardTableVisual';
 import { APP_VERSION } from '../version';
@@ -227,7 +232,20 @@ const AdminView: React.FC = () => {
   const [dismissedQualifAlertTourId, setDismissedQualifAlertTourId] = useState<string | null>(null);
   const [playerSearchQuery, setPlayerSearchQuery] = useState('');
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => isVoiceAnnouncerEnabled());
+  const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const [selectedVoiceURI, setSelectedVoiceURIState] = useState<string | null>(() => getSelectedVoiceURI());
+  const [availableFrenchVoices, setAvailableFrenchVoices] = useState<FrenchVoiceOption[]>(() => listAvailableFrenchVoices());
   const matchStatusAtOpenRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const refreshVoices = () => setAvailableFrenchVoices(listAvailableFrenchVoices());
+    refreshVoices();
+    window.speechSynthesis.addEventListener?.('voiceschanged', refreshVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener?.('voiceschanged', refreshVoices);
+    };
+  }, []);
 
   const toggleVoiceAnnouncer = () => {
     const next = !voiceEnabled;
@@ -1185,27 +1203,112 @@ const AdminView: React.FC = () => {
             <Trophy size={16} /> Classement Club
           </button>
 
-          <button
-            className={`btn ${voiceEnabled ? 'btn-neon' : 'btn-outline'}`}
-            onClick={toggleVoiceAnnouncer}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              fontWeight: 800,
-              padding: '0.55rem 0.9rem',
-              fontSize: '0.82rem',
-              color: voiceEnabled ? '#041210' : 'var(--text-muted)',
-              borderColor: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)',
-              background: voiceEnabled ? undefined : 'rgba(255,255,255,0.04)'
-            }}
-            title={voiceEnabled
-              ? "Appel vocal automatique des matchs activé (cliquez pour couper)"
-              : "Appel vocal automatique des matchs coupé (cliquez pour activer)"}
-          >
-            {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            {voiceEnabled ? 'Appel Vocal ON' : 'Appel Vocal OFF'}
-          </button>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <button
+              className={`btn ${voiceEnabled ? 'btn-neon' : 'btn-outline'}`}
+              onClick={toggleVoiceAnnouncer}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontWeight: 800,
+                padding: '0.55rem 0.9rem',
+                fontSize: '0.82rem',
+                color: voiceEnabled ? '#041210' : 'var(--text-muted)',
+                borderColor: voiceEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)',
+                background: voiceEnabled ? undefined : 'rgba(255,255,255,0.04)'
+              }}
+              title={voiceEnabled
+                ? "Appel vocal automatique des matchs activé (cliquez pour couper)"
+                : "Appel vocal automatique des matchs coupé (cliquez pour activer)"}
+            >
+              {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              {voiceEnabled ? 'Appel Vocal ON' : 'Appel Vocal OFF'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                setAvailableFrenchVoices(listAvailableFrenchVoices());
+                setShowVoicePicker(v => !v);
+              }}
+              style={{
+                padding: '0.55rem 0.6rem',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: showVoicePicker ? 'var(--accent-primary)' : 'var(--text-muted)',
+                borderColor: showVoicePicker ? 'var(--accent-primary)' : 'rgba(255,255,255,0.2)'
+              }}
+              title={`Choisir la voix du speaker (${getActiveFrenchVoiceLabel()})`}
+            >
+              🎙️
+            </button>
+
+            {showVoicePicker && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  width: '310px',
+                  background: '#0b1222',
+                  border: '1px solid rgba(0, 255, 170, 0.35)',
+                  borderRadius: '14px',
+                  padding: '0.85rem',
+                  boxShadow: '0 14px 36px rgba(0,0,0,0.65)',
+                  zIndex: 8000,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.55rem'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#fff' }}>🎙️ Voix du speaker</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowVoicePicker(false)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <select
+                  className="input-field"
+                  value={selectedVoiceURI || ''}
+                  onChange={(e) => {
+                    const nextUri = e.target.value || null;
+                    setSelectedVoiceURI(nextUri);
+                    setSelectedVoiceURIState(nextUri);
+                    speakAnnouncement('Nouveau match sur le Billard 1, Julien Raiwet contre Yannick Maurice.', true);
+                  }}
+                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.6rem' }}
+                >
+                  <option value="">✨ Automatique (meilleure voix naturelle)</option>
+                  {availableFrenchVoices.map(v => (
+                    <option key={v.voiceURI} value={v.voiceURI}>
+                      {v.isNatural ? '⭐ ' : ''}{v.name} ({v.lang})
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  className="btn btn-neon"
+                  onClick={() => speakAnnouncement('Nouveau match sur le Billard 1, Julien Raiwet contre Yannick Maurice.', true)}
+                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.7rem', justifyContent: 'center', color: '#041210', fontWeight: 800 }}
+                >
+                  <Volume2 size={14} /> Tester la voix
+                </button>
+
+                {!availableFrenchVoices.some(v => v.isNatural) && (
+                  <div style={{ fontSize: '0.7rem', color: '#fbbf24', lineHeight: 1.35 }}>
+                    Astuce : ouvrez l'appli dans <strong>Microsoft Edge</strong> (voix gratuites Denise / Vivienne / Henri Naturelles) pour une voix très réaliste.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Bouton Commutateur Mode Clair / Mode Sombre */}
           <button
