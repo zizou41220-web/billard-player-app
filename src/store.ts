@@ -488,6 +488,16 @@ export const dispatchTournamentMatches = (
     }
   });
 
+  // Rule A-Link: Ensure any table pointing to a live match links match.tableId before deduplication
+  Object.values(newTables).forEach(table => {
+    if (table.status === 'occupied' && table.currentMatchId) {
+      const curM = newMatches[table.currentMatchId];
+      if (curM && curM.status !== 'finished' && !curM.tableId) {
+        newMatches[curM.id] = { ...curM, tableId: table.id };
+      }
+    }
+  });
+
   // Rule A: Each table can have at most ONE match assigned to it
   Object.keys(newTables).forEach(tId => {
     const table = newTables[tId];
@@ -501,10 +511,10 @@ export const dispatchTournamentMatches = (
 
       assignedMatches.forEach(m => {
         if (m.id !== keeper.id) {
-          newMatches[m.id] = { ...m, tableId: undefined };
+          newMatches[m.id] = { ...m, tableId: undefined, status: 'pending' };
         }
       });
-      newTables[tId] = { ...table, status: keeper.status === 'playing' ? 'occupied' : 'occupied', currentMatchId: keeper.id };
+      newTables[tId] = { ...table, status: 'occupied', currentMatchId: keeper.id };
     } else if (assignedMatches.length === 1) {
       const single = assignedMatches[0];
       if (table.currentMatchId !== single.id || table.status === 'free') {
@@ -528,13 +538,33 @@ export const dispatchTournamentMatches = (
     const p2Conflict = m.player2Id && playerSeen.has(m.player2Id);
     if (p1Conflict || p2Conflict) {
       // Duplicate player on multiple tables: unassign this pending match
-      newMatches[m.id] = { ...m, tableId: undefined };
+      newMatches[m.id] = { ...m, tableId: undefined, status: 'pending' };
       if (m.tableId && newTables[m.tableId]?.currentMatchId === m.id) {
         newTables[m.tableId] = { ...newTables[m.tableId], status: 'free', currentMatchId: undefined };
       }
     } else {
       if (m.player1Id) playerSeen.add(m.player1Id);
       if (m.player2Id) playerSeen.add(m.player2Id);
+    }
+  });
+
+  // Rule C: Auto-heal any ongoing tournament match stuck in 'playing' without a valid table
+  const tablePointedMatchIds = new Set(
+    Object.values(newTables)
+      .filter(t => t.currentMatchId)
+      .map(t => t.currentMatchId as string)
+  );
+  Object.keys(newMatches).forEach(mId => {
+    const m = newMatches[mId];
+    if (
+      m &&
+      m.tournamentId &&
+      tournaments[m.tournamentId]?.status === 'ongoing' &&
+      m.status === 'playing' &&
+      (!m.tableId || !newTables[m.tableId]) &&
+      !tablePointedMatchIds.has(m.id)
+    ) {
+      newMatches[mId] = { ...m, status: 'pending', tableId: undefined };
     }
   });
 

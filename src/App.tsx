@@ -9,7 +9,7 @@ import StreamOverlayView from './components/StreamOverlayView';
 import SmartphoneCameraSenderView from './components/SmartphoneCameraSenderView';
 import { NeonBackdrop, NeonToggleButton } from './components/NeonBackdrop';
 import { QrCode, User, Activity, Settings, Sun, Moon } from 'lucide-react';
-import { initSync } from './sync';
+import { initSync, fetchFreshMatchForLaunch } from './sync';
 import { APP_VERSION } from './version';
 import { useTheme } from './utils/theme';
 
@@ -33,8 +33,6 @@ function App() {
   const [theme, , toggleTheme] = useTheme();
 
   useEffect(() => {
-    initSync();
-
     if (clubParam) {
       useStore.getState().setClub({ id: clubParam });
     }
@@ -43,40 +41,22 @@ function App() {
       setAppMode('player');
 
       const openMatchFromUrl = async () => {
-        let match = matchParam ? useStore.getState().matches[matchParam] : null;
-        if (!match && tableParam) {
-          const tObj = useStore.getState().tables[tableParam];
-          if (tObj?.currentMatchId) match = useStore.getState().matches[tObj.currentMatchId];
-          if (!match) {
-            match = Object.values(useStore.getState().matches).find(m => m.tableId === tableParam && m.status !== 'finished') || null;
-          }
-        }
-
-        if (!match) {
-          try {
-            await initSync();
-            if (matchParam) match = useStore.getState().matches[matchParam];
-            if (!match && tableParam) {
-              const tObj = useStore.getState().tables[tableParam];
-              if (tObj?.currentMatchId) match = useStore.getState().matches[tObj.currentMatchId];
-              if (!match) {
-                match = Object.values(useStore.getState().matches).find(m => m.tableId === tableParam && m.status !== 'finished') || null;
-              }
+        try {
+          const match = await fetchFreshMatchForLaunch(matchParam || undefined, tableParam || undefined);
+          if (match && match.status !== 'finished') {
+            if (match.status === 'pending') {
+              useStore.getState().startTournamentMatch(match.id, true);
             }
-          } catch (e) {
-            console.warn("Erreur chargement match URL:", e);
+            useStore.setState({ activeMatchId: match.id });
           }
-        }
-
-        if (match) {
-          if (match.status === 'pending') {
-            useStore.getState().startTournamentMatch(match.id, true);
-          }
-          useStore.setState({ activeMatchId: match.id });
+        } catch (e) {
+          console.warn("Erreur chargement match URL:", e);
         }
       };
 
       openMatchFromUrl();
+    } else {
+      initSync();
     }
   }, []);
 

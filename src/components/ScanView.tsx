@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import { ScanLine, Loader2 } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { initSync, mapDBToMatch } from '../sync';
-import { supabase } from '../supabase';
+import { fetchFreshMatchForLaunch } from '../sync';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 
 const ScanView: React.FC = () => {
@@ -48,7 +47,7 @@ const ScanView: React.FC = () => {
         }
       }
 
-      if (clubId && clubId !== currentClub.id) {
+      if (clubId && clubId !== useStore.getState().currentClub.id) {
         setClub({ id: clubId });
       }
 
@@ -58,103 +57,11 @@ const ScanView: React.FC = () => {
         return;
       }
 
-      // Step 1: Check in local Zustand store by matchId
-      let match = matchId ? useStore.getState().matches[matchId] : null;
-
-      // If not found by matchId, check by tableId in local store
-      if (!match && tableId) {
-        const tableObj = useStore.getState().tables[tableId];
-        if (tableObj?.currentMatchId) {
-          match = useStore.getState().matches[tableObj.currentMatchId];
-        }
-        if (!match) {
-          match = Object.values(useStore.getState().matches).find(
-            m => m.tableId === tableId && m.status !== 'finished'
-          ) || null;
-        }
-      }
-
-      // Step 2: If still not found, trigger initSync() to ensure fresh state from Supabase
-      if (!match) {
-        try {
-          await initSync();
-          if (matchId) {
-            match = useStore.getState().matches[matchId];
-          }
-          if (!match && tableId) {
-            const tableObj = useStore.getState().tables[tableId];
-            if (tableObj?.currentMatchId) {
-              match = useStore.getState().matches[tableObj.currentMatchId];
-            }
-            if (!match) {
-              match = Object.values(useStore.getState().matches).find(
-                m => m.tableId === tableId && m.status !== 'finished'
-              ) || null;
-            }
-          }
-        } catch (syncErr) {
-          console.warn("Erreur resync scan:", syncErr);
-        }
-      }
-
-      // Step 3: Direct fallback query to Supabase if still not in store
-      if (!match && matchId) {
-        try {
-          const { data: dbMatch } = await supabase
-            .from('tournoi2_matches')
-            .select('*')
-            .eq('id', matchId)
-            .maybeSingle();
-          if (dbMatch) {
-            const fetched = mapDBToMatch(dbMatch);
-            match = fetched;
-            useStore.setState(s => ({ matches: { ...s.matches, [fetched.id]: fetched } }));
-          }
-        } catch (dbErr) {
-          console.warn("Erreur fetch match Supabase:", dbErr);
-        }
-      }
-
-      // Step 4: If still not found, check Supabase for active match on tableId
-      if (!match && tableId) {
-        try {
-          const { data: dbTableMatches } = await supabase
-            .from('tournoi2_matches')
-            .select('*')
-            .eq('table_id', tableId)
-            .neq('status', 'finished')
-            .limit(1);
-          if (dbTableMatches && dbTableMatches.length > 0) {
-            const fetched = mapDBToMatch(dbTableMatches[0]);
-            match = fetched;
-            useStore.setState(s => ({ matches: { ...s.matches, [fetched.id]: fetched } }));
-          } else {
-            // Check if tournoi2_tables has current_match_id set for this table
-            const { data: dbTable } = await supabase
-              .from('tournoi2_tables')
-              .select('current_match_id')
-              .eq('id', tableId)
-              .maybeSingle();
-            if (dbTable?.current_match_id) {
-              const { data: dbTargetMatch } = await supabase
-                .from('tournoi2_matches')
-                .select('*')
-                .eq('id', dbTable.current_match_id)
-                .maybeSingle();
-              if (dbTargetMatch) {
-                const fetched = mapDBToMatch(dbTargetMatch);
-                match = fetched;
-                useStore.setState(s => ({ matches: { ...s.matches, [fetched.id]: fetched } }));
-              }
-            }
-          }
-        } catch (dbErr) {
-          console.warn("Erreur fetch table match Supabase:", dbErr);
-        }
-      }
+      // Always synchronize fresh cloud state first so stale localStorage never hijacks a table scan
+      const match = await fetchFreshMatchForLaunch(matchId || undefined, tableId || undefined);
 
       if (!match) {
-        alert("Match introuvable ! Assurez-vous que le match est bien créé et assigné par le gérant.");
+        alert("Match introuvable ! Assurez-vous que le match est bien créé et assigné.");
         setIsProcessing(false);
         return;
       }

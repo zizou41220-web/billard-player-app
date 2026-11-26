@@ -33,6 +33,7 @@ import { useTheme } from '../utils/theme';
 import { getClubLogoUrl, defaultClubLogo } from '../utils/logo';
 import { getMaxAllowedQualifHandicap, getMaxAllowedFinalHandicap, getMatchScoringRules, resolveMatchDurationMinutes } from '../utils/rules';
 import { isFinalStageMatch, isByeMatch, isRealFinishedMatch } from '../utils/bracket';
+import { formatShortDateTime } from '../utils/timeFormat';
 import { getPlayerAvatar } from '../utils/avatar';
 
 interface QualifiersCountSelectorProps {
@@ -1355,6 +1356,39 @@ const AdminView: React.FC = () => {
                 ? `⏱️ ${activeTournament.settings.finalMatchDurationMinutes || activeTournament.settings.qualifMatchDurationMinutes || activeTournament.settings.matchDurationMinutes} min / match`
                 : '⏱️ Temps illimité'}
             </span>
+
+            {(() => {
+              const latestFinished = finishedTourMatches.reduce(
+                (maxTs, m) => Math.max(maxTs, m.endTime || m.startTime || 0),
+                0
+              );
+              const latestPlaying = activeMatches.reduce(
+                (maxTs, m) => Math.max(maxTs, m.startTime || 0),
+                0
+              );
+              const lastTs = latestFinished || latestPlaying;
+              if (!lastTs) return null;
+              const label = formatShortDateTime(lastTs);
+              return (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: 'rgba(0, 229, 255, 0.1)',
+                    color: 'var(--accent-secondary)',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                    border: '1px solid rgba(0, 229, 255, 0.3)'
+                  }}
+                  title={latestFinished ? 'Heure de validation du dernier match terminé' : 'Heure de début du dernier match lancé'}
+                >
+                  {latestFinished ? `Dernier validé : ${label}` : `Dernier lancé : ${label}`}
+                </span>
+              );
+            })()}
 
             {/* Quick Button to Edit Rules & Time directly from Dashboard */}
             <button
@@ -3577,7 +3611,9 @@ const AdminView: React.FC = () => {
             return a.id.localeCompare(b.id);
           });
 
-          const finishedMatches = allTourMatches.filter(m => isRealFinishedMatch(m, players)).reverse();
+          const finishedMatches = allTourMatches
+            .filter(m => isRealFinishedMatch(m, players))
+            .sort((a, b) => (b.endTime || b.startTime || 0) - (a.endTime || a.startTime || 0));
 
           if (dashboardSubTab === 'bracket') {
             return (
@@ -4655,6 +4691,12 @@ const AdminView: React.FC = () => {
 
                           return (
                             <div key={m.id} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', padding: '0.8rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              {(m.endTime || m.startTime) && (
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span>{m.poolName || (m.stage && m.stage !== 'qualif' ? m.stage.toUpperCase() : 'Poules')}</span>
+                                  <span>Terminé : {formatShortDateTime(m.endTime || m.startTime)}</span>
+                                </div>
+                              )}
                               <div style={{ display: 'flex', justifyContent: 'space-between', opacity: m.score1 > m.score2 ? 1 : 0.5 }}>
                                 <span style={{ fontWeight: m.score1 > m.score2 ? 700 : 400, color: m.score1 > m.score2 ? 'var(--accent-primary)' : 'var(--card-text)' }}>{players[m.player1Id]?.name}</span>
                                 <span style={{ fontWeight: 800 }}>{m.score1}</span>
